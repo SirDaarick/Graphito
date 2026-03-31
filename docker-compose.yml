@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  # Nuestro laboratorio de procesamiento de datos
+  data-science:
+    build:
+      context: ./data
+      dockerfile: Dockerfile
+    image: graphito-data
+    volumes:
+      - ./data:/app
+    env_file:
+      - .env
+    stdin_open: true # Para que puedas interactuar con la terminal
+    tty: true        # Para ver colores y formato en la terminal
+
+  # (Más adelante agregaremos aquí el backend y frontend)

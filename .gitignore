@@ -1,0 +1,23 @@
+# Python basura
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+
+# Datos pesados (No queremos subirlos a la nube)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Modelos y pesos
+modelos/weights/*.pth
+modelos/weights/*.bin
+
+# Docker y variables de entorno
+.env
+.dockerignore
+
+# Otros
+.DS_Store
