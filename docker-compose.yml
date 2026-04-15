@@ -12,6 +12,20 @@ services:
     env_file:
       - .env
     stdin_open: true # Para que puedas interactuar con la terminal
-    tty: true        # Para ver colores y formato en la terminal
+    tty: true # Para ver colores y formato en la terminal
 
-  # (Más adelante agregaremos aquí el backend y frontend)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: graphito-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      # Evitar reescribir node_modules en la máquina local si hay diferencias en C++ add-ons
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    stdin_open: true
+    tty: true
