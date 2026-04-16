@@ -1,0 +1,78 @@
+@startuml
+' Configuración para que el diagrama crezca hacia abajo
+top to bottom direction
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam backgroundColor White
+
+skinparam usecase {
+    BackgroundColor White
+    BorderColor Black
+    FontColor Black
+    ArrowColor Black
+}
+
+actor "Docente / Evaluador" as Docente
+actor "<<System>>\nMotor de IA (LLM)" as IA
+
+rectangle "Sistema Graphito" {
+
+    ' Bloque 1: Acceso
+    usecase "UC1: Iniciar sesión" as UC1
+    usecase "UC2: Registrar usuario" as UC2
+    
+    ' Bloque 2: Centro de mando
+    usecase "UC3: Ver biblioteca" as UC3
+
+    ' Bloque 3: Gestión de Referencias (Pre-procesamiento)
+    usecase "UC4: Agregar código de referencia" as UC4
+    usecase "UC5: Generar descripción (IA)" as UC5
+    usecase "UC6: Generar variaciones (IA)" as UC6
+    usecase "UC11: Realizar análisis semántico\n(Generación de embeddings)" as UC11
+
+    ' Bloque 4: Gestión de Comparaciones (Ejecución)
+    usecase "UC7: Agregar comparación" as UC7
+    usecase "UC12: Ejecutar análisis bimodal\n(Semántico + Estilométrico)" as UC12
+    
+    ' Bloque 5: Resultados
+    usecase "UC8: Ver lista de comparaciones" as UC8
+    usecase "UC9: Ver reporte de similitud" as UC9
+    usecase "UC10: Descargar reporte en PDF" as UC10
+
+}
+
+' --- UNIONES CON EL USUARIO ---
+Docente -- UC1
+Docente -- UC2
+Docente -- UC3
+
+' --- RELACIONES LÓGICAS (Hacia abajo) ---
+
+' De la Biblioteca se desprenden las acciones
+UC4 ..> UC3 : <<extend>>
+UC7 ..> UC3 : <<extend>>
+UC8 ..> UC3 : <<extend>>
+
+' Proceso de Referencia
+UC5 ..> UC4 : <<extend>>
+UC6 ..> UC4 : <<extend>>
+UC4 ..> UC11 : <<include>>
+
+' Proceso de Comparación (Solo el código del alumno)
+UC7 ..> UC12 : <<include>>
+
+' Flujo de Reportes
+UC9 ..> UC8 : <<extend>>
+UC10 ..> UC9 : <<extend>>
+
+' --- CONEXIÓN CON IA EXTERNA ---
+IA -- UC5
+IA -- UC6
+
+' Alineaciones invisibles para forzar la verticalidad
+UC1 -[hidden]down- UC3
+UC3 -[hidden]down- UC4
+UC4 -[hidden]down- UC7
+UC7 -[hidden]down- UC8
+@enduml
