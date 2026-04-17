@@ -1,0 +1,67 @@
+import { useState } from "react";
+import { Header } from "./components/layout/Header";
+import { Biblioteca } from "./pages/Biblioteca";
+import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
+import { MouseGlowBackground } from "./components/layout/MouseGlowBackground";
+import { NewReferenceModal } from "./pages/NewReferenceModal";
+import { NewComparisonModal } from "./pages/NewComparisonModal";
+
+import { SimilarityReportModal } from "./pages/SimilarityReportModal";
+
+type View = "login" | "register" | "app";
+
+function App() {
+    const [view, setView] = useState<View>("login");
+    const [isNewCodeModalOpen, setIsNewCodeModalOpen] = useState(false);
+    const [isNewComparisonModalOpen, setIsNewComparisonModalOpen] = useState(false);
+    const [selectedComparison, setSelectedComparison] = useState<any>(null);
+    const [isSimilarityReportOpen, setIsSimilarityReportOpen] = useState(false);
+
+    const handleLogin = () => setView("app");
+    const handleRegister = () => setView("app");
+    const navigateToRegister = () => setView("register");
+    const navigateToLogin = () => setView("login");
+
+    return (
+        <MouseGlowBackground>
+            {view === "app" ? (
+                <>
+                    <Header onNewCode={() => setIsNewCodeModalOpen(true)} />
+                    <Biblioteca
+                        onCompare={() => setIsNewComparisonModalOpen(true)}
+                        onComparisonClick={(comp) => {
+                            setSelectedComparison(comp);
+                            setIsSimilarityReportOpen(true);
+                        }}
+                    />
+                    <NewReferenceModal
+                        isOpen={isNewCodeModalOpen}
+                        onClose={() => setIsNewCodeModalOpen(false)}
+                    />
+                    <NewComparisonModal
+                        isOpen={isNewComparisonModalOpen}
+                        onClose={() => setIsNewComparisonModalOpen(false)}
+                    />
+                    <SimilarityReportModal
+                        isOpen={isSimilarityReportOpen}
+                        onClose={() => setIsSimilarityReportOpen(false)}
+                        comparison={selectedComparison}
+                    />
+                </>
+            ) : view === "register" ? (
+                <Register
+                    onRegister={handleRegister}
+                    onNavigateToLogin={navigateToLogin}
+                />
+            ) : (
+                <Login
+                    onLogin={handleLogin}
+                    onNavigateToRegister={navigateToRegister}
+                />
+            )}
+        </MouseGlowBackground>
+    );
+}
+
+export default App;

@@ -4,7 +4,11 @@ import { GradientButton } from "../ui/GradientButton";
 // Importamos tu logo. Asegúrate de que esté en src/assets/logo.png
 import logo from "../../assets/logo.png";
 
-export function Header() {
+interface HeaderProps {
+    onNewCode?: () => void;
+}
+
+export function Header({ onNewCode }: HeaderProps) {
     return (
         <header className="w-full bg-graphito-dark border-b border-graphito-border px-6 py-4">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -41,7 +45,7 @@ export function Header() {
                 {/* Lado Derecho: Acciones y Perfil */}
                 <div className="flex items-center gap-6">
 
-                    <GradientButton>
+                    <GradientButton onClick={onNewCode}>
                         <span>+ Nuevo código</span>
                     </GradientButton>
 

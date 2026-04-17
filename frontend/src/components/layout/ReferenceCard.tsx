@@ -18,6 +18,8 @@ interface ReferenceCardProps {
     updatedAt: string
     activeComparisons: number
     comparisons: Comparison[]
+    onCompare?: () => void
+    onComparisonClick?: (comparison: Comparison) => void
 }
 
 // Mapeamos los colores de categoría a tu paleta
@@ -35,6 +37,8 @@ export function ReferenceCard({
     updatedAt,
     activeComparisons,
     comparisons,
+    onCompare,
+    onComparisonClick,
 }: ReferenceCardProps) {
     const [isExpanded, setIsExpanded] = useState(false)
 
@@ -69,7 +73,7 @@ export function ReferenceCard({
 
                     <div className="flex items-center gap-3">
                         {/* Usamos tu GradientButton aquí */}
-                        <GradientButton className="text-sm py-2 px-4">
+                        <GradientButton className="text-sm py-2 px-4" onClick={onCompare}>
                             <Plus className="h-4 w-4" />
                             <span>Comparar</span>
                         </GradientButton>
@@ -108,6 +112,7 @@ export function ReferenceCard({
                                     {comparisons.map((comparison) => (
                                         <div
                                             key={comparison.id}
+                                            onClick={() => onComparisonClick?.(comparison)}
                                             className="flex items-center justify-between p-4 bg-graphito-dark/50 border border-graphito-border rounded-xl hover:border-graphito-blue/30 transition-colors cursor-pointer group"
                                         >
                                             <div className="flex flex-col">
