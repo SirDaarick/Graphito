@@ -58,7 +58,7 @@ export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
             mouseRef.current = { x: event.clientX, y: event.clientY };
         };
 
-        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mousemove", handleMouseMove, { passive: true });
 
         const animate = (time: number) => {
             const seconds = time * 0.001;
