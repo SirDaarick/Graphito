@@ -33,13 +33,14 @@ export function PaginationControls({
                 {/* Botón Anterior */}
                 <button
                     className={cn(
-                        "p-2 rounded-lg transition-all border border-transparent",
+                        "p-2.5 min-w-11 min-h-11 rounded-lg transition-all border border-transparent",
                         currentPage === 1
                             ? "text-slate-600 cursor-not-allowed"
-                            : "text-slate-400 hover:text-white hover:bg-graphito-card hover:border-graphito-border"
+                            : "text-slate-400 hover:text-white hover:bg-graphito-card hover:border-graphito-border focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                     )}
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage === 1}
+                    aria-label="Página anterior"
                 >
                     <ChevronLeft className="h-5 w-5" />
                 </button>
@@ -50,11 +51,13 @@ export function PaginationControls({
                         <button
                             key={page}
                             onClick={() => onPageChange(page)}
+                            aria-label={`Ir a página ${page}`}
+                            aria-current={page === currentPage ? "page" : undefined}
                             className={cn(
-                                "h-9 w-9 rounded-xl text-sm font-bold transition-all duration-300",
+                                "h-9 w-9 min-w-9 rounded-xl text-sm font-bold transition-all duration-300",
                                 page === currentPage
                                     ? "bg-graphito-blue text-white shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110"
-                                    : "text-slate-400 hover:text-white hover:bg-graphito-card"
+                                    : "text-slate-400 hover:text-white hover:bg-graphito-card focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                             )}
                         >
                             {page}
@@ -65,13 +68,14 @@ export function PaginationControls({
                 {/* Botón Siguiente */}
                 <button
                     className={cn(
-                        "p-2 rounded-lg transition-all border border-transparent",
+                        "p-2.5 min-w-11 min-h-11 rounded-lg transition-all border border-transparent",
                         currentPage === totalPages
                             ? "text-slate-600 cursor-not-allowed"
-                            : "text-slate-400 hover:text-white hover:bg-graphito-card hover:border-graphito-border"
+                            : "text-slate-400 hover:text-white hover:bg-graphito-card hover:border-graphito-border focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                     )}
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
+                    aria-label="Página siguiente"
                 >
                     <ChevronRight className="h-5 w-5" />
                 </button>

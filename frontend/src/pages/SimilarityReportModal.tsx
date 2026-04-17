@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles } from "lucide-react";
 import { AuthCard } from "../components/layout/AuthCard";
 
-// Helper hook for the typewriter effect
-function useTypewriter(text: string, speed: number = 20) {
+// Helper hook for the typewriter effect (optimized for performance)
+function useTypewriter(text: string, speed: number = 15) {
     const [displayedText, setDisplayedText] = useState("");
 
     useEffect(() => {
         setDisplayedText(""); // Reset when text changes
+        if (!text) return;
+        
         let i = 0;
         const interval = setInterval(() => {
             if (i < text.length) {

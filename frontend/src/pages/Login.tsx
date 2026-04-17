@@ -56,7 +56,7 @@ export function Login({ onLogin, onNavigateToRegister }: LoginProps) {
                 <form onSubmit={(e) => { e.preventDefault(); onLogin?.(); }} className="space-y-5">
                     {/* Email */}
                     <div className="space-y-2">
-                        <label className="text-[13px] font-bold text-slate-200 ml-1">
+                        <label htmlFor="login-email" className="text-[13px] font-bold text-slate-200 ml-1">
                             Correo electrónico
                         </label>
                         <div className="relative group">
@@ -64,6 +64,7 @@ export function Login({ onLogin, onNavigateToRegister }: LoginProps) {
                                 <AtSign size={18} />
                             </div>
                             <input
+                                id="login-email"
                                 type="email"
                                 required
                                 value={email}
@@ -75,37 +76,38 @@ export function Login({ onLogin, onNavigateToRegister }: LoginProps) {
                     </div>
 
                     {/* Password */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between ml-1">
-                            <label className="text-[13px] font-bold text-slate-200">
-                                Contraseña
-                            </label>
-                            <button type="button" className="text-[10px] font-bold text-graphito-violet hover:text-white transition-colors uppercase tracking-wider">
-                                ¿Olvidaste tu contraseña?
-                            </button>
-                        </div>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-graphito-blue transition-colors">
-                                <Lock size={18} />
+<div className="space-y-2">
+                            <div className="flex items-center justify-between ml-1">
+                                <label htmlFor="login-password" className="text-[13px] font-bold text-slate-200">
+                                    Contraseña
+                                </label>
+                                <button type="button" className="text-[10px] font-bold text-graphito-violet hover:text-white transition-colors uppercase tracking-wider">
+                                    ¿Olvidaste tu contraseña?
+                                </button>
                             </div>
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                className="w-full bg-[#121827]/30 border border-[#2b3346] text-white rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-500 text-[15px] tracking-widest font-mono"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-white transition-colors"
-                                aria-label="Toggle password visibility"
-                            >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                            </button>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-graphito-blue transition-colors">
+                                    <Lock size={18} />
+                                </div>
+                                <input
+                                    id="login-password"
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full bg-[#121827]/30 border border-[#2b3346] text-white rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-500 text-[15px] tracking-widest font-mono"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-white transition-colors"
+                                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
                     {/* Submit */}
                     <button

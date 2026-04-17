@@ -80,7 +80,9 @@ export function ReferenceCard({
 
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className="p-2 bg-graphito-dark hover:bg-graphito-border text-slate-400 rounded-xl transition-all"
+                            className="p-2.5 min-w-11 min-h-11 bg-graphito-dark hover:bg-graphito-border text-slate-400 rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                            aria-label={isExpanded ? "Colapsar comparaciones" : "Expandir comparaciones"}
+                            aria-expanded={isExpanded}
                         >
                             <ChevronDown
                                 className={cn(

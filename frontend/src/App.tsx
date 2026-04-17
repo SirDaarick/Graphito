@@ -25,6 +25,14 @@ function App() {
 
     return (
         <MouseGlowBackground>
+            {/* Skip link for keyboard navigation */}
+            <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-graphito-blue focus:text-white focus:rounded-lg focus:font-bold"
+            >
+                Saltar al contenido principal
+            </a>
+
             {view === "app" ? (
                 <>
                     <Header onNewCode={() => setIsNewCodeModalOpen(true)} />

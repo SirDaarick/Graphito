@@ -34,8 +34,9 @@ export function SearchBar({ searchTerm, onSearchChange }: SearchBarProps) {
                         "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body text-sm font-semibold",
                         "bg-graphito-card border border-graphito-border text-slate-400 transition-all",
                         "hover:text-white hover:border-graphito-blue/30 hover:bg-graphito-card/80",
-                        "active:scale-95"
+                        "active:scale-95 focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                     )}
+                    aria-label="Abrir filtros"
                 >
                     <SlidersHorizontal className="h-4 w-4" />
                     <span>Filtrar</span>
@@ -46,8 +47,9 @@ export function SearchBar({ searchTerm, onSearchChange }: SearchBarProps) {
                         "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body text-sm font-semibold",
                         "bg-graphito-card border border-graphito-border text-slate-400 transition-all",
                         "hover:text-white hover:border-graphito-blue/30 hover:bg-graphito-card/80",
-                        "active:scale-95"
+                        "active:scale-95 focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                     )}
+                    aria-label="Abrir opciones de ordenamiento"
                 >
                     <ArrowUpDown className="h-4 w-4" />
                     <span>Ordenar</span>

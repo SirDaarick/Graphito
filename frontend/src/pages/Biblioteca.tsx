@@ -93,7 +93,7 @@ export function Biblioteca({
     };
 
     return (
-        <main className="max-w-7xl mx-auto p-8 flex-1 w-full flex flex-col">
+        <main id="main-content" className="max-w-7xl mx-auto p-8 flex-1 w-full flex flex-col" tabIndex={-1}>
             <div className="mb-8">
                 <h2 className="text-3xl font-display font-black text-white">
                     Mi Biblioteca

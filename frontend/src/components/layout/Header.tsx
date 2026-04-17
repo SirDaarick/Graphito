@@ -49,14 +49,20 @@ export function Header({ onNewCode }: HeaderProps) {
                         <span>+ Nuevo código</span>
                     </GradientButton>
 
-                    <button className="relative p-2 text-slate-400 hover:text-white hover:bg-graphito-card rounded-full transition-all">
+                    <button 
+                        className="relative p-2 text-slate-400 hover:text-white hover:bg-graphito-card rounded-full transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                        aria-label="Notificaciones"
+                    >
                         <Bell size={20} />
                         <span className="absolute top-2 right-2 w-2 h-2 bg-risk-high rounded-full border-2 border-graphito-dark"></span>
                     </button>
 
                     <div className="h-8 w-[1px] bg-graphito-border"></div>
 
-                    <div className="flex items-center gap-3 pl-2 cursor-pointer group">
+                    <button 
+                        className="flex items-center gap-3 pl-2 cursor-pointer group rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                        aria-label="Menú de usuario"
+                    >
                         <div className="relative">
                             <div className="w-10 h-10 rounded-full bg-graphito-card border border-graphito-border overflow-hidden ring-2 ring-transparent group-hover:ring-graphito-blue/50 transition-all">
                                 <div className="w-full h-full bg-gradient-to-tr from-slate-700 to-slate-500 flex items-center justify-center text-white font-bold">
@@ -71,7 +77,7 @@ export function Header({ onNewCode }: HeaderProps) {
                             <p className="font-body text-[10px] text-slate-500 mt-1 uppercase tracking-wider">Investigador</p>
                         </div>
                         <ChevronDown size={14} className="text-slate-500 group-hover:text-white transition-colors" />
-                    </div>
+                    </button>
 
                 </div>
             </div>

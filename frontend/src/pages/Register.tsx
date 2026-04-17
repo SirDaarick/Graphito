@@ -62,10 +62,11 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
 
                     {/* Nombre completo */}
                     <div className="space-y-1.5">
-                        <label className="text-[12px] font-bold text-slate-400 ml-1">
+                        <label htmlFor="register-name" className="text-[12px] font-bold text-slate-400 ml-1">
                             Nombre completo
                         </label>
                         <input
+                            id="register-name"
                             type="text"
                             required
                             value={name}
@@ -77,10 +78,11 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
 
                     {/* Email */}
                     <div className="space-y-1.5">
-                        <label className="text-[12px] font-bold text-slate-400 ml-1">
+                        <label htmlFor="register-email" className="text-[12px] font-bold text-slate-400 ml-1">
                             Correo electrónico
                         </label>
                         <input
+                            id="register-email"
                             type="email"
                             required
                             value={email}
@@ -92,10 +94,11 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
 
                     {/* Password */}
                     <div className="space-y-1.5">
-                        <label className="text-[12px] font-bold text-slate-400 ml-1">
+                        <label htmlFor="register-password" className="text-[12px] font-bold text-slate-400 ml-1">
                             Contraseña
                         </label>
                         <input
+                            id="register-password"
                             type="password"
                             required
                             value={password}
@@ -118,11 +121,12 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
 
                     {/* Confirm Password */}
                     <div className="space-y-1.5">
-                        <label className="text-[12px] font-bold text-slate-400 ml-1">
+                        <label htmlFor="register-confirm-password" className="text-[12px] font-bold text-slate-400 ml-1">
                             Confirmar contraseña
                         </label>
                         <div className="relative">
                             <input
+                                id="register-confirm-password"
                                 type="password"
                                 required
                                 value={confirmPassword}
@@ -143,7 +147,7 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
                             id="terms"
                             checked={agreed}
                             onChange={(e) => setAgreed(e.target.checked)}
-                            className="w-4 h-4 rounded border-[#2b3346] bg-[#121827]/50 text-graphito-blue focus:ring-offset-[#1a2031]"
+                            className="w-4 h-4 rounded border-[#2b3346] bg-[#121827]/50 text-graphito-blue focus:ring-2 focus:ring-graphito-blue/50 focus:ring-offset-[#1a2031] focus:outline-none"
                         />
                         <label htmlFor="terms" className="text-[11px] font-medium text-slate-400">
                             Acepto los <button type="button" className="text-slate-300 underline">Términos de uso</button> y la <button type="button" className="text-slate-300 underline">Política de privacidad</button>
