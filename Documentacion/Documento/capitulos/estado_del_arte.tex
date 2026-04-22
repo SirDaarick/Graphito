@@ -1,0 +1,171 @@
+\chapter{Estado del Arte}
+
+% =========================================================
+\section{Problema de la detección de similitud de código}
+% =========================================================
+
+La detección de similitud y plagio en código fuente es un problema ampliamente estudiado dentro de la ingeniería de software y la educación en ciencias de la computación. Este problema surge principalmente en cursos de programación donde múltiples estudiantes desarrollan soluciones para un mismo problema, lo que puede facilitar la copia parcial o total de código entre estudiantes. El plagio de código se define como el uso de un programa desarrollado por otra persona sin la debida atribución, lo cual dificulta evaluar si el estudiante realmente comprendió el problema o simplemente reutilizó una solución existente. De acuerdo con diversos estudios sobre análisis de similitud de código, la detección automática de plagio constituye un área fundamental dentro del análisis de software, ya que también se relaciona con tareas como detección de clones de código, reutilización de software y mantenimiento de sistemas \cite{Zakeri2023Systematic}.
+
+% =========================================================
+\section{Enfoques tradicionales basados en texto}
+% =========================================================
+
+Los primeros enfoques para detectar similitud entre programas se basaban principalmente en comparaciones textuales del código fuente. Estos métodos analizan el código como una secuencia de caracteres y buscan coincidencias exactas o casi exactas entre fragmentos de programas. Aunque este enfoque permite identificar copias directas, presenta limitaciones cuando los programas han sido modificados mediante cambios superficiales como renombramiento de variables, modificación de comentarios o alteraciones en el formato del código. En consecuencia, los investigadores comenzaron a explorar métodos más robustos que pudieran detectar similitudes incluso cuando el código había sido modificado para ocultar su origen \cite{Roy2007Survey}.
+
+% =========================================================
+\section{Herramientas basadas en fingerprinting}
+% =========================================================
+
+\subsection{MOSS}
+
+Uno de los sistemas más influyentes en la detección de plagio en código es MOSS (Measure of Software Similarity), desarrollado por Alex Aiken en la Universidad de Stanford. Este sistema utiliza técnicas de fingerprinting, un método que consiste en generar una representación compacta del código mediante huellas digitales o identificadores únicos derivados del contenido del programa. En términos generales, el proceso de fingerprinting consiste en dividir el código en fragmentos y aplicar una función hash a cada uno de ellos. Una función hash es un algoritmo matemático que transforma una secuencia de caracteres en un número de longitud fija. Estas huellas permiten representar el código de forma resumida, de modo que dos programas con fragmentos similares generarán hashes similares o idénticos \cite{AikenMOSS}.
+\paragraph{Funcionamiento de MOSS}
+\begin{itemize}
+    \item División del código en fragmentos
+    \item Aplicación de funciones hash
+    \item Generación de huellas digitales
+    \item Selección de fingerprints mediante winnowing
+\end{itemize}
+
+Para mejorar la precisión de este proceso, MOSS utiliza el algoritmo de winnowing, un método diseñado para seleccionar un subconjunto representativo de las huellas digitales generadas a partir del código. El algoritmo funciona generando múltiples hashes a partir de fragmentos consecutivos del programa y posteriormente seleccionando aquellos que representan la información más relevante dentro de una ventana de tamaño determinado. Esta técnica permite garantizar que cualquier coincidencia significativa entre dos programas sea detectada incluso cuando se realizan modificaciones menores en el código. Gracias a este procedimiento, el sistema puede identificar fragmentos similares de manera eficiente sin necesidad de comparar el código completo carácter por carácter \cite{AikenMOSS}.
+
+\paragraph{Limitaciones}
+\begin{itemize}
+    \item Sensible a cambios estructurales del código
+    \item No detecta similitud semántica profunda
+\end{itemize}
+
+A pesar de su amplia adopción en instituciones educativas, el sistema MOSS presenta ciertas limitaciones relacionadas con el tipo de similitud que es capaz de detectar. Debido a que su funcionamiento se basa en la comparación de huellas digitales generadas a partir de fragmentos del código, el sistema puede verse afectado cuando los programas presentan modificaciones significativas en su estructura, incluso si implementan la misma lógica algorítmica. Por ejemplo, cambios como la reestructuración de bucles, la división de funciones o la reorganización del flujo del programa pueden alterar las huellas digitales generadas, reduciendo la probabilidad de detectar coincidencias. Estas limitaciones han motivado el desarrollo de enfoques más avanzados capaces de analizar la semántica del código en lugar de basarse únicamente en coincidencias textuales o estructurales \cite{Hovemeyer2019Gradescope}.
+
+% =========================================================
+\section{Herramientas basadas en análisis sintáctico y evaluación automática}
+% =========================================================
+
+\subsection{JPlag}
+
+Otra herramienta ampliamente utilizada en entornos educativos es JPlag, un sistema desarrollado en el Karlsruhe Institute of Technology que permite detectar similitudes entre múltiples programas dentro de un conjunto de entregas. A diferencia de MOSS, que se basa principalmente en fingerprinting, JPlag utiliza un enfoque basado en tokenización del código. La tokenización consiste en convertir el código fuente en una secuencia de unidades léxicas llamadas tokens, que representan elementos fundamentales del lenguaje de programación como palabras clave, operadores, identificadores y símbolos. Una vez que el código se transforma en tokens, el sistema compara las secuencias obtenidas utilizando algoritmos de coincidencia para identificar similitudes estructurales entre programas \cite{PrecheltJPlag}.
+
+\subsection{Gradescope}
+
+Otro sistema ampliamente utilizado en entornos educativos para la evaluación automática de programas es Gradescope, una plataforma que permite automatizar la revisión de tareas de programación mediante la ejecución de pruebas sobre el código entregado por los estudiantes. Este sistema se enfoca principalmente en la validación funcional del programa, evaluando si el código produce los resultados esperados para un conjunto de casos de prueba definidos por el instructor. Aunque este enfoque facilita la calificación automática de ejercicios de programación, su capacidad para detectar similitud entre programas es limitada, ya que se centra principalmente en verificar la funcionalidad del código y no necesariamente en analizar la lógica interna de la solución implementada. En consecuencia, dos programas que resuelven el mismo problema mediante estructuras algorítmicas equivalentes pueden obtener resultados idénticos sin que el sistema detecte posibles coincidencias estructurales entre ellos \cite{CodeGrade2023}.
+
+\subsection{CodeGrade}
+
+De manera similar, herramientas como CodeGrade han sido desarrolladas para apoyar la evaluación automática en cursos de programación mediante la integración de sistemas de ejecución de pruebas y detección de similitud entre programas. CodeGrade permite automatizar la revisión de tareas y proporcionar retroalimentación inmediata a los estudiantes, lo cual resulta particularmente útil en cursos con un gran número de participantes. Sin embargo, al igual que otras herramientas basadas en análisis sintáctico o textual, su capacidad para identificar similitud profunda entre programas puede verse limitada cuando los estudiantes aplican transformaciones estructurales al código, como el uso de diferentes estructuras de control o la reorganización de funciones dentro del programa \cite{Cheers2021Robustness}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Herramienta} & \textbf{Enfoque} & \textbf{Ventaja} & \textbf{Limitación} \\ \hline
+MOSS & Fingerprinting & Eficiente y escalable & No detecta semántica \\ \hline
+JPlag & Tokenización & Detecta similitud estructural & Evadible \\ \hline
+Gradescope & Pruebas & Automatización & No analiza lógica \\ \hline
+CodeGrade & Evaluación automática & Retroalimentación & Limitado \\ \hline
+\end{tabular}
+\caption{Comparación de herramientas de análisis de código}
+\end{table}
+
+% =========================================================
+\section{Representaciones estructurales del código}
+% =========================================================
+
+\subsection{Árboles de sintaxis abstracta (AST)}
+
+Con el objetivo de mejorar la detección de similitud entre programas, los investigadores han explorado representaciones estructurales del código basadas en árboles de sintaxis abstracta (AST). Un árbol de sintaxis abstracta es una representación jerárquica del programa que describe su estructura gramatical de acuerdo con las reglas del lenguaje de programación. En esta representación, los nodos del árbol corresponden a construcciones del lenguaje como operaciones aritméticas, expresiones lógicas o estructuras de control. El uso de AST permite comparar la estructura del programa en lugar de su representación textual, lo que facilita detectar similitudes entre programas que presentan diferencias sintácticas superficiales \cite{Song2024AST}.
+
+El análisis basado en árboles de sintaxis abstracta ha sido ampliamente utilizado en sistemas de detección de clones de código debido a su capacidad para capturar la estructura gramatical de los programas. A diferencia de los métodos basados en texto, el análisis de AST permite ignorar detalles superficiales como espacios, comentarios o nombres de variables, enfocándose en la estructura lógica del programa. No obstante, este enfoque también presenta ciertas limitaciones. Dos programas que implementan el mismo algoritmo utilizando diferentes construcciones sintácticas pueden producir árboles sintácticos significativamente distintos, lo que dificulta la detección de similitudes semánticas profundas. Por esta razón, muchos trabajos recientes han propuesto combinar el análisis estructural con técnicas de aprendizaje automático que permitan capturar patrones más complejos en el código \cite{Song2024AST}.
+
+\subsection{Grafos de flujo de control y datos}
+
+Sin embargo, el análisis estructural mediante árboles sintácticos puede resultar insuficiente para detectar similitudes más profundas relacionadas con la lógica del programa. Por esta razón, algunos enfoques utilizan representaciones basadas en grafos, como los grafos de flujo de control (CFG) y los grafos de dependencia de datos (DFG). Los grafos de flujo de control representan las posibles rutas de ejecución dentro de un programa, mientras que los grafos de dependencia de datos modelan las relaciones entre variables y operaciones. Estas representaciones permiten capturar información semántica más rica del programa, ya que describen cómo fluye la información dentro del código y cómo interactúan sus diferentes componentes \cite{Yu2023Graph}.
+
+\subsection{Embeddings de código}
+
+En los últimos años, el avance del aprendizaje automático ha permitido desarrollar nuevas técnicas para analizar código fuente mediante representaciones vectoriales conocidas como embeddings. Un embedding es una representación numérica de alta dimensión que captura características semánticas de un objeto. En el contexto del código fuente, los embeddings permiten transformar fragmentos de código en vectores dentro de un espacio matemático donde programas similares se ubican cerca entre sí. Para medir la similitud entre estos vectores se utilizan métricas como la similitud del coseno \cite{Mikolov2013Distributed}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Representación} & \textbf{Nivel} & \textbf{Ventaja} & \textbf{Limitación} \\ \hline
+Texto & Superficial & Simple & Fácil de evadir \\ \hline
+AST & Sintáctico & Analiza estructura & No semántico \\ \hline
+Grafos & Semántico & Captura flujo & Complejo \\ \hline
+Embeddings & Semántico profundo & Detecta lógica & Requiere modelos \\ \hline
+\end{tabular}
+\caption{Comparación de representaciones de código}
+\end{table}
+% =========================================================
+\section{Modelos basados en aprendizaje profundo}
+% =========================================================
+
+Una de las principales innovaciones en este campo ha sido la aplicación de modelos basados en la arquitectura Transformer, originalmente desarrollada para tareas de procesamiento de lenguaje natural. Estos modelos utilizan mecanismos de atención que permiten analizar relaciones entre diferentes partes de una secuencia de texto o código. Entre los modelos más relevantes se encuentra CodeBERT, un modelo preentrenado desarrollado por Microsoft que fue entrenado utilizando grandes repositorios de código fuente y documentación que permite generar representaciones semánticas del código que pueden utilizarse para tareas como búsqueda de código, generación de comentarios y detección de similitud entre programas \cite{Feng2020CodeBERT}.
+
+Una evolución de este enfoque es GraphCodeBERT, que incorpora información estructural adicional mediante grafos de flujo de datos durante el proceso de entrenamiento. A diferencia de modelos que analizan únicamente secuencias de tokens, este modelo integra relaciones entre variables y dependencias de datos dentro del programa, lo que permite capturar información semántica más profunda sobre el comportamiento del código. Investigaciones recientes han demostrado que este modelo puede mejorar significativamente la detección de similitud semántica entre programas que implementan la misma lógica mediante estructuras sintácticas diferentes \cite{Guo2021GraphCodeBERT}.
+
+Además de CodeBERT y GraphCodeBERT, investigaciones recientes han propuesto otros modelos basados en arquitecturas Transformer diseñados específicamente para el análisis de código fuente. Uno de estos modelos es UniXcoder, desarrollado por investigadores de Microsoft, el cual busca aprender representaciones unificadas del código mediante diferentes tareas de preentrenamiento. Este modelo combina información sintáctica y semántica del programa para generar representaciones que pueden utilizarse en tareas como búsqueda de código, generación automática de documentación y análisis de similitud entre programas. Estudios recientes han demostrado que este tipo de modelos puede capturar patrones complejos en el código y mejorar la capacidad de los sistemas para identificar relaciones semánticas entre programas escritos de manera diferente \cite{Guo2022UniXcoder}.
+
+\paragraph{Características de los modelos basados en Transformers}
+\begin{itemize}
+    \item Capturan relaciones semánticas dentro del código mediante mecanismos de atención
+    \item Permiten representar programas en espacios vectoriales de alta dimensión
+    \item Integran información sintáctica y semántica en una sola representación
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Modelo} & \textbf{Tipo} & \textbf{Característica} & \textbf{Aplicación} \\ \hline
+CodeBERT & Transformer & Representación semántica & Búsqueda de código \\ \hline
+GraphCodeBERT & Transformer + grafos & Usa flujo de datos & Similitud semántica \\ \hline
+UniXcoder & Multimodal & Representación unificada & Análisis avanzado \\ \hline
+\end{tabular}
+\caption{Modelos basados en Transformers para análisis de código}
+\end{table}
+
+% =========================================================
+\section{Detección de código generado por inteligencia artificial}
+% =========================================================
+
+De manera complementaria, algunos trabajos recientes han propuesto el uso de técnicas de aprendizaje profundo para identificar patrones semánticos dentro del código utilizando redes neuronales y representaciones basadas en grafos. Por ejemplo, investigaciones sobre aprendizaje semántico de código mediante grafos han demostrado que los modelos que analizan relaciones estructurales entre instrucciones pueden mejorar la detección de clones semánticos, es decir, programas que realizan la misma funcionalidad, aunque presenten diferencias en su estructura textual \cite{Yu2023Graph}. Estos enfoques permiten capturar información a múltiples niveles del programa, incluyendo tokens, sentencias y relaciones entre estructuras de control.
+
+En los últimos años también se han realizado diversos estudios que exploran el uso de representaciones semánticas del código para detectar plagio o similitud entre programas. Por ejemplo, investigaciones recientes han propuesto sistemas de búsqueda semántica de código que utilizan modelos preentrenados para generar embeddings de programas y posteriormente comparar estos vectores utilizando métricas de similitud. Estos sistemas han demostrado que las representaciones semánticas pueden capturar relaciones entre programas incluso cuando presentan diferencias significativas en su estructura sintáctica. En particular, algunos trabajos han mostrado que los modelos basados en Transformers pueden correlacionar de manera significativa con evaluaciones humanas al medir la similitud entre programas, lo que sugiere que estas técnicas pueden convertirse en herramientas valiosas para apoyar la evaluación automática en cursos de programación \cite{Ebrahim2024Semantic}.
+
+Finalmente, estudios recientes han destacado que el crecimiento de herramientas de generación automática de código basadas en modelos de lenguaje introduce nuevos desafíos para la detección de plagio en entornos educativos. Los modelos generativos actuales son capaces de producir soluciones funcionalmente correctas para problemas de programación, lo que dificulta determinar si el código fue desarrollado por un estudiante o generado mediante inteligencia artificial. Ante este escenario, algunos trabajos han comenzado a explorar el uso de técnicas de análisis estilométrico y aprendizaje automático para identificar patrones característicos asociados a código generado automáticamente \cite{Ebrahim2023Source}.
+
+\paragraph{Retos en la detección de código generado por IA}
+\begin{itemize}
+    \item Los modelos generativos producen código funcionalmente correcto
+    \item Difícil distinguir entre código humano y generado automáticamente
+    \item Los patrones de generación pueden ser consistentes pero no evidentes
+\end{itemize}
+
+% =========================================================
+\section{Análisis y brecha de investigación}
+% =========================================================
+
+En general, la literatura muestra que los sistemas existentes para la detección de similitud de código suelen enfocarse en uno de dos enfoques principales: el análisis estructural del programa o el análisis semántico mediante representaciones aprendidas por modelos de aprendizaje profundo. Sin embargo, cada uno de estos enfoques presenta limitaciones cuando se utiliza de manera aislada. Mientras que los métodos estructurales pueden verse afectados por modificaciones sintácticas significativas, los modelos basados en aprendizaje profundo pueden requerir grandes cantidades de datos para su entrenamiento y presentar dificultades para explicar sus decisiones. Por esta razón, varios trabajos recientes sugieren que la combinación de diferentes enfoques de análisis puede mejorar la precisión y robustez de los sistemas de detección de similitud de código \cite{Zakeri2023Systematic}.
+
+\paragraph{Limitaciones identificadas en la literatura}
+\begin{itemize}
+    \item Los enfoques estructurales no capturan completamente la semántica del código
+    \item Los modelos de aprendizaje profundo requieren grandes volúmenes de datos
+    \item Existe dificultad para interpretar los resultados de modelos complejos
+\end{itemize}
+
+En síntesis, la investigación en detección de similitud de código ha evolucionado desde enfoques basados en comparación textual hacia métodos más avanzados que incorporan representaciones estructurales y semánticas del programa. Mientras que herramientas tradicionales como MOSS y JPlag se enfocan principalmente en coincidencias sintácticas, los modelos modernos basados en aprendizaje profundo y arquitecturas Transformer permiten capturar relaciones semánticas más complejas dentro del código. No obstante, el desarrollo reciente de herramientas de generación automática de código plantea nuevos retos para la evaluación académica, lo que sugiere la necesidad de desarrollar sistemas híbridos que integren múltiples técnicas de análisis para mejorar la detección de similitud y la identificación de código generado mediante inteligencia artificial.
+
+A pesar de los avances en la detección de similitud de código, las herramientas tradicionales como MOSS o JPlag se enfocan principalmente en coincidencias textuales o estructurales, lo que limita su capacidad para detectar equivalencias semánticas profundas entre programas que implementan la misma lógica mediante estructuras diferentes. Por otra parte, los modelos recientes basados en aprendizaje profundo y arquitecturas Transformer han demostrado ser capaces de capturar relaciones semánticas más complejas dentro del código, aunque su aplicación en entornos educativos aún presenta desafíos relacionados con la interpretación de resultados y la integración con herramientas de evaluación académica.
+
+Asimismo, el crecimiento de herramientas de generación automática de código basadas en modelos de lenguaje ha introducido nuevos retos para la detección de plagio en programación. Los sistemas actuales no siempre permiten distinguir de manera confiable entre código escrito por estudiantes y código generado mediante inteligencia artificial, lo que dificulta evaluar adecuadamente el aprendizaje en cursos introductorios de programación.
+
+\paragraph{Necesidad identificada}
+\begin{itemize}
+    \item Integrar análisis semántico y estilométrico en un mismo sistema
+    \item Mejorar la interpretación de resultados para apoyo docente
+    \item Desarrollar herramientas aplicables en contextos educativos reales
+\end{itemize}
+
+En este contexto, se identifica una brecha en la literatura relacionada con el desarrollo de sistemas que integren simultáneamente análisis semántico del código y técnicas adicionales que permitan identificar patrones asociados al uso de herramientas de inteligencia artificial. Por lo tanto, resulta pertinente explorar enfoques híbridos que combinen representaciones semánticas del código con técnicas complementarias de análisis, con el objetivo de mejorar la evaluación automática en entornos educativos.

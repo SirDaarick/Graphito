@@ -1,0 +1,1115 @@
+\chapter{Marco Teórico}
+
+% =========================================================
+\section{Introducción al análisis automático de código}
+% =========================================================
+
+El análisis automático de código fuente constituye un área interdisciplinaria que combina conceptos de ingeniería de software, procesamiento de lenguaje natural y aprendizaje automático. En entornos educativos, particularmente en cursos introductorios de programación, el análisis de código se utiliza para evaluar soluciones desarrolladas por estudiantes y detectar posibles similitudes entre programas. Este tipo de análisis está estrechamente relacionado con el problema de la detección de clones de código, el cual ha sido ampliamente estudiado en la literatura de ingeniería de software.
+
+Dada la complejidad de la estructura y semántica de los lenguajes de programación, la identificación de estas similitudes no es una tarea trivial. A lo largo de las últimas décadas, los trabajos de investigacion previos han desarrollado multiples metodologías que van desde comparaciones textuales simples hasta el uso de grafos y modelos de aprendizaje profundo. En este sentido, para comprender cómo operan las herramientas modernas, es fundamental analizar primero la naturaleza técnica de este desafío, considerando que existen múltiples enfoques para abordar este problema. 
+% Aquí va tu primer párrafo introductorio (ya lo tienes)
+% Explica:
+% - Qué es el análisis de código
+% - Contexto educativo
+% - Relación con detección de similitud
+
+% TODO: Agregar 1 párrafo final conectando con:
+% "existen múltiples enfoques para abordar este problema"
+
+
+% Aquí va tu texto sobre Roy y Cordy (ya lo tienes)
+
+% TODO: Agregar lista de retos:
+% \begin{itemize}
+% \item Variaciones sintácticas
+% \item Ofuscación de código
+% \item Diferentes implementaciones del mismo algoritmo
+% \item Código generado por IA
+% \end{itemize}
+
+% =========================================================
+\section{Problema de la detección de similitud de código}
+% =========================================================
+
+Roy y Cordy describen los clones de código como fragmentos de programas que presentan similitudes significativas en su estructura o funcionalidad, y destacan que su detección es una tarea fundamental para el mantenimiento y análisis de software \cite{Roy2007Survey}. No obstante, este proceso enfrenta múltiples desafíos técnicos debido a la ambigüedad estructural del código y a la existencia de múltiples implementaciones para un mismo algoritmo. Esto hace más complejo distinguir entre una similitud semántica real y coincidencias sintácticas por el uso de convenciones de programación estándar y buenas prácticas, dificultando la identificación de clones funcionales con una alta precisión. 
+
+Para sistematizar estos obstáculos, la literatura identifica los siguientes retos principales en la detección automática \cite{Roy2007Survey, Horvath2026ProgrammerAttribution}:
+
+\begin{itemize}
+    \item \textbf{Variaciones sintácticas:} Cambios en el estilo de programación, nombres de variables o estructuras de control que no alteran el resultado.
+    \item \textbf{Ofuscación de código:} Transformaciones deliberadas para hacer el código ilegible manteniendo su funcionalidad original.
+    \item \textbf{Diferentes implementaciones:} El uso de distintos algoritmos o estructuras de datos para resolver el mismo problema lógico.
+    \item \textbf{Código generado por IA:} El auge de modelos de lenguaje (LLMs) permite generar múltiples versiones de un mismo programa, introduciendo patrones de similitud difíciles de rastrear mediante métodos tradicionales.
+\end{itemize}
+
+Esta diversidad de desafíos exige una taxonomía clara que permita categorizar el grado de semejanza entre dos fragmentos de código, lo cual se aborda a través de la clasificación técnica de clones.
+
+% =========================================================
+\section{Clones de código}
+% =========================================================
+
+La investigación sobre similitud de código identifica niveles en los que dos programas pueden considerarse similares, siendo la clasificación de Bellon \cite{Bellon2007Comparison} el marco predominante. 
+
+Los clones de \textbf{Tipo I} representan copias exactas con variaciones mínimas en formato (espacios, comentarios), mientras que los de \textbf{Tipo II} permiten el renombrado de identificadores y tipos de datos manteniendo una estructura sintáctica idéntica. Esta taxonomía establece una base estandarizada que permite definir matemáticamente los primeros dos tipos como relaciones de equivalencia precisas \cite{Bellon2007Comparison}. Debido a su naturaleza textual, su detección resulta altamente confiable mediante técnicas de normalización de tokens.
+
+Por el contrario, los clones de \textbf{Tipo III} y \textbf{Tipo IV} introducen una complejidad mayor. Según detalla Bellon \cite{Bellon2007Comparison}, los de Tipo III aceptan alteraciones donde se añaden o eliminan sentencias de código (clones casi idénticos). Finalmente, los clones de Tipo IV, o \textbf{clones semánticos}, constituyen el desafío más crítico. Estos implementan la misma funcionalidad mediante estructuras sintácticas completamente diferentes, compartiendo únicamente precondiciones y postcondiciones similares. La detección de esta categoría se considera un problema técnicamente complejo e incluso indecidible, ya que requiere interpretar la intención del código en lugar de su forma.
+
+% --- TODO: Tabla comparativa ---
+\begin{table}[h]
+\centering
+\caption{Comparativa de los tipos de clones de código según Bellon.}
+\label{tab:clones_bellon}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Tipo} & \textbf{Nivel de Similitud} & \textbf{Descripción} \\ \hline
+Tipo I & Textual / Exacto & Copias idénticas, excepto por espacios y comentarios. \\ \hline
+Tipo II & Sintáctico / Renombrado & Estructura idéntica, pero con distintos identificadores. \\ \hline
+Tipo III & Sintáctico / Modificado & Fragmentos con sentencias añadidas, eliminadas o cambiadas. \\ \hline
+Tipo IV & Semántico / Funcional & Lógica idéntica implementada con sintaxis distinta. \\ \hline
+\end{tabular}
+\end{table}
+
+% --- TODO: Imagen de ejemplos ---
+% \begin{figure}[h]
+% \centering
+% \includegraphics[width=0.8\textwidth]{ejemplos_clones.png}
+% \caption{Ejemplos de código para clones Tipo I, II, III y IV.}
+% \label{fig:ejemplos_clones}
+% \end{figure}
+
+En resumen, mientras que los clones sintácticos (I y II) pueden resolverse con análisis superficial, los clones semánticos (IV) demandan una comprensión profunda del flujo de datos. Para abordar esta jerarquía de dificultades, se han desarrollado diversos enfoques técnicos que varían en su nivel de abstracción y capacidad de generalización.
+
+
+\section{Enfoques para la detección de similitud de código}
+% =========================================================
+
+Existen diferentes enfoques con distintos niveles de abstracción para abordar el problema de la detección de similitud y clones de código fuente. Históricamente, las técnicas han evolucionado desde el análisis superficial del código como texto plano hasta la extracción de propiedades estructurales complejas y, más recientemente, la generación de representaciones vectoriales densas mediante aprendizaje automático \cite{Roy2007Survey}. Cada paradigma ofrece un equilibrio distinto entre la precisión semántica, la escalabilidad y el costo computacional.
+
+En general, estos enfoques se diferencian no solo por la estrategia de comparación empleada, sino también por la forma en que el código fuente es representado internamente. En este sentido, cada paradigma se apoya en distintas representaciones del código, que van desde secuencias textuales hasta estructuras sintácticas, grafos semánticos o vectores en espacios de alta dimensión. La elección de la representación influye directamente en la capacidad del sistema para capturar similitud superficial o semántica.
+
+\subsection{Enfoques basados en análisis textual}
+
+Según lo descrito por Roy en \cite{Roy2007Survey}, los enfoques basados en el análisis textual consideran el programa objetivo fundamentalmente como secuencias de líneas o cadenas de caracteres (strings). La técnica central consiste en comparar directamente estos fragmentos de código entre sí para buscar secuencias de texto iguales o fuertemente superpuestas. Por lo general, estos métodos operan sobre el código en crudo aplicando muy poca o ninguna transformación estructural; se limitan principalmente a emplear filtros básicos como la eliminación de espacios en blanco, tabulaciones y comentarios antes de realizar el emparejamiento de las cadenas.
+
+Mediante este enfoque se detecta exclusivamente la similitud léxica y textual directa entre pares de código\cite{Roy2007Survey}. Está diseñado para identificar fragmentos que comparten grandes cantidades de texto idéntico, lo que en la literatura de la ingeniería de software corresponde a copias exactas o clones sintácticos (generalmente denominados clones de Tipo I) \cite{karakatic2022software}. Debido a su naturaleza superficial basada en cadenas, la similitud detectada no representa las propiedades estructurales, lógicas ni semánticas del lenguaje de programación\cite{Roy2007Survey}.
+
+El analisis de la literatura, determina que el analisis textual enfocado en código fuente tiene las siguientes fortalezas y limitaciones \cite{Roy2007Survey, karakatic2022software}:
+
+\textbf{Fortalezas}
+\begin{itemize}
+    \item \textbf{Alta eficacia y precisión:} Resulta altamente efectivo en la detección de copias idénticas de código fuente, ya que la coincidencia textual directa minimiza la presencia de falsos positivos bajo este criterio.
+    
+    \item \textbf{Alta portabilidad:} No depende del análisis gramatical del lenguaje, por lo que puede aplicarse a múltiples lenguajes de programación requiriendo únicamente un análisis léxico básico.
+    
+    \item \textbf{Simplicidad computacional:} Presenta un bajo costo computacional, lo que permite su aplicación eficiente en grandes volúmenes de código.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Incapacidad para detectar similitud semántica:} Presenta un bajo rendimiento frente a clones semánticos o fragmentos que implementan la misma funcionalidad mediante diferentes estructuras de código.
+    
+    \item \textbf{Alta sensibilidad a cambios superficiales:} Modificaciones como la reubicación de saltos de línea o cambios en el formato (\textit{layout}) del código afectan significativamente la similitud detectada.
+    
+    \item \textbf{Vulnerabilidad al renombrado de identificadores:} El cambio de nombres de variables o funciones altera la representación textual sin modificar la lógica del programa.
+    
+    \item \textbf{Fragilidad ante modificaciones sintácticas menores:} La adición o eliminación de elementos como llaves o paréntesis puede cambiar la cadena de texto sin afectar el comportamiento del programa.
+\end{itemize}
+%==========================================================================
+\subsection{Enfoques basados en estructura}
+
+Los enfoques basados en estructura abordan el problema de la detección de similitud de código a partir de la organización interna de los programas, en lugar de centrarse únicamente en su forma textual. Estos métodos analizan cómo se disponen los distintos elementos del código, permitiendo capturar patrones de diseño y organización que reflejan decisiones de implementación a un nivel más profundo que el léxico.
+
+Desde el punto de vista estructural, estos enfoques modelan el código considerando unidades como funciones, bloques de control, clases y relaciones entre componentes. A partir de estas unidades, se pueden derivar métricas que describen la organización del programa, como la profundidad de anidamiento, la complejidad ciclomática o el número de llamadas a funciones. Asimismo, se pueden identificar similitudes dentro de límites sintácticos específicos, como bloques de instrucciones o definiciones de funciones, lo que permite caracterizar la estructura del software a diferentes niveles de granularidad \cite{Roy2007Survey, Horvath2026ProgrammerAttribution}.
+
+En términos de capacidad de análisis, los enfoques estructurales permiten capturar la organización lógica del código y las preferencias de diseño del programador, más allá del vocabulario utilizado. Esto incluye aspectos como la descomposición funcional, la modularidad y los patrones de organización recurrentes. Sin embargo, estas representaciones siguen siendo esencialmente estáticas, ya que no incorporan información sobre el comportamiento dinámico del programa ni sobre su semántica profunda, lo que limita su capacidad para identificar equivalencias funcionales complejas \cite{Horvath2026ProgrammerAttribution}.
+
+\textbf{Fortalezas}
+\begin{itemize}
+    \item \textbf{Captura de organización del código:} Permiten modelar la estructura lógica del programa, incluyendo la disposición de funciones, bloques y relaciones entre componentes \cite{Roy2007Survey}.
+    
+    \item \textbf{Independencia parcial del texto:} Son menos sensibles a cambios superficiales como formato o nombres de variables en comparación con los enfoques textuales.
+    
+    \item \textbf{Utilidad en análisis de diseño:} Facilitan la identificación de patrones estructurales y preferencias de codificación del autor \cite{Horvath2026ProgrammerAttribution}.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Ausencia de semántica profunda:} No capturan completamente el comportamiento funcional del programa, limitando la detección de clones semánticos \cite{karakatic2022software}.
+    
+    \item \textbf{Sensibilidad a cambios estructurales:} Modificaciones como sustituir un tipo de bucle por otro pueden alterar la estructura sin cambiar la funcionalidad \cite{Roy2007Survey}.
+    
+    \item \textbf{Ambigüedad en métricas:} Diferentes fragmentos de código pueden presentar métricas estructurales similares sin ser realmente equivalentes.
+    
+    \item \textbf{Granularidad limitada:} Tienden a enfocarse en relaciones locales, dificultando la captura de dependencias globales dentro del programa \cite{karakatic2022software}.
+\end{itemize}
+
+En conjunto, los enfoques estructurales representan un avance significativo respecto a los métodos puramente textuales, al incorporar información sobre la organización interna del código. No obstante, sus limitaciones evidencian la necesidad de representaciones más ricas que permitan modelar explícitamente las relaciones entre instrucciones y el flujo de información dentro del programa, lo cual conduce al uso de representaciones más avanzadas basadas en grafos y estructuras semánticas.
+
+% -----------------------------
+\subsection{Enfoques basados en semántica}
+
+Los enfoques basados en semántica buscan analizar el código fuente desde la perspectiva de su comportamiento funcional, superando las limitaciones de los métodos textuales y estructurales. En lugar de centrarse en cómo está escrito o organizado un programa, estos enfoques intentan comprender qué hace realmente, modelando la lógica de ejecución y las relaciones entre los datos.
+
+Desde esta perspectiva, la semántica del código se representa mediante estructuras que capturan el flujo de control y de datos, como los Grafos de Dependencia de Programas (PDG) o los Grafos de Flujo de Control (CFG). Estas representaciones permiten abstraer el comportamiento del programa al modelar cómo se ejecutan las instrucciones y cómo se transforman los valores a lo largo del mismo. De este modo, es posible identificar equivalencias funcionales incluso cuando la implementación difiere completamente a nivel sintáctico \cite{Roy2007Survey, Yu2023Graph}.
+
+El objetivo principal de estos enfoques es resolver el problema de los clones semánticos (Tipo IV), definidos como fragmentos de código que implementan la misma funcionalidad o producen los mismos resultados, a pesar de estar escritos de manera diferente. Este tipo de similitud representa el nivel más profundo de análisis, ya que requiere identificar equivalencias en términos de precondiciones, transformaciones y postcondiciones, ignorando completamente la forma textual o estructural del código \cite{Roy2007Survey, Yu2023Graph}.
+
+No obstante, esta capacidad implica un alto costo computacional y conceptual. La detección de similitud semántica ha sido caracterizada como un problema altamente complejo e incluso indecidible en el caso general. Los enfoques clásicos basados en grafos enfrentan dificultades como el isomorfismo de subgrafos, un problema de complejidad no polinómica que limita su escalabilidad. En respuesta, investigaciones recientes han propuesto modelos basados en aprendizaje profundo que permiten aproximar la semántica del código de manera más eficiente, utilizando arquitecturas como redes siamesas o mecanismos de atención para reducir el costo de comparación \cite{Yu2023Graph}. Asimismo, enfoques alternativos han explorado el uso de modelos de lenguaje para generar descripciones interpretables del comportamiento del código, evitando comparaciones estructurales costosas \cite{Gagnon2025Beyond}.
+
+\paragraph{Fortalezas y limitaciones}
+
+\textbf{Fortalezas}
+\begin{itemize}
+    \item \textbf{Captura de comportamiento funcional:} Permiten identificar equivalencias reales entre programas, independientemente de su forma textual o estructural.
+    
+    \item \textbf{Detección de clones semánticos:} Son los únicos enfoques capaces de abordar el problema de los clones Tipo IV de manera efectiva.
+    
+    \item \textbf{Robustez ante transformaciones:} Mantienen su efectividad frente a refactorizaciones, ofuscación o cambios de estilo en el código.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Alta complejidad computacional:} Problemas como el isomorfismo de grafos dificultan su aplicación en sistemas de gran escala.
+    
+    \item \textbf{Dificultad de implementación:} Requieren modelos avanzados o representaciones complejas del código.
+    
+    \item \textbf{Compromiso entre precisión y escalabilidad:} Métodos más precisos suelen ser menos eficientes, mientras que aproximaciones más rápidas pueden perder información semántica.
+\end{itemize}
+
+En síntesis, los enfoques semánticos representan el nivel más avanzado en la detección de similitud de código, al centrarse en la comprensión del comportamiento del programa. Sin embargo, su complejidad inherente ha impulsado el desarrollo de técnicas híbridas y representaciones más eficientes, lo que conduce naturalmente al análisis de cómo el código puede ser modelado internamente para capturar dicha semántica, tema que se abordará en la siguiente sección.
+% -----------------------------
+\subsection{Enfoques basados en aprendizaje automático}
+
+El análisis de código fuente ha evolucionado significativamente con la consolidación del área de investigación conocida como "Big Code", la cual parte de la premisa de que el código fuente puede interpretarse como una forma de lenguaje altamente estructurado \cite{Le2021DeepLearning}. Bajo este enfoque, los modelos de aprendizaje automático y aprendizaje profundo se emplean para inferir propiedades sintácticas y semánticas de los programas sin necesidad de ejecutarlos \cite{Alon2018Code2Vec}. A diferencia de las metodologías tradicionales, que dependen de heurísticas diseñadas manualmente, estos enfoques automatizan la extracción de características mediante la transformación del código en representaciones numéricas, comúnmente conocidas como embeddings, donde la información semántica se distribuye en un espacio vectorial continuo\cite{Le2021DeepLearning}.
+
+El paradigma dominante para procesar estas representaciones se fundamenta en arquitecturas de tipo codificador-decodificador(encoder-decoder). En este esquema, un modelo codificador recibe una representación del código —ya sea como secuencia de tokens, estructura sintáctica o grafo— y la transforma en un vector de contexto que captura sus propiedades relevantes. Posteriormente, un decodificador utiliza dicha representación para realizar tareas como clasificación, predicción o generación de código\cite{Le2021DeepLearning}. Frecuentemente, este proceso incorpora mecanismos de atención, los cuales permiten al modelo identificar y ponderar las partes más relevantes del código durante el proceso de inferencia, facilitando la captura de relaciones complejas dentro del programa\cite{Alon2018Code2Vec}.
+
+\textbf{Fortalezas}
+\begin{itemize}
+    \item \textbf{Generación automática de características:} Eliminan la necesidad de diseñar manualmente reglas o heurísticas para representar el código.
+    
+    \item \textbf{Captura de dependencias de largo alcance:} Permiten modelar relaciones entre elementos del código que se encuentran distantes en la estructura del programa \cite{Le2021DeepLearning}.
+    
+    \item \textbf{Agnosticismo del lenguaje:} Mediante representaciones intermedias, pueden generalizar a distintos lenguajes de programación.
+    
+    \item \textbf{Versatilidad:} Las representaciones aprendidas pueden reutilizarse en múltiples tareas, como detección de clones, búsqueda de código o atribución de autoría \cite{Alon2018Code2Vec}.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Problema de vocabulario abierto:} La creación arbitraria de identificadores introduce dificultades en la modelación de tokens no vistos previamente\cite{Le2021DeepLearning}.
+    
+    \item \textbf{Alta demanda de datos:} Requieren grandes volúmenes de datos para evitar el sobreajuste y lograr una adecuada generalización.
+    
+    \item \textbf{Alto costo computacional:} El entrenamiento y la inferencia implican un consumo significativo de recursos, especialmente en arquitecturas profundas.
+    
+    \item \textbf{Limitada interpretabilidad:} Los modelos suelen comportarse como cajas negras, dificultando la explicación de sus decisiones internas \cite{Alon2018Code2Vec}.
+\end{itemize}
+
+En síntesis, los enfoques basados en aprendizaje automático representan un cambio de paradigma al permitir la captura automática de patrones complejos en el código fuente, superando muchas de las limitaciones de los métodos tradicionales. No obstante, su eficacia depende directamente de la forma en que el código es representado antes de ser procesado, lo que refuerza la importancia de analizar en detalle las distintas representaciones del código fuente, tema que se aborda en la siguiente sección.
+
+% -----------------------------
+\subsection{Comparación de enfoques}
+% -----------------------------
+A partir del análisis de los distintos enfoques para la detección de similitud de código, es posible observar una evolución clara en el nivel de abstracción empleado para modelar los programas. Mientras que los enfoques textuales se centran en la superficie del código, los estructurales incorporan información sobre su organización interna, los semánticos buscan capturar su comportamiento funcional y, finalmente, los enfoques basados en aprendizaje automático permiten modelar estas propiedades de manera automática mediante representaciones vectoriales.
+
+Esta progresión implica un compromiso inherente entre precisión semántica, complejidad computacional y escalabilidad. En la Tabla~\ref{tab:comparacion_enfoques} se presenta una comparación general de los enfoques analizados.
+
+\begin{table}[H]
+\centering
+\caption{Comparación de enfoques para la detección de similitud de código}
+\label{tab:comparacion_enfoques}
+\begin{tabular}{|p{3cm}|p{3cm}|p{3cm}|p{2.5cm}|}
+\hline
+\textbf{Enfoque} & \textbf{Nivel de abstracción} & \textbf{Tipo de similitud} & \textbf{Costo computacional} \\ \hline
+
+Textual & Bajo (cadenas de texto) & Léxica (Tipo I) & Bajo \\ \hline
+
+Estructural & Medio (organización del código) & Sintáctica / estructural (Tipo II-III) & Medio \\ \hline
+
+Semántico & Alto (comportamiento del programa) & Funcional (Tipo IV) & Alto \\ \hline
+
+Aprendizaje automático & Variable (dependiente de la representación) & Sintáctica y semántica (aproximada) & Alto \\ \hline
+
+\end{tabular}
+\end{table}
+
+Como se observa, ningún enfoque resulta completamente dominante en todos los escenarios. Los métodos más simples ofrecen alta eficiencia y escalabilidad, pero carecen de profundidad semántica, mientras que los enfoques más avanzados logran capturar el comportamiento del programa a costa de un mayor costo computacional y complejidad de implementación. En este sentido, muchas soluciones modernas combinan múltiples enfoques para equilibrar estas propiedades.
+
+Finalmente, es importante destacar que todos los enfoques descritos dependen fundamentalmente de cómo se representa internamente el código fuente. Ya sea como texto, estructuras sintácticas, grafos o vectores en espacios de alta dimensión, la representación elegida determina qué tipo de información puede ser capturada y procesada. Por ello, en la siguiente sección se analizan en detalle las principales representaciones del código fuente, las cuales constituyen la base sobre la que se construyen los distintos métodos de detección de similitud.
+%############################################################################
+
+\section{Representaciones del código fuente}
+
+El análisis automático de código fuente requiere transformar los programas en estructuras que permitan su procesamiento y comparación. Estas transformaciones, conocidas como representaciones del código, constituyen un elemento fundamental en los sistemas de detección de similitud, ya que determinan el tipo de información que puede ser capturada y analizada.
+
+El código puede representarse en distintos niveles de abstracción, que van desde su forma textual hasta estructuras que modelan su comportamiento semántico. Cada tipo de representación presenta ventajas y limitaciones, por lo que su elección depende del tipo de similitud que se desea identificar.
+
+
+% =========================================================
+\subsection{Representaciones textuales}
+% =========================================================
+
+El nivel más básico para representar el código fuente consiste en tratarlo como una secuencia lineal de elementos. Estas representaciones se diferencian principalmente por el nivel de abstracción aplicado sobre el texto original. A continuación, se describen las principales variantes:
+
+\begin{itemize}
+    \item \textbf{Representación a nivel de caracteres:} El código se modela como una secuencia continua de caracteres. La comparación se realiza directamente sobre subcadenas mediante técnicas como \textit{fingerprinting}. Esta aproximación es simple y eficiente, pero altamente sensible a cambios mínimos en formato, como espacios, indentación o saltos de línea \cite{Roy2007Survey}.
+    
+    \item \textbf{Representación a nivel de tokens:} El código se transforma mediante un analizador léxico (\textit{lexer}) en una secuencia de \textit{tokens}, como palabras clave, operadores e identificadores. Esta abstracción elimina elementos irrelevantes del formato y permite una comparación más robusta. Adicionalmente, es común aplicar normalización, sustituyendo nombres de variables y literales por símbolos genéricos para reducir la variabilidad \cite{Roy2007Survey}.
+    
+    \item \textbf{Representación basada en \textit{n}-gramas:} A partir de secuencias de caracteres o \textit{tokens}, se construyen subsecuencias contiguas de longitud $n$. Estas ventanas deslizantes capturan información contextual local y patrones de orden en el código. En la práctica, valores entre 6 y 8 tokens suelen ofrecer un buen balance entre precisión y generalización\cite{Burrows2007Ngrams}.
+\end{itemize}
+
+Para el procesamiento de estas representaciones, se aplica un ciclo de preprocesamiento que incluye la eliminación de comentarios y espacios en blanco, así como la posible normalización de identificadores. Posteriormente, las secuencias resultantes son comparadas utilizando estructuras de datos eficientes, como árboles de sufijos (\textit{suffix trees}), o mediante técnicas de recuperación de información que evalúan la similitud a partir de patrones compartidos\cite{Roy2007Survey}.
+
+Basado en la investigacion realizada por Roy en 2007, se exponen las ventajas y limitaciones de utilizar esta representación para analizar código fuente \cite{Roy2007Survey}: 
+
+\textbf{Ventajas}
+\begin{itemize}
+    \item \textbf{Alta portabilidad:} Pueden aplicarse a distintos lenguajes con un esfuerzo mínimo.
+    
+    \item \textbf{Eficiencia y escalabilidad:} Permiten analizar grandes volúmenes de código con bajo costo computacional.
+    
+    \item \textbf{Robustez frente al formato:} Especialmente en representaciones por \textit{tokens}, se eliminan variaciones superficiales.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Falsos positivos por normalización:} La abstracción puede generar coincidencias irrelevantes.
+    
+    \item \textbf{Ausencia de semántica:} No capturan el comportamiento ni la estructura profunda del programa.
+    
+    \item \textbf{Sensibilidad al orden:} Cambios en la secuencia afectan directamente la similitud detectada.
+\end{itemize}
+
+En síntesis, las representaciones textuales ofrecen una solución eficiente y ampliamente aplicable para el análisis de similitud de código. Sin embargo, su naturaleza lineal limita su capacidad para modelar la estructura interna del programa, lo que motiva el uso de representaciones más ricas basadas en la sintaxis del lenguaje, las cuales se abordan en la siguiente sección.
+
+
+
+% =========================================================
+\subsection{Representaciones sintácticas: Árboles de Sintaxis Abstracta}
+% =========================================================
+
+Las representaciones sintácticas constituyen un nivel de abstracción superior respecto a las representaciones textuales, al modelar explícitamente la estructura gramatical del código fuente. La forma más representativa de este enfoque es el Árbol de Sintaxis Abstracta (AST, por sus siglas en inglés), el cual representa el programa como una estructura jerárquica en forma de árbol.
+
+Un AST es una representación estructurada del código en la que se eliminan elementos superficiales como espacios en blanco, comentarios o detalles de formato, conservando únicamente la información relevante desde el punto de vista sintáctico. En esta estructura, los nodos internos representan constructos del lenguaje (por ejemplo, condicionales, bucles o declaraciones de funciones), mientras que los nodos hoja corresponden a operandos como identificadores o valores literales. De esta manera, el AST captura la organización jerárquica del programa conforme a la gramática del lenguaje \cite{Roy2007Survey, Bogomolov2021Authorship}.
+
+Song \cite{Song2024AST} explica en su articulo que la construcción de un AST se realiza mediante un analizador sintáctico (\textit{parser}), el cual procesa la secuencia de \textit{tokens} generada previamente y la organiza según las reglas de una gramática libre de contexto. Herramientas modernas como \textit{Tree-sitter} o \textit{ANTLR} permiten automatizar este proceso, generando estructuras de datos navegables que representan fielmente la sintaxis del programa.
+
+A diferencia de las representaciones textuales, los AST permiten capturar la estructura lógica del código de manera más precisa, agrupando instrucciones en subárboles que corresponden a unidades sintácticas bien definidas\cite{Pradeep2025AntiPlagiarism}. Esto permite abstraer detalles como nombres de variables o formato, enfocándose en la estructura interna del programa y facilitando la detección de similitudes estructurales profundas.
+
+\textbf{Ventajas}
+\begin{itemize}
+    \item \textbf{Alta precisión estructural:} Al basarse en la gramática del lenguaje, permiten capturar relaciones sintácticas complejas con mayor exactitud que las representaciones textuales.
+    
+    \item \textbf{Robustez ante cambios superficiales:} Son inmunes a modificaciones de formato, renombrado de variables o alteraciones de estilo \cite{Pradeep2025AntiPlagiarism}.
+    
+    \item \textbf{Adecuados para análisis estructural avanzado:} Los subárboles representan unidades lógicas bien definidas, lo que facilita tareas como detección de clones estructurales o refactorización\cite{Roy2007Survey}.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Dependencia del lenguaje:} Requieren analizadores sintácticos específicos para cada lenguaje de programación, lo que reduce su portabilidad\cite{Roy2007Survey}.
+    
+    \item \textbf{Costo computacional elevado:} La comparación entre árboles (por ejemplo, mediante distancia de edición o isomorfismo) implica algoritmos costosos, lo que limita su escalabilidad\cite{Pradeep2025AntiPlagiarism}.
+    
+    \item \textbf{Limitada captura de semántica:} Aunque representan la sintaxis con precisión, no modelan explícitamente el flujo de datos ni el comportamiento del programa.
+    
+    \item \textbf{Sensibilidad a cambios estructurales equivalentes:} Transformaciones como sustituir un tipo de bucle por otro pueden alterar significativamente la estructura del árbol sin modificar la funcionalidad\cite{Roy2007Survey}.
+\end{itemize}
+
+En síntesis, los Árboles de Sintaxis Abstracta representan un avance significativo respecto a las representaciones textuales, al permitir modelar de forma explícita la estructura jerárquica del código. Sin embargo, su incapacidad para capturar el comportamiento dinámico del programa evidencia la necesidad de representaciones más expresivas que incorporen relaciones de control y flujo de datos. En este contexto, la siguiente sección aborda las representaciones basadas en grafos, las cuales extienden el análisis sintáctico hacia una comprensión más profunda de la semántica del código.
+
+% =========================================================
+\subsection{Representaciones basadas en grafos}
+% =========================================================
+
+Para superar las limitaciones de las representaciones puramente sintácticas y capturar el comportamiento lógico del código fuente, se emplean las representaciones basadas en grafos. Estas estructuras modelan el programa como una red de relaciones, donde los nodos representan entidades del código (como sentencias o variables) y las aristas representan dependencias o relaciones de ejecución \cite{Yu2023Graph}. A continuación, se describen las principales variantes:
+
+\begin{itemize}
+    \item \textbf{Grafo de Flujo de Control (CFG):} Representa el orden de ejecución de las instrucciones dentro de un programa. Sus aristas dirigidas indican los posibles caminos que puede seguir la ejecución, permitiendo modelar estructuras como condicionales, ciclos y bifurcaciones \cite{Yu2023Graph}.
+
+    \item \textbf{Grafo de Flujo de Datos (DFG):} Modela cómo los datos se producen, transforman y consumen a lo largo del programa. Las aristas representan dependencias entre variables, indicando de dónde proviene un valor y cómo se propaga dentro del código\cite{Guo2021GraphCodeBERT}.
+
+    \item \textbf{Grafo de Dependencia de Programas (PDG):} Integra tanto el flujo de control como el flujo de datos en una única representación. Permite capturar de manera conjunta las dependencias de ejecución y de información, ofreciendo una visión semántica completa del comportamiento del programa \cite{Yu2023Graph}.
+\end{itemize}
+
+Lu \cite{Lu2026CSSG} expone que diferencia de los Árboles de Sintaxis Abstracta (AST), que capturan únicamente la jerarquía gramatical del código, las representaciones basadas en grafos modelan explícitamente las dependencias que determinan el comportamiento en tiempo de ejecución. Esto permite representar relaciones causales entre instrucciones, así como dependencias de datos que no son evidentes en estructuras sintácticas. Además, los grafos pueden modelar ciclos de ejecución, como los presentes en bucles o recursividad, lo que los hace más expresivos que los árboles tradicionales.
+
+\textbf{Ventajas}
+\begin{itemize}
+    \item \textbf{Riqueza semántica profunda:} Capturan simultáneamente la información local y global de la lógica del programa, facilitando la detección de similitudes funcionales complejas.
+
+    \item \textbf{Inmunidad a la variabilidad estructural:} Al centrarse en el flujo real de la información, abstraen diferencias superficiales en la sintaxis o estilo del código \cite{Yu2023Graph}.
+
+    \item \textbf{Resolución de dependencias a largo plazo:} Permiten modelar relaciones entre elementos distantes dentro del programa que son algorítmicamente dependientes \cite{Guo2021GraphCodeBERT}.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Alta complejidad computacional:} La construcción y comparación de grafos implica algoritmos costosos en tiempo y memoria, dificultando su escalabilidad.
+
+    \item \textbf{Dificultad técnica de extracción:} Requieren herramientas avanzadas de análisis estático y compilación, adaptadas a cada lenguaje de programación \cite{Yu2023Graph}.
+\end{itemize}
+
+En síntesis, las representaciones basadas en grafos constituyen uno de los niveles más expresivos para modelar el código fuente, al capturar explícitamente su comportamiento y dependencias internas. Sin embargo, su alto costo computacional y complejidad técnica han impulsado el desarrollo de representaciones más compactas y eficientes, particularmente aquellas orientadas a aprendizaje automático, donde el objetivo es proyectar estas estructuras complejas en espacios vectoriales continuos que faciliten su procesamiento.
+
+% =========================================================
+\subsection{Representaciones distribuidas: embeddings}
+% =========================================================
+
+Las representaciones distribuidas, comúnmente conocidas como \textit{embeddings}, constituyen un enfoque en el que los elementos de código fuente intrínsecamente discretos— se proyectan en un espacio vectorial continuo de dimensiones fijas y reducidas \cite{Alon2018Code2Vec}. A diferencia de las representaciones simbólicas tradicionales, donde cada elemento posee una identidad independiente, en los \textit{embeddings} el significado semántico y estructural del código se distribuye a lo largo de múltiples dimensiones numéricas. Como resultado, fragmentos de código con comportamientos similares tienden a ubicarse en regiones cercanas dentro de este espacio vectorial\cite{Alon2018Code2Vec}.
+
+El proceso de vectorización consiste en transformar distintas representaciones del código como secuencias de \textit{tokens}, identificadores, rutas en Árboles de Sintaxis Abstracta (AST) o incluso instrucciones de bajo nivel en vectores numéricos densos de alta dimensionalidad \cite{Alon2018Code2Vec}. A diferencia de enfoques tradicionales como los \textit{n-gramas} o la codificación \textit{one-hot}, que generan representaciones dispersas y de gran tamaño, los métodos modernos comprimen esta información en vectores compactos (usualmente entre 100 y 1024 dimensiones)\cite{Alon2018Code2Vec}. En estos vectores, cada dimensión no corresponde a una característica explícita, sino a patrones latentes que capturan regularidades estructurales y semánticas del código \cite{Gagnon2025Beyond}.
+
+La relación entre los \textit{embeddings} y el aprendizaje automático es fundamental, Alon \cite{Alon2018Code2Vec} explica ya que los modelos de aprendizaje profundo requieren entradas numéricas continuas para operar. Al transformar el código en vectores, se habilita el uso de arquitecturas avanzadas como redes neuronales profundas o modelos basados en atención que permiten resolver tareas complejas de ingeniería de software, incluyendo detección de clones, búsqueda de código y generación automática. En este contexto, el aprendizaje se basa en la optimización de operaciones matemáticas sobre vectores, en lugar de depender de reglas explícitas diseñadas manualmente.
+
+\textbf{Ventajas}
+\begin{itemize}
+    \item \textbf{Generalización y escalabilidad:} Permiten modelar patrones complejos en un espacio continuo, facilitando la generalización a casos no observados previamente y reduciendo la complejidad combinatoria de los enfoques simbólicos.
+    
+    \item \textbf{Captura de semántica profunda:} Son capaces de representar similitudes funcionales complejas y relaciones abstractas entre fragmentos de código\cite{Alon2018Code2Vec}.
+    
+    \item \textbf{Robustez ante variaciones:} Mantienen su efectividad frente a cambios sintácticos, diferencias de compilación o variaciones estructurales\cite{Gagnon2025Beyond}.
+\end{itemize}
+
+\textbf{Limitaciones}
+\begin{itemize}
+    \item \textbf{Falta de interpretabilidad:} Los vectores generados carecen de significado directo para el análisis humano, dificultando la explicación de los resultados.
+    
+    \item \textbf{Compromiso entre precisión y eficiencia:} La búsqueda en espacios de alta dimensionalidad requiere técnicas aproximadas que pueden degradar la exactitud.
+    
+    \item \textbf{Alta dependencia de datos:} Requieren grandes volúmenes de datos y recursos computacionales, además de enfrentar problemas asociados al vocabulario abierto \cite{Gagnon2025Beyond}.
+\end{itemize}
+
+En síntesis, los \textit{embeddings} representan una evolución hacia representaciones compactas, continuas y altamente expresivas del código fuente, permitiendo integrar de manera eficiente información sintáctica y semántica en un único espacio matemático. No obstante, su efectividad depende tanto de la calidad de los datos como de las arquitecturas utilizadas para aprender dichas representaciones, lo que conduce al estudio de los modelos y técnicas específicas que operan sobre estos vectores, tema que se aborda en la siguiente sección.
+
+% =========================================================
+\subsection{Comparación de representaciones}
+% =========================================================
+
+Las distintas representaciones del código fuente analizadas difieren en el nivel de abstracción, el tipo de información que capturan y su costo computacional. Mientras que las representaciones textuales priorizan la eficiencia y simplicidad, las representaciones sintácticas y basadas en grafos incrementan progresivamente la capacidad de modelar la estructura y el comportamiento del programa. Por su parte, los \textit{embeddings} permiten integrar estas características en espacios vectoriales continuos, facilitando su procesamiento mediante modelos de aprendizaje automático.
+
+La Tabla~\ref{tab:comparacion_representaciones} resume las principales características de cada tipo de representación.
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{\textwidth}{lXXXX}
+\hline
+\textbf{Representación} & \textbf{Nivel de abstracción} & \textbf{Capacidad semántica} & \textbf{Costo computacional} & \textbf{Escalabilidad} \\
+\hline
+Textual & Bajo & Baja & Bajo & Alta \\
+AST & Medio & Media & Medio & Media \\
+Grafos & Alto & Alta & Alto & Baja \\
+Embeddings & Alto & Alta & Alto & Alta \\
+\hline
+\end{tabularx}
+\caption{Comparación de representaciones del código fuente}
+\end{table}
+
+Como se observa, existe un compromiso claro entre expresividad y eficiencia. Las representaciones más simples permiten procesar grandes volúmenes de código con bajo costo, pero carecen de la capacidad para capturar relaciones profundas. En contraste, las representaciones más complejas, como los grafos o los \textit{embeddings}, logran modelar información semántica rica, aunque a costa de un mayor consumo de recursos y complejidad de implementación.
+
+% =========================================================
+\subsection*{Conclusión de la sección}
+% =========================================================
+
+En conjunto, las representaciones del código fuente constituyen la base sobre la cual se construyen los sistemas de análisis y detección de similitud. Cada nivel de abstracción aporta una perspectiva distinta del programa: desde su forma superficial hasta su comportamiento funcional. Sin embargo, ninguna representación es universalmente superior, ya que su efectividad depende del tipo de problema abordado, del nivel de similitud que se desea capturar y de las restricciones computacionales del sistema.
+
+En este contexto, las tendencias actuales en la investigación se orientan hacia la combinación de múltiples representaciones o hacia el uso de modelos capaces de aprender automáticamente representaciones más ricas a partir de los datos. Esto conduce naturalmente al estudio de los métodos y modelos que operan sobre dichas representaciones, los cuales permiten explotar su potencial para tareas específicas de ingeniería de software, tema que se desarrolla en la siguiente sección.
+
+% =========================================================
+\section{Medidas de similitud en código fuente}
+% =========================================================
+
+El análisis de similitud en código fuente constituye un componente fundamental en tareas como la detección de clones, la atribución de autoría y la búsqueda de código. A diferencia de otras formas de comparación, la similitud en código no es un concepto único, sino que depende del nivel de abstracción considerado y de la representación utilizada. En este sentido, diferentes métricas permiten capturar desde coincidencias superficiales hasta equivalencias funcionales complejas, estableciendo un vínculo directo entre la forma en que el código es modelado y la manera en que se compara.
+
+% ---------------------------------------------------------
+\subsection{Concepto de similitud en código fuente}
+% ---------------------------------------------------------
+
+En el análisis de código fuente, la noción de similitud no posee una definición única y universal, ya que depende del contexto de estudio, de las representaciones utilizadas y de las métricas empleadas para su evaluación \cite{Roy2007Survey}. En términos generales, la similitud se define de manera operativa: dos fragmentos de código son considerados similares si comparten un conjunto suficiente de características según un criterio específico de comparación\cite{Bellon2007Comparison}.
+
+Esta definición implica que la similitud no es un concepto absoluto, sino relativo al nivel de abstracción considerado. Dependiendo del enfoque adoptado, la comparación puede centrarse en propiedades superficiales del código, en su organización estructural o en su comportamiento funcional. En consecuencia, la capacidad de detectar similitud está directamente condicionada por la representación interna del código y por las métricas aplicadas sobre dicha representación \cite{Lu2026CSSG}.
+
+Con el objetivo de estandarizar estos distintos niveles de análisis, la literatura ha establecido una taxonomía ampliamente aceptada basada en distintos tipos de clones de código, los cuales reflejan diferentes grados de similitud entre fragmentos \cite{Bellon2007Comparison}. Esta clasificación se describe con mayor detalle en la siguiente sección.
+
+% ---------------------------------------------------------
+\subsection{Tipos de similitud}
+% ---------------------------------------------------------
+
+En el análisis de código fuente, la similitud puede evaluarse en distintos niveles de abstracción, los cuales determinan qué propiedades del programa son consideradas durante la comparación. Estos niveles permiten operacionalizar el concepto de similitud en función de la representación utilizada, estableciendo una relación directa con la taxonomía de clones de código (Tipo I a IV) \cite{Roy2007Survey, Lu2026CSSG}
+
+\begin{itemize}
+
+\item \textbf{Similitud léxica:} Corresponde al nivel más superficial de análisis, en el cual el código se representa como texto plano o como secuencias de \textit{tokens} obtenidas mediante análisis léxico. En este nivel, la similitud se mide a partir del solapamiento de caracteres o unidades léxicas, ignorando la estructura gramatical del programa\cite{Lu2026CSSG}. Este tipo de similitud permite detectar principalmente clones de \textbf{Tipo I}, donde los fragmentos son prácticamente idénticos, y clones de \textbf{Tipo II}, en los que existen variaciones sistemáticas en identificadores o literales. Adicionalmente, ciertos métodos léxicos con tolerancia a modificaciones pueden identificar clones de \textbf{Tipo III}, en presencia de inserciones o eliminaciones de sentencias \cite{Roy2007Survey}.
+
+\item \textbf{Similitud sintáctica:} Se centra en la estructura gramatical del código, abstrayendo los detalles superficiales para modelar la organización jerárquica de las instrucciones mediante representaciones como los Árboles de Sintaxis Abstracta (AST) \cite{Lu2026CSSG}. Este enfoque permite comparar directamente la forma estructural de los programas, identificando correspondencias entre subárboles. A este nivel, es posible detectar clones de \textbf{Tipo II}, cuando la estructura se mantiene pero cambian los elementos léxicos, así como clones de \textbf{Tipo III}, donde existen modificaciones en la organización interna del código \cite{Roy2007Survey}.
+
+\item \textbf{Similitud semántica:} Representa el nivel más profundo de análisis, ya que se enfoca en el comportamiento funcional del programa. En lugar de considerar la forma del código, este enfoque modela la lógica de ejecución y las dependencias de datos y control, comúnmente mediante grafos como los PDG. Este nivel permite identificar clones de \textbf{Tipo IV}, en los cuales dos fragmentos son funcionalmente equivalentes, aun cuando difieren completamente en su implementación sintáctica \cite{Lu2026CSSG}.
+
+\end{itemize}
+
+En conjunto, estos niveles de similitud reflejan una progresión desde comparaciones superficiales hacia análisis más profundos y expresivos. Sin embargo, cada nivel requiere el uso de técnicas y herramientas específicas para cuantificar la similidad entre fragmentos de código. En este contexto, resulta necesario definir formalmente las métricas que permiten medir dicha similitud, tema que se aborda en la siguiente sección.
+
+
+% ---------------------------------------------------------
+\subsection{Métricas de similitud}
+% ---------------------------------------------------------
+
+Las métricas de similitud permiten cuantificar el grado de semejanza entre dos fragmentos de código a partir de su representación interna. La elección de la métrica depende directamente del nivel de abstracción considerado, ya que no es lo mismo comparar cadenas de texto que estructuras sintácticas, grafos o vectores continuos. A continuación, se presentan las principales categorías de métricas utilizadas en la literatura.
+
+% -----------------------------
+\subsubsection{Métricas basadas en texto}
+% -----------------------------
+
+Estas métricas operan sobre representaciones léxicas o de caracteres, evaluando el solapamiento superficial entre fragmentos de código.
+
+\textbf{Similitud de Jaccard:} Mide la proporción de elementos compartidos entre dos conjuntos de \textit{tokens}. Se define como la intersección dividida entre la unión de ambos conjuntos. Es simple y eficiente, pero no captura el orden ni la estructura del código.
+
+\textbf{Distancia de Levenshtein:} Calcula el número mínimo de operaciones (inserciones, eliminaciones o sustituciones) necesarias para transformar una cadena en otra. Es útil para detectar copias cercanas, pero es sensible a cambios pequeños como renombramiento de variables o reordenamiento de instrucciones.
+
+En general, estas métricas son rápidas y escalables, pero limitadas a similitud superficial.
+
+% -----------------------------
+\subsubsection{Métricas estructurales}
+% -----------------------------
+
+Estas métricas analizan la estructura sintáctica del código, generalmente a través de Árboles de Sintaxis Abstracta (AST).
+
+\textbf{Tree Edit Distance (TED):} Mide el costo de transformar un árbol en otro mediante operaciones como insertar, eliminar o modificar nodos. Permite cuantificar la similitud estructural entre programas.
+
+\textbf{Comparación de subárboles:} Para mejorar la eficiencia, algunos enfoques comparan subárboles mediante técnicas de \textit{hashing} o conjuntos, identificando coincidencias estructurales sin calcular la distancia exacta. En algunos casos, se aplica la similitud de Jaccard sobre conjuntos de subárboles.
+
+Estas métricas capturan mejor la organización del código, aunque con mayor costo computacional.
+
+% -----------------------------
+\subsubsection{Métricas basadas en grafos}
+% -----------------------------
+
+Estas métricas evalúan la similitud a nivel semántico mediante representaciones como CFG o PDG.
+
+\textbf{Graph Edit Distance (GED):} Similar al caso de árboles, mide el costo de transformar un grafo en otro considerando operaciones sobre nodos y aristas. Permite capturar diferencias en el flujo de control y datos.
+
+\textbf{Isomorfismo de grafos:} Busca subgrafos estructuralmente idénticos entre dos programas. Es una de las formas más precisas de detectar equivalencia semántica, pero su complejidad es elevada (problema NP-Completo), lo que limita su uso en sistemas grandes.
+
+Estas métricas ofrecen una visión profunda del comportamiento del programa, pero son costosas y difíciles de escalar.
+
+% -----------------------------
+\subsubsection{Métricas en espacios vectoriales}
+% -----------------------------
+
+Estas métricas operan sobre representaciones distribuidas (\textit{embeddings}), midiendo similitud mediante operaciones geométricas.
+
+\textbf{Similitud del coseno:} Mide el ángulo entre dos vectores, independientemente de su magnitud. Es la métrica más utilizada, ya que captura similitud semántica sin verse afectada por la longitud del código.
+
+\textbf{Producto punto:} Evalúa la alineación entre vectores. En modelos normalizados, es equivalente a la similitud del coseno y se usa frecuentemente en sistemas de recuperación de código.
+
+\textbf{Distancia euclidiana:} Calcula la distancia directa entre vectores en el espacio. Aunque es intuitiva, puede verse afectada por la magnitud de los vectores, por lo que es menos utilizada en comparación con el coseno.
+
+Estas métricas permiten comparar código de manera eficiente en sistemas modernos basados en aprendizaje automático.
+
+% -----------------------------
+\paragraph{Síntesis}
+
+En conjunto, las métricas de similitud reflejan el nivel de abstracción de la representación utilizada: mientras que las métricas textuales priorizan eficiencia, las estructurales y de grafos aumentan la precisión a costa de mayor complejidad, y las métricas vectoriales ofrecen un equilibrio mediante representaciones continuas. Esta diversidad de enfoques evidencia que no existe una única métrica universal, sino que su selección depende del tipo de similitud que se desea capturar y del contexto de aplicación.
+
+% ---------------------------------------------------------
+\subsection{Comparación de métricas de similitud}
+% ---------------------------------------------------------
+
+Las métricas descritas anteriormente difieren significativamente en cuanto al nivel 
+de abstracción que explotan, el tipo de similitud que son capaces de capturar y el 
+costo computacional que implican. La Tabla~\ref{tab:comparacion_metricas} resume 
+estas diferencias a partir de las dimensiones más relevantes para el análisis de 
+código fuente.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparación de métricas de similitud en código fuente}
+\label{tab:comparacion_metricas}
+\small
+\begin{tabularx}{\textwidth}{lXXXX}
+\hline
+\textbf{Métrica} & \textbf{Nivel} & \textbf{Tipo de similitud} 
+& \textbf{Costo computacional} & \textbf{Robustez ante cambios} \\
+\hline
+Similitud de Jaccard   & Léxico     & Léxica (Tipo I-II)      & Bajo  & Baja \\
+Distancia de Levenshtein & Léxico   & Léxica (Tipo I-II)      & Bajo  & Baja \\
+Tree Edit Distance     & Sintáctico & Estructural (Tipo II-III) & Medio & Media \\
+Comparación de subárboles & Sintáctico & Estructural (Tipo II-III) & Medio & Media \\
+Graph Edit Distance    & Semántico  & Funcional (Tipo III-IV)  & Alto  & Alta \\
+Isomorfismo de grafos  & Semántico  & Funcional (Tipo IV)      & Muy alto & Alta \\
+Similitud del coseno   & Vectorial  & Sintáctica y semántica   & Bajo  & Alta \\
+Distancia euclidiana   & Vectorial  & Sintáctica y semántica   & Bajo  & Media \\
+\hline
+\end{tabularx}
+\end{table}
+
+Como se observa, existe una relación directa entre la profundidad semántica de una 
+métrica y su costo computacional. Las métricas léxicas como Jaccard o Levenshtein 
+ofrecen alta eficiencia y son adecuadas para detectar copias directas, pero su 
+sensibilidad a cambios superficiales como el renombrado de variables o el 
+reordenamiento de instrucciones limita severamente su utilidad ante modificaciones 
+intencionales del código. Las métricas estructurales como el Tree Edit Distance 
+amplían el alcance del análisis al considerar la organización sintáctica del 
+programa, aunque su costo crece con la profundidad y complejidad de los árboles 
+comparados.
+
+En el extremo opuesto, las métricas basadas en grafos, como el isomorfismo de 
+subgrafos, ofrecen la mayor capacidad de abstracción al operar sobre representaciones 
+que modelan el comportamiento funcional del programa. Sin embargo, su complejidad 
+computacional las hace poco viables en escenarios de gran escala. Las métricas 
+vectoriales, en particular la similitud del coseno, representan un punto de 
+equilibrio notable: al operar sobre \textit{embeddings} continuos, combinan baja 
+complejidad operacional con alta robustez semántica, a condición de que los vectores 
+hayan sido generados por modelos capaces de capturar información estructural y 
+funcional del código.
+
+Esta última observación evidencia que la efectividad de una métrica no puede 
+evaluarse de forma aislada, sino que depende críticamente de la representación sobre 
+la que opera. En este sentido, la calidad del análisis semántico recae en gran medida 
+sobre los modelos encargados de generar dichas representaciones, los cuales se 
+describen en la siguiente sección.
+\section{Modelos para análisis de código}
+
+\subsection{Evolución del análisis automático de código}
+
+El análisis automatizado de código fuente ha atravesado una evolución metodológica 
+progresiva, impulsada por las limitaciones inherentes de cada generación de modelos. 
+Esta evolución refleja una transición desde enfoques que dependen de características 
+extraídas manualmente hacia arquitecturas capaces de aprender representaciones 
+semánticas de forma automática \cite{Alon2018Code2Vec}. Independientemente del 
+paradigma, los sistemas de análisis de código operan bajo un pipeline común de tres 
+etapas: la representación del código en objetos matemáticos procesables, el modelo 
+que procesa dichos objetos para resolver la tarea analítica, y la métrica que 
+cuantifica la similitud entre representaciones \cite{Alon2018Code2Vec}.
+
+\subsubsection{Modelos clásicos de aprendizaje automático}
+
+Los primeros enfoques para el análisis automático de código se apoyaron en algoritmos 
+de aprendizaje automático clásico, como las Máquinas de Vectores de Soporte (SVM), 
+los Bosques Aleatorios (Random Forests) y los k-Vecinos Más Cercanos (kNN). Estos 
+modelos operan sobre vectores de características construidos manualmente a partir del 
+código, como frecuencias de tokens, métricas de software o perfiles de n-gramas 
+\cite{Manning2008Introduction}. Su principal ventaja radica en su eficiencia 
+computacional y simplicidad de implementación.
+
+Sin embargo, su limitación fundamental es estructural: al depender de características 
+diseñadas por expertos, estos modelos capturan únicamente propiedades superficiales 
+del código. Ignoran el orden de las instrucciones, las dependencias entre variables y 
+la semántica funcional del programa, lo que los hace frágiles ante refactorizaciones, 
+renombrado de identificadores o cambios de estilo \cite{aiai2024proceedings}. Esta 
+incapacidad para abstraer la lógica del algoritmo motivó la adopción de arquitecturas 
+capaces de aprender representaciones directamente desde los datos.
+
+\subsubsection{Redes neuronales recurrentes y convolucionales}
+
+Las redes neuronales artificiales superaron la dependencia de la ingeniería manual de 
+características al aprender representaciones densas automáticamente mediante el 
+algoritmo de retropropagación \cite{Alon2018Code2Vec}. En el contexto del código, 
+dos familias de arquitecturas dominaron esta etapa.
+
+Las Redes Neuronales Recurrentes (RNN) y su variante con Memoria a Corto y Largo 
+Plazo (LSTM) modelaron el código como una secuencia temporal de tokens, procesándolo 
+de forma autorregresiva mediante la actualización de un estado oculto paso a paso \cite{Chung2014Empirical}. 
+Aunque demostraron utilidad en tareas locales, presentan dos limitaciones críticas : 
+la naturaleza estrictamente secuencial impide la paralelización computacional, y la 
+propagación de gradientes sufre de atenuación al intentar conectar dependencias a 
+largo alcance. En el código fuente, donde una variable puede declararse en las 
+primeras líneas y utilizarse cientos de líneas después, esta limitación resulta 
+especialmente crítica \cite{Le2021DeepLearning, Chung2014Empirical}.
+
+Las Redes Neuronales Convolucionales (CNN), en su variante a nivel de caracteres 
+(CharCNN) \cite{Zhang2015CharCNN}, abordaron el problema de la secuencialidad aplicando filtros locales 
+sobre el código tratado como señal en bruto. Esta aproximación permite aprender 
+patrones de estilo locales sin necesidad de analizadores sintácticos, lo que la hace 
+útil en tareas de estilometría \cite{Zhang2015CharCNN}. No obstante, al centrarse en ventanas locales de caracteres, las CNN carecen de mecanismos para capturar dependencias globales dentro 
+del programa, limitando su capacidad para modelar la semántica funcional del código \cite{Le2021DeepLearning}.
+
+En ambos casos, la limitación común es la incapacidad de relacionar directamente 
+elementos distantes dentro del programa en una sola operación, lo cual resulta 
+indispensable para el análisis semántico profundo.
+
+\subsubsection{Transformers}
+
+La arquitectura Transformer resolvió las limitaciones de los modelos anteriores al 
+prescindir completamente de mecanismos recurrentes o convolucionales, basándose 
+exclusivamente en el mecanismo de autoatención (self-attention) \cite{Vaswani2017Attention}. 
+Este mecanismo permite que cada elemento de una secuencia interactúe directamente 
+con todos los demás en una sola operación, capturando relaciones contextuales 
+globales mediante vectores de consultas (queries), claves (keys) y valores (values). 
+Como resultado, la longitud de dependencia entre elementos se reduce de $O(n)$ en 
+modelos recurrentes a $O(1)$, eliminando el problema de atenuación de gradientes.
+
+La atención multicabezal extiende esta capacidad al permitir que el modelo aprenda 
+distintas representaciones en paralelo dentro de múltiples subespacios, capturando 
+simultáneamente diferentes tipos de relaciones dentro del código. Estudios recientes 
+han demostrado que las capas profundas de los Transformers son capaces de reconstruir 
+implícitamente relaciones estructurales como el flujo de datos y control, permitiendo 
+que ciertas cabezas de atención se especialicen en el seguimiento de variables o 
+patrones algorítmicos \cite{Vaswani2017Attention}.
+
+Estas propiedades convierten a los Transformers en la arquitectura base de los 
+modelos modernos para análisis semántico de código, al ser los únicos capaces de 
+modelar dependencias globales, aprender representaciones automáticas y escalar 
+eficientemente mediante preentrenamiento a gran escala. Por esta razón, la 
+investigación actual en análisis de código se centra en modelos preentrenados basados 
+en Transformers, los cuales se diferencian principalmente por el tipo de 
+representación que utilizan como entrada, como se describe en la siguiente sección.
+
+\subsection{Modelos basados en texto y tokens}
+
+Los modelos basados en texto y tokens constituyen la primera generación de modelos 
+preentrenados aplicables al análisis de código fuente. Su principio fundamental es 
+tratar el código como si fuera lenguaje natural, procesándolo como una secuencia 
+lineal de caracteres o unidades léxicas sin considerar su organización sintáctica 
+ni su comportamiento funcional. Gracias a la capacidad de los Transformers para 
+capturar dependencias contextuales globales, estos modelos logran aprender 
+representaciones semánticas útiles únicamente a partir del texto del programa, 
+lo que los hace simples de aplicar y altamente portables entre lenguajes de 
+programación.
+
+\subsubsection{CuBERT}
+
+CuBERT es un modelo desarrollado por investigadores de Google Brain y el Indian 
+Institute of Science, diseñado como el primer embedding contextual preentrenado 
+específicamente para código fuente \cite{Kanade2020CuBERT}. Su arquitectura se 
+basa en BERT Large, un Transformer bidireccional que procesa la entrada completa 
+en ambas direcciones simultáneamente, lo que le permite capturar el contexto 
+tanto anterior como posterior de cada token.
+
+El modelo representa el código Python tratándolo como texto plano, tokenizándolo 
+mediante el analizador léxico estándar de Python y comprimiendo el vocabulario 
+con un codificador de subpalabras. Esta representación preserva los límites 
+sintácticos del código, como la separación de identificadores en formato 
+snake\_case, pero no incorpora ninguna información estructural explícita sobre 
+la organización del programa.
+
+CuBERT fue preentrenado sobre millones de archivos Python extraídos de 
+repositorios públicos de GitHub, utilizando el objetivo de Modelado de Lenguaje 
+Enmascarado (MLM), donde el modelo aprende a predecir tokens ocultos a partir 
+de su contexto. Sus aplicaciones principales incluyen clasificación de código y 
+detección de errores. Su limitación central es que al modelar el código 
+exclusivamente como secuencia de tokens, no captura relaciones de flujo de 
+control ni dependencias entre variables, lo que restringe su capacidad para 
+analizar la semántica funcional del programa.
+
+\subsubsection{CodeBERT}
+
+CodeBERT es un modelo bimodal desarrollado por Microsoft en colaboración con el Harbin Institute of Technology y la Universidad Sun Yat-sen, diseñado con el propósito de aprender representaciones universales que vinculen el código fuente con el lenguaje natural. Su arquitectura base consiste en un Transformer bidireccional multicapa, heredando la estructura neuronal y la configuración de hiperparámetros de RoBERTa-base, lo que le permite procesar contextos bilingües mediante 125 millones de parámetros.
+
+Para el análisis semántico, este modelo representa el código fuente estrictamente como una secuencia lineal de tokens, abstrayendo la organización gramatical o relacional del programa. Toma como entrada la concatenación de dos segmentos —lenguaje natural y código— separados por el token especial \textit{[SEP]} y precedidos por el identificador \textit{[CLS]}. La tokenización emplea el esquema \textit{WordPiece} para el texto y componentes léxicos para el código, generando como representación exacta vectores contextuales continuos por token y una representación matemática agregada de la secuencia completa a través del vector \textit{[CLS]}.
+
+CodeBERT se preentrena mediante una función híbrida que combina el Modelado de Lenguaje Enmascarado (MLM) y la Detección de Tokens Reemplazados (RTD), utilizando un corpus masivo de GitHub con 2.1 millones de pares bimodales y 6.4 millones de códigos unimodales en seis lenguajes de programación. Es una herramienta fundamental para la búsqueda de código, generación de documentación y detección de clones sintácticos. No obstante, la literatura documenta limitaciones críticas en la captura de semántica profunda al omitir estructuras jerárquicas (AST) o de flujo de datos, además de presentar una degradación significativa en la precisión ante dominios o funcionalidades no vistos previamente sin un proceso de ajuste fino (fine-tuning) intensivo.
+
+\subsubsection{RoBERTa para código}
+
+RoBERTa es un modelo desarrollado por Meta AI como una optimización del 
+preentrenamiento de BERT, eliminando el objetivo de Predicción de Siguiente 
+Oración y entrenando con mayor volumen de datos y por más tiempo \cite{Liu2019RoBERTa}. 
+En el contexto del análisis de código, ha sido adoptado como modelo base en 
+diversas investigaciones que tratan el código fuente como texto plano sin 
+representaciones estructurales adicionales.
+
+El modelo tokeniza el código mediante Codificación de Par de Bytes (BPE), un 
+esquema que combina representaciones a nivel de carácter y de palabra para 
+manejar identificadores y términos técnicos no vistos durante el entrenamiento, 
+reduciendo el problema de tokens fuera de vocabulario. Esta característica lo 
+hace más robusto que BERT ante el vocabulario abierto propio del código fuente, 
+donde los programadores crean identificadores arbitrarios.
+
+RoBERTa ha sido aplicado en tareas de clasificación y recuperación de fragmentos 
+de código \cite{Yang2021DeepSCC}, demostrando buena capacidad para distinguir patrones léxicos entre 
+lenguajes de programación. Su limitación principal, compartida con los modelos 
+anteriores, es su naturaleza puramente textual: al no incorporar información 
+sobre la estructura o el comportamiento del programa, su precisión se reduce 
+cuando fragmentos de código son léxicamente similares pero funcionalmente 
+distintos, o viceversa.
+
+A pesar de sus diferencias en arquitectura y objetivos de preentrenamiento, los 
+tres modelos comparten una limitación estructural común: al representar el código 
+exclusivamente como secuencia de tokens, ninguno incorpora información explícita 
+sobre la organización jerárquica del programa. Esta ausencia implica que 
+transformaciones equivalentes como sustituir un bucle por otro, o reorganizar 
+bloques de código, pueden alterar significativamente sus representaciones sin 
+que el comportamiento del programa cambie. Para superar esta limitación, una 
+segunda generación de modelos incorpora la estructura sintáctica del código como 
+información adicional, aprovechando los Árboles de Sintaxis Abstracta descritos 
+anteriormente, lo cual se aborda en la siguiente sección.
+
+\subsection{Modelos basados en Árboles de Sintaxis Abstracta}
+
+Los modelos basados en Árboles de Sintaxis Abstracta representan una evolución 
+respecto a los enfoques puramente textuales, al incorporar explícitamente la 
+estructura gramatical del programa como información de entrada. En lugar de 
+tratar el código como una secuencia lineal de tokens, estos modelos lo organizan 
+en una jerarquía de nodos que refleja las relaciones sintácticas entre sus 
+componentes. Esto les permite capturar patrones estructurales que son invisibles 
+para los modelos basados en texto, como la organización de bloques de control, 
+la anidación de expresiones o la descomposición funcional del programa.
+
+\subsubsection{Code2Vec}
+
+Code2Vec es un modelo desarrollado por Uri Alon y colaboradores del Technion y 
+Facebook AI Research, diseñado para aprender representaciones vectoriales de 
+fragmentos de código a partir de su estructura sintáctica \cite{Alon2018Code2Vec}. 
+Su arquitectura se basa en una red neuronal con mecanismo de atención suave, 
+que agrega múltiples contextos estructurales en un único vector representativo.
+
+El modelo representa el código como un conjunto no ordenado de rutas extraídas 
+del AST, donde cada ruta es un triplete formado por el token inicial, la 
+secuencia de nodos intermedios y el token final. Esta representación captura 
+relaciones estructurales entre pares de identificadores que los enfoques 
+textuales no pueden detectar, como la relación entre el parámetro de una función 
+y su valor de retorno.
+
+Code2Vec fue entrenado sobre millones de métodos en Java extraídos de repositorios 
+públicos de GitHub, con el objetivo de predecir automáticamente el nombre de un 
+método a partir de su implementación. Sus limitaciones principales incluyen un 
+vocabulario de etiquetas cerrado que le impide generalizar a nombres no vistos 
+durante el entrenamiento, y una alta sensibilidad a la ofuscación de 
+identificadores, ya que los nombres de las variables influyen directamente en 
+su representación.
+
+\subsubsection{ASTNN}
+
+ASTNN es un modelo desarrollado por Jian Zhang y colaboradores de la Universidad 
+de Beihang, diseñado para capturar simultáneamente el conocimiento léxico y 
+sintáctico del código resolviendo el problema de dependencias a largo plazo en 
+árboles profundos \cite{Zhang2019ASTNN}. Su arquitectura combina redes neuronales 
+recursivas para procesar subárboles locales con una red recurrente bidireccional 
+para modelar la secuencia global de sentencias.
+
+En lugar de procesar el AST completo como una estructura única, ASTNN lo divide 
+en una secuencia de subárboles de sentencias más pequeños, codificando cada uno 
+de forma independiente antes de modelar sus relaciones secuenciales. Esta 
+estrategia le permite manejar programas de longitud arbitraria sin perder 
+información estructural relevante a nivel local.
+
+El modelo fue entrenado y evaluado sobre programas en C y Java, demostrando 
+resultados destacados en clasificación de código y detección de clones de Tipo I 
+al Tipo IV. Su limitación principal es que fue validado principalmente sobre 
+código académico de entornos de juez en línea, lo que introduce incertidumbre 
+sobre su comportamiento en código de producción real con mayor variabilidad 
+estructural.
+
+\subsubsection{TreeBERT}
+
+TreeBERT es un modelo preentrenado desarrollado por Xue Jiang y colaboradores 
+de la Universidad Normal de Shandong, diseñado para adaptar la arquitectura 
+Transformer al procesamiento directo de la estructura jerárquica del AST 
+\cite{Jiang2021TreeBERT}. Su arquitectura sigue el esquema codificador-decodificador 
+estándar de Transformer, extendido con mecanismos específicos para incorporar 
+información posicional sobre la jerarquía del árbol.
+
+El modelo representa el AST como un conjunto de rutas desde la raíz hasta los 
+nodos terminales, inyectando embeddings de posición de nodo que informan al 
+modelo sobre las relaciones jerárquicas entre padres y hermanos. Esta 
+representación le permite al Transformer razonar sobre la estructura del árbol 
+sin perder las capacidades de atención global que lo caracterizan.
+
+TreeBERT fue preentrenado sobre millones de archivos en Python y Java mediante 
+dos objetivos: el enmascarado de nodos del árbol y la predicción del orden 
+correcto de nodos desordenados intencionalmente. Sus aplicaciones principales 
+incluyen resumen y documentación automática de código. Su limitación documentada 
+es que al basarse únicamente en rutas sintácticas del AST, los autores señalan 
+que incorporar grafos de dependencia como información adicional mejoraría 
+significativamente su capacidad semántica.
+
+En conjunto, los tres modelos demuestran que incorporar la estructura sintáctica 
+del código mejora la capacidad de análisis respecto a los enfoques puramente 
+textuales. Sin embargo, todos comparten una limitación común: el AST captura la 
+organización gramatical del programa pero no modela explícitamente cómo fluye 
+la información entre sus instrucciones ni cómo se ejecuta en tiempo real. Para 
+capturar ese nivel de comportamiento funcional, una tercera generación de modelos 
+incorpora representaciones basadas en grafos de dependencia, las cuales se 
+describen en la siguiente sección.
+
+\subsection{Modelos basados en grafos}
+
+Las arquitecturas basadas en grafos representan el nivel más avanzado de abstracción en el análisis automatizado de código fuente, al trascender la organización gramatical para capturar el comportamiento dinámico y funcional de los programas. A diferencia de los enfoques previos, estas metodologías modelan el código como una red de dependencias interconectadas, donde los nodos y aristas representan la propagación de valores y la jerarquía de ejecución. Este enfoque permite abordar el problema de la similitud semántica desde una perspectiva lógica, facilitando la identificación de algoritmos funcionalmente idénticos que han sido alterados sintácticamente. En esta sección se analizan tres modelos fundamentales que integran la topología de grafos para la generación de representaciones vectoriales profundas
+
+\subsubsection{GGNN (Gated Graph Neural Networks)}
+
+Desarrollado por Allamanis et al. en Microsoft Research, este modelo pionero aplica Redes Neuronales de Grafos (GNN) para razonar sobre la semántica estructural de los programas. Su arquitectura se fundamenta en mitigar las deficiencias de los modelos secuenciales mediante el uso de Redes Neuronales de Grafos con Compuertas (GGNN), las cuales emplean Unidades Recurrentes con Compuerta (GRU) para actualizar el estado de los nodos a través de múltiples pasos de propagación de mensajes.
+
+Para representar el código, el modelo construye "grafos de programa" cuya columna vertebral es el Árbol de Sintaxis Abstracta (AST), enriquecido con aristas semánticas explícitas. La entrada procesa identificadores tokenizados mediante la división de sub-palabras (sub-tokens). La representación exacta consiste en un grafo masivo y disperso donde los nodos sintácticos se vinculan mediante aristas gramaticales (Child, NextToken) y aristas de flujo de datos y control, tales como \textit{LastRead}, \textit{LastWrite}, \textit{ComputedFrom} y \textit{GuardedBy}.
+
+A diferencia de los modelos modernos, GGNN se basa en optimización supervisada específica para tareas como la predicción de nombres de variables (\textit{VARNAMING}) y la detección de mal uso de las mismas (\textit{VARMISUSE}), utilizando funciones de pérdida de margen máximo (max-margin). Fue entrenado sobre 29 proyectos de código abierto en C\# (2.9 millones de líneas de código). Sus limitaciones incluyen dificultades para generalizar en dominios no vistos, confusión ante el uso de "alias" de memoria y la exigencia de que el código fuente sea estrictamente compilable para su procesamiento.
+
+
+
+\subsubsection{Devign}
+
+Desarrollado por Zhou et al. en la Nanyang Technological University, Devign es un modelo general basado en grafos diseñado para la identificación automática de vulnerabilidades de software a nivel de función. Su arquitectura integra una capa de incrustación (Graph Embedding), capas recurrentes con compuertas para capturar características de los nodos y un módulo convolucional unidimensional (Conv) que extrae jerárquicamente los atributos relevantes para la clasificación del grafo completo.
+
+El modelo transforma el código fuente de una función en un grafo heterogéneo que fusiona múltiples dimensiones semánticas. Utiliza un modelo \textit{word2vec} preentrenado para vectorizar el texto de cada nodo, concatenándolo con la codificación de su tipo gramatical. La representación se define como un grafo unificado cuyos nodos de AST están interconectados simultáneamente por cuatro subgrafos: el AST sintáctico (jerarquía), el Grafo de Flujo de Control (CFG), el Grafo de Flujo de Datos (DFG) y la Secuencia de Código Natural (NCS).
+
+El aprendizaje se realiza mediante entrenamiento supervisado de extremo a extremo, empleando el optimizador AdamW y una función de pérdida de entropía cruzada binaria. Fue entrenado sobre un corpus etiquetado manualmente de grandes proyectos en C como Linux Kernel, QEMU y Wireshark. Su tarea principal es la clasificación de código vulnerable, superando a los analizadores estáticos tradicionales. No obstante, presenta limitaciones ante vulnerabilidades complejas dependientes del tiempo de ejecución (condiciones de carrera) y fallas en la generación de grafos ante código C altamente imperfecto.
+
+\subsubsection{GraphCodeBERT}
+
+\subsubsection{GraphCodeBERT}
+
+GraphCodeBERT, desarrollado conjuntamente por Microsoft Research y la Universidad Sun Yat-sen, es un modelo preentrenado diseñado para profundizar en la comprensión semántica del código mediante la integración de su estructura inherente. Su arquitectura se fundamenta en el modelo Transformer, extendida algorítmicamente mediante una "función de atención enmascarada guiada por grafos", la cual permite inyectar información relacional directamente en el mecanismo de atención de la red.
+
+A diferencia de las representaciones puramente secuenciales, este modelo representa el código incorporando el flujo de datos (Data Flow), un grafo que modela la procedencia de los valores entre variables sin la complejidad jerárquica de un AST. Toma como entrada una secuencia que concatena comentarios en lenguaje natural, tokens del código fuente y un conjunto de variables que fungen como nodos del grafo. La representación exacta emplea una matriz de máscara rígida que restringe la atención matemática: los tokens y nodos solo comparten pesos si existe una alineación textual o una arista directa de flujo de datos entre ellos.
+
+El modelo aprende representaciones estructuradas mediante tres objetivos de preentrenamiento: Modelado de Lenguaje Enmascarado (MLM), Predicción de Aristas y Alineación de Nodos. Fue entrenado masivamente sobre el conjunto de datos \textit{CodeSearchNet}, que contiene 2.3 millones de funciones en seis lenguajes de programación. GraphCodeBERT destaca en la detección de clones semánticos, búsqueda de código y reparación de errores. No obstante, la literatura documenta limitaciones en su interpretabilidad debido a su opacidad, deficiencias al procesar interfaces (APIs) externas de las cuales carece de contexto y la posibilidad de generar errores sintácticos al no integrar reglas gramaticales formales en su decodificador.
+
+
+En síntesis, los modelos basados en grafos destacan por su robustez ante transformaciones sintácticas y su alta precisión en la identificación de equivalencias funcionales (clones de Tipo IV). Sin embargo, su enfoque orientado estrictamente a la extracción de la semántica algorítmica conlleva una omisión deliberada de las características sub-léxicas y los rasgos de estilo del código fuente. Al normalizar el programa para aislar su lógica pura, estos modelos pierden la capacidad de representar patrones de autoría que residen en la superficie del texto, tales como las convenciones de formato o las preferencias de micro-codificación. Esta característica delimita su uso exclusivamente a la comprensión del "qué hace" el código, dejando fuera del análisis el "cómo se escribe", un factor determinante en tareas de atribución de autoría.
+
+
+\subsection{Comparación de modelos}
+
+La evolución de las arquitecturas para el análisis de código refleja un incremento progresivo en la capacidad de abstracción semántica. A continuación, se presenta una síntesis comparativa de los modelos analizados, categorizados por su tipo de representación, destacando sus fortalezas y las limitaciones técnicas que definen su alcance.
+
+\begin{table}[H]
+\centering
+\caption{Comparación técnica de modelos para el análisis de código fuente.}
+\label{tab:comparativa_modelos}
+\small
+\begin{tabularx}{\textwidth}{|p{2.5cm}|X|X|X|}
+\hline
+\textbf{Categoría} & \textbf{Modelos Representativos} & \textbf{Ventajas Principales} & \textbf{Limitaciones Críticas} \\ \hline
+\textbf{Aprendizaje Clásico} & SVM, Random Forest, kNN. & Alta eficiencia computacional y simplicidad de implementación. & Dependencia de ingeniería manual de características; ceguera semántica. \\ \hline
+\textbf{Redes Neuronales} & RNN (LSTM), CNN (CharCNN). & Aprendizaje de representaciones densas; captura de patrones de estilo locales. & Dificultad para modelar dependencias globales y flujo de datos a largo alcance. \\ \hline
+\textbf{Basados en Texto / Tokens} & CuBERT, CodeBERT, RoBERTa. & Captura de contexto global bimodal; alta portabilidad entre lenguajes. & Representación lineal; insensibilidad a la estructura jerárquica y lógica. \\ \hline
+\textbf{Basados en AST} & Code2Vec, ASTNN, TreeBERT. & Incorporación de la jerarquía gramatical; robustez ante cambios léxicos. & Sensibilidad a transformaciones estructurales funcionalmente equivalentes. \\ \hline
+\textbf{Basados en Grafos} & GGNN, Devign, GraphCodeBERT. & Captura de semántica profunda (Flujo de Datos/Control); detección de clones Tipo IV. & Elevado costo computacional; omisión de rasgos estilométricos superficiales. \\ \hline
+\end{tabularx}
+\end{table}
+
+Una vez agotado el análisis de los modelos orientados a la captura de la semántica algorítmica, es imperativo reconocer que el código fuente no es solo una entidad funcional, sino también un producto de autoría humana. Mientras que el flujo de datos y control define la ejecución del programa, existen rasgos intrínsecos en la escritura que no alteran la lógica, pero que actúan como una huella digital del programador. En consecuencia, el análisis automático de código requiere de una perspectiva complementaria que no se centre en el 'qué' hace el algoritmo, sino en el 'cómo' se manifiesta el estilo individual del autor. Esta disciplina, conocida como estilometría de código, proporciona las herramientas necesarias para abordar la dimensión de identidad, la cual se explora a detalle en la siguiente sección..
+
+% =========================================================
+\section{Análisis estilométrico}
+% =========================================================
+
+La estilometría se define como el estudio cuantitativo del estilo de escritura individual \cite{Horvath2026ProgrammerAttribution}. En el contexto del análisis de código fuente, esta disciplina examina cómo los hábitos personales de un desarrollador, tales como las convenciones de nomenclatura, la disposición del formato y la organización de las estructuras de control, se manifiestan como patrones estilísticos medibles\cite{Horvath2026ProgrammerAttribution}. El problema formal de esta área es la identificación o atribución de autoría de programas, el cual consiste en determinar o verificar quién es el autor de un fragmento de código dado a partir de un conjunto de candidatos conocidos\cite{Horvath2026ProgrammerAttribution}. Este problema resulta de suma relevancia en diversos escenarios prácticos, tales como la detección de plagio, la resolución de disputas de derechos de autor, la investigación forense de software y la mitigación de problemas de seguridad ante ataques cibernéticos. La viabilidad de resolver estos desafíos se fundamenta en que, aunque los lenguajes de programación son formales y restrictivos, los desarrolladores aún conservan un amplio grado de flexibilidad que les permite dejar huellas estilísticas y características identificables en los programas que escriben\cite{Horvath2026ProgrammerAttribution}.
+
+
+% =========================================================
+\subsection{Taxonomía de rasgos estilométricos en código fuente}
+% =========================================================
+
+El análisis estilométrico busca caracterizar la identidad de un programador mediante la cuantificación de patrones y hábitos recurrentes en la escritura del código fuente. A diferencia del análisis funcional, que se centra en la lógica de ejecución, la estilometría opera sobre la premisa de que el código es un artefacto de autoría humana que refleja preferencias individuales. Para un análisis adecuado, Hovarth \cite{Horvath2026ProgrammerAttribution} clasifica estos indicadores en cuatro categorías fundamentales, complementadas por una dimensión conductual moderna.
+
+% --- Rasgos Léxicos ---
+\subsubsection{Rasgos léxicos (Nivel superficial)}
+Constituyen los elementos atómicos y visuales del programa, capturando tendencias estilísticas a través de la frecuencia y distribución de unidades léxicas (\textit{tokens}). Estos rasgos son, en gran medida, independientes de la semántica del lenguaje y se centran en la micro-estructura del texto.
+
+\begin{itemize}
+    \item \textbf{Indicadores:} Frecuencia de palabras clave, longitud de identificadores, uso de operadores y estadísticas de caracteres.
+    \item \textbf{Manifestaciones técnicas:} Elección de convenciones de nomenclatura (e.g., \textit{camelCase} frente a \textit{snake\_case}), preferencias en operadores de incremento (\textit{i++} vs. \textit{i = i + 1}) y la densidad o estilo de la documentación y comentarios.
+\end{itemize}
+
+% --- Rasgos Sintácticos ---
+\subsubsection{Rasgos sintácticos (Nivel gramatical)}
+Representan la forma en que el autor estructura las sentencias lógicas y los flujos de control de acuerdo con la gramática formal del lenguaje. El análisis de esta dimensión suele requerir la transformación del código en representaciones intermedias como los Árboles de Sintaxis Abstracta (AST).
+
+\begin{itemize}
+    \item \textbf{Indicadores:} Organización jerárquica de constructos, distribución de estructuras de control y anidamiento gramatical.
+    \item \textbf{Manifestaciones técnicas:} Preferencia sistemática por bucles \textit{for} sobre \textit{while}, o la estructuración de evaluaciones booleanas (e.g., el uso de comparaciones explícitas \textit{if (var == true)} frente a formatos implícitos).
+\end{itemize}
+
+% --- Rasgos Estructurales ---
+\subsubsection{Rasgos estructurales (Nivel de diseño)}
+Reflejan decisiones de arquitectura y organización de alto nivel. Esta dimensión ofrece indicios sobre la madurez técnica y las preferencias de diseño que trascienden el vocabulario básico o la sintaxis.
+
+\begin{itemize}
+    \item \textbf{Indicadores:} Descomposición funcional, acoplamiento entre módulos y complejidad de las interfaces.
+    \item \textbf{Manifestaciones técnicas:} Tendencia hacia funciones monolíticas de alta extensión frente a diseños modulares basados en funciones pequeñas; asimismo, el uso recurrente de recursividad o la profundidad del anidamiento lógico.
+\end{itemize}
+
+% --- Rasgos Semánticos ---
+\subsubsection{Rasgos semánticos (Nivel conceptual)}
+Capturan la intención y el significado detrás de las decisiones de programación, enfocándose en la selección de algoritmos y la gestión de la información.
+
+\begin{itemize}
+    \item \textbf{Indicadores:} Selección de estructuras de datos y coherencia conceptual en la nomenclatura de dominio.
+    \item \textbf{Manifestaciones técnicas:} Preferencia por estructuras de datos específicas para la resolución de problemas (e.g., uso de tablas \textit{hash} frente a arreglos lineales) y la asignación de nombres con alta carga semántica vinculada al problema de negocio.
+\end{itemize}
+
+% --- Rasgos Biométricos ---
+\subsubsection{Rasgos biométricos de comportamiento (Dimensión temporal)}
+A diferencia de los rasgos estáticos, esta dimensión analiza la dinámica de producción del código. Incorpora datos temporales e interactivos que ocurren durante el proceso de desarrollo.
+
+\begin{itemize}
+    \item \textbf{Indicadores:} Dinámicas de tecleo (\textit{keystroke dynamics}), secuencias de edición y patrones de actividad en sistemas de control de versiones.
+    \item \textbf{Manifestaciones técnicas:} Frecuencia y granularidad de las confirmaciones (\textit{commits}) en repositorios y la evolución estilística del autor a lo largo del tiempo, concepto denominado estilocronometría.
+\end{itemize}
+
+% =========================================================
+\subsection{Enfoques de estilometría}
+% =========================================================
+
+% ---------------------------------------------------------
+\subsubsection{Métodos estadísticos}
+% ---------------------------------------------------------
+
+Los enfoques estadísticos abordan la estilometría mediante el cálculo de frecuencias sobre elementos superficiales del texto. Esto incluye el conteo de tokens, la extracción de métricas de software simples y el análisis de n-gramas, que son secuencias contiguas de caracteres o palabras. La principal ventaja de estas metodologías radica en su alta interpretabilidad, ya que resulta sencillo para los analistas comprender las reglas o recuentos subyacentes a una decisión de similitud. Sin embargo, presentan limitaciones significativas debido a su baja capacidad semántica, puesto que al tratar el programa como una secuencia básica de símbolos ignoran la intención funcional o lógica del mismo. En el análisis de código fuente, los métodos estadísticos resultan útiles para capturar el vocabulario repetitivo o las métricas superficiales de un programador de forma rápida, aunque fracasan al intentar identificar similitudes funcionales frente a modificaciones estructurales.
+
+% ---------------------------------------------------------
+\subsubsection{Machine Learning clásico}
+% ---------------------------------------------------------
+
+Para mejorar el rendimiento predictivo, el Machine Learning clásico emplea algoritmos como las Máquinas de Vectores de Soporte (SVM), los k-vecinos más cercanos (kNN) y diversas técnicas de agrupamiento (clustering) o árboles de decisión. Estos modelos requieren de ingeniería de características, lo que significa que dependen completamente de que expertos humanos definan y extraigan manualmente los atributos del código a analizar antes de entrenar el modelo. El uso de estos clasificadores señala una mejora importante respecto a los métodos puramente estadísticos al ofrecer una mejor capacidad de discriminación y generalización al clasificar los datos. En el análisis de código fuente, la aplicación de modelos de Machine Learning clásico optimiza la identificación de la autoría al reconocer patrones de codificación complejos, pero sus limitaciones semánticas persisten al depender de características estáticas manuales que no logran abstraer el comportamiento funcional profundo del programa.
+
+% ---------------------------------------------------------
+\subsubsection{Deep Learning}
+% ---------------------------------------------------------
+
+Las arquitecturas de Deep Learning han transformado este campo mediante el uso de redes neuronales avanzadas que aprenden a generar representaciones computacionales de manera automática directamente desde los datos crudos. Estos enfoques logran una mejor capacidad de generalización al procesar el código sin depender de características diseñadas manualmente, tolerando de manera superior las variaciones imprevistas en la programación. Estas redes mapean el código fuente en "embeddings" o vectores continuos de alta dimensión, los cuales codifican de forma conjunta las propiedades sintácticas y semánticas del texto. Aplicado al análisis de código fuente, el uso de redes neuronales y representaciones vectoriales permite que fragmentos de código lógicamente similares converjan en el espacio vectorial, facilitando un análisis semántico profundo que comprende la intención del algoritmo mucho más allá del estilo superficial.
+
+% ---------------------------------------------------------
+\subsubsection{Comparación de enfoques}
+% ---------------------------------------------------------
+
+Al evaluar estos tres paradigmas metodológicos, se observan diferencias críticas en cuanto a su capacidad semántica, su dependencia de características manuales y su costo computacional. Los métodos estadísticos son sumamente sencillos y transparentes, pero carecen por completo de una comprensión semántica profunda. El Machine Learning clásico proporciona una mejor capacidad de generalización gracias a la optimización de algoritmos más sofisticados, pero se encuentra limitado por su dependencia absoluta de la extracción manual de características (features) que capturan predominantemente similitudes estructurales o léxicas superficiales. Por el contrario, el Deep Learning alcanza una capacidad semántica sobresaliente al aprender representaciones autónomas (embeddings), eliminando la dependencia de la ingeniería manual humana; no obstante, esto introduce la clara limitación de un costo computacional y de recursos sumamente elevado durante su entrenamiento. En problemas complejos de la ingeniería de software, como la identificación de autoría en repositorios masivos o el análisis de código ofuscado, el Deep Learning se consolida como el enfoque más adecuado porque su capacidad inherente para abstraer y generalizar el comportamiento semántico del software supera ampliamente las barreras de los métodos tradicionales.
+
+\subsection{Modelos para el analisis estilometrico}
+
+El análisis estilométrico de código fuente requiere modelos capaces de capturar 
+las huellas personales que un programador deja en sus programas, más allá de la 
+lógica del algoritmo que implementa. A diferencia de los modelos orientados a 
+similitud semántica, los modelos estilométricos se centran en rasgos como 
+convenciones de nomenclatura, hábitos de formato y preferencias sintácticas. 
+Los tres modelos descritos a continuación representan enfoques distintos para 
+capturar estas características, desde métodos estadísticos simples hasta 
+arquitecturas profundas basadas en Transformers.
+
+\subsubsection{Modelos basados en n-gramas}
+
+Los modelos de n-gramas aplicados a código fuente fueron desarrollados por 
+investigadores como Burrows y Tahaghoghi, así como Frantzeskou et al. mediante 
+el método SCAP, con el propósito de resolver problemas de atribución de autoría 
+tratando el código como una consulta en un sistema de recuperación de información 
+\cite{Burrows2007Ngrams}. Su funcionamiento consiste en transformar el código en 
+ventanas de tokens superpuestas de tamaño n, generando un perfil estadístico del 
+autor que puede compararse con otros perfiles mediante métricas como la similitud 
+del coseno.
+
+Para capturar la huella estilística del programador, estos modelos retienen 
+únicamente operadores y palabras clave, descartando comentarios y valores 
+literales. Esto les permite detectar rasgos léxicos superficiales como 
+convenciones de escritura y preferencias sintácticas de forma independiente 
+al problema lógico que el código resuelve.
+
+Sus limitaciones principales son dos: su eficacia se degrada conforme aumenta 
+el número de autores y disminuye la cantidad de muestras disponibles, y a 
+diferencia del lenguaje natural, el código requiere secuencias más largas 
+como 6-gramas u 8-gramas para distinguir entre autores, lo que incrementa 
+la complejidad del índice \cite{Burrows2007Ngrams}.
+
+\subsubsection{CharCNN}
+
+Las redes neuronales convolucionales a nivel de caracteres (CharCNN) fueron 
+desarrolladas por Zhang, Zhao y LeCun con el propósito de clasificar documentos 
+tratando el texto como una señal cruda de bajo nivel, sin depender de palabras 
+ni estructuras predefinidas \cite{Zhang2015CharCNN}. Su arquitectura combina 
+módulos de convolución temporal unidimensional con capas de max-pooling, tomando 
+como entrada secuencias de caracteres codificadas en one-hot.
+
+Esta aproximación resulta especialmente útil en estilometría porque aprende 
+representaciones directamente desde los caracteres brutos, detectando 
+biomarcadores estilísticos como hábitos de indentación, convenciones de 
+nomenclatura, uso específico de mayúsculas o guiones bajos, e incluso patrones 
+de formato invisibles para modelos basados en tokens. Todo esto sin requerir 
+ningún conocimiento previo sobre la sintaxis del lenguaje analizado.
+
+Su limitación crítica es la escala de datos requerida: necesita corpus de 
+cientos de miles o millones de muestras para superar al estado del arte. En 
+conjuntos de datos moderados, enfoques más simples como los n-gramas con 
+TF-IDF siguen siendo más competitivos y eficientes \cite{Zhang2015CharCNN}.
+
+\subsubsection{RoBERTa}
+
+RoBERTa es un modelo desarrollado por Liu et al. en Facebook AI como una 
+optimización del preentrenamiento de BERT, eliminando el objetivo de predicción 
+de siguiente oración y entrenando con mayor volumen de datos y enmascaramiento 
+dinámico \cite{Liu2019RoBERTa}. En el contexto de la estilometría de código, 
+su arquitectura Transformer bidireccional le permite modelar dependencias 
+contextuales a lo largo de fragmentos completos de hasta 512 tokens.
+
+El modelo tokeniza el código mediante Codificación de Par de Bytes a nivel de 
+bytes, lo que le permite procesar identificadores raros, ofuscados o inventados 
+por el autor sin introducirlos como tokens desconocidos. Esto le permite detectar 
+rasgos léxicos avanzados y preferencias semánticas del programador capturando 
+el contexto completo de sus decisiones de codificación.
+
+Sus limitaciones documentadas son su alto costo computacional de entrenamiento y, al tratar el código como secuencia plana de tokens, su incapacidad para razonar explícitamente sobre la jerarquía sintáctica o el flujo de datos del programa, asimilando la semántica por proximidad textual en lugar de por estructura lógica \cite{Liu2019RoBERTa}.
+
+% ---------------------------------------------------------
+\subsubsection{Comparación de modelos estilométricos}
+% ---------------------------------------------------------
+
+La Tabla~\ref{tab:comparacion_estilometria} resume las principales diferencias 
+entre los tres modelos descritos, considerando las dimensiones más relevantes 
+para el análisis estilométrico de código fuente.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparación de modelos aplicados a estilometría de código}
+\label{tab:comparacion_estilometria}
+\small
+\begin{tabularx}{\textwidth}{lXXXX}
+\hline
+\textbf{Modelo} & \textbf{Rasgos detectados} & \textbf{Representación} 
+& \textbf{Costo computacional} & \textbf{Limitación principal} \\
+\hline
+N-gramas & Léxicos superficiales & Secuencias de tokens & Bajo 
+& Degradación con muchos autores \\
+CharCNN & Léxicos y formato & Caracteres en one-hot & Medio 
+& Requiere grandes volúmenes de datos \\
+RoBERTa & Léxicos y semánticos & Tokens BPE & Alto 
+& Sin comprensión estructural explícita \\
+\hline
+\end{tabularx}
+\end{table}
+
+Como se observa, los tres modelos capturan rasgos estilométricos desde 
+perspectivas complementarias. Los n-gramas ofrecen una solución eficiente y 
+transparente para identificar patrones léxicos superficiales, pero su capacidad 
+se limita a similitudes estadísticas en la superficie del código. CharCNN amplía 
+este alcance al aprender representaciones directamente desde los caracteres, 
+capturando biomarcadores de formato invisibles para los modelos basados en tokens, 
+aunque a costa de una mayor demanda de datos. RoBERTa representa el nivel más 
+avanzado al modelar dependencias contextuales profundas, pero su naturaleza 
+secuencial le impide razonar explícitamente sobre la estructura lógica del 
+programa.
+
+En conjunto, estos modelos evidencian que la estilometría de código puede 
+abordarse desde múltiples niveles de abstracción, cada uno con un equilibrio 
+distinto entre eficiencia, profundidad y requerimientos de datos. Esta diversidad 
+de enfoques refleja la misma progresión observada a lo largo del marco teórico: 
+desde representaciones superficiales hacia análisis más profundos y expresivos. 
+En la siguiente sección se presenta una síntesis que muestra que mediante la integracion de distintos enfoques, se puede conseguir una arquitectura robusta capáz de superar las limitaciones de los modelos previamente presentados. 
+
+
+\section{Integración y fusión de características (\textit{Feature Fusion})}
+
+Martinez habla en su investigacion \cite{MartinezGil2026Improving} que la integración o fusión de características es una técnica avanzada de aprendizaje profundo que permite expandir las capacidades de un modelo base mediante la amalgama de sus representaciones internas con datos procesados de forma externa. Arquitectónicamente, este proceso se realiza mediante la adición de una capa de proyección y un mecanismo de concatenación que vincula el vector de salida global (\textit{pooled output}) del modelo principal con vectores de características adicionales. Esta integración proyecta múltiples dimensiones de información en un espacio latente común, permitiendo que arquitecturas heterogéneas se complementen funcionalmente para superar sus limitaciones individuales.
+
+En \cite{MartinezGil2026Improving} se identifican tres ventajas críticas de esta aproximación híbrida:
+
+\begin{itemize}
+\item \textbf{Compensación de puntos ciegos:} Permite inyectar conocimiento específico del dominio o información experta que el modelo base, a pesar de su capacidad contextual, podría omitir durante el proceso de extracción automática.
+\item \textbf{Sinergia analítica:} Facilita la convergencia entre el análisis estático y dinámico. Mientras el modelo neuronal procesa la estructura gramatical, las características externas pueden representar datos de ejecución real, validando la lógica funcional ante posibles técnicas de ofuscación sintáctica.
+\item \textbf{Representación semántica enriquecida:} Al fusionar el procesamiento neuronal profundo con capas lineales para datos externos, el sistema resultante produce una representación multidimensional que evalúa simultáneamente la sintaxis, la lógica y el comportamiento del código fuente.
+\end{itemize}
+
+A través de la implementación de este enfoque sobre modelos de vanguardia, ha demostrado ser altamente efectiva. Diversos estudios documentan que la integración de características permite subsanar carencias estructurales de los modelos preentrenados, alcanzando métricas sobresalientes de 0.98 en precisión, 1.00 en \textit{recall} y 0.99 en medida F (\textit{f-measure}) \cite{MartinezGil2026Improving}. Estos resultados validan la fusión híbrida como una de las estrategias más robustas para superar el estado del arte en la detección de similitud semántica y el análisis de programas complejos.
+
+% =========================================================
+\section{Síntesis del marco teórico}
+% =========================================================
+
+% Aquí va tu conclusión (ya la tienes)
+
+% TODO: reforzar:
+% - limitaciones individuales
+% - necesidad de integración
+
+% ESTE APARTADO ES CLAVE PARA CONECTAR CON TU PROPUESTA

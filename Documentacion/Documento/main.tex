@@ -1,0 +1,100 @@
+\documentclass[11pt,a4paper]{report}
+
+% ===================== PAQUETES BÁSICOS Y LENGUAJE =====================
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-nodecimaldot,es-tabla]{babel}
+\usepackage[left=3cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+
+% ===================== FUENTES Y ESTILO =====================
+\usepackage{newtxtext,newtxmath} % Times New Roman
+\usepackage[dvipsnames,table]{xcolor}
+\usepackage{setspace}
+\onehalfspacing 
+\setlength{\parindent}{1.27cm}
+\setlength{\parskip}{4pt}
+\usepackage{ragged2e}
+\usepackage{microtype}
+
+% ===================== TABLAS Y GRÁFICOS =====================
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{booktabs}    % Necesario para \toprule, \midrule, \bottomrule
+\usepackage{array}       % Necesario para alineaciones especiales en tablas
+\usepackage{tabularx}    % Tablas con ancho fijo
+\usepackage{longtable}   % Tablas largas
+\usepackage{xltabular}   % El "héroe" que combina tabularx y longtable
+\usepackage{caption}     % Mejora los títulos de tablas y figuras
+\graphicspath{{./figs/}}
+
+% ===================== MATEMÁTICAS Y CÓDIGO =====================
+\usepackage{amsmath, amsfonts, mathtools}
+\usepackage{listings}    % Para bloques de código
+\usepackage{minted}      % Si prefieres minted para C/C++
+\usepackage{url}
+
+% ===================== TÍTULOS Y NAVEGACIÓN =====================
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage[pdftex]{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=blue,
+    urlcolor=cyan,
+    linktoc=all
+}
+
+% Configuración de niveles de títulos (Hasta #.#.#.#)
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+
+\titleformat{\section}{\normalfont\bfseries\fontsize{14}{16}\selectfont}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\bfseries\fontsize{12}{14}\selectfont}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalfont\bfseries\fontsize{12}{14}\selectfont}{\thesubsubsection}{1em}{}
+
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{5pt}
+\titlespacing*{\subsubsection}{0pt}{8pt}{4pt}
+
+% ======================================================================
+%                               DOCUMENTO
+% ======================================================================
+\begin{document}
+
+% --- PORTADAS ---
+\pagestyle{empty}
+% \include{portada1} % Descomenta cuando verifiques los nombres de archivo
+% \include{portada2}
+
+% --- ÍNDICES ---
+\pagenumbering{roman} % Números romanos para la parte introductoria
+\pagestyle{plain}
+\tableofcontents
+\newpage
+\listoffigures
+\listoftables
+\newpage
+
+% --- CUERPO DEL TRABAJO ---
+\pagenumbering{arabic} % AQUÍ comienza la numeración 1, 2, 3...
+\pagestyle{plain}      % Asegura que se vea el número de página
+
+\include{capitulos/generalidades}
+\include{capitulos/estado_del_arte}
+\include{capitulos/marco_teorico_v3}
+\include{capitulos/propuesta_de_solucion}
+\include{capitulos/requerimientos}
+\include{capitulos/analisis}
+
+% NOTA: Si renombraste el archivo a 'diseno.tex', cámbialo aquí:
+\include{capitulos/diseño} 
+
+% --- REFERENCIAS ---
+\newpage
+\addcontentsline{toc}{chapter}{Referencias}
+\bibliographystyle{IEEEtran}
+\bibliography{referencias}
+
+\end{document}
