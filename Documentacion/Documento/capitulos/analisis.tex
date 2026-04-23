@@ -383,6 +383,37 @@ A continuación se detallan los casos de uso que rigen el comportamiento del sis
 \caption{Especificación de los Casos de Uso 8 y 9.}
 \end{table}
 
+\section{Modelado de Procesos de Negocio (BPMN)}
+
+Para la orquestación de las capacidades de inteligencia artificial y la gestión de la persistencia híbrida, se diseñó un modelo de procesos utilizando la notación BPMN 2.0. Este modelo, ilustrado en la Figura \ref{fig:bpmn_proceso}, detalla la interacción entre el docente, el motor de \textit{backend} y los módulos de inferencia de IA.
+
+El proceso se divide en tres áreas de responsabilidad (\textit{lanes}) claramente definidas:
+
+\begin{itemize}
+    \item \textbf{Usuario (Docente):} Responsable de la carga de insumos (código de referencia y entregas de alumnos) y la toma de decisiones basada en los reportes generados.
+    \item \textbf{Backend:} Actúa como el orquestador del sistema, gestionando la validación de archivos, la comunicación con las bases de datos (relacional y vectorial) y la sincronización de los flujos de datos.
+    \item \textbf{Módulo de IA:} Ejecuta las tareas de cómputo intensivo, incluyendo la generación de variantes sintéticas mediante LLMs, la extracción de características semánticas con \textit{GraphCodeBERT} y el análisis estilométrico mediante \textit{CharCNN}.
+\end{itemize}
+
+\subsection{Descripción del Flujo de Trabajo}
+
+El ciclo operativo de \textit{Graphito} se desglosa en tres fases críticas:
+
+\begin{enumerate}
+    \item \textbf{Fase de Gestión de Referencias:} El sistema ofrece tres caminos de ejecución para establecer la base de comparación. Si el código de referencia es nuevo, el \textit{backend} verifica su existencia en la base de datos relacional; en caso de no existir, el módulo de IA genera variantes sintéticas para robustecer el espacio vectorial. Si la referencia ya existe, se recupera directamente su representación densa (\textit{embedding}) desde la base de datos vectorial (\textit{ChromaDB}), optimizando los tiempos de respuesta.
+    
+    \item \textbf{Fase de Procesamiento Bimodal:} Una vez cargado el código del alumno, el sistema realiza un pre-procesamiento y normalización en el \textit{backend}. Posteriormente, el flujo se bifurca mediante una compuerta paralela para realizar un análisis dual: una extracción de lógica estructural (semántica) y un análisis de patrones de escritura (estilometría). Esta fase garantiza que el sistema capture tanto la intención funcional como la huella digital del autor.
+    
+    \item \textbf{Fase de Fusión y Resultados:} Los vectores resultantes son integrados en un proceso de fusión de características. El sistema utiliza una compuerta de sincronización para asegurar que tanto el vector del alumno como el de referencia estén disponibles antes de calcular la \textit{Similitud del Coseno}. Finalmente, el módulo de IA interpreta los resultados numéricos para generar un reporte de integridad que se persiste en el historial y se presenta al docente.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figuras/ModeloBPMN.png}
+    \caption{Diagrama BPMN de la comparación de código fuente.}
+    \label{fig:bpmn_proceso}
+\end{figure}
+
 % ---------------------------------------------------------
 \section{Características semánticas del código}
 % ---------------------------------------------------------

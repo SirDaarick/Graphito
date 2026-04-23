@@ -1,219 +1,190 @@
 \chapter{Diseño del sistema}
-\section{Arquitectura del Sistema Graphito}
 
-La arquitectura de \textit{Graphito} se basa en un modelo de micro-servicios lógicos orquestados centralmente, diseñado para manejar el procesamiento intensivo de lenguaje natural y el análisis bimodal de código fuente. En la Figura~\ref{fig:arquitectura_real} se detalla la interconexión de los componentes tecnológicos elegidos.
+\section{Arquitectura (Modelo C4)}
+
+El diseño arquitectónico de \textit{Graphito} se estructura utilizando el Modelo C4, el cual permite describir el software a través de múltiples niveles de abstracción. Esto proporciona diferentes perspectivas técnicas, desde la visión contextual de las interacciones externas hasta el nivel más profundo de componentes.
+
+\subsection{Nivel 1: Contexto}
+
+El diagrama de contexto ilustra cómo el sistema \textbf{GRAPHITO} se relaciona con sus actores externos. En el centro de la arquitectura, el sistema provee las capacidades de procesamiento y análisis. A su alrededor se ubican: el \textbf{Docente}, quien interactúa para gestionar ejercicios, cargar el código de las entregas y visualizar los reportes; y la \textbf{External LLM API}, que es consultada por la plataforma para generar automáticamente soluciones sintéticas que formarán parte del marco de referencias.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1.0\textwidth]{figuras/arquitectura.png}
-    \caption{Diagrama detallado de la arquitectura del sistema Graphito.}
-    \label{fig:arquitectura_real}
+    % Placeholder sugerido, actualizar con la ruta correcta si es diferente 
+    \includegraphics[width=1\textwidth]{figuras/diagrama_contexto.png}
+    \caption{Diagrama de Contexto (Nivel 1) del sistema Graphito.}
+    \label{fig:c4_contexto}
 \end{figure}
 
-\subsection{Descripción de Componentes}
+\subsection{Nivel 2: Contenedores}
+
+En este nivel de abstracción se detalla la arquitectura de micro-servicios y bases de datos que componen el sistema. \textit{Graphito} se separa funcionalmente en los siguientes contenedores principales:
 
 \begin{itemize}
-    \item \textbf{Capa de Cliente (Front-end):} Implementada en \textit{React}, proporciona una interfaz interactiva para que el docente gestione ejercicios y visualice resultados. La comunicación con el servidor se realiza mediante peticiones asíncronas bajo el estándar REST.
-    
-    \item \textbf{Núcleo de Aplicación (Back-end):} El servidor principal utiliza \textit{FastAPI} sobre \textit{Python}. Este componente actúa como el punto de entrada y salida de datos, gestionando la lógica de negocio y coordinando las peticiones hacia las bases de datos y los módulos de inferencia.
-    
-    \item \textbf{Motores de Análisis (PyTorch):} 
-    \begin{itemize}
-        \item \textbf{Módulo Semántico:} Encargado de transformar el código en una estructura lógica mediante un generador de \textit{DataFlowGraph} y su posterior vectorización con \textit{GraphCodeBERT}.
-        \item \textbf{Módulo Estilométrico:} Realiza una limpieza de estilo específica para preservar patrones de escritura y utiliza una red \textit{CharCNN} para clasificar la autoría.
-    \end{itemize}
-    
-    \item \textbf{Orquestador de Inteligencia Artificial:} Es el componente diferencial del sistema. Utiliza \textbf{LangGraph} para gestionar un flujo de trabajo cíclico donde un \textbf{Agente de Decisión} evalúa los resultados de ambos canales. Este agente puede interactuar con una \textit{External LLM API} para obtener soluciones de referencia dinámicas y finalmente calcula la similitud del coseno para emitir un veredicto.
-    
-    \item \textbf{Persistencia de Datos Híbrida:}
-    \begin{itemize}
-        \item \textbf{PostgreSQL (SQL):} Almacena los metadatos de usuarios, ejercicios y configuraciones relacionales.
-        \item \textbf{ChromaDB (Vectorial):} Especializada en el almacenamiento de \textit{embeddings}, permitiendo búsquedas de similitud semántica de alta eficiencia.
-    \end{itemize}
+    \item \textbf{Capa de Cliente (Front-end):} Interfaz web interactiva en \textit{React} que consume servicios REST, facilitando el trabajo del docente.
+    \item \textbf{Núcleo de Aplicación (Back-end):} Servicio principal implementado en \textit{FastAPI} (Python) encargado de orquestar el sistema, gestionar las peticiones a la IA y procesar la lógica general.
+    \item \textbf{DB Relacional (PostgreSQL):} Persistencia estructurada para datos del usuario, problemas y registro histórico integral del análisis.
+    \item \textbf{Vector DB (ChromaDB):} Persistencia hiperdimensional de los \textit{embeddings} que agilizan las búsquedas por proximidad semántica en las referencias.
 \end{itemize}
 
-% ---------------------------------------------------------
-\section{Diagrama de clases}
-% ---------------------------------------------------------
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figuras/diagrama_contenedores.png}
+    \caption{Diagrama de Contenedores (Nivel 2) del sistema Graphito.}
+    \label{fig:c4_contenedores}
+\end{figure}
 
-Para dar soporte a los casos de uso descritos anteriormente y garantizar la correcta ejecución del análisis de integridad académica, se diseñó una arquitectura de software robusta, modular y orientada a objetos. El diseño estructural del sistema se abstrae mediante componentes que aseguran una alta cohesión funcional y un bajo acoplamiento, siguiendo los principios de diseño de software para sistemas de procesamiento de lenguaje natural. A continuación, en la Figura 5.2 , se presenta el diagrama de clases del sistema Graphito, el cual ilustra la separación de responsabilidades y la implementación de patrones de diseño fundamentales para orquestar el flujo de trabajo bimodal.
+\subsection{Nivel 3: Componentes}
 
-\begin{figure}[htbp]
+Haciendo un acercamiento al motor central de analítica del sistema (el contenedor Back-end de FastAPI), se ilustran los componentes internos que materializan la funcionalidad bimodal de auditoría académica para Graphito:
+
+\begin{itemize}
+    \item \textbf{Orquestador Inteligente (LangGraph):} Componente maestro de orquestación que evalúa iteraciones, fusiona características biomodales e interactúa cíclicamente para extender las referencias funcionales.
+    \item \textbf{Módulo de Análisis Semántico:} Utiliza de forma profunda el modelo pre-entrenado \textit{GraphCodeBERT} para interpretar características lógicas a través del grafo de flujo de datos (DFG).
+    \item \textbf{Módulo de Estilometría:} Implementa un clasificador \textit{CharCNN} a nivel de caracteres, capaz de categorizar autorías al aprender la textura de redacción original y capturar singularidades estructurales como sangrías o estilo de corchetes.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    % Placeholder sugerido
+    %\includegraphics[width=0.8\textwidth]{figuras/diagrama_componentes.png}
+    \caption{Diagrama de Componentes (Nivel 3) enfocado en el motor back-end en Python.}
+    \label{fig:c4_componentes}
+\end{figure}
+
+\subsection{Nivel 4: Código (Clases y Secuencia)}
+
+El nivel de código ofrece el máximo detalle referencial. Se subdivide en la vista estática, representada por las clases y patrones, y la vista dinámica, que muestra el paso a paso transaccional.
+
+\subsubsection{Diagrama de Clases}
+
+A nivel estático, el corazón del diseño obedece al patrón de diseño \textit{Strategy}. 
+
+Como es posible constatar en el la Figura \ref{fig:diagrama_clases_graphito}, la ejecución transaccional principal se centraliza en \textbf{OrquestadorGraphito}, que coordina los módulos. El patrón \textit{Strategy} se aplica a la interfaz de inyección \textbf{ModeloIA}, separando los modelos predictivos como \textbf{ModeloGraphCodeBERT} y \textbf{ModeloCharCNN} del núcleo aplicativo. 
+
+El componente \textbf{Preprocesador} bifurca el ciclo para proveer textos pulidos (análisis semántico) o crudos (estilométrico). Finalizada la ejecución iterativa, se concreta la \textbf{FirmaBimodal}. Por su parte, la persistencia se expone con la interfaz \textbf{AlmacenamientoDatos} la cual rige las lógicas independientes de \textbf{GestorPostgreSQL} y \textbf{GestorChromaDB}.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figuras/diagramaclases.png}
-    \caption{Diagrama de clases del sistema Graphito, ilustrando la arquitectura bimodal (semántica y estilométrica) y los patrones de diseño aplicados.}
+    \caption{Diagrama de clases del sistema Graphito, ilustrando la arquitectura orientada a objetos correspondientes al Nivel 4 de abstracción.}
     \label{fig:diagrama_clases_graphito}
 \end{figure}
 
-\vspace{0.5cm}
+\subsubsection{Diagrama de Secuencia}
 
-Como se observa en el modelo arquitectónico de la Figura \ref{fig:diagrama_clases_graphito}, el núcleo de control recae sobre la clase \textbf{OrquestadorGraphito}, responsable de coordinar la interacción entre el preprocesamiento, la inferencia algorítmica y la persistencia. Para integrar los componentes de inteligencia artificial, se implementó el patrón de diseño \textit{Strategy} a través de la interfaz \textbf{ModeloIA}. Esta abstracción permite desacoplar la lógica de negocio de las arquitecturas de aprendizaje profundo específicas, facilitando la escalabilidad del sistema. 
+Para el flujo de eventos, el diagrama de secuencia dicta el actuar de los módulos durante una validación estándar:
 
-Bajo este contrato, el \textbf{ModeloGraphCodeBERT} procesa la semántica extrayendo el grafo de flujo de datos (DFG) de acuerdo con la metodología de Guo, mientras que el \textbf{ModeloCharCNN} evalúa la estilometría operando sobre un mapeo de caracteres para identificar la "huella digital" del autor, fundamentado en el trabajo de Zhang.
+\begin{itemize}
+    \item \textbf{Ejecución Paralela:} Tanto GraphCodeBERT (para entender lógica) como CharCNN (para captar el perfil estilométrico) se ejecutan de manera concurrente con la finalidad de optimizar la inferencia. 
+    \item \textbf{Veredicto y Alertas:} Una vez concatenado (\textit{early fusion}) el vector bimodal, se compara su similitud de coseno contra referencias maestras en ChromaDB y, bajo métricas específicas, se retornan las anomalías visuales a la capa de abstracción del frontend.
+\end{itemize}
 
-El flujo de información inicia cuando el \textbf{Preprocesador} recibe el \textbf{CodigoFuente} y lo bifurca según las necesidades de cada canal: normalizándolo para la captura lógica y preservándolo crudo (\textit{raw}) para el análisis de autoría. Una vez que ambos modelos de IA devuelven sus respectivos vectores espaciales, el orquestador ejecuta el método \textit{fusionarCaracteristicas}, el cual realiza la concatenación de los embeddings para generar una \textbf{FirmaBimodal} unificada, técnica que ha demostrado mejorar la precisión en la detección de similitudes.
-
-Finalmente, la persistencia del sistema se resuelve mediante la interfaz \textbf{AlmacenamientoDatos}, la cual define una arquitectura de base de datos híbrida. El \textbf{GestorPostgreSQL} administra los datos relacionales y metadatos del \textbf{ReporteAnalisis}, mientras que el \textbf{GestorChromaDB} se encarga del almacenamiento y la búsqueda de proximidad matemática de las firmas vectoriales de alta dimensionalidad utilizando la similitud del coseno.
-
-En síntesis, esta estructuración orientada a objetos garantiza que el sistema Graphito sea altamente escalable y mantenible. La delegación de responsabilidades a través de interfaces no solo facilita la trazabilidad de los procesos de auditoría académica, sino que permite que el sistema pueda integrar futuras generaciones de modelos de lenguaje o nuevos motores de base de datos sin requerir refactorizaciones profundas en su núcleo operativo. Esta solidez arquitectónica es un pilar fundamental para respaldar la confiabilidad de las métricas entregadas al evaluador docente.
-
-% --- Fin de la sección ---
-
-% ---------------------------------------------------------
-\section{Diagrama de estados}
-% ---------------------------------------------------------
-
-Posteriormente al diseño estructural, es imperativo modelar el comportamiento dinámico del sistema para comprender la transición entre las diferentes etapas del proceso de evaluación. El diagrama de estados permite visualizar el ciclo de vida de una solicitud de análisis, desde la configuración inicial por parte del docente hasta la emisión del veredicto final. En la Figura \ref{fig:diagrama_estados_graphito}, se detallan los estados lógicos y las transiciones que gobiernan el flujo de información en la plataforma.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{figuras/diagramaestados.png} 
-    \caption{Diagrama de estados del sistema Graphito, representando el flujo dinámico desde la configuración hasta la generación de reportes bimodales.}
-    \label{fig:diagrama_estados_graphito}
+    \includegraphics[width=0.9\textwidth]{figuras/diagramaSecuencia.jpeg}
+    \caption{Diagrama de secuencia transaccional de \textit{Graphito} desde el cliente, Nivel 4.}
+    \label{fig:diagrama_secuencia}
 \end{figure}
 
-\vspace{0.5cm}
-
-El diagrama de la Figura \ref{fig:diagrama_estados_graphito} ilustra la progresión del sistema a través de siete estados clave. El proceso inicia en el estado de \textbf{Configuración (S1)}, donde el docente establece los criterios y soluciones base. Una vez cargadas las \textbf{Entregas (S2)}, el sistema transita hacia el \textbf{Preprocesamiento (S3)}, etapa crítica donde el código se bifurca para satisfacer los requerimientos técnicos de cada canal de análisis.
-
-La transición hacia los estados \textbf{S4 (Semántico)} y \textbf{S5 (Estilométrico)} ocurre de manera concurrente. En S4, el sistema extrae el Grafo de Flujo de Datos (DFG) para capturar la lógica algorítmica, mientras que en S5 se analizan los patrones locales de escritura mediante CharCNN para identificar rasgos de autoría. La convergencia de ambos canales se produce en el estado de \textbf{Fusión y Cálculo (S6)}, donde se integra la firma bimodal y se cuantifica la proximidad matemática mediante la similitud del coseno. Finalmente, el sistema alcanza el estado de \textbf{Reporte Generado (S7)}, donde se emiten alertas de integridad en caso de detectar discrepancias entre la funcionalidad y el estilo del código.
-
-Este modelado dinámico reafirma la capacidad del sistema Graphito para gestionar de forma secuencial y paralela la complejidad del análisis de código fuente. Al definir claramente las transiciones y los eventos disparadores, se garantiza que el flujo de datos sea consistente y que los resultados entregados al docente posean el rigor técnico necesario para actuar como una herramienta confiable en la auditoría académica de cursos introductorios de programación.
-
-% --- Fin de la sección ---
-
 % ---------------------------------------------------------
-\section{Diagrama entidad - relación}
+\section{Diseño de Base de Datos}
 % ---------------------------------------------------------
 
-Para dar cumplimiento a los requerimientos de persistencia transaccional y gestión de metadatos (RF-09 y RNF-02), se diseñó un modelo relacional normalizado que garantiza la integridad de la información académica. Mientras que las firmas vectoriales de alta dimensionalidad se gestionan en una base de datos especializada (ChromaDB), la administración de usuarios, la trazabilidad de los ejercicios y el histórico de auditoría residen en un motor relacional PostgreSQL. En la Figura \ref{fig:diagrama_er_graphito}, se presenta el Diagrama de Entidad-Relación (ER) que define esta estructura.
+Se ha implementado un sistema multi-persistencia (relacional y vectorial) para satisfacer requerimientos históricos y heurísticos.
 
-\begin{figure}[htbp]
+\subsection{Modelo Relacional (Diagrama Entidad-Relación)}
+
+El repositorio SQL maneja registros normalizados con PostgreSQL. Cada \textbf{DOCENTE} gestiona su entidad \textbf{PROBLEMA}. Dicha tabla posee cardinalidad con múltiples instancias de \textbf{CODIGO\_FUENTE} que documentan la entrega cruda en texto o las referencias de origen LLM y su metadata. 
+
+Las similitudes y probabilidades resultantes tienen su hogar en la tabla transaccional \textbf{REPORTE\_ANALISIS}, la cual desencadena notificaciones a la entidad de \textbf{ALERTA\_INTEGRIDAD} al identificar comportamientos fuera del límite permisible en términos de completitud lógica versus artificialidad de estilo.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth, height=0.75\textheight, keepaspectratio]{figuras/diagramarelacional.png}
-    \caption{Diagrama de Entidad-Relación del sistema Graphito, detallando la jerarquía de persistencia y la vinculación de métricas bimodales.}
+    \caption{Diagrama C4 y Entidad-Relación de PostgreSQL sobre el componente integrador.}
     \label{fig:diagrama_er_graphito}
 \end{figure}
 
-\vspace{0.5cm}
+\subsection{Esquema de Colección Vectorial (ChromaDB)}
 
-La arquitectura de datos ilustrada en la Figura \ref{fig:diagrama_er_graphito} se fundamenta en cinco entidades núcleo. La entidad \textbf{DOCENTE} actúa como el nodo principal de autenticación y gestión. Esta se relaciona de forma unívoca con la entidad \textbf{PROBLEMA}, permitiendo que cada profesor administre su propio repositorio de ejercicios de programación.
+La persistencia heurística se hospeda en el clúster transitorio o indexado de ChromaDB. Se estipuló un indexado central mediante la colección denominada \texttt{codigos\_referencia}, empleando UUIDs que coinciden con los registros almacenados en \texttt{CODIGO\_FUENTE} de su contraparte relacional.
 
-Los registros de la entidad \textbf{CODIGO\_FUENTE} representan la unidad mínima de análisis. Este modelo permite almacenar tanto las soluciones de referencia (incluyendo las variantes sintéticas generadas por modelos de lenguaje externos) como las entregas de los estudiantes, diferenciándolas mediante atributos de clasificación técnica. 
-
-La convergencia de los canales semántico y estilométrico se materializa en la entidad \textbf{REPORTE\_\allowbreak ANALISIS}. Esta tabla persiste los resultados de la inferencia bimodal: el índice de similitud lógica obtenido mediante GraphCodeBERT y la probabilidad de autoría calculada por el modelo CharCNN. Finalmente, la entidad \textbf{ALERTA\_\allowbreak INTEGRIDAD} se encarga de catalogar de forma persistente las discrepancias críticas detectadas durante el análisis (Trayectorias A4 y A5), proporcionando al docente un registro histórico para la toma de decisiones informada.
-
-En conclusión, este diseño relacional asegura que el sistema Graphito posea una alta disponibilidad y eficiencia en la recuperación de datos. Al separar los metadatos estructurados de los componentes vectoriales, se logra una arquitectura híbrida que proporciona una base sólida para la auditoría y el fortalecimiento de la integridad académica en cursos introductorios de programación.
-
-% --- Fin de la sección ---
-
-\section{Modelado de Procesos de Negocio (BPMN)}
-
-Para la orquestación de las capacidades de inteligencia artificial y la gestión de la persistencia híbrida, se diseñó un modelo de procesos utilizando la notación BPMN 2.0. Este modelo, ilustrado en la Figura \ref{fig:bpmn_proceso}, detalla la interacción entre el docente, el motor de \textit{backend} y los módulos de inferencia de IA.
-
-El proceso se divide en tres áreas de responsabilidad (\textit{lanes}) claramente definidas:
-
-\begin{itemize}
-    \item \textbf{Usuario (Docente):} Responsable de la carga de insumos (código de referencia y entregas de alumnos) y la toma de decisiones basada en los reportes generados.
-    \item \textbf{Backend:} Actúa como el orquestador del sistema, gestionando la validación de archivos, la comunicación con las bases de datos (relacional y vectorial) y la sincronización de los flujos de datos.
-    \item \textbf{Módulo de IA:} Ejecuta las tareas de cómputo intensivo, incluyendo la generación de variantes sintéticas mediante LLMs, la extracción de características semánticas con \textit{GraphCodeBERT} y el análisis estilométrico mediante \textit{CharCNN}.
-\end{itemize}
-
-\subsection{Descripción del Flujo de Trabajo}
-
-El ciclo operativo de \textit{Graphito} se desglosa en tres fases críticas:
-
+Esta base vectorial aloja un \textit{embedding híbrido o concatenado} compuesto exactamente por \textbf{769 dimensiones}:
 \begin{enumerate}
-    \item \textbf{Fase de Gestión de Referencias:} El sistema ofrece tres caminos de ejecución para establecer la base de comparación. Si el código de referencia es nuevo, el \textit{backend} verifica su existencia en la base de datos relacional; en caso de no existir, el módulo de IA genera variantes sintéticas para robustecer el espacio vectorial. Si la referencia ya existe, se recupera directamente su representación densa (\textit{embedding}) desde la base de datos vectorial (\textit{ChromaDB}), optimizando los tiempos de respuesta.
-    
-    \item \textbf{Fase de Procesamiento Bimodal:} Una vez cargado el código del alumno, el sistema realiza un pre-procesamiento y normalización en el \textit{backend}. Posteriormente, el flujo se bifurca mediante una compuerta paralela para realizar un análisis dual: una extracción de lógica estructural (semántica) y un análisis de patrones de escritura (estilometría). Esta fase garantiza que el sistema capture tanto la intención funcional como la huella digital del autor.
-    
-    \item \textbf{Fase de Fusión y Resultados:} Los vectores resultantes son integrados en un proceso de fusión de características. El sistema utiliza una compuerta de sincronización para asegurar que tanto el vector del alumno como el de referencia estén disponibles antes de calcular la \textit{Similitud del Coseno}. Finalmente, el módulo de IA interpreta los resultados numéricos para generar un reporte de integridad que se persiste en el historial y se presenta al docente.
+    \item \textbf{Dimensión [0 a 767] (Semántica):} Son formadas íntegramente por \textit{GraphCodeBERT} abstrayendo el comportamiento funcional del código.
+    \item \textbf{Dimensión [768] (Estilometría):} Valor predictivo escalar inyectado desde la matriz \textit{CharCNN} donde se penaliza matemáticamente la autenticidad cuando los trazos reflejan una estructura sintética LLM.
 \end{enumerate}
 
-\begin{figure}[htbp]
+Para acelerar la segmentación del análisis de referencias, todos los nodos dentro de la colección ChromaDB se engloban con metadatos JSON básicos conteniendo al identificador de lógica (\texttt{problema\_id}), marcadores booleanos (\texttt{es\_referencia}), el ecosistema matriz como (\texttt{lenguaje}: \texttt{C|C++}) y un catalogador simple (\texttt{author\_type}).
+
+% ---------------------------------------------------------
+\section{Maquetación de la Interfaz}
+% ---------------------------------------------------------
+
+Para validar el análisis y diseño propuestos, se desarrollaron diferentes interfaces y componentes que conforman el prototipo inicial del sistema Graphito. A continuación, se documentan dichas pantallas, estableciendo la relación entre las vistas del sistema y los requerimientos funcionales definidos previamente.
+
+\subsection{Arquitectura de Información}
+La arquitectura de información del prototipo ha sido planteada para mantener un flujo intuitivo en la labor del docente. El sistema se compone de un área pública para la autenticación, y un área privada o "Centro de Mando" desde donde el usuario puede gestionar sus ejercicios, subir nuevas entregas y examinar los resultados del análisis semántico y estilométrico. Se prioriza una navegación jerárquica sencilla, facilitando el acceso a los reportes y comparaciones detalladas.
+
+\subsection{Diseño de Interfaces (Pantallas)}
+
+El diseño visual y funcional del prototipo aborda las principales necesidades del evaluador. A continuación, se presentan las diversas pantallas implementadas que demuestran el cumplimiento de los requerimientos de la plataforma.
+
+\subsubsection{Inicio de Sesión y Registro}
+El sistema cuenta con un área pública que permite a los docentes autenticarse y crear una cuenta, asegurando la privacidad de los ejercicios.
+
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{figuras/ModeloBPMN.png}
-    \caption{Diagrama BPMN de la comparación de código fuente.}
-    \label{fig:bpmn_proceso}
+    \includegraphics[width=0.8\textwidth]{figuras/iniciar_sesión.png}
+    \caption{Interfaz de inicio de sesión, cumpliendo con el RF-01.}
+    \label{fig:ui_iniciar_sesion}
 \end{figure}
 
-\section{Diagrama de Secuencia del Sistema}
-
-El diagrama de secuencia presentado en la Figura \ref{fig:diagrama_secuencia} detalla la interacción cronológica entre los componentes del sistema \textit{Graphito}. Se describe el flujo de mensajes desde la interfaz de usuario hasta los motores de inferencia y las bases de datos híbridas, enfatizando la lógica de orquestación del \textit{backend}.
-
-\subsection{Interacción de Componentes y Flujos de Control}
-
-El diseño del flujo se ha estructurado para minimizar la latencia de respuesta y garantizar la integridad referencial de los datos. A continuación, se describen las etapas críticas del proceso de análisis:
-
-\begin{itemize}
-    \item \textbf{Gestión Inteligente de Referencias:} El sistema implementa una lógica de decisión en el \textit{backend} para determinar la procedencia de los vectores de comparación. Se prioriza la recuperación desde \textit{ChromaDB} si el problema ya existe en la biblioteca. En caso de nuevas configuraciones, el sistema interactúa con un agente LLM externo para la generación de variantes sintéticas, las cuales son procesadas inmediatamente por el motor de IA para generar sus correspondientes \textit{embeddings}.
-    
-    \item \textbf{Procesamiento Bimodal Paralelo:} Una de las características técnicas más relevantes es el uso de bloques de ejecución paralela (\textit{parallel blocks}). Mientras el modelo \textit{GraphCodeBERT} extrae la representación semántica del código del alumno, el modelo \textit{CharCNN} realiza simultáneamente el análisis estilométrico. Esta concurrencia es vital para reducir el tiempo de ejecución en entornos de alta demanda académica.
-    
-    \item \textbf{Fusión y Veredicto de Integridad:} Tras la generación del vector de 769 dimensiones (fusión de lógica y estilo), el \textit{backend} realiza el cálculo de la similitud del coseno contra el espacio vectorial de referencia. El motor de IA actúa nuevamente para interpretar este valor numérico, transformándolo en un veredicto cualitativo y detonando alertas de integridad si se detectan anomalías en la autoría.
-\end{itemize}
-
-\subsection{Estrategia de Persistencia}
-
-El diagrama ilustra una estrategia de persistencia atómica: el sistema no solo entrega el reporte al docente, sino que asegura la trazabilidad mediante el almacenamiento simultáneo en \textit{PostgreSQL} (metadatos y reportes) y \textit{ChromaDB} (vectores de características). Esta dualidad permite que el sistema mantenga un historial de auditoría y, al mismo tiempo, fortalezca su biblioteca de comparación con cada nuevo análisis realizado.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\textwidth]{figuras/diagramaSecuencia.jpeg}
-    \caption{Diagrama de secuencia del proceso de comparación de código.}
-    \label{fig:diagrama_secuencia}
+    \includegraphics[width=0.8\textwidth]{figuras/crear_cuenta.png}
+    \caption{Interfaz de creación de cuenta.}
+    \label{fig:ui_crear_cuenta}
 \end{figure}
-\newpage
-\section{Esquema de la Base de Datos Vectorial (ChromaDB)}
 
-Para la gestión de las representaciones densas y la ejecución de búsquedas por similitud de alta velocidad, se ha seleccionado \textit{ChromaDB} como motor de base de datos vectorial. A diferencia del modelo relacional tradicional, esta base de datos organiza la información en colecciones de vectores de alta dimensionalidad enriquecidos con metadatos técnicos.
+\subsubsection{Interfaz de Carga de Código}
+Se diseñó un mecanismo de carga sencillo para que los docentes integren nuevos archivos al sistema, agreguen comparaciones y comiencen el análisis automático de las entregas.
 
-\subsection{Esquema de la Colección: codigos\_referencia}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figuras/nuevo_código_de_referencia.png}
+    \caption{Interfaz para nuevo código de referencia, cumpliendo con el RF-03.}
+    \label{fig:ui_carga_ref}
+\end{figure}
 
-La colección principal, denominada \texttt{codigos\_referencia}, actúa como el índice semántico-estilométrico del sistema. Cada objeto dentro de esta colección se compone de cuatro elementos fundamentales, detallados en la Tabla \ref{tab:esquema_vectorial}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figuras/agregar_comparación.png}
+    \caption{Interfaz para agregar comparación.}
+    \label{fig:ui_carga_comp}
+\end{figure}
 
-\begin{table}[htbp]
-\centering
-\caption{Estructura de objetos en la colección vectorial.}
-\label{tab:esquema_vectorial}
-\renewcommand{\arraystretch}{1.5}
-\begin{tabularx}{\textwidth}{|l|l|X|}
-\hline
-\rowcolor[HTML]{EFEFEF} 
-\textbf{Campo} & \textbf{Tipo de Dato} & \textbf{Descripción} \\ \hline
-\texttt{id} & \texttt{String (UUID)} & Identificador único global, vinculado directamente a la llave primaria de la tabla \texttt{CODIGO\_FUENTE} en PostgreSQL. \\ \hline
-\texttt{embedding} & \texttt{float32[769]} & Vector híbrido que concatena 768 dimensiones semánticas y 1 dimensión de autoría estilométrica. \\ \hline
-\texttt{document} & \texttt{String} & Versión normalizada del código fuente original para reconstrucción y visualización. \\ \hline
-\texttt{metadata} & \texttt{JSON Object} & Diccionario de atributos para filtrado lógico y segmentación de búsqueda. \\ \hline
-\end{tabularx}
-\end{table}
+\subsubsection{Interfaz de Gestión y Repositorio}
+Para organizar de manera efectiva el trabajo docente, el sistema cuenta con un repositorio personal de ejercicios.
 
-\subsection{Composición del Vector Híbrido (769 Dimensiones)}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figuras/biblioteca_de_referencias.png}
+    \caption{Repositorio personal de ejercicios, cumpliendo con el RF-02.}
+    \label{fig:ui_repositorio}
+\end{figure}
 
-La principal innovación en la persistencia de \textit{Graphito} reside en el diseño del \textit{embedding}. Se ha implementado un esquema de concatenación de características (\textit{Early Fusion}) que resulta en un vector de 769 dimensiones, particionado de la siguiente manera:
+El \textbf{RF-02} especifica que el sistema debe permitir al docente la creación y gestión de un listado de ejercicios o problemas de programación. La Figura \ref{fig:ui_repositorio} muestra la implementación de esta funcionalidad, ofreciendo una vista consolidada de los problemas registrados.
 
-\begin{itemize}
-    \item \textbf{Dimensiones 0 a 767 (Semántica):} Características extraídas mediante el modelo \textit{GraphCodeBERT}, que representan la topología del flujo de datos y la lógica funcional del algoritmo.
-    \item \textbf{Dimensión 768 (Estilometría):} Valor escalar normalizado obtenido del análisis \textit{CharCNN}. Representa la probabilidad de autoría sintética, permitiendo que la métrica de similitud del coseno penalice discrepancias de estilo.
-\end{itemize}
+\subsubsection{Reporte de Análisis Bimodal}
+La pantalla principal de resultados presenta de forma integral las métricas calculadas por los motores de inteligencia artificial.
 
-\subsection{Estrategia de Filtrado mediante Metadatos}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figuras/reporte_de_similitud.png}
+    \caption{Dashboard de reporte bimodal, cumpliendo con el RF-10 y RF-11.}
+    \label{fig:ui_reporte}
+\end{figure}
 
-Para optimizar el rendimiento y garantizar la relevancia de los resultados, se hace uso de metadatos indexados. La Tabla \ref{tab:metadatos_vectoriales} describe los campos utilizados para el segmentado de las consultas (\textit{Query Filtering}).
-
-\begin{table}[htbp]
-\centering
-\caption{Atributos de metadatos para optimización de búsqueda.}
-\label{tab:metadatos_vectoriales}
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{|l|l|l|}
-\hline
-\rowcolor[HTML]{EFEFEF} 
-\textbf{Clave} & \textbf{Tipo} & \textbf{Función de Negocio} \\ \hline
-\texttt{problema\_id} & \texttt{Integer} & Filtro primario para restringir la búsqueda al contexto del problema. \\ \hline
-\texttt{es\_referencia} & \texttt{Boolean} & Distingue entre soluciones maestras y entregas de alumnos. \\ \hline
-\texttt{lenguaje} & \texttt{String} & Especifica el lenguaje de programación (C o C++). \\ \hline
-\texttt{author\_type} & \texttt{String} & Etiqueta de origen: \texttt{human} o \texttt{synthetic}. \\ \hline
-\end{tabular}
-\end{table}
+En la Figura \ref{fig:ui_reporte} se visualiza la interfaz del reporte, cumpliendo con el \textbf{RF-10} sobre la necesidad de generar un reporte bimodal que integre el índice de similitud semántica y la probabilidad de autoría de forma visual. Además, esta pantalla despliega de manera automática las alertas de integridad estipuladas en el \textbf{RF-11} frente a discrepancias entre la lógica y el estilo.

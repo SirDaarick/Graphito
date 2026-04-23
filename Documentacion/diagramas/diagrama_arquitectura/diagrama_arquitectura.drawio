@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="wtIKfg112GqH4JJrmoaI" name="Page-1">
-        <mxGraphModel dx="1392" dy="832" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1200" math="0" shadow="0">
+        <mxGraphModel dx="792" dy="832" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1200" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -149,28 +149,6 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="96" style="edgeStyle=none;html=1;exitX=0.5;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;fontSize=12;" edge="1" parent="1" source="4" target="6">
-                    <mxGeometry relative="1" as="geometry">
-                        <Array as="points">
-                            <mxPoint x="190" y="350"/>
-                            <mxPoint x="190" y="422"/>
-                        </Array>
-                    </mxGeometry>
-                </mxCell>
-                <mxCell id="4" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Profesor&lt;/font&gt;" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" parent="1" vertex="1">
-                    <mxGeometry x="80" y="300" width="50" height="100" as="geometry"/>
-                </mxCell>
-                <mxCell id="97" style="edgeStyle=none;html=1;exitX=0.5;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;fontSize=12;" edge="1" parent="1" source="5" target="6">
-                    <mxGeometry relative="1" as="geometry">
-                        <Array as="points">
-                            <mxPoint x="200" y="780"/>
-                            <mxPoint x="200" y="570"/>
-                        </Array>
-                    </mxGeometry>
-                </mxCell>
-                <mxCell id="5" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Alumno&lt;/font&gt;" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" parent="1" vertex="1">
-                    <mxGeometry x="80" y="730" width="50" height="100" as="geometry"/>
-                </mxCell>
                 <mxCell id="83" style="edgeStyle=none;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;fontSize=12;" parent="1" source="49" target="13" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
@@ -189,6 +167,12 @@
                             <mxPoint x="1790" y="305"/>
                         </Array>
                     </mxGeometry>
+                </mxCell>
+                <mxCell id="98" value="&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;b style=&quot;font-size: 20px;&quot;&gt;Docente / evaluador&lt;br&gt;&lt;br&gt;&lt;/b&gt;Usuario principal que gestiona las entregas de los alumnos y evalua los códigos" style="rounded=1;whiteSpace=wrap;html=1;fontSize=16;fillColor=#0050ef;fontColor=#ffffff;strokeColor=#001DBC;" vertex="1" parent="1">
+                    <mxGeometry x="120" y="360" width="260" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="99" value="" style="shape=actor;whiteSpace=wrap;html=1;fontSize=16;fillStyle=solid;fillColor=#FFFFFF;" vertex="1" parent="1">
+                    <mxGeometry x="230" y="380" width="40" height="50" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
