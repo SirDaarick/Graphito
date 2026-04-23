@@ -317,7 +317,6 @@ Las representaciones descritas en las secciones anteriores no son equivalentes e
     \toprule
     \textbf{Representación} & \textbf{Abstracción} & \textbf{Costo} & \textbf{Ventaja principal} & \textbf{Limitación principal} \\
     \midrule
-    \endinput % Usamos esto para la primera página
     \endfirsthead
 
     \multicolumn{5}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
@@ -566,7 +565,7 @@ La evolución de las arquitecturas para el análisis de código refleja un incre
 \renewcommand{\arraystretch}{1.5}
 \small
 
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.2cm} X X}
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.2cm} X X}
     \caption{Comparación de modelos preentrenados para análisis de código} \label{tab:modelos} \\
     
     \toprule
@@ -599,7 +598,7 @@ La evolución de las arquitecturas para el análisis de código refleja un incre
     
     GraphCodeBERT & Grafos & Tokens + DFG & Integra flujo de datos en el mecanismo de atención \cite{Guo2021GraphCodeBERT}. & Opacidad interpretativa; alta demanda de cómputo. \\
 
-\end{tabularx}
+\end{xltabular}
 
 \nopagebreak
 \footnotesize\textit{Elaboración propia con base en \cite{Feng2020CodeBERT, Liu2019RoBERTa, Alon2018Code2Vec, Zhang2019ASTNeural, Allamanis2018Graphs, Guo2021GraphCodeBERT}.}
@@ -623,7 +622,7 @@ Para caracterizar estos patrones, Hovarth \cite{Horvath2026ProgrammerAttribution
 \renewcommand{\arraystretch}{1.6}
 \small
 
-\begin{tabularx}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{3.5cm} X}
+\begin{xltabular}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{3.5cm} X}
     % --- Título y Etiquetas de la tabla ---
     \caption{Taxonomía de rasgos estilométricos en código fuente} \label{tab:rasgos_estilometricos} \\
     
@@ -665,7 +664,7 @@ Para caracterizar estos patrones, Hovarth \cite{Horvath2026ProgrammerAttribution
     
     Conductual & Dinámica de desarrollo y comportamiento del autor. & Frecuencia de \textit{commits}, patrones de edición en el tiempo, dinámica de tecleo (\textit{keystroke dynamics}). \\
 
-\end{tabularx}
+\end{xltabular}
 
 \nopagebreak
 \footnotesize\textit{Elaboración propia con base en \cite{Horvath2026ProgrammerAttribution}.}
@@ -819,7 +818,7 @@ estilométrico.
 \renewcommand{\arraystretch}{1.6}
 \small
 
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2cm} X X}
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2cm} X X}
     \caption{Comparación de modelos para el análisis estilométrico de código fuente} \label{tab:modelos_estilo} \\
     
     \toprule
@@ -849,7 +848,7 @@ estilométrico.
     
     RoBERTa & Transformer (BPE) & Contexto semántico & Maneja identificadores arbitrarios sin perder contexto \cite{Liu2019RoBERTa}. & Sin comprensión estructural; alto costo computacional. \\
 
-\end{tabularx}
+\end{xltabular}
 
 \nopagebreak
 \footnotesize\textit{Elaboración propia con base en \cite{Burrows2007Ngrams, Zhang2015CharCNN, Liu2019RoBERTa}.}
@@ -857,6 +856,7 @@ estilométrico.
 } % Fin del grupo small
 
 En conjunto, estos modelos ofrecen distintas formas de capturar el estilo de programación, desde patrones superficiales hasta representaciones profundas basadas en contexto. En la siguiente sección se presenta una síntesis que muestra que mediante la integracion de distintos enfoques, se puede conseguir una arquitectura robusta capáz de superar las limitaciones de los modelos previamente presentados. 
+
 
 
 \section{Integración y fusión de características (\textit{Feature Fusion})}
