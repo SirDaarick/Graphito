@@ -49,5 +49,4 @@ modelos/weights/*.bin
 *.fls
 *.fdb_latexmk
 *.synctex.gz
-*.pdf
 _minted-*/
