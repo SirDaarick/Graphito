@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="wtIKfg112GqH4JJrmoaI" name="Page-1">
-        <mxGraphModel dx="792" dy="832" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1200" math="0" shadow="0">
+        <mxGraphModel dx="1476" dy="775" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1200" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -54,9 +54,6 @@
                 </mxCell>
                 <mxCell id="42" value="Encoder Semántico (GraphCodeBERT)" style="rounded=0;whiteSpace=wrap;html=1;fontSize=12;" parent="15" vertex="1">
                     <mxGeometry x="110" y="170" width="120" height="60" as="geometry"/>
-                </mxCell>
-                <mxCell id="69" value="Pytorch" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;fontSize=12;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaWRZTWlkIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAyNTYgMzA5LjQzNTE4MDY2NDA2MjUiIGhlaWdodD0iMzA5LjQzNTE4MDY2NDA2MjUiIHdpZHRoPSIyNTYiPgogICAgPHRpdGxlPlB5VG9yY2g8L3RpdGxlPgogICAgPGc+CiAgICAgICAgPHBhdGggZmlsbD0iI0VFNEMyQyIgZD0iTTEyNy44MjUzNzUsMCBMMTI3LjgyNTM3NSw0NS4wNTMyMDYgTDU4LjYwMTQzODUsMTE0LjI3NDU4MSBDMjIuMzcyNDQ5OCwxNTEuMDE5Mjc5IDIyLjM3NjE0NjYsMjEwLjEyNzU5NCA1OC42MTI1MjksMjQ3LjUzODc3MiBMNTkuNzIxNjkxNywyNDguNjY1NzU3IEM5Ni43NDIxNTU1LDI4Ni4zODQ3MiAxNTcuNTExNTk2LDI4Ni4zODQ3MiAxOTUuMjMwNTU5LDI0OC42NjU3NTcgQzIzMi41NzIzMzMsMjEyLjAxNTQ5OCAyMzIuOTQ1NzUxLDE1Mi4wODg4NjcgMTk2LjM1MDgxMywxMTQuMjk1MzI3IEwxOTUuMjMwNTU5LDExMy4xNTY4ODkgTDIxOC4yODEwMzcsOTAuMTA2NDEyIEMyNjguNTcyOTg4LDE0MC4zOTgzNjMgMjY4LjU3Mjk4OCwyMjEuMDc1MDM0IDIxOC4yODEwMzcsMjcxLjcxNjIzNSBDMTY5LjAzNjgzNSwzMjIuMDA4MTg2IDg4LjAxMDkxNDEsMzIyLjAwODE4NiAzNy43MTg5NjMyLDI3MS43MTYyMzUgQy0xMi4wNzAwNjgyLDIyMS45MjcyMDMgLTEyLjU2Nzk1ODUsMTQyLjAxNTgwOCAzNi4yMjUyOTIyLDkxLjYyNDMyOTMgTDM3LjcxODk2MzIsOTAuMTA2NDEyIEwxMjcuODI1Mzc1LDAgWiBNMTczLjIyNzgzMSw1MC45OTA0NTAyIEMxODIuNDg2MzIzLDUwLjk5MDQ1MDIgMTg5Ljk5MTgxNCw1OC40OTU5NDEzIDE4OS45OTE4MTQsNjcuNzU0NDMzOCBDMTg5Ljk5MTgxNCw3Ny4wMTI5MjYzIDE4Mi40ODYzMjMsODQuNTE4NDE3NSAxNzMuMjI3ODMxLDg0LjUxODQxNzUgQzE2My45NjkzMzgsODQuNTE4NDE3NSAxNTYuNDYzODQ3LDc3LjAxMjkyNjMgMTU2LjQ2Mzg0Nyw2Ny43NTQ0MzM4IEMxNTYuNDYzODQ3LDU4LjQ5NTk0MTMgMTYzLjk2OTMzOCw1MC45OTA0NTAyIDE3My4yMjc4MzEsNTAuOTkwNDUwMiBaIi8+CiAgICA8L2c+Cjwvc3ZnPg==;" parent="15" vertex="1">
-                    <mxGeometry x="10" y="30" width="33.14" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="16" value="&lt;span style=&quot;font-size: 11px;&quot;&gt;Analisis estilométrico&lt;/span&gt;" style="swimlane;whiteSpace=wrap;html=1;fontSize=16;" parent="9" vertex="1">
                     <mxGeometry x="780" y="660" width="340" height="270" as="geometry"/>
@@ -149,6 +146,9 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
+                <mxCell id="69" value="Pytorch" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;fontSize=12;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaWRZTWlkIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAyNTYgMzA5LjQzNTE4MDY2NDA2MjUiIGhlaWdodD0iMzA5LjQzNTE4MDY2NDA2MjUiIHdpZHRoPSIyNTYiPgogICAgPHRpdGxlPlB5VG9yY2g8L3RpdGxlPgogICAgPGc+CiAgICAgICAgPHBhdGggZmlsbD0iI0VFNEMyQyIgZD0iTTEyNy44MjUzNzUsMCBMMTI3LjgyNTM3NSw0NS4wNTMyMDYgTDU4LjYwMTQzODUsMTE0LjI3NDU4MSBDMjIuMzcyNDQ5OCwxNTEuMDE5Mjc5IDIyLjM3NjE0NjYsMjEwLjEyNzU5NCA1OC42MTI1MjksMjQ3LjUzODc3MiBMNTkuNzIxNjkxNywyNDguNjY1NzU3IEM5Ni43NDIxNTU1LDI4Ni4zODQ3MiAxNTcuNTExNTk2LDI4Ni4zODQ3MiAxOTUuMjMwNTU5LDI0OC42NjU3NTcgQzIzMi41NzIzMzMsMjEyLjAxNTQ5OCAyMzIuOTQ1NzUxLDE1Mi4wODg4NjcgMTk2LjM1MDgxMywxMTQuMjk1MzI3IEwxOTUuMjMwNTU5LDExMy4xNTY4ODkgTDIxOC4yODEwMzcsOTAuMTA2NDEyIEMyNjguNTcyOTg4LDE0MC4zOTgzNjMgMjY4LjU3Mjk4OCwyMjEuMDc1MDM0IDIxOC4yODEwMzcsMjcxLjcxNjIzNSBDMTY5LjAzNjgzNSwzMjIuMDA4MTg2IDg4LjAxMDkxNDEsMzIyLjAwODE4NiAzNy43MTg5NjMyLDI3MS43MTYyMzUgQy0xMi4wNzAwNjgyLDIyMS45MjcyMDMgLTEyLjU2Nzk1ODUsMTQyLjAxNTgwOCAzNi4yMjUyOTIyLDkxLjYyNDMyOTMgTDM3LjcxODk2MzIsOTAuMTA2NDEyIEwxMjcuODI1Mzc1LDAgWiBNMTczLjIyNzgzMSw1MC45OTA0NTAyIEMxODIuNDg2MzIzLDUwLjk5MDQ1MDIgMTg5Ljk5MTgxNCw1OC40OTU5NDEzIDE4OS45OTE4MTQsNjcuNzU0NDMzOCBDMTg5Ljk5MTgxNCw3Ny4wMTI5MjYzIDE4Mi40ODYzMjMsODQuNTE4NDE3NSAxNzMuMjI3ODMxLDg0LjUxODQxNzUgQzE2My45NjkzMzgsODQuNTE4NDE3NSAxNTYuNDYzODQ3LDc3LjAxMjkyNjMgMTU2LjQ2Mzg0Nyw2Ny43NTQ0MzM4IEMxNTYuNDYzODQ3LDU4LjQ5NTk0MTMgMTYzLjk2OTMzOCw1MC45OTA0NTAyIDE3My4yMjc4MzEsNTAuOTkwNDUwMiBaIi8+CiAgICA8L2c+Cjwvc3ZnPg==;" parent="9" vertex="1">
+                    <mxGeometry x="250" y="90" width="33.14" height="40" as="geometry"/>
+                </mxCell>
                 <mxCell id="83" style="edgeStyle=none;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;fontSize=12;" parent="1" source="49" target="13" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
@@ -168,10 +168,10 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="98" value="&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;b style=&quot;font-size: 20px;&quot;&gt;Docente / evaluador&lt;br&gt;&lt;br&gt;&lt;/b&gt;Usuario principal que gestiona las entregas de los alumnos y evalua los códigos" style="rounded=1;whiteSpace=wrap;html=1;fontSize=16;fillColor=#0050ef;fontColor=#ffffff;strokeColor=#001DBC;" vertex="1" parent="1">
+                <mxCell id="98" value="&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;b style=&quot;font-size: 20px;&quot;&gt;Docente / evaluador&lt;br&gt;&lt;br&gt;&lt;/b&gt;Usuario principal que gestiona las entregas de los alumnos y evalua los códigos" style="rounded=1;whiteSpace=wrap;html=1;fontSize=16;fillColor=#0050ef;fontColor=#ffffff;strokeColor=#001DBC;" parent="1" vertex="1">
                     <mxGeometry x="120" y="360" width="260" height="210" as="geometry"/>
                 </mxCell>
-                <mxCell id="99" value="" style="shape=actor;whiteSpace=wrap;html=1;fontSize=16;fillStyle=solid;fillColor=#FFFFFF;" vertex="1" parent="1">
+                <mxCell id="99" value="" style="shape=actor;whiteSpace=wrap;html=1;fontSize=16;fillStyle=solid;fillColor=#FFFFFF;" parent="1" vertex="1">
                     <mxGeometry x="230" y="380" width="40" height="50" as="geometry"/>
                 </mxCell>
             </root>

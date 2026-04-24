@@ -36,3 +36,18 @@ modelos/weights/*.bin
 .DS_Store
 .vscode/
 .idea/
+
+# LaTeX
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.pdf
+_minted-*/

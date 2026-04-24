@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles } from "lucide-react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
 
 // Helper hook for the typewriter effect (optimized for performance)
@@ -42,6 +44,8 @@ interface SimilarityReportModalProps {
 export function SimilarityReportModal({ isOpen, onClose, comparison }: SimilarityReportModalProps) {
     const [isAnimating, setIsAnimating] = useState(false);
     const [shouldRender, setShouldRender] = useState(isOpen);
+    const backdropRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -54,6 +58,18 @@ export function SimilarityReportModal({ isOpen, onClose, comparison }: Similarit
             return () => clearTimeout(timer);
         }
     }, [isOpen]);
+
+    useGSAP(() => {
+        if (!shouldRender) return;
+
+        if (isOpen) {
+            gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" });
+            gsap.fromTo(contentRef.current, { opacity: 0, scale: 0.95, y: 32 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "back.out(1.2)" });
+        } else {
+            gsap.to(backdropRef.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
+            gsap.to(contentRef.current, { opacity: 0, scale: 0.95, y: 32, duration: 0.3, ease: "power2.in", onComplete: () => setShouldRender(false) });
+        }
+    }, [isOpen, shouldRender]);
 
     // Typewriter effect description
     const fullInterpretationText = `Basado en el análisis profundo de Graphito, los resultados sugieren una probabilidad muy alta de que el código haya sido adaptado de la misma fuente original o que exista una colaboración no declarada. Aunque los nombres de algunas funciones fueron modificados, la estructura lógica central se mantiene intacta.
@@ -72,15 +88,16 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
     const strokeDashoffset = isAnimating ? circumference - (comparison.similarity / 100) * circumference : circumference;
 
     return (
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-300 ${isAnimating ? 'visible' : 'invisible'}`}>
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4`}>
             {/* Backdrop */}
             <div
-                className={`absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'}`}
+                ref={backdropRef}
+                className={`absolute inset-0 bg-black/80 backdrop-blur-md opacity-0`}
                 onClick={onClose}
             />
 
             {/* Modal Content */}
-            <div className={`w-full max-w-5xl transition-all duration-300 transform ${isAnimating ? 'opacity-100 scale-100' : 'opacity-0 translate-y-8 scale-95'}`}>
+            <div ref={contentRef} className={`w-full max-w-5xl opacity-0 transform translate-y-8 scale-95`}>
                 <AuthCard className="w-full p-0 overflow-hidden border-[#2b3346]/60 backdrop-blur-2xl bg-[#0f1522]/90">
 
                     <div className="flex flex-col h-full max-h-[90vh]">
@@ -88,7 +105,7 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
                         <div className="flex items-center justify-between px-8 py-4 border-b border-[#2b3346]/40 bg-black/20">
                             <button
                                 onClick={onClose}
-                                className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                                className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                                 <ArrowLeft size={16} />
                                 Volver a la biblioteca
@@ -281,13 +298,13 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
                                 Documento: ID_8829-X
                             </div>
                             <div className="flex items-center gap-4">
-                                <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-[#2b3346] text-sm font-bold text-white hover:bg-white/5 transition-colors">
+                                <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-[#2b3346] text-sm font-bold text-white hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                                     <Download size={16} />
                                     <span>Descargar reporte PDF</span>
                                 </button>
                                 <button
                                     onClick={onClose}
-                                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-graphito-blue to-graphito-violet text-sm font-bold text-white hover:opacity-90 transition-opacity"
+                                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-graphito-blue to-graphito-violet text-sm font-bold text-white hover:opacity-90 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
                                     Volver a la biblioteca
                                 </button>

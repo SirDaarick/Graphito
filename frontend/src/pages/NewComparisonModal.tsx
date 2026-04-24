@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Upload, CheckCircle2 } from "lucide-react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
 import { GradientButton } from "../components/ui/GradientButton";
 
@@ -9,33 +11,41 @@ interface NewComparisonModalProps {
 }
 
 export function NewComparisonModal({ isOpen, onClose }: NewComparisonModalProps) {
-    const [isAnimating, setIsAnimating] = useState(false);
     const [shouldRender, setShouldRender] = useState(isOpen);
+    const backdropRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isOpen) {
             setShouldRender(true);
-            const timer = setTimeout(() => setIsAnimating(true), 10);
-            return () => clearTimeout(timer);
-        } else {
-            setIsAnimating(false);
-            const timer = setTimeout(() => setShouldRender(false), 300);
-            return () => clearTimeout(timer);
         }
     }, [isOpen]);
+
+    useGSAP(() => {
+        if (!shouldRender) return;
+
+        if (isOpen) {
+            gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" });
+            gsap.fromTo(contentRef.current, { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.2)" });
+        } else {
+            gsap.to(backdropRef.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
+            gsap.to(contentRef.current, { opacity: 0, scale: 0.95, duration: 0.3, ease: "power2.in", onComplete: () => setShouldRender(false) });
+        }
+    }, [isOpen, shouldRender]);
 
     if (!shouldRender) return null;
 
     return (
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-300 ${isAnimating ? 'visible' : 'invisible'}`}>
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4`}>
             {/* Backdrop */}
             <div
-                className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'}`}
+                ref={backdropRef}
+                className={`absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0`}
                 onClick={onClose}
             />
 
             {/* Modal Content */}
-            <div className={`w-full max-w-xl transition-all duration-300 transform ${isAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+            <div ref={contentRef} className={`w-full max-w-xl opacity-0 transform scale-95`}>
                 <AuthCard className="w-full p-0 overflow-hidden border-[#2b3346]/60">
                     {/* Header */}
                     <div className="flex items-center justify-between px-8 py-6 border-b border-[#2b3346]/40">
@@ -48,7 +58,7 @@ export function NewComparisonModal({ isOpen, onClose }: NewComparisonModalProps)
                             </span>
                             <button
                                 onClick={onClose}
-                                className="p-1 text-slate-500 hover:text-white transition-colors"
+                                className="p-1 text-slate-500 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                                 <X size={20} />
                             </button>
@@ -76,7 +86,7 @@ export function NewComparisonModal({ isOpen, onClose }: NewComparisonModalProps)
                                     </p>
                                 </div>
 
-                                <button className="bg-[#2b3346]/60 hover:bg-[#2b3346] text-white text-sm font-bold py-2.5 px-6 rounded-xl border border-[#334155] transition-colors">
+                                <button className="bg-[#2b3346]/60 hover:bg-[#2b3346] text-white text-sm font-bold py-2.5 px-6 rounded-xl border border-[#334155] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                                     Seleccionar archivo
                                 </button>
                             </div>
@@ -97,7 +107,7 @@ export function NewComparisonModal({ isOpen, onClose }: NewComparisonModalProps)
                                     </p>
                                 </div>
                             </div>
-                            <button className="text-xs font-bold text-slate-400 hover:text-white transition-colors">
+                            <button className="text-xs font-bold text-slate-400 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                                 Cambiar archivo
                             </button>
                         </div>
@@ -107,7 +117,7 @@ export function NewComparisonModal({ isOpen, onClose }: NewComparisonModalProps)
                     <div className="flex items-center justify-between px-10 py-8 border-t border-[#2b3346]/40 bg-black/5">
                         <button
                             onClick={onClose}
-                            className="text-sm font-bold text-slate-400 hover:text-white transition-colors"
+                            className="text-sm font-bold text-slate-400 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#121827] rounded-lg px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                             Cancelar
                         </button>

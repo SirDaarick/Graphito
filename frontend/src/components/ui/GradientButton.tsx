@@ -24,6 +24,8 @@ export function GradientButton({ children, className, ...props }: GradientButton
         /* 4. Efectos de interacción */
         transition-all duration-500 ease-in-out
         active:scale-95
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1522]
+        disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
         
         /* 5. Reflejo interno (Glow) */
         before:absolute before:inset-0
