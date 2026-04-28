@@ -1,0 +1,5 @@
+// Estructura de la Colección Vectorial en ChromaDB
+Table codigos_referencia {
+  id uuid [pk, note: 'Vinculado con CODIGO_FUENTE.id']
+  embedding_hibrido vector [note: '769 dimensiones (768 sem + 1 estilo)']
+  metadata_json json [note: 'problema_id, lenguaje, es_referencia, author_type']

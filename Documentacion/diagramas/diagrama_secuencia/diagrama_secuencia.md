@@ -1,67 +1,68 @@
+%%{init: { 'themeVariables': { 'fontSize': '16px', 'actorFontSize': '18px', 'messageFontSize': '16px', 'noteFontSize': '16px' } } }%%
 sequenceDiagram
     autonumber
-    actor P as Profesor
-    participant UI as Interfaz (React/TS)
-    participant B as Backend (FastAPI)
-    participant O as Orquestador (LangGraph)
-    participant DB as Bases de Datos (Relacional/Vectorial)
-    participant LLM as API LLM Externa
-    participant IA_S as Módulo semántico (GraphCodeBERT)
-    participant IA_A as Módulo estilométrico (CharCNN)
+    
+    actor P as Docente
+    participant UI as Interfaz<br/>(React)
+    participant B as Backend<br/>(FastAPI)
+    participant O as Orquestador<br/>(LangGraph)
+    participant DB as Bases de Datos<br/>(PG/Chroma)
+    participant LLM as API LLM<br/>Externa
+    participant IA_S as Canal Semántico<br/>(GraphCodeBERT)
+    participant IA_A as Canal Estilométrico<br/>(CharCNN)
 
-    Note over P, DB: Fase 1: Configuración de Referencia
+    Note over P, DB: Fase 1: Configuración de Referencias
     
-    P->>UI: Define problema y restricciones
+    P->>UI: Define problema<br/>y restricciones
     UI->>B: POST /configurar-problema
-    B->>O: Iniciar flujo de preparación
+    B->>O: Iniciar flujo<br/>de configuración
     
-    O->>DB: ¿Existen soluciones previas? (Hash)
+    O->>DB: ¿Existen soluciones<br/>previas? (Hash)
     
-    alt Caso: No existen en Base de Datos
-        O->>LLM: Solicitar variantes funcionalmente equivalentes
-        LLM-->>O: Retorno de códigos sintéticos (.cpp)
-        loop Por cada variante generada
-            O->>IA_S: Generar Embedding Semántico
-            IA_S-->>O: Vector de características
-            O->>DB: Guardar en ChromaDB (Indexación)
+    alt Caso: No existen en BD
+        O->>LLM: Solicitar variantes<br/>equivalentes
+        LLM-->>O: Retorno de<br/>códigos sintéticos
+        loop Por cada variante
+            O->>IA_S: Extraer Embedding<br/>Semántico
+            IA_S-->>O: Vector lógico
+            O->>DB: Indexar en<br/>ChromaDB
         end
     else Caso: Ya existen
-        O->>DB: Recuperar embeddings de referencia
+        O->>DB: Recuperar embeddings<br/>de referencia
         DB-->>O: Vectores listos
     end
     O-->>B: Estado: Referencia Lista
-    B-->>UI: Confirmación de configuración
+    B-->>UI: Confirmación de<br/>configuración
 
-    Note over P, IA_A: Fase 2: Análisis de Entrega (Evaluación de Alumno)
+    Note over P, IA_A: Fase 2: Análisis de Entrega (Doble Canal)
     
-    P->>UI: Carga código del alumno (.cpp)
+    P->>UI: Carga archivo<br/>a analizar (.cpp)
     UI->>B: POST /analizar-entrega
     activate B
     
-    B->>O: Orquestar análisis bimodal
+    B->>O: Orquestar análisis<br/>híbrido
     
     par Inferencia en Paralelo
-        O->>IA_S: Generar Embedding (Semantic)
-        IA_S-->>O: Vector Alumno
-        O->>IA_A: Analizar Autoría (Style)
-        IA_A-->>O: Probabilidad de autoría (%)
+        O->>IA_S: Extraer Embedding<br/>(Semántica)
+        IA_S-->>O: Vector Estructural
+        O->>IA_A: Analizar Origen<br/>(Estilometría)
+        IA_A-->>O: Prob. de generación<br/>sintética (%)
     end
 
-    %% --- PASO AGREGADO: FEATURE FUSION ---
-    O->>O: Fusión de Características (Feature Fusion)
-
+    %% --- FEATURE FUSION ---
+    O->>O: Fusión de Características<br/>(Feature Fusion)
     %% -------------------------------------
 
-    Note over O, DB: Fase 3: Cálculo de Similitud y Persistencia
+    Note over O, DB: Fase 3: Consolidación y Persistencia
     
-    O->>DB: Buscar vectores de referencia en ChromaDB 
-    DB-->>O: Score de Similitud del Coseno
+    O->>DB: Buscar referencias<br/>en ChromaDB 
+    DB-->>O: Índice de Similitud<br/>del Coseno
     
-    O->>O: Consolidar reporte (Bimodal)
+    O->>O: Consolidar reporte<br/>dual
     
-    O->>DB: Guardar reporte final en PostgreSQL
+    O->>DB: Guardar metadatos<br/>en PostgreSQL
     O-->>B: Datos del reporte
     
-    B-->>UI: 200 OK (Reporte Generado)
+    B-->>UI: 200 OK<br/>(Reporte Generado)
     deactivate B
-    UI->>P: Visualiza resultados en Dashboard
+    UI->>P: Visualiza indicadores<br/>en Dashboard

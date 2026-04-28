@@ -1,0 +1,34 @@
+---
+config:
+  theme: redux
+  themeVariables:
+    fontSize: 16px
+    mainBkg: '#ffffff'
+    lineColor: '#1e4976'
+---
+stateDiagram-v2
+    direction TB
+
+    [*] --> S1: Inicio
+    
+    state "S1. Configuración del Problema" as S1
+    state "S2. Carga de Entregas" as S2
+    state "S3. Preprocesamiento de Doble Canal" as S3
+    state "S4. Análisis Semántico" as S4
+    state "S5. Análisis Estilométrico" as S5
+    state "S6. Fusión y Cálculo" as S6
+    state "S7. Reporte Generado" as S7
+
+    S1 --> S2: Cargar referencias y parámetros
+    S2 --> S3: Recepción de archivos (.c/.cpp)
+    
+    S3 --> S4: Normalización (Canal Semántico)
+    S3 --> S5: Preparación (Canal Estilométrico)
+    
+    S4 --> S6: Genera Embedding Lógico
+    S5 --> S6: Cálculo de Prob. Sintética
+    
+    S6 --> S7: Similitud e Indicadores
+    
+    S7 --> [*]: Fin del proceso
+    S7 --> S1: Iniciar Nuevo Análisis

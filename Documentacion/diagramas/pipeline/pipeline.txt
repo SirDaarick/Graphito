@@ -1,0 +1,86 @@
+---
+config:
+  theme: neo
+---
+flowchart TB
+ subgraph P2["<b>Adquisición de Datos</b>"]
+    direction LR
+        S2_2("Generación de Código Sintético")
+        S2_1("Recolección de Dataset Humano")
+        S2_3("Balanceo de Clases")
+        S2_4("Partición del Corpus<br>(Train, Val, Test)")
+  end
+ subgraph P3["<b>Preparación de Datos</b>"]
+    direction LR
+        S3_B("Extracción de Lógica (Grafos)")
+        S3_A("Limpieza y Normalización")
+        S3_D("Conversión a Vectores 1D")
+        S3_C("Preservación de Formato")
+  end
+ subgraph P4["<b>Entrenamiento de Modelos</b>"]
+    direction LR
+        S4_A("Canal Semántico:<br>Extracción de Características")
+        S4_C("Estrategias de Prevención<br>de Sobreajuste")
+        S4_B("Canal Estilométrico:<br>Entrenamiento de Clasificador")
+  end
+ subgraph P5["<b>Evaluación de Modelos</b>"]
+    direction LR
+        S5_3("Validación de similitud (Coseno)")
+        S5_2("Cálculo de métricas de clasificación")
+        S5_1("Pruebas con datos no vistos<br>(Conjunto Test)")
+  end
+ subgraph P6["<b>Despliegue de Modelos</b>"]
+    direction LR
+        S6_3("Fusión de Características")
+        S6_2("Integración en Backend (API)")
+        S6_1("Carga de Pesos Entrenados")
+  end
+ subgraph P7["<b>Monitorización de Modelos</b>"]
+    direction LR
+        S7_2("Validación de Reglas y Rendimiento")
+        S7_1("Pruebas de Integración Continua")
+  end
+    S2_1 --> S2_2
+    S2_2 --> S2_3
+    S2_3 --> S2_4
+    S3_A --> S3_B
+    S3_C --> S3_D
+    S4_B --> S4_C
+    S5_1 --> S5_2
+    S5_2 --> S5_3
+    S6_1 --> S6_2
+    S6_2 --> S6_3
+    S7_1 --> S7_2
+    P2 --> P3
+    P3 --> P4
+    P4 --> P5
+    P5 --> P6
+    P6 --> P7
+
+     S2_2:::subnodo
+     S2_1:::subnodo
+     S2_3:::subnodo
+     S2_4:::subnodo
+     S3_B:::subnodo
+     S3_A:::subnodo
+     S3_D:::subnodo
+     S3_C:::subnodo
+     S4_A:::subnodo
+     S4_C:::subnodo
+     S4_B:::subnodo
+     S5_3:::subnodo
+     S5_2:::subnodo
+     S5_1:::subnodo
+     S6_3:::subnodo
+     S6_2:::subnodo
+     S6_1:::subnodo
+     S7_2:::subnodo
+     S7_1:::subnodo
+     P2:::fase
+     P3:::fase
+     P4:::fase
+     P5:::fase
+     P6:::fase
+     P7:::fase
+    classDef fase fill:#eef5fc,stroke:#1e4976,stroke-width:2px,color:#1e4976,font-size:18px,rx:8px,ry:8px
+    classDef subnodo fill:#ffffff,stroke:#5b8db8,stroke-width:2px,color:#000000,font-size:16px,rx:6px,ry:6px

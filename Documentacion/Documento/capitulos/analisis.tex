@@ -8,30 +8,30 @@ En esta sección se describen los requerimientos funcionales y no funcionales de
 \subsection{Requerimientos Funcionales}
 % =========================================================
 
-Los requerimientos funcionales definen las capacidades y procesos que el sistema debe implementar para cumplir con las funciones de análisis, gestión de información y evaluación del código en el contexto académico.
+Los requerimientos funcionales definen las capacidades y procesos que el sistema debe implementar para cumplir con las funciones de análisis, gestión de información y auditoría de código en el contexto académico.
 
 \begin{itemize}
     \item \textbf{RF-01:} El sistema debe permitir el registro e inicio de sesión de docentes mediante credenciales cifradas para garantizar un espacio de trabajo privado.
     
-    \item \textbf{RF-02:} El sistema debe permitir al docente la creación y gestión de un listado de ejercicios o problemas de programación (Repositorio Personal).
+    \item \textbf{RF-02:} El sistema debe permitir al docente la creación y gestión de un listado de ejercicios o problemas de programación (Biblioteca).
     
-    \item \textbf{RF-03:} El sistema debe permitir la carga de código fuente en formato .c, .cpp y .txt asociados a un ejercicio específico.
+    \item \textbf{RF-03:} El sistema debe permitir la carga de código fuente en formato .c y .cpp asociados a un ejercicio específico.
     
-    \item \textbf{RF-04:} El sistema debe realizar la normalización adecuada del código, eliminando comentarios para la extracción de grafos y preservando las estructuras de estilo para el análisis de autoría.
+    \item \textbf{RF-04:} El sistema debe realizar el preprocesamiento y normalización del código fuente, asegurando la correcta extracción de los grafos para el canal semántico, mientras se preserva la integridad de las estructuras de estilo originales para el detección de patrones generativos.
     
-    \item \textbf{RF-05:} El sistema debe generar representaciones basadas en Grafos de Flujo de Datos (DFG) y n-gramas de caracteres.
+    \item \textbf{RF-05:} El sistema debe generar representaciones basadas en Grafos de Flujo de Datos (DFG) para el módulo semántico, y transformar el código fuente en secuencias matriciales bidimensionales (carácter por vector) para su procesamiento mediante convoluciones 1D en el módulo estilométrico.
     
     \item \textbf{RF-06:} El sistema debe realizar el análisis de similitud semántica mediante el modelo GraphCodeBERT para la generación de vectores de características (embeddings), cuantificando la proximidad entre ellos utilizando la métrica de similitud del coseno.
     
-    \item \textbf{RF-07:} El sistema debe realizar el análisis estilométrico mediante el modelo CharCNN para calcular la probabilidad de autoría.
+    \item \textbf{RF-07:} El sistema debe realizar el análisis estilométrico mediante el modelo CharCNN para calcular la probabilidad de generación mediante inteligencia artificial. sintética o humana.
     
-    \item \textbf{RF-08:} El sistema debe solicitar y recibir múltiples versiones funcionalmente equivalentes del problema proporcionado por el evaluador a través de un modelo LLM externo (Trayectoria A1).
+    \item \textbf{RF-08:} El sistema debe solicitar y recibir múltiples versiones funcionalmente equivalentes del problema proporcionado por el docente a través de un modelo LLM externo.
     
-    \item \textbf{RF-09:} El sistema debe permitir el almacenamiento persistente de los embeddings y resultados en una base de datos vectorial junto con sus metadatos lógicos.
+    \item \textbf{RF-09:} El sistema debe realizar el almacenamiento persistente de los resultados del análisis y metadatos en una base de datos relacional (PostgreSQL), así como de los vectores de características en una base de datos vectorial (ChromaDB), asegurando la integridad referencial.
     
-    \item \textbf{RF-10:} El sistema debe generar un reporte bimodal que integre el índice de similitud semántica y la probabilidad de autoría de forma visual.
+    \item \textbf{RF-10:} El sistema debe generar un reporte consolidado que integre el índice de similitud semántica y la probabilidad de generación mediante inteligencia artificial. de forma visual.
     
-    \item \textbf{RF-11:} El sistema debe emitir alertas de integridad de forma automática cuando se detecten discrepancias críticas entre la lógica y el estilo de la entrega (Trayectorias A4 y A5).
+    \item \textbf{RF-11:} El sistema debe realizar una fusión de características (Feature Fusion) que integre el vector semántico y la probabilidad estilométrica, consolidando las métricas de ambos módulos en una sola estructura para su análisis dual.
     
     \item \textbf{RF-12:} El sistema debe permitir la consulta histórica de reportes de análisis realizados previamente sin necesidad de re-procesar los archivos fuente.
 \end{itemize}
@@ -45,25 +45,25 @@ Los requerimientos no funcionales establecen las restricciones, atributos de cal
 \begin{itemize}
     \item \textbf{RNF-01:} Seguridad de datos: El sistema debe cifrar las contraseñas de los usuarios y utilizar tokens de sesión (JWT) para proteger la comunicación entre el cliente y el servidor.
     
-    \item \textbf{RNF-02:} Persistencia híbrida: El sistema debe contar con un esquema de base de datos dual (SQL para metadatos de usuario y Vectorial para embeddings de código).
+    \item \textbf{RNF-02:} Persistencia híbrida: El sistema debe operar bajo un esquema de base de datos dual, optimizando las consultas relacionales en PostgreSQL y las búsquedas por similitud vectorial en ChromaDB.
     
-    \item \textbf{RNF-03:} El modelo GraphCodeBERT debe alcanzar un F1-Score mayor a 0.85 en tareas de detección de clones.
+    \item \textbf{RNF-03:} Los modelos de IA integrados deben estar calibrados buscando alcanzar un objetivo de rendimiento base de F1-Score $\ge$ 0.85 para GraphCodeBERT en tareas de detección de similitud semántica.
     
-    \item \textbf{RNF-04:} El modelo CharCNN debe alcanzar una precisión de autoría mayor al 0.8.
+    \item \textbf{RNF-04:} El módulo estilométrico (CharCNN) debe estar optimizado para buscar una precisión de clasificación de autoría igual o superior a 0.8 bajo el corpus de pruebas establecido.
     
-    \item \textbf{RNF-05:} El sistema debe operar bajo los estándares C11 y C++17 para garantizar compatibilidad con el currículo de ESCOM.
+    \item \textbf{RNF-05:} El sistema debe soportar el análisis de código bajo los estándares C11 y C++17 para garantizar compatibilidad operativa con el currículo y las entregas esperadas.
     
-    \item \textbf{RNF-06:} El sistema debe mantener una tasa de falsos positivos menor al 10\% mediante el orquestador de métricas.
+    \item \textbf{RNF-06:} El orquestador de métricas debe ajustar los umbrales de decisión con el objetivo de mantener una tasa de falsos positivos menor al 10\% durante el análisis de doble canal.
     
-    \item \textbf{RNF-07:} El tiempo de procesamiento total por entrega no debe exceder los 20 segundos.
+    \item \textbf{RNF-07:} El tiempo de procesamiento de inferencia en el backend durante la fase de análisis de una entrega estudiantil no debe exceder los 20 segundos, dado que la indexación de referencias y la generación de variantes (LLM) se realizan de forma asíncrona en la fase de configuración previa.
     
-    \item \textbf{RNF-08:} El sistema debe ser compatible con navegadores basados en Chromium versión 110 o superior.
+    \item \textbf{RNF-08:} El sistema debe ser compatible para su ejecución en navegadores web basados en el motor Chromium versión 110 o superior.
     
-    \item \textbf{RNF-09:} La interfaz debe ser responsiva y mostrar indicadores de progreso en tiempo real durante la inferencia de los modelos.
+    \item \textbf{RNF-09:} La interfaz web debe ser intuitiva, permitiendo ejecutar todas las tareas en 3 o menos acciones y proporcionar retroalimentación visual o indicadores de estado en tiempo real mientras el orquestador (LangGraph) procesa las tareas en segundo plano.
     
-    \item \textbf{RNF-10:} El sistema debe garantizar una disponibilidad del 99\% para su uso en periodos de evaluación.
+    \item \textbf{RNF-10:} El sistema debe asegurar alta disponibilidad operativa durante el procesamiento y análisis de código dentro del entorno de despliegue asignado para las pruebas.
     
-    \item \textbf{RNF-11:} El sistema debe validar la integridad y tipo de los archivos en el cliente antes de ser enviados al backend.
+    \item \textbf{RNF-11:} El sistema debe realizar validaciones preventivas en el cliente (tipo de archivo, tamaño e integridad) antes de iniciar la transmisión de la carga útil hacia la API REST.
 \end{itemize}
 
 % =========================================================
@@ -79,191 +79,123 @@ Las reglas de negocio definen los criterios que guían el funcionamiento y uso �
     
     \item \textbf{RN-03:} Integridad de la referencia: Toda entrega debe ser comparada contra al menos una solución de referencia proporcionada por el docente para ser considerada válida.
     
-    \item \textbf{RN-04:} La decisión final de evaluación es responsabilidad exclusiva del docente; el sistema actúa únicamente como una herramienta de apoyo a la auditoría académica.
+    \item \textbf{RN-04:} La decisión final de calificación es responsabilidad exclusiva del docente; el sistema actúa únicamente como una herramienta objetiva de apoyo a la auditoría académica.
     
     \item \textbf{RN-05:} Se permite el uso de múltiples soluciones generadas por LLM para ampliar el espectro de comparación lógica, siempre que el docente las valide inicialmente.
     
-    \item \textbf{RN-06:} La autoría del código se infiere mediante la desviación del vector estilométrico respecto al estándar humano o sintético identificado por el canal B.
+    \item \textbf{RN-06:} Preservación de referencias: Los archivos cargados en calidad de entregas a analizar no podrán ser catalogados ni reutilizados por el sistema como códigos de referencia para futuras comparaciones, garantizando que el estándar de comparación se mantenga basado exclusivamente en soluciones validadas o generadas por el docente.
 \end{itemize}
 
 % =========================================================
 \section{Identificación y descripción de actores}
 % =========================================================
 
-En el contexto del sistema propuesto, los actores representan las entidades externas que interactúan con la plataforma y que participan en el flujo de análisis y evaluación del código fuente. La correcta identificación de estos actores permite definir los casos de uso, delimitar responsabilidades y establecer la interacción entre los usuarios y los módulos del sistema.
+En el contexto del sistema propuesto (Graphito), los actores representan las entidades externas que interactúan con la plataforma y que participan en el flujo de configuración, análisis y auditoría del código fuente. La correcta identificación de estos actores permite definir los casos de uso, delimitar responsabilidades y establecer las fronteras del sistema.
 
-A partir del análisis de requerimientos y de la arquitectura funcional del sistema, se identifican los siguientes actores principales:
+A partir de la arquitectura funcional, se identifican exclusivamente dos actores que interactúan de forma directa con la plataforma:
 
 % ---------------------------------------------------------
-\subsection{Evaluador (Docente)}
+\subsection{Docente / Evaluador}
 % ---------------------------------------------------------
 
-El evaluador es el actor principal del sistema, ya que utiliza la plataforma como herramienta de apoyo en el proceso de evaluación académica. Este actor corresponde a profesores o instructores de cursos introductorios de programación.
+Es el actor principal y humano del sistema. Utiliza la plataforma como una herramienta de apoyo a la decisión en su proceso de auditoría académica (correspondiente a profesores o instructores de programación).
 
-Entre sus principales responsabilidades se encuentran:
+Entre sus principales responsabilidades de interacción se encuentran:
 
 \begin{itemize}
-    \item Proporcionar la descripción del problema o práctica a evaluar.
-    \item Definir restricciones técnicas asociadas al ejercicio (por ejemplo, uso de estructuras específicas o limitaciones en librerías).
-    \item Cargar los programas desarrollados por los estudiantes.
-    \item Seleccionar o generar fuentes de referencia para la comparación.
-    \item Analizar los resultados generados por el sistema, incluyendo la similitud semántica y la probabilidad de autoría.
-    \item Tomar la decisión final sobre la evaluación del código.
+    \item Proporcionar la descripción técnica del problema o práctica.
+    \item Configurar el marco de comparación cargando sus códigos de referencia.
+    \item Cargar los archivos fuente (\textit{.c, .cpp}) desarrollados por los estudiantes para su análisis.
+    \item Interpretar los reportes visuales generados por el sistema, incluyendo los índices de similitud semántica y la probabilidad de generación mediante inteligencia artificial..
+    \item Tomar la decisión final sobre la calificación del alumno, utilizando la evidencia estática proporcionada por la herramienta.
 \end{itemize}
 
-Es importante destacar que el sistema no reemplaza la decisión del docente, sino que actúa como una herramienta de apoyo proporcionando métricas e información relevante para facilitar el proceso de evaluación.
-
 % ---------------------------------------------------------
-\subsection{Estudiante}
+\subsection{Motor de Inteligencia Artificial Externo (LLM)}
 % ---------------------------------------------------------
 
-El estudiante es el actor que genera el código fuente que será evaluado por el sistema. Aunque no interactúa directamente con la plataforma en todos los escenarios, su participación es fundamental dentro del flujo del sistema.
+Este actor corresponde a una API de un sistema externo basado en Modelos de Lenguaje Grande (LLM). Actúa como un proveedor de servicios de generación de código sintético bajo demanda.
 
-Sus principales características son:
+Sus funciones en interacción con el orquestador de Graphito son:
 
 \begin{itemize}
-    \item Desarrolla soluciones a problemas de programación en C/C++.
-    \item Entrega el código fuente como resultado de una actividad académica.
-    \item Puede utilizar diferentes enfoques, estructuras o herramientas (incluyendo IA generativa) para resolver el problema.
+    \item Recibir el código de referencia original y generar descripciones técnicas algorítmicas.
+    \item Generar múltiples variantes de código que sean funcionalmente equivalentes a la referencia del docente.
+    \item Proveer el insumo necesario para que el sistema indexe un espacio vectorial de comparación mucho más robusto.
 \end{itemize}
-
-El sistema analiza indirectamente el trabajo del estudiante con el objetivo de evaluar la equivalencia lógica de su solución y detectar posibles patrones de generación automática.
-
-% ---------------------------------------------------------
-\subsection{Modelo de Inteligencia Artificial Externo (LLM)}
-% ---------------------------------------------------------
-
-Este actor corresponde a un sistema externo basado en modelos de lenguaje (LLM), el cual es utilizado para generar múltiples soluciones funcionalmente equivalentes a un problema dado.
-
-Sus funciones dentro del sistema son:
-
-\begin{itemize}
-    \item Recibir la descripción del problema y las restricciones definidas por el evaluador.
-    \item Generar soluciones alternativas que cumplen con dichas restricciones.
-    \item Proporcionar un conjunto de referencia ampliado para el análisis de similitud semántica.
-\end{itemize}
-
-Este actor permite enriquecer el proceso de comparación, ya que introduce variabilidad en las soluciones de referencia, mejorando la capacidad del sistema para detectar equivalencias funcionales.
-
-% ---------------------------------------------------------
-\subsection{Sistema}
-% ---------------------------------------------------------
-
-El sistema actúa como el núcleo del proceso de análisis, integrando los diferentes módulos de procesamiento y modelos de inteligencia artificial.
-
-Sus principales funciones incluyen:
-
-\begin{itemize}
-    \item Preprocesamiento y normalización del código fuente.
-    \item Generación de representaciones estructurales (DFG y n-gramas).
-    \item Cálculo de similitud semántica mediante GraphCodeBERT.
-    \item Análisis estilométrico mediante CharCNN.
-    \item Generación de reportes con métricas de similitud y probabilidad de autoría.
-\end{itemize}
-
-El sistema coordina la interacción entre los actores y centraliza el flujo de datos necesario para el análisis.
-
-% ---------------------------------------------------------
-\subsection{Base de Datos}
-% ---------------------------------------------------------
-
-La base de datos es un actor de soporte que permite el almacenamiento y recuperación de información relevante para el sistema.
-
-Sus funciones principales son:
-
-\begin{itemize}
-    \item Almacenar embeddings generados por los modelos.
-    \item Guardar metadatos asociados a los programas analizados.
-    \item Permitir la reutilización de información para futuras comparaciones.
-\end{itemize}
-
-La existencia de este componente permite mejorar la eficiencia del sistema y facilitar análisis posteriores.
-
-
 
 % =========================================================
 \section{Trayectorias principales y alternativas}
 % =========================================================
 
-Las trayectorias del sistema describen el flujo de interacción entre el evaluador y la plataforma Graphito, detallando las secuencias de acciones necesarias para llevar a cabo el análisis de código. Estas trayectorias permiten identificar tanto el comportamiento esperado del sistema como posibles escenarios alternativos ante condiciones específicas.
+Las trayectorias describen el flujo de interacción entre el docente, el orquestador backend y los modelos de IA, detallando las secuencias de acciones para llevar a cabo el análisis bimodal. Estas trayectorias reflejan el comportamiento esperado (Modelado BPMN) y los escenarios alternativos.
 
 % ---------------------------------------------------------
-\subsection{Trayectoria principal}
+\subsection{Trayectoria principal (Flujo de Análisis Estándar)}
 % ---------------------------------------------------------
 
-La trayectoria principal describe el flujo estándar de uso del sistema para realizar el análisis de código en un contexto académico.
-
-\textbf{Flujo principal:}
+La trayectoria principal describe el flujo de uso del sistema para procesar una entrega estudiantil contra referencias previamente configuradas.
 
 \begin{enumerate}
-    \item El evaluador accede a la plataforma web del sistema.
-    \item El evaluador define el problema de programación a evaluar, incluyendo restricciones y criterios relevantes.
-    \item El evaluador carga los programas desarrollados por los estudiantes.
-    \item El sistema recibe el código y realiza un proceso de preprocesamiento y normalización.
-    \item El sistema genera representaciones estructurales del código, incluyendo grafos de flujo de datos y características estilométricas.
-    \item El módulo de análisis semántico genera embeddings del código utilizando GraphCodeBERT.
-    \item El módulo de análisis estilométrico procesa el código mediante el modelo CharCNN.
-    \item El sistema calcula la similitud semántica entre programas utilizando similitud del coseno.
-    \item El sistema estima la probabilidad de autoría basada en patrones estilométricos.
-    \item El sistema integra los resultados mediante el orquestador y genera un reporte final.
-    \item El evaluador visualiza los resultados del análisis.
-    \item El evaluador toma una decisión informada sobre la evaluación del código.
+    \item El docente accede a su biblioteca en la plataforma web del sistema.
+    \item El docente carga el archivo fuente a analizar, seleccionando el problema correspondiente.
+    \item El backend recibe el código y ejecuta el preprocesamiento y normalización (limpieza para el canal semántico y preservación de formato para el estilométrico).
+    \item \textbf{Canal Semántico:} Se extrae el Grafo de Flujo de Datos (DFG) y el modelo \textit{GraphCodeBERT} genera el embedding estructural.
+    \item \textbf{Canal Estilométrico:} El modelo \textit{CharCNN} procesa la matriz de caracteres 1D para estimar la probabilidad de generación mediante inteligencia artificial.
+    \item El orquestador ejecuta la \textbf{Fusión de Características (Feature Fusion)} unificando ambos resultados.
+    \item El sistema calcula la similitud del coseno del vector unificado contra la base de datos vectorial (\textit{ChromaDB}).
+    \item El sistema consolida los resultados y persiste los metadatos en la base de datos relacional (\textit{PostgreSQL}).
+    \item El sistema renderiza el reporte de análisis dual.
+    \item El docente visualiza los indicadores numéricos y toma una decisión informada.
 \end{enumerate}
 
 % ---------------------------------------------------------
 \subsection{Trayectorias alternativas}
 % ---------------------------------------------------------
 
-Las trayectorias alternativas describen variaciones del flujo principal que pueden ocurrir debido a condiciones específicas durante la ejecución del sistema.
+Las trayectorias alternativas describen variaciones del flujo principal, orquestadas por \textit{LangGraph} ante condiciones específicas.
 
-\textbf{A1. Generación de soluciones de referencia mediante IA}
-
-\begin{enumerate}
-    \item El evaluador solicita la generación de soluciones de referencia.
-    \item El sistema envía la descripción del problema a un modelo de lenguaje externo.
-    \item El modelo genera múltiples soluciones funcionalmente equivalentes.
-    \item El sistema incorpora estas soluciones al conjunto de comparación.
-    \item El flujo continúa a partir del paso 4 de la trayectoria principal.
-\end{enumerate}
-
-\textbf{A2. Código con errores de formato o sintaxis}
+\textbf{A1. Robustecimiento de referencias mediante LLM}
 
 \begin{enumerate}
-    \item El sistema detecta inconsistencias durante el preprocesamiento del código.
-    \item Se aplica un proceso de limpieza y normalización.
-    \item Si el código es recuperable, el sistema continúa con el análisis.
-    \item En caso contrario, se notifica al evaluador sobre el error.
+    \item Durante la configuración de un problema, el docente solicita la generación de variantes de su solución.
+    \item El sistema envía el código de referencia al LLM externo.
+    \item El modelo externo retorna múltiples soluciones equivalentes.
+    \item El sistema calcula los embeddings semánticos de estas variantes y los indexa en la base vectorial de forma asíncrona.
 \end{enumerate}
 
-\textbf{A3. Ausencia de datos suficientes para análisis estilométrico}
+\textbf{A2. Código con errores críticos de formato}
 
 \begin{enumerate}
-    \item El sistema identifica que el código no contiene suficientes características estilométricas.
-    \item El módulo estilométrico reduce su peso en la evaluación.
-    \item El sistema prioriza el análisis semántico.
-    \item Se genera el reporte con esta consideración.
+    \item El sistema detecta inconsistencias irreparables durante la normalización inicial del código.
+    \item El orquestador detiene el flujo antes de la inferencia de los modelos.
+    \item Se notifica al docente en la interfaz sobre la invalidez del archivo fuente.
 \end{enumerate}
 
-\textbf{A4. Alta similitud semántica detectada}
+\textbf{A3. Análisis estilométrico de baja confianza}
 
 \begin{enumerate}
-    \item El sistema detecta una similitud elevada entre programas.
-    \item Se marca el resultado como caso relevante.
-    \item Se prioriza su visualización en el reporte.
-    \item El evaluador realiza una revisión más detallada.
+    \item El sistema identifica que el código cargado carece de una extensión mínima para extraer patrones de caracteres viables.
+    \item El orquestador reduce la ponderación del canal estilométrico en la fusión de características.
+    \item El sistema prioriza el índice de similitud semántica y añade una nota técnica en el reporte final.
 \end{enumerate}
 
-\textbf{A5. Inconsistencia entre análisis semántico y estilométrico}
+\textbf{A4. Alta equivalencia lógica detectada}
 
 \begin{enumerate}
-    \item El sistema detecta discrepancias entre los resultados de ambos módulos.
-    \item El orquestador aplica reglas de decisión.
-    \item Se genera una alerta en el reporte final.
-    \item El evaluador analiza el caso manualmente.
+    \item El cálculo de la similitud del coseno arroja un valor superior al umbral establecido.
+    \item El sistema clasifica la entrega como de alto interés de auditoría.
+    \item Se destaca visualmente el registro en el panel del docente para sugerir una revisión prioritaria.
 \end{enumerate}
 
+\textbf{A5. Discrepancia crítica en análisis de doble canal}
 
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{enumerate}
+    \item El orquestador detecta una correlación anómala (ej. alta similitud lógica combinada con una huella de autoría clasificada como inteligencia artificial).
+    \item El sistema estructura un indicador visual de inconsistencia en el reporte final.
+    \item El docente analiza el reporte detallado para auditar la anomalía.
+\end{enumerate}
+
 \section{Diagrama de Casos de Uso}
 
 El análisis de casos de uso define las fronteras del sistema Graphito y describe las interacciones entre los actores externos y las funcionalidades internas. Este modelo permite visualizar cómo el evaluador gestiona el proceso de auditoría académica, desde la configuración inicial hasta la toma de decisiones basada en el reporte bimodal.
@@ -272,7 +204,7 @@ En la Figura~\ref{fig:casos_uso} se presenta el diagrama de casos de uso general
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\textwidth]{figuras/casos_de_uso.png} 
+    \includegraphics[width=0.75\textwidth]{figuras/casos_uso_v2.png} 
     \caption{Diagrama de casos de uso del sistema Graphito.}
     \label{fig:casos_uso}
 \end{figure}
@@ -282,8 +214,8 @@ En la Figura~\ref{fig:casos_uso} se presenta el diagrama de casos de uso general
 Para el funcionamiento del sistema se han identificado dos actores principales:
 
 \begin{itemize}
-    \item \textbf{Docente / Evaluador:} Actor principal humano que interactúa con la plataforma para configurar problemas, gestionar entregas y analizar los reportes de similitud.
-    \item \textbf{Modelo LLM Externo:} Actor de sistema que actúa como proveedor de servicios de generación de código. Es consultado de forma opcional para robustecer el conjunto de referencias (Trayectoria A1).
+    \item \textbf{Docente / Evaluador:} Actor principal humano que interactúa con la plataforma para configurar problemas, gestionar entregas y visualizar los reportes de similitud.
+    \item \textbf{Modelo LLM Externo:} Actor de sistema que actúa como proveedor de servicios de generación de código. Es consultado de forma opcional para robustecer el conjunto de referencias.
 \end{itemize}
 
 \subsection{Descripción de los Casos de Uso}
@@ -291,9 +223,9 @@ Para el funcionamiento del sistema se han identificado dos actores principales:
 A continuación, se describen los módulos funcionales que integran la solución \textit{Graphito}, estructurados de acuerdo con su rol en el flujo de auditoría académica:
 
 \begin{itemize}
-    \item \textbf{Gestión de Acceso y Biblioteca (UC1, UC2, UC3):} Facilitan la administración de la sesión del docente y el acceso al centro de mando (Biblioteca). Este módulo centraliza los ejercicios históricos y las comparaciones realizadas, permitiendo un entorno de trabajo persistente.
+    \item \textbf{Gestión de Acceso y Biblioteca (UC1, UC2, UC3):} Facilitan la administración de la sesión del docente y el acceso a la pagina principal (Biblioteca). Este módulo centraliza los ejercicios históricos y las comparaciones realizadas, permitiendo un entorno de trabajo persistente.
     \item \textbf{Gestión de Referencias y Pre-procesamiento (UC4, UC5, UC6, UC11):} Permiten al evaluador establecer el marco de comparación. Incluye la carga de soluciones base (UC4) y su enriquecimiento mediante un motor de IA externo para generar descripciones y variantes sintéticas (UC5, UC6). De forma obligatoria (\textit{include}), el sistema realiza la generación de \textit{embeddings} semánticos (UC11) sobre estas referencias.
-    \item \textbf{Ejecución de Comparaciones (UC7, UC12):} Constituye el núcleo operativo del sistema. Al agregar una entrega para comparar (UC7), el sistema ejecuta automáticamente (\textit{include}) el análisis bimodal (UC12), el cual integra el procesamiento semántico de flujo de datos y el análisis de autoría estilométrica.
+    \item \textbf{Ejecución de Comparaciones (UC7, UC12):} Constituye el núcleo operativo del sistema. Al agregar una entrega para comparar (UC7), el sistema ejecuta automáticamente (\textit{include}) el análisis de doble canal (UC12), el cual integra el procesamiento semántico de flujo de datos y el detección de patrones generativos estilométrica.
     \item \textbf{Resultados y Reporteo (UC8, UC9, UC10):} Proporcionan la interfaz de auditoría donde se listan las comparaciones (UC8) y se visualizan los reportes de similitud detallados (UC9). Finalmente, se permite la exportación de resultados en formato PDF (UC10) para su integración en actas de evaluación.
 \end{itemize}
 
@@ -301,24 +233,62 @@ A continuación, se describen los módulos funcionales que integran la solución
 
 A continuación se detallan los casos de uso que rigen el comportamiento del sistema Graphito. Estas especificaciones describen la interacción detallada entre los actores y los módulos de inteligencia artificial.
 
+% =========================================================
+% ESPECIFICACIÓN DE CASOS DE USO
+% =========================================================
+
+% --- CASO DE USO 1 ---
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3cm}|p{11cm}|}
+\hline
+\rowcolor[HTML]{E7F3FF} 
+\textbf{Caso de Uso:} & \textbf{UC1: Iniciar sesión} \\ \hline
+\textbf{Actor:} & Docente / Evaluador \\ \hline
+\textbf{Descripción:} & El docente ingresa sus credenciales de acceso para entrar al sistema Graphito. \\ \hline
+\textbf{Precondiciones:} & El docente debe estar registrado previamente en la plataforma (UC2). \\ \hline
+\textbf{Flujo Básico:} & 
+1. El docente ingresa su correo electrónico y contraseña en la interfaz. \newline
+2. El sistema valida las credenciales mediante un proceso de autenticación cifrada contra la base de datos relacional (PostgreSQL). \newline
+3. El sistema genera un token de sesión (JWT) y redirige al docente a su Biblioteca (UC3). \\ \hline
+\textbf{Trayectorias Alternativas:} & Si las credenciales son incorrectas, el sistema muestra un mensaje de error y deniega el acceso, manteniendo la sesión cerrada. \\ \hline
+\end{tabular}
+\caption{Especificación del Caso de Uso 1.}
+\end{table}
+
+% --- CASO DE USO 2 ---
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3cm}|p{11cm}|}
+\hline
+\rowcolor[HTML]{E7F3FF} 
+\textbf{Caso de Uso:} & \textbf{UC2: Registrar usuario} \\ \hline
+\textbf{Actor:} & Docente / Evaluador \\ \hline
+\textbf{Descripción:} & Un nuevo docente crea una cuenta en la plataforma para poder gestionar sus ejercicios, referencias y comparaciones. \\ \hline
+\textbf{Flujo Básico:} & 
+1. El docente proporciona su nombre, correo electrónico y define una contraseña. \newline
+2. El sistema cifra la contraseña y registra al nuevo usuario en PostgreSQL. \newline
+3. El sistema confirma el registro exitoso y redirige a la vista de inicio de sesión. \\ \hline
+\textbf{Postcondición:} & Se inicializa un espacio aislado en la base de datos para el repositorio personal del docente. \\ \hline
+\end{tabular}
+\caption{Especificación del Caso de Uso 2.}
+\end{table}
+
 % --- CASO DE USO 3 ---
 \begin{table}[H]
 \centering
-\begin{tabular}{|p{3cm}|p{9cm}|}
+\begin{tabular}{|p{3cm}|p{11cm}|}
 \hline
 \rowcolor[HTML]{E7F3FF} 
-\textbf{Caso de Uso:} & \textbf{UC3: Configurar Nuevo Problema} \\ \hline
+\textbf{Caso de Uso:} & \textbf{UC3: Ver biblioteca} \\ \hline
 \textbf{Actor:} & Docente / Evaluador \\ \hline
-\textbf{Descripción:} & El docente define los parámetros de una nueva evaluación, cargando su solución ideal y configurando los criterios de comparación. \\ \hline
-\textbf{Precondiciones:} & El docente debe haber iniciado sesión (UC1). \\ \hline
+\textbf{Descripción:} & Página principal del sistema donde el docente accede a su biblioteca personal, desde donde visualiza los problemas configurados previamente o inicia nuevas configuraciones. \\ \hline
+\textbf{Precondiciones:} & El docente debe haber iniciado sesión de forma exitosa (UC1). \\ \hline
 \textbf{Flujo Básico:} & 
-1. El docente selecciona "Crear nuevo ejercicio". \newline
-2. El sistema solicita nombre del problema y descripción técnica. \newline
-3. El docente carga el archivo de referencia (.cpp). \newline
-4. El sistema valida la sintaxis básica del archivo. \newline
-5. El sistema ofrece la opción de robustecer la referencia mediante IA (UC4). \newline
-6. El docente guarda la configuración. \\ \hline
-\textbf{Postcondición:} & El problema queda disponible en el listado para recibir entregas. \\ \hline
+1. El docente selecciona la opción de "Biblioteca" en la interfaz. \newline
+2. El sistema recupera de PostgreSQL la lista de ejercicios asociados al identificador del docente. \newline
+3. El sistema muestra la lista de ejercicios, habilitando las opciones de gestión (agregar referencia, ver comparaciones). \\ \hline
+\textbf{Postcondición:} & El sistema queda a la espera de la ejecución de una acción extendida (UC4, UC7, UC8). \\ \hline
 \end{tabular}
 \caption{Especificación del Caso de Uso 3.}
 \end{table}
@@ -326,61 +296,139 @@ A continuación se detallan los casos de uso que rigen el comportamiento del sis
 % --- CASO DE USO 4 ---
 \begin{table}[H]
 \centering
-\begin{tabular}{|p{3cm}|p{9cm}|}
+\begin{tabular}{|p{3cm}|p{11cm}|}
 \hline
 \rowcolor[HTML]{E7F3FF} 
-\textbf{Caso de Uso:} & \textbf{UC4: Generar Referencias Sintéticas} \\ \hline
-\textbf{Actor:} & Modelo LLM Externo (Sistema) \\ \hline
-\textbf{Descripción:} & El sistema utiliza una API externa para generar variantes funcionalmente equivalentes a la solución del profesor. \\ \hline
+\textbf{Caso de Uso:} & \textbf{UC4: Agregar código de referencia} \\ \hline
+\textbf{Actor:} & Docente / Evaluador \\ \hline
+\textbf{Descripción:} & El docente carga el código fuente que servirá como solución ideal, inicializando el proceso asíncrono de indexación semántica. \\ \hline
+\textbf{Precondiciones:} & El docente debe encontrarse gestionando un ejercicio dentro de la Biblioteca (UC3). \\ \hline
 \textbf{Flujo Básico:} & 
-1. El sistema envía el código de referencia y la descripción técnica al LLM. \newline
-2. El LLM procesa la petición y genera N variantes del código. \newline
-3. El sistema recibe las variantes y las normaliza. \newline
-4. El sistema almacena estas variantes como "referencias sintéticas" vinculadas al problema. \\ \hline
-\textbf{Trayectoria Alternativa:} & \textbf{A1:} Si la conexión con el LLM falla, el sistema notifica al docente y permite continuar usando solo la referencia manual. \\ \hline
+1. El docente selecciona agregar una nueva referencia y carga el archivo (.c o .cpp). \newline
+2. El sistema normaliza el código eliminando comentarios. \newline
+3. El orquestador extrae el Grafo de Flujo de Datos (DFG) y genera el embedding correspondiente mediante GraphCodeBERT. \newline
+4. El vector semántico resultante se almacena en ChromaDB. \newline
+5. El sistema habilita las opciones para enriquecer la referencia utilizando un modelo de IA externo (UC5, UC6). \\ \hline
+\textbf{Postcondición:} & El código base queda indexado en la base vectorial, preparado para futuras comparaciones. \\ \hline
 \end{tabular}
 \caption{Especificación del Caso de Uso 4.}
+\end{table}
+
+% --- CASO DE USO 5 ---
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3cm}|p{11cm}|}
+\hline
+\rowcolor[HTML]{E7F3FF} 
+\textbf{Caso de Uso:} & \textbf{UC5: Generar descripción (IA)} \\ \hline
+\textbf{Actor:} & Motor de IA (LLM) / Docente \\ \hline
+\textbf{Descripción:} & El sistema consume una API de LLM externo para redactar automáticamente un resumen o descripción técnica basada en la lógica del código de referencia. \\ \hline
+\textbf{Precondiciones:} & Debe existir un código de referencia cargado en el sistema (UC4). \\ \hline
+\textbf{Flujo Básico:} & 
+1. El docente solicita la autogeneración de la descripción del problema. \newline
+2. El sistema envía el código crudo al LLM empaquetado en un prompt específico de resumen algorítmico. \newline
+3. El LLM devuelve la descripción técnica generada. \newline
+4. El docente revisa el texto, realiza ajustes si lo considera necesario y confirma su guardado en los metadatos de PostgreSQL. \\ \hline
+\end{tabular}
+\caption{Especificación del Caso de Uso 5.}
 \end{table}
 
 % --- CASO DE USO 6 ---
 \begin{table}[H]
 \centering
-\begin{tabular}{|p{3cm}|p{9cm}|}
+\begin{tabular}{|p{3cm}|p{11cm}|}
 \hline
 \rowcolor[HTML]{E7F3FF} 
-\textbf{Caso de Uso:} & \textbf{UC6: Ejecutar Análisis Bimodal} \\ \hline
-\textbf{Actor:} & Sistema (Automático) \\ \hline
-\textbf{Descripción:} & El núcleo del sistema procesa las entregas utilizando los canales semántico y estilométrico para generar la firma bimodal. \\ \hline
-\textbf{Precondiciones:} & Existen entregas cargadas (UC5) y al menos una referencia configurada. \\ \hline
+\textbf{Caso de Uso:} & \textbf{UC6: Generar variaciones (IA)} \\ \hline
+\textbf{Actor:} & Motor de IA (LLM) / Docente \\ \hline
+\textbf{Descripción:} & El sistema utiliza el LLM externo para generar variantes funcionalmente equivalentes al código base. \\ \hline
+\textbf{Precondiciones:} & Se debe haber cargado exitosamente al menos un código de referencia manual (UC4). \\ \hline
 \textbf{Flujo Básico:} & 
-1. El sistema inicia el preprocesamiento de la entrega. \newline
-2. \textbf{Canal A:} Se extrae el DFG y GraphCodeBERT genera el embedding lógico. \newline
-3. \textbf{Canal B:} CharCNN analiza el código \textit{raw} y genera el embedding de autoría. \newline
-4. El orquestador concatena ambos vectores aplicando \textit{zero-padding} a las referencias. \newline
-5. Se calcula la Similitud del Coseno entre el vector del alumno y los vectores de referencia. \\ \hline
-\textbf{Postcondición:} & Los resultados se almacenan en la base de datos vectorial y se activa UC9. \\ \hline
+1. El docente solicita la generación de N variantes para robustecer las referencias, otorgando consideraciones para la generación de las mismas. \newline
+2. El sistema envía el código de referencia y las consideraciones al LLM externo. \newline
+3. El LLM retorna N versiones sintéticas del código con la lógica requerida. \newline
+4. El sistema preprocesa estas variantes, genera sus respectivos embeddings semánticos a través de GraphCodeBERT y las indexa en ChromaDB. \\ \hline
+\textbf{Trayectorias Alternativas:} & Si la API del LLM no responde o excede el tiempo límite, el sistema notifica al docente y finaliza el proceso manteniendo activa únicamente la referencia original. \\ \hline
 \end{tabular}
 \caption{Especificación del Caso de Uso 6.}
 \end{table}
 
-% --- CASO DE USO 8/9 ---
+% --- CASO DE USO 7 ---
 \begin{table}[H]
 \centering
-\begin{tabular}{|p{3cm}|p{9cm}|}
+\begin{tabular}{|p{3cm}|p{11cm}|}
 \hline
 \rowcolor[HTML]{E7F3FF} 
-\textbf{Caso de Uso:} & \textbf{UC8/9: Visualizar Reporte y Alertas} \\ \hline
+\textbf{Caso de Uso:} & \textbf{UC7: Agregar comparación} \\ \hline
 \textbf{Actor:} & Docente / Evaluador \\ \hline
-\textbf{Descripción:} & El docente consulta los resultados finales, donde el sistema destaca anomalías de integridad. \\ \hline
+\textbf{Descripción:} & El docente carga una entrega estudiantil para ser comparada con el repositorio de referencias indexadas, ejecutando el análisis de los modelos de Deep Learning. \\ \hline
+\textbf{Precondiciones:} & El problema debe contar con al menos una referencia previamente indexada en ChromaDB. \\ \hline
 \textbf{Flujo Básico:} & 
-1. El sistema presenta un listado de alumnos con sus puntajes de similitud. \newline
-2. El docente selecciona un alumno para ver el detalle. \newline
-3. El sistema muestra la comparación visual de código. \\ \hline
-\textbf{Trayectorias Alternativas:} & 
-\textbf{A4 (Alta Similitud):} Si la similitud supera el umbral configurado, el sistema resalta el registro en color rojo. \newline
-\textbf{A5 (Inconsistencia):} Si la lógica coincide pero el estilo es detectado como sintético (IA), el sistema inserta una "Alerta de Autoría" en el reporte. \\ \hline
+1. El docente carga el archivo (.c o .cpp) correspondiente a la entrega a evaluar. \newline
+2. El sistema inicia la inferencia paralela: GraphCodeBERT calcula el vector lógico (semántico) y CharCNN calcula la probabilidad de generación mediante inteligencia artificial. sintética (estilométrico). \newline
+3. El orquestador ejecuta la Fusión de Características (Feature Fusion) para consolidar las métricas de doble canal. \newline
+4. Se ejecuta una búsqueda matemática de Similitud del Coseno contra los vectores indexados en ChromaDB. \newline
+5. Los resultados se persisten en PostgreSQL vinculados exclusivamente al nombre del archivo analizado. \\ \hline
+\textbf{Postcondición:} & La entrega finaliza la comparación y queda disponible para su consulta detallada (UC8). \\ \hline
 \end{tabular}
-\caption{Especificación de los Casos de Uso 8 y 9.}
+\caption{Especificación del Caso de Uso 7.}
+\end{table}
+
+% --- CASO DE USO 8 ---
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3cm}|p{11cm}|}
+\hline
+\rowcolor[HTML]{E7F3FF} 
+\textbf{Caso de Uso:} & \textbf{UC8: Ver lista de comparaciones} \\ \hline
+\textbf{Actor:} & Docente / Evaluador \\ \hline
+\textbf{Descripción:} & El docente visualiza un panel con el listado general de todas las entregas que han completado su proceso de comparación para un ejercicio específico. \\ \hline
+\textbf{Precondiciones:} & El docente debe haber seleccionado un ejercicio activo desde la Biblioteca (UC3). \\ \hline
+\textbf{Flujo Básico:} & 
+1. El docente accede a la pestaña de comparaciones del problema seleccionado. \newline
+2. El sistema consulta en PostgreSQL los metadatos de los análisis vinculados a dicho ejercicio. \newline
+3. El sistema despliega una tabla resumiendo los nombres de los archivos procesados y sus puntajes consolidados. \\ \hline
+\textbf{Postcondición:} & El docente tiene la opción de seleccionar un archivo específico para abrir su reporte (UC9). \\ \hline
+\end{tabular}
+\caption{Especificación del Caso de Uso 8.}
+\end{table}
+
+% --- CASO DE USO 9 ---
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3cm}|p{11cm}|}
+\hline
+\rowcolor[HTML]{E7F3FF} 
+\textbf{Caso de Uso:} & \textbf{UC9: Ver reporte de similitud} \\ \hline
+\textbf{Actor:} & Docente / Evaluador \\ \hline
+\textbf{Descripción:} & El docente abre la vista detallada de una comparación, donde el sistema renderiza la interpretación matemática de los modelos de IA. \\ \hline
+\textbf{Precondiciones:} & El docente seleccionó una entrega desde el listado de comparaciones (UC8). \\ \hline
+\textbf{Flujo Básico:} & 
+1. El docente selecciona un archivo evaluado. \newline
+2. El sistema recupera el reporte de doble canal completo desde PostgreSQL. \newline
+3. El sistema renderiza la interfaz mostrando de forma gráfica el índice de similitud semántica y la probabilidad de generación mediante inteligencia artificial. del código. \\ \hline
+\end{tabular}
+\caption{Especificación del Caso de Uso 9.}
+\end{table}
+
+% --- CASO DE USO 10 ---
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3cm}|p{11cm}|}
+\hline
+\rowcolor[HTML]{E7F3FF} 
+\textbf{Caso de Uso:} & \textbf{UC10: Descargar reporte en PDF} \\ \hline
+\textbf{Actor:} & Docente / Evaluador \\ \hline
+\textbf{Descripción:} & El docente exporta el reporte de doble canal de similitud a un documento estructurado, obteniendo una evidencia técnica estática e imprimible de la comparación. \\ \hline
+\textbf{Precondiciones:} & El docente debe estar visualizando un reporte de similitud procesado (UC9). \\ \hline
+\textbf{Flujo Básico:} & 
+1. El docente ejecuta la acción "Descargar PDF" desde la interfaz del reporte. \newline
+2. El backend compila el nombre del archivo, el gráfico de similitud, el índice estilométrico y los indicadores visuales detectados. \newline
+3. El sistema genera un archivo en formato PDF aplicando una plantilla institucional. \newline
+4. El sistema transmite el archivo para su descarga directa en el dispositivo local del evaluador. \\ \hline
+\textbf{Postcondición:} & El flujo de auditoría académica concluye satisfactoriamente con la generación de la evidencia estática. \\ \hline
+\end{tabular}
+\caption{Especificación del Caso de Uso 10.}
 \end{table}
 
 \section{Modelado de Procesos de Negocio (BPMN)}
@@ -390,9 +438,9 @@ Para la orquestación de las capacidades de inteligencia artificial y la gestió
 El proceso se divide en tres áreas de responsabilidad (\textit{lanes}) claramente definidas:
 
 \begin{itemize}
-    \item \textbf{Usuario (Docente):} Responsable de la carga de insumos (código de referencia y entregas de alumnos) y la toma de decisiones basada en los reportes generados.
+    \item \textbf{Usuario (Docente):} Responsable de la carga de archivos de referencia y entrega, y la toma de decisiones basada en los reportes generados.
     \item \textbf{Backend:} Actúa como el orquestador del sistema, gestionando la validación de archivos, la comunicación con las bases de datos (relacional y vectorial) y la sincronización de los flujos de datos.
-    \item \textbf{Módulo de IA:} Ejecuta las tareas de cómputo intensivo, incluyendo la generación de variantes sintéticas mediante LLMs, la extracción de características semánticas con \textit{GraphCodeBERT} y el análisis estilométrico mediante \textit{CharCNN}.
+    \item \textbf{Módulo de IA:} Ejecuta las tareas de cómputo intensivo, incluyendo la generación de variantes sintéticas mediante LLMs, la extracción de características semánticas con \textit{GraphCodeBERT} y el análisis estilométrico mediante convoluciones 1D (\textit{CharCNN}).
 \end{itemize}
 
 \subsection{Descripción del Flujo de Trabajo}
@@ -400,11 +448,11 @@ El proceso se divide en tres áreas de responsabilidad (\textit{lanes}) claramen
 El ciclo operativo de \textit{Graphito} se desglosa en tres fases críticas:
 
 \begin{enumerate}
-    \item \textbf{Fase de Gestión de Referencias:} El sistema ofrece tres caminos de ejecución para establecer la base de comparación. Si el código de referencia es nuevo, el \textit{backend} verifica su existencia en la base de datos relacional; en caso de no existir, el módulo de IA genera variantes sintéticas para robustecer el espacio vectorial. Si la referencia ya existe, se recupera directamente su representación densa (\textit{embedding}) desde la base de datos vectorial (\textit{ChromaDB}), optimizando los tiempos de respuesta.
+    \item \textbf{Fase de Gestión de Referencias:} El sistema ofrece caminos de ejecución alternativos para establecer la base de comparación. Si la configuración del problema es nueva, el \textit{backend} verifica su existencia en la base de datos relacional; en caso de no existir, el módulo de IA genera variantes sintéticas para robustecer el espacio vectorial. Si la referencia ya existe, se recupera directamente su representación densa (\textit{embedding}) desde la base de datos vectorial (\textit{ChromaDB}), optimizando los tiempos de respuesta.
     
-    \item \textbf{Fase de Procesamiento Bimodal:} Una vez cargado el código del alumno, el sistema realiza un pre-procesamiento y normalización en el \textit{backend}. Posteriormente, el flujo se bifurca mediante una compuerta paralela para realizar un análisis dual: una extracción de lógica estructural (semántica) y un análisis de patrones de escritura (estilometría). Esta fase garantiza que el sistema capture tanto la intención funcional como la huella digital del autor.
+    \item \textbf{Fase de Análisis de Doble Canal:} Una vez cargado el código a comparar, el sistema realiza un pre-procesamiento y normalización en el \textit{backend}. Posteriormente, el flujo se bifurca mediante una compuerta paralela para realizar un análisis dual: una extracción de lógica estructural (semántica) y un análisis de patrones de escritura (estilometría). Esta fase garantiza que el sistema capture tanto la intención funcional como la huella de autoría sintética o humana.
     
-    \item \textbf{Fase de Fusión y Resultados:} Los vectores resultantes son integrados en un proceso de fusión de características. El sistema utiliza una compuerta de sincronización para asegurar que tanto el vector del alumno como el de referencia estén disponibles antes de calcular la \textit{Similitud del Coseno}. Finalmente, el módulo de IA interpreta los resultados numéricos para generar un reporte de integridad que se persiste en el historial y se presenta al docente.
+    \item \textbf{Fase de Fusión y Resultados:} Los vectores resultantes son integrados en un proceso de fusión de características (\textit{Feature Fusion}). El sistema utiliza una compuerta de sincronización para asegurar que tanto el vector consolidado del archivo analizado como el vector de la referencia estén disponibles de forma concurrente antes de calcular la \textit{Similitud del Coseno}. Finalmente, el módulo de IA interpreta los resultados numéricos para estructurar un reporte técnico que se persiste en el historial y se presenta al docente.
 \end{enumerate}
 
 \begin{figure}[H]
@@ -420,7 +468,7 @@ El ciclo operativo de \textit{Graphito} se desglosa en tres fases críticas:
 
 A diferencia del análisis estilométrico, el análisis semántico se centra en la lógica subyacente y la funcionalidad del programa, ignorando aspectos superficiales como el nombre de las variables o el formato del texto. Estas características permiten capturar la esencia algorítmica de una solución, lo que facilita la identificación de códigos que, aunque parezcan diferentes visualmente, ejecutan la misma lógica de resolución.
 
-En la Tabla~\ref{tab:caracteristicas_semanticas} se presenta una clasificación de las características semánticas identificadas para la construcción de la firma lógica del código.
+En la Tabla~\ref{tab:caracteristicas_semanticas} se presenta una clasificación de las características semánticas identificadas para la construcción de la firma lógica en este proyecto.
 
 \begin{table}[H]
 \centering
@@ -443,90 +491,90 @@ En la Tabla~\ref{tab:caracteristicas_semanticas} se presenta una clasificación 
 \bottomrule
 \end{tabularx}
 \caption{Clasificación sintetizada de características semánticas del código.}
-\label{tab:caracteristicas_semanticas} % <-- Este es el nombre "interno"
+\label{tab:caracteristicas_semanticas}
 \end{table}
 
-La extracción de estas características permite generar una representación robusta ante técnicas de ofuscación comunes, como el renombrado de variables o el cambio de estructuras de control equivalentes (por ejemplo, sustituir un ciclo \textit{for} por un \textit{while}). En este proyecto, el uso de \textit{GraphCodeBERT} es fundamental, ya que este modelo no solo procesa el código como una secuencia de texto, sino que incorpora explícitamente el Grafo de Flujo de Datos (DFG). Esto permite que los \textit{embeddings} resultantes capturen de manera profunda las dependencias de datos, facilitando una comparación semántica precisa incluso cuando el estilo de programación ha sido alterado intencionalmente.
+La extracción de estas características permite generar una representación robusta ante técnicas de ofuscación comunes, como el renombrado de variables o el cambio de estructuras de control equivalentes (por ejemplo, sustituir un ciclo \textit{for} por un \textit{while}). En este sistema, el uso de \textit{GraphCodeBERT} es fundamental, ya que este modelo no solo procesa el código como una secuencia de texto, sino que incorpora explícitamente el Grafo de Flujo de Datos (DFG). Esto permite que las representaciones vectoriales resultantes capturen de manera profunda las dependencias lógicas, facilitando un análisis semántico preciso incluso cuando la estructura superficial ha sido alterada intencionalmente.
+
 % ---------------------------------------------------------
 \section{Características estilométricas del código}
 % ---------------------------------------------------------
 
-Para el análisis estilométrico del código fuente, se identifican diferentes tipos de características que permiten capturar patrones asociados al estilo de programación. Estas características no dependen de la funcionalidad del programa, sino de la forma en que el código es escrito, lo que permite distinguir entre diferentes autores o identificar posibles patrones asociados a código generado automáticamente.
+Para el canal de análisis estilométrico, se identifican diferentes tipos de características que permiten capturar patrones asociados a la escritura del autor. Estas características no dependen de la funcionalidad del programa, sino de la huella digital sintáctica y de formato, lo que permite distinguir entre diferentes autores o identificar probables intervenciones de generación sintética (IA).
 
-En la Tabla~\ref{tab:caracteristicas_estilometricas} se presenta una clasificación de las principales características estilométricas consideradas en este trabajo.
+En la Tabla~\ref{tab:caracteristicas_estilometricas} se presenta una clasificación de las principales características estilométricas que la red neuronal procesa de forma implícita.
 
 \begin{table}[H]
 \centering
+\small
 \begin{tabular}{lll}
 \toprule
 \textbf{Categoría} & \textbf{Característica} & \textbf{Descripción} \\
 \midrule
-Léxicas & Frecuencia de caracteres & Distribución de caracteres y símbolos en el código \\
-        & Uso de palabras clave & Frecuencia de keywords del lenguaje \\
-        & Longitud de tokens & Tamaño promedio de identificadores y expresiones \\
-
-Sintácticas & Estructuras de control & Uso de if, for, while, switch \\
-            & Anidamiento & Profundidad de bloques de código \\
-            & Modularidad & Organización en funciones o bloques \\
-
-Formato & Indentación & Uso de espacios o tabulaciones \\
-        & Saltos de línea & Distribución de líneas de código \\
-        & Estilo de llaves & Ubicación de \{ \} \\
-
-Estructurales & Tamaño del código & Número de líneas \\
-              & Uso de comentarios & Relación código/comentarios \\
-              & Distribución & Organización general del programa \\
+Léxicas & Frecuencia de caracteres & Distribución de caracteres y símbolos en el código. \\
+        & Uso de palabras clave & Frecuencia de keywords del lenguaje (C11/C++17). \\
+        & Longitud de tokens & Tamaño promedio de identificadores y expresiones. \\
+\midrule
+Sintácticas & Estructuras de control & Preferencia de uso entre if, for, while, switch. \\
+            & Anidamiento & Profundidad promedio de los bloques de código. \\
+            & Modularidad & Tendencia en la organización en funciones o bloques. \\
+\midrule
+Formato & Indentación & Uso predominante de espacios o tabulaciones. \\
+        & Saltos de línea & Patrones de densidad y distribución de líneas. \\
+        & Estilo de llaves & Ubicación de apertura y cierre de bloques \{ \}. \\
+\midrule
+Estructurales & Tamaño del código & Número total de líneas del archivo original. \\
+              & Uso de comentarios & Densidad y ubicación de comentarios respecto al código. \\
 \bottomrule
 \end{tabular}
-\caption{Clasificación de características estilométricas del código fuente}
+\caption{Clasificación de características estilométricas del código fuente.}
 \label{tab:caracteristicas_estilometricas}
 \end{table}
 
-Estas características permiten construir una representación del estilo de codificación que puede ser utilizada por modelos de aprendizaje automático para identificar patrones de autoría. En particular, los modelos basados en redes neuronales convolucionales a nivel de caracteres (CharCNN) son capaces de aprender automáticamente patrones locales en la secuencia de caracteres, lo que resulta especialmente útil para capturar diferencias sutiles entre código escrito por humanos y código generado mediante modelos de lenguaje.
-
+Estas características permiten construir una representación del estilo de codificación que puede ser utilizada por modelos de aprendizaje automático para identificar anomalías de autoría. En particular, los modelos basados en redes neuronales convolucionales a nivel de caracteres (CharCNN) son capaces de aprender automáticamente patrones locales y distribuciones espaciales en la secuencia de caracteres cruda (preservando el estilo y formato original), lo que resulta especialmente útil para capturar diferencias sutiles entre código escrito por un estudiante humano y código generado de forma automatizada.
 
 % =========================================================
-\section{Definición de métricas de evaluación}
+\section{Definición de métricas de desempeño}
 % =========================================================
 
-La evaluación del sistema propuesto requiere la definición de métricas que permitan cuantificar su desempeño en los distintos módulos que lo componen. En particular, se consideran dos componentes principales: el análisis de similitud semántica y el análisis estilométrico.
+La validación del sistema propuesto requiere la definición de métricas cuantitativas que permitan medir el desempeño algorítmico en los distintos módulos que lo componen. En particular, se consideran los dos componentes de la arquitectura dual: el canal de similitud semántica y el canal de análisis estilométrico.
 
-Cada uno de estos módulos requiere métricas específicas que permitan evaluar su precisión, confiabilidad y utilidad en el contexto de evaluación académica, permitiendo así validar la efectividad del sistema como herramienta de apoyo a la decisión docente.
+Cada uno de estos módulos requiere métricas específicas que permitan evaluar su precisión, confiabilidad y utilidad computacional, permitiendo así validar la efectividad de la herramienta como apoyo objetivo a la auditoría docente.
 
 % ---------------------------------------------------------
 \subsection{Métricas para el análisis de similitud semántica}
 % ---------------------------------------------------------
 
-El módulo de análisis semántico tiene como objetivo cuantificar el grado de similitud lógica entre dos programas. Para ello, se utilizan representaciones vectoriales (embeddings) generadas mediante el modelo GraphCodeBERT.
+El canal de análisis semántico tiene como objetivo cuantificar el grado de equivalencia lógica entre dos programas. Para ello, se utilizan representaciones vectoriales (embeddings) generadas mediante el modelo \textit{GraphCodeBERT}.
 
-La principal métrica utilizada es la similitud del coseno, la cual mide el ángulo entre dos vectores en un espacio de alta dimensión. Su valor se encuentra en el rango [-1,1], donde valores cercanos a 1 indican alta similitud entre los programas analizados.
+La principal métrica utilizada es la similitud del coseno, la cual mide el ángulo entre dos vectores en un espacio de alta dimensión. Su valor se encuentra en el rango de [-1, 1], donde valores cercanos a 1 indican una alta proximidad entre los grafos lógicos de los programas analizados.
 
-Esta métrica resulta especialmente adecuada para comparar embeddings, ya que permite evaluar la cercanía semántica entre programas independientemente de su forma sintáctica.
+Esta métrica resulta especialmente adecuada para comparar embeddings, ya que permite determinar la cercanía semántica entre soluciones de software independientemente de su estructura sintáctica superficial.
 
-Adicionalmente, se considera la correlación con evaluaciones humanas como un mecanismo de validación externa, con el fin de determinar si los resultados generados por el sistema son consistentes con el juicio del evaluador.
+Adicionalmente, se considera la correlación con el juicio experto como un mecanismo de validación externa, con el fin de determinar si los índices matemáticos generados por el sistema son consistentes con la auditoría manual del evaluador.
 
 % ---------------------------------------------------------
 \subsection{Métricas para el análisis estilométrico}
 % ---------------------------------------------------------
 
-El módulo estilométrico se plantea como un problema de clasificación binaria, en el cual se busca determinar si un fragmento de código fue escrito por un humano o generado mediante inteligencia artificial.
+El canal estilométrico, impulsado por la red neuronal \textit{CharCNN}, se plantea como un problema de clasificación binaria, en el cual se infiere si un fragmento de código presenta patrones de escritura correspondientes a un humano o a generación sintética mediante inteligencia artificial.
 
-Para evaluar el desempeño de este módulo, se utilizan métricas estándar de clasificación supervisada:
+Para evaluar el desempeño de este modelo de Deep Learning, se utilizan métricas estándar de clasificación supervisada:
 
 \begin{itemize}
-    \item \textbf{Accuracy}: mide la proporción de predicciones correctas respecto al total de muestras evaluadas.
-    \item \textbf{Precision}: indica la proporción de predicciones positivas correctas respecto al total de predicciones positivas realizadas.
-    \item \textbf{Recall}: mide la capacidad del modelo para identificar correctamente los casos positivos.
-    \item \textbf{F1-score}: representa la media armónica entre precisión y recall, proporcionando una medida equilibrada del desempeño del modelo.
+    \item \textbf{Accuracy (Exactitud)}: mide la proporción de predicciones correctas respecto al total de muestras analizadas.
+    \item \textbf{Precision (Precisión)}: indica la proporción de predicciones positivas correctas respecto al total de predicciones positivas realizadas.
+    \item \textbf{Recall (Exhaustividad)}: mide la capacidad del modelo para identificar correctamente todos los casos positivos reales.
+    \item \textbf{F1-score}: representa la media armónica entre precisión y exhaustividad, proporcionando una medida equilibrada del desempeño del modelo ante posibles desbalances de clases.
 \end{itemize}
 
-Estas métricas permiten evaluar el comportamiento del modelo en distintos escenarios, particularmente en presencia de posibles desbalances entre clases.
+Estas métricas permiten calibrar el comportamiento del modelo en distintos escenarios, particularmente para minimizar la tasa de falsos positivos al detectar anomalías de autoría.
 
 % ---------------------------------------------------------
 \subsection{Resumen de métricas utilizadas}
 % ---------------------------------------------------------
 
-En la Tabla X se presenta un resumen de las métricas empleadas en cada uno de los módulos del sistema.
+En la Tabla~\ref{tab:resumen_metricas} se presenta un resumen de las métricas empleadas en cada uno de los módulos de la arquitectura.
 
 \begin{table}[H]
 \centering
@@ -534,75 +582,74 @@ En la Tabla X se presenta un resumen de las métricas empleadas en cada uno de l
 \toprule
 \textbf{Módulo} & \textbf{Métrica} & \textbf{Propósito} \\
 \midrule
-Similitud semántica & Similitud del coseno & Medir cercanía entre embeddings \\
-                    & Correlación humana & Validar coherencia con evaluación docente \\
-
-Análisis estilométrico & Accuracy & Evaluar desempeño general \\
-                       & Precision & Medir exactitud en predicciones positivas \\
-                       & Recall & Evaluar detección de casos positivos \\
-                       & F1-score & Balance entre precision y recall \\
+Similitud semántica & Similitud del coseno & Medir cercanía espacial entre embeddings. \\
+                    & Correlación humana & Validar coherencia con la auditoría docente. \\
+\midrule
+Análisis estilométrico & Accuracy & Evaluar desempeño general de la red CharCNN. \\
+                       & Precision & Medir exactitud en alertas de autoría. \\
+                       & Recall & Evaluar detección de anomalías sintéticas. \\
+                       & F1-score & Balancear rendimiento ante clases desbalanceadas. \\
 \bottomrule
 \end{tabular}
-\caption{Métricas de evaluación utilizadas en el sistema}
+\caption{Métricas de validación de modelos utilizadas en el sistema.}
+\label{tab:resumen_metricas}
 \end{table}
 
 % ---------------------------------------------------------
 \subsection{Criterios de interpretación de resultados}
 % ---------------------------------------------------------
 
-Para facilitar el análisis de los resultados obtenidos por el sistema, se definen criterios de interpretación que permiten contextualizar los valores obtenidos en cada métrica.
+Para facilitar el análisis de los resultados arrojados por los modelos, se definen criterios de interpretación que permiten contextualizar los valores numéricos obtenidos.
 
-En el caso de la similitud semántica, los valores de similitud del coseno pueden interpretarse de la siguiente manera:
+En el caso del canal semántico, los valores de similitud del coseno se interpretan bajo los siguientes umbrales preliminares:
 
 \begin{table}[H]
 \centering
 \begin{tabular}{ll}
 \toprule
-\textbf{Rango de similitud} & \textbf{Interpretación} \\
+\textbf{Rango de similitud} & \textbf{Interpretación algorítmica} \\
 \midrule
-0.80 -- 1.00 & Alta similitud semántica \\
-0.60 -- 0.79 & Similitud moderada \\
-0.40 -- 0.59 & Baja similitud \\
-0.00 -- 0.39 & Similitud no significativa \\
+0.80 -- 1.00 & Alta equivalencia lógica. \\
+0.60 -- 0.79 & Equivalencia moderada (posible inspiración estructural). \\
+0.40 -- 0.59 & Baja equivalencia. \\
+0.00 -- 0.39 & Disimilitud algorítmica. \\
 \bottomrule
 \end{tabular}
-\caption{Criterios de interpretación para similitud semántica}
+\caption{Criterios de interpretación para similitud semántica espacial.}
+\label{tab:criterios_similitud}
 \end{table}
 
-Estos rangos permiten identificar casos potencialmente relevantes para revisión docente, especialmente aquellos que presentan alta similitud lógica entre programas.
+Estos rangos permiten identificar casos atípicos y resaltarlos visualmente para revisión detallada del docente, especialmente aquellos que cruzan el umbral de alta equivalencia lógica.
 
-Para el análisis estilométrico, la interpretación se basa en el comportamiento conjunto de las métricas:
+Para el análisis estilométrico, la interpretación técnica se basa en el comportamiento conjunto de las métricas de clasificación:
 
 \begin{itemize}
-    \item Valores altos de precision y recall indican una adecuada capacidad del modelo para identificar patrones de autoría.
-    \item Un F1-score elevado refleja un equilibrio adecuado entre exactitud y cobertura.
-    \item Diferencias significativas entre precision y recall pueden indicar sesgos en la clasificación.
+    \item Valores altos de precisión y exhaustividad indican una sólida capacidad de la CharCNN para diferenciar características de autoría humana versus sintética.
+    \item Un F1-score elevado refleja un modelo confiable que no sesga sus clasificaciones hacia la clase mayoritaria.
+    \item Diferencias significativas entre precisión y exhaustividad requerirán ajustes en el orquestador para evitar falsos positivos que afecten la transparencia de la auditoría.
 \end{itemize}
 
 % ---------------------------------------------------------
-\subsection{Consideraciones para la evaluación experimental}
+\subsection{Consideraciones para la experimentación}
 % ---------------------------------------------------------
 
-Para garantizar una evaluación adecuada del sistema, es necesario considerar diversos factores durante el diseño experimental:
+Para garantizar una validación rigurosa de los modelos, es necesario considerar los siguientes factores durante el diseño del corpus experimental:
 
 \begin{itemize}
-    \item \textbf{Diversidad de programas}: incluir soluciones con diferentes enfoques algorítmicos.
-    \item \textbf{Presencia de código generado por IA}: incorporar ejemplos generados mediante modelos de lenguaje.
-    \item \textbf{Balance de clases}: asegurar una distribución adecuada entre código humano y generado.
-    \item \textbf{Validación cruzada}: utilizar técnicas de partición de datos para evitar sobreajuste.
+    \item \textbf{Diversidad algorítmica}: incluir soluciones con diferentes lógicas de control para el mismo problema.
+    \item \textbf{Presencia de variantes IA}: incorporar entregas generadas específicamente mediante la Trayectoria A1 (Modelos de Lenguaje Externos).
+    \item \textbf{Balance de clases}: asegurar una distribución representativa entre código escrito por estudiantes y código sintético.
+    \item \textbf{Validación cruzada}: aplicar técnicas de partición de datos para evitar el sobreajuste (overfitting) de la red estilométrica.
 \end{itemize}
-
-Estas consideraciones permiten asegurar que las métricas reflejen de manera adecuada el desempeño real del sistema en escenarios educativos.
 
 % ---------------------------------------------------------
 \subsection{Justificación de las métricas seleccionadas}
 % ---------------------------------------------------------
 
-La combinación de estas métricas permite evaluar el sistema desde dos perspectivas complementarias. Por un lado, la similitud del coseno permite cuantificar la equivalencia lógica entre programas, abordando el problema de la detección de similitud semántica. Por otro lado, las métricas de clasificación permiten evaluar la capacidad del sistema para identificar patrones estilométricos asociados al uso de inteligencia artificial.
+La combinación de estas métricas permite validar el sistema desde dos perspectivas técnicas complementarias. Por un lado, la similitud del coseno aborda el problema de la detección de clones estructurales, cuantificando la equivalencia lógica a través de los grafos. Por otro lado, las métricas de clasificación evalúan la capacidad de la red convolucional para identificar patrones anómalos asociados a la Inteligencia Artificial.
 
-Este enfoque integral permite validar el desempeño del sistema en el contexto educativo, proporcionando evidencia cuantitativa sobre su utilidad como herramienta de apoyo a la evaluación docente.
+Este enfoque dual permite certificar el desempeño del backend, proporcionando evidencia algorítmica sobre su viabilidad como herramienta de auditoría de código en entornos académicos.
 
-% =========================================================
 \section{Análisis de riesgos}
 % =========================================================
 
@@ -659,7 +706,7 @@ Clasificación incorrecta en estilometría & Media & Alta & Uso de múltiples m�
 
 Datos insuficientes o no representativos & Alta & Alta & Ampliación y diversificación del dataset \\
 
-Dependencia de modelos externos (LLM) & Media & Media & Uso de datasets propios como respaldo \\
+Dependencia de modelos externos (LLM) & Alta & Alta & Uso de rutas de respaldo con modelos alternativos y locales\\
 
 Interpretación incorrecta por el docente & Media & Alta & Visualización clara y explicaciones dentro del sistema \\
 
@@ -708,36 +755,36 @@ No obstante, la integración de estrategias de mitigación, como el uso combinad
 En este sentido, el análisis realizado respalda la viabilidad del sistema propuesto como una herramienta de apoyo a la decisión docente, siempre que se considere como un complemento al criterio humano y no como un sustituto del mismo.
 
 
-\subsection{Selección y Justificación del Conjunto de Datos}
+\subsection{Selección y justificación del conjunto de datos}
 
-Para el entrenamiento del clasificador de autoría propuesto se requieren dos tipos de datos: código fuente escrito por humanos en un contexto educativo introductorio, y código equivalente generado por modelos de inteligencia artificial. A continuación se describe y justifica cada fuente utilizada, así como la estructura cuantitativa del dataset resultante.
+Para el entrenamiento del clasificador estilométrico propuesto se requieren dos tipos de datos: código fuente escrito por humanos en un contexto educativo introductorio, y código equivalente generado por modelos de inteligencia artificial. A continuación se describe y justifica cada fuente utilizada, así como la estructura cuantitativa del dataset resultante.
 
 \subsubsection{Código humano: IEEE Programming Homework Dataset}
 
 El componente de código humano proviene del \textit{Programming Homework Dataset} publicado por Ljubovic y Pajic (2020) en \cite{Ljubovic2020Dataset}. Este dataset contiene envíos reales de estudiantes en dos cursos introductorios de programación universitaria: el curso A en lenguaje C y el curso B en C++, con entre 16 y 22 asignaciones por curso. Su selección se justifica por tres razones principales.
 
-En primer lugar, el origen de los datos es directamente relevante al dominio del problema. Los envíos provienen de estudiantes en cursos de fundamentos de programación, que es exactamente la población objetivo del clasificador propuesto. Esto garantiza que el modelo aprenda patrones estilométricos propios del código estudiantil introductorio y no de programadores expertos o código de producción.
+En primer lugar, el origen de los datos es directamente relevante al dominio del problema. Los envíos provienen de estudiantes en cursos de fundamentos de programación, que es exactamente la población objetivo del sistema propuesto. Esto garantiza que el modelo aprenda patrones estilométricos propios del código estudiantil introductorio y no de programadores expertos o código de producción.
 
-En segundo lugar, el dataset cubre los tipos de problemas de interés: estructuras de control, manejo de arreglos, funciones, estructuras de datos básicas y manejo de archivos, todos representativos del currículo de un curso introductorio de C/C++.
+En segundo lugar, el dataset cubre los tipos de problemas de interés: estructuras de control, manejo de arreglos, funciones, estructuras de datos básicas y manejo de archivos, todos representativos del currículo de un curso introductorio de C/C++ (acorde a los estándares C11 y C++17).
 
-En tercer lugar, respecto al idioma de los identificadores y comentarios, el análisis del código fuente contenido en el dataset confirmó que este se encuentra escrito en serbocroata con alfabeto latino. Dado que los comentarios constituyen un rasgo estilométrico relevante puesto que codifican información sobre la frecuencia, extensión y estilo de documentación del programador, estos se conservan íntegramente como parte del input de CharCNN. La compatibilidad con código escrito en otros idiomas de alfabeto latino, como el español o el inglés, se garantiza a nivel de distribución de caracteres, a diferencia de datasets en idiomas con alfabetos no latinos como el griego o el cirílico.
+En tercer lugar, respecto al idioma de los identificadores y comentarios, el análisis del código fuente contenido en el dataset confirmó que este se encuentra escrito en serbocroata con alfabeto latino. Dado que los comentarios constituyen un rasgo estilométrico relevante —puesto que codifican información sobre la frecuencia, extensión y estilo de documentación del programador—, estos se conservan íntegramente durante el preprocesamiento como parte del \textit{input} de la CharCNN. La compatibilidad general con código escrito en otros idiomas de alfabeto latino, como el español o el inglés, se garantiza a nivel de distribución de caracteres y topología estructural.
 
-\subsubsection{Código generado por IA}
+\subsubsection{Código generado por IA (Clase Sintética)}
 
-Para construir la clase positiva del clasificador (código generado por IA), se opta por una estrategia de generación propia sobre los mismos enunciados de problemas presentes en el dataset humano. Esta decisión se fundamenta en la necesidad de que ambas clases respondan al mismo dominio de problema, evitando que el modelo aprenda diferencias asociadas al tipo de tarea y no a la autoría.
+Para construir la clase positiva del clasificador (código generado por IA), se opta por una estrategia de generación propia sobre los mismos enunciados de problemas presentes en el dataset humano. Esta decisión se fundamenta en la necesidad de que ambas clases respondan al mismo dominio del problema, evitando que el modelo aprenda diferencias asociadas a la lógica de la tarea y no a la naturaleza de su origen (humano vs. máquina).
 
-Con el objetivo de maximizar la generalización del clasificador ante distintos modelos de lenguaje, se emplea un conjunto diverso de generadores organizado en dos niveles, como se resume en la Tabla \ref{tab:composicion_dataset}. En el primer nivel se incluyen modelos de referencia comerciales (SOTA), mientras que el segundo nivel abarca modelos de código abierto.
+Con el objetivo de maximizar la generalización de la red convolucional ante distintos modelos de lenguaje, se emplea un conjunto diverso de generadores organizado en dos niveles, como se resume en la Tabla \ref{tab:composicion_dataset}. En el primer nivel se incluyen modelos de referencia comerciales (SOTA), mientras que el segundo nivel abarca modelos de código abierto.
 
 \begin{table}[ht]
 \centering
-\caption{Composición y origen del conjunto de datos bimodal}
+\caption{Composición y origen del conjunto de datos dual}
 \label{tab:composicion_dataset}
 \renewcommand{\arraystretch}{1.6}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{1.5cm} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}X}
 \toprule
-\textbf{Categoría} & \textbf{Fuente / Modelo} & \textbf{Lenguaje} & \textbf{Tipo de Autoría} & \textbf{Propósito en el sistema} \\
+\textbf{Categoría} & \textbf{Fuente / Modelo} & \textbf{Lenguaje} & \textbf{Origen de Escritura} & \textbf{Propósito en el sistema} \\
 \midrule
-Código Humano & IEEE Programming Homework \cite{Ljubovic2020Dataset} & C / C++ & Estudiante (Nivel 1) & Base de referencia de escritura manual y entrenamiento de CharCNN. \\
+Código Humano & IEEE Programming Homework \cite{Ljubovic2020Dataset} & C / C++ & Estudiante (Humano) & Base de referencia de escritura manual y entrenamiento de CharCNN. \\
 
 \addlinespace
 
@@ -752,18 +799,18 @@ Código IA (Local) & CodeLlama, DeepSeek, Qwen2.5 & C / C++ & Generativo (Open-S
 \footnotesize\textit{Elaboración propia con base en \cite{Ljubovic2020Dataset}.}
 \end{table}
 
-Para garantizar consistencia de idioma entre ambas clases, todos los prompts de generación se formulan en serbocroata, indicando explícitamente al modelo que utilice nombres de variables y comentarios en dicho idioma. Esto asegura que el idioma no constituya una señal discriminante entre clases durante el entrenamiento, forzando al modelo a aprender diferencias de naturaleza estilométrica y estructural. Adicionalmente, se generan variantes de prompt para cada problema con el fin de reducir el sesgo de un estilo de generación único:
+Para garantizar la consistencia entre ambas clases, todos los \textit{prompts} de generación se formulan indicando explícitamente al modelo que utilice nombres de variables y comentarios en serbocroata. Esto asegura que el idioma no constituya una señal discriminante (sesgo) durante el entrenamiento, forzando a la red a aprender diferencias estrictamente de naturaleza estilométrica espacial. Adicionalmente, se generan variantes de \textit{prompt} para cada problema con el fin de reducir la dependencia a un estilo de generación único:
 
 \begin{itemize}
-    \item Un prompt directo con el enunciado del problema.
-    \item Un prompt con instrucción de simular el estilo de un estudiante principiante.
-    \item Un prompt sin instrucciones de estilo adicionales.
+    \item Un \textit{prompt} directo con el enunciado del problema.
+    \item Un \textit{prompt} con instrucción de simular el estilo de un estudiante principiante.
+    \item Un \textit{prompt} con enfoque en optimización sin instrucciones de estilo adicionales.
 \end{itemize}
 
 \subsubsection{Consideraciones de balance y partición}
 
-El dataset final se construye con clases balanceadas entre código humano y código generado por IA para evitar sesgos en la predicción del modelo CharCNN. La partición se realiza a nivel de problema, es decir, un problema dado aparece exclusivamente en entrenamiento, validación o prueba, pero nunca en más de una partición. Esta decisión previene la fuga de información por similitud semántica entre problemas del mismo tipo. La Tabla \ref{tab:distribucion_muestras} presenta la distribución cuantitativa planificada para asegurar la convergencia de los modelos de aprendizaje profundo.
-\newpage
+El corpus final se construye con clases estrictamente balanceadas (50\% humano, 50\% IA) para evitar sesgos de clase mayoritaria en las predicciones de la CharCNN. La partición de los datos se realiza a nivel de \textit{problema}; es decir, todas las soluciones (humanas o sintéticas) de un problema específico aparecen exclusivamente en una de las fases (entrenamiento, validación o prueba). Esta restricción arquitectónica previene la fuga de información (\textit{data leakage}), obligando al modelo a clasificar basándose en el estilo y no en la lógica del algoritmo. La Tabla \ref{tab:distribucion_muestras} presenta la distribución cuantitativa establecida.
+
 \begin{table}[ht]
 \centering
 \caption{Distribución cuantitativa y partición del conjunto de datos}
@@ -773,7 +820,7 @@ El dataset final se construye con clases balanceadas entre código humano y cód
 \toprule
 \textbf{Subconjunto} & \textbf{Porcentaje} & \textbf{Cantidad ($n$)} & \textbf{Finalidad en el modelo} \\
 \midrule
-Entrenamiento (\textit{Train}) & 70\% & 14,000 & Ajuste de pesos y aprendizaje de características estilométricas. \\
+Entrenamiento (\textit{Train}) & 70\% & 14,000 & Ajuste de pesos y aprendizaje de características estilométricas 1D. \\
 
 \addlinespace
 
@@ -781,14 +828,14 @@ Validación (\textit{Val}) & 15\% & 3,000 & Ajuste de hiperparámetros y prevenc
 
 \addlinespace
 
-Prueba (\textit{Test}) & 15\% & 3,000 & Evaluación final de precisión y matriz de confusión en datos no vistos. \\
+Prueba (\textit{Test}) & 15\% & 3,000 & Evaluación cuantitativa del rendimiento y matriz de confusión en datos no vistos. \\
 
 \midrule
-\textbf{Total ($N$)} & \textbf{100\%} & \textbf{20,000} & \textbf{Dataset balanceado (50\% Humano / 50\% IA).} \\
+\textbf{Total ($N$)} & \textbf{100\%} & \textbf{20,000} & \textbf{Dataset consolidado e híbrido.} \\
 \bottomrule
 \end{tabularx}
 \smallskip
 \footnotesize\textit{Elaboración propia.}
 \end{table}
 
-En conclusión, la estructuración de este conjunto de datos bimodal permite que el sistema \textbf{Graphito} no solo identifique la similitud semántica mediante grafos de flujo de datos, sino que también desarrolle una alta sensibilidad a las micro-estructuras de estilo que diferencian a un alumno de un modelo generativo. El uso de $N = 20,000$ muestras asegura una base estadística suficiente para que la arquitectura CharCNN generalice patrones de autoría más allá de las palabras clave, capturando la esencia estilométrica del código fuente en entornos académicos de programación inicial.
+En conclusión, la estructuración de este corpus híbrido permite calibrar con precisión el canal estilométrico del sistema \textbf{Graphito}. El diseño metodológico empleado fuerza a la arquitectura CharCNN a desarrollar una alta sensibilidad a las micro-estructuras de estilo que diferencian el código orgánico del sintético. El uso de $N = 20,000$ muestras asegura una base estadística robusta para generalizar características más allá de las palabras clave, capturando la huella digital del código fuente en entornos académicos iniciales.

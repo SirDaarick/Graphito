@@ -1,0 +1,78 @@
+---
+config:
+  theme: base
+  themeVariables:
+    fontSize: 20px
+    classText: '#000000'
+    mainBkg: '#ffffff'
+---
+classDiagram
+direction LR
+    class OrquestadorGraphito {
+	    - agente : AgenteDecision
+	    - calculador : CalculadorSimilitud
+	    + ejecutarAnalisis(entrega, ref)
+	    - fusionarCaracteristicas(logica, estilo)
+    }
+
+    class Preprocesador {
+	    + normalizarParaLogica(codigo)
+	    + limpiarParaEstilo(codigo)
+    }
+
+    class ModeloIA {
+	    + generarEmbedding(datos)
+    }
+
+    class AlmacenamientoDatos {
+	    + guardar(entidad)
+    }
+
+    class ReporteAnalisis {
+	    + puntajeSimilitud : float
+	    + probSintetica : float
+	    + indicadores : List
+	    + fecha : DateTime
+    }
+
+    class CodigoFuente {
+	    + contenido : String
+	    + lenguaje : String
+	    + obtenerAST()
+    }
+
+    class ModeloGraphCodeBERT {
+	    - dfg : GrafoFlujoDatos
+	    + generarEmbedding(datos)
+    }
+
+    class ModeloCharCNN {
+	    - mapaCaracteres : Alfabeto
+	    + predecirOrigenSintetico(crudo)
+    }
+
+    class GestorPostgreSQL {
+	    + guardarMetadatos(reporte)
+    }
+
+    class GestorChromaDB {
+	    + almacenarVector(firma)
+	    + buscarSimilares(consulta)
+    }
+
+	<<interface>> ModeloIA
+	<<interface>> AlmacenamientoDatos
+
+    OrquestadorGraphito "1" *-- "1" Preprocesador : usa
+    OrquestadorGraphito "1" *-- "2" ModeloIA : consulta
+    OrquestadorGraphito "1" *-- "1" AlmacenamientoDatos : persiste
+    OrquestadorGraphito ..> ReporteAnalisis : genera
+    Preprocesador ..> CodigoFuente : procesa
+    ModeloIA <|.. ModeloGraphCodeBERT : implementa
+    ModeloIA <|.. ModeloCharCNN : implementa
+    AlmacenamientoDatos <|.. GestorPostgreSQL : implementa
+    AlmacenamientoDatos <|.. GestorChromaDB : implementa
+
+	classDef principal :,fill:#eef5fc,stroke:#1e4976,stroke-width:2px,color:#1e4976,font-weight:bold
+	classDef interfaz :,fill:#ffffff,stroke:#5b8db8,stroke-width:2px,stroke-dasharray: 5 5,color:#1e4976
+	classDef modelo :,fill:#ffffff,stroke:#5b8db8,stroke-width:1px,color:#000000

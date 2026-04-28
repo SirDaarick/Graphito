@@ -1,0 +1,73 @@
+%! TeX root = ../main.tex
+\newgeometry{left=2cm,right=2cm,top=2cm,bottom=3cm}
+\begin{titlepage}
+\thispagestyle{empty}
+\definecolor{azulESCOM}{RGB}{49,131,173}
+
+\noindent
+% ===================== COLUMNA IZQUIERDA (3cm) =====================
+\begin{minipage}[c][\textheight][c]{3cm}
+    \centering
+    \includegraphics[height=3.5cm]{logo-ipn.png}
+    
+    \vspace{0.5cm}
+    
+    % Quitamos el entorno center para evitar espacios extra
+    {\color{azulESCOM}\vrule width1pt height16.5cm}
+    \hspace{0.3cm}
+    {\color{azulESCOM}\vrule width5pt height16.5cm}
+    \hspace{0.3cm}
+    {\color{azulESCOM}\vrule width1pt height16.5cm}
+    
+    \vspace{0.5cm}
+    
+    \includegraphics[height=2.5cm]{logo-escom.png}
+\end{minipage}% <--- MUY IMPORTANTE este % para que no haya espacio extra
+\hfill
+% ===================== COLUMNA DERECHA (13cm) =====================
+% Eliminamos \fbox para que no añada bordes ni espacios extra
+\begin{minipage}[c][\textheight][c]{13cm}
+    \centering
+    \vspace{1cm}
+
+    {\fontsize{20}{22}\selectfont\textbf{INSTITUTO POLITÉCNICO NACIONAL}}\\[0.3cm]
+    {\fontsize{16}{18}\selectfont ESCUELA SUPERIOR DE CÓMPUTO}
+
+    \vspace{1.8cm}
+    {\fontsize{16}{18}\selectfont\textbf{ESCOM}}
+
+    \vfill 
+
+    {\fontsize{14}{16}\selectfont\textit{Trabajo Terminal I}}
+
+    \vspace{0.5cm}
+    {\fontsize{16}{18}\selectfont\textbf{
+    ``Sistema de comparación de código en C/C++ mediante similitud
+semántica para cursos introductorios de programación''
+    }}
+
+    \vspace{0.5cm}
+    {\fontsize{14}{16}\selectfont\textit{2026-B032}}
+
+    \vfill
+
+    {\fontsize{14}{16}\selectfont\textit{Presentan:}}\\[0.5cm]
+    {\fontsize{16}{18}\selectfont\textbf{Erick Daniel García Rodríguez} }\\
+    {\fontsize{16}{18}\selectfont\textbf{Claudia Emilia Sánchez García} }
+
+    \vfill
+
+    {\fontsize{14}{16}\selectfont\textit{Directores:}}\\[0.8cm]
+    \fontsize{14}{16}\selectfont\textbf{M. en C. Manuel Portillo Cedillo}\\
+    \textbf{Maribel Aragón García}
+
+    \vfill
+    {\fontsize{12}{14}\selectfont\textit{Fecha de presentación\\ de TT-I}}
+
+    \begin{flushright}
+        {\fontsize{12}{14}\selectfont Mayo 2026}
+    \end{flushright}
+\end{minipage}
+
+\end{titlepage}
+\restoregeometry
