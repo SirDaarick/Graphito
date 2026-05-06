@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).parent.resolve()
 
@@ -74,8 +77,22 @@ MODELS = {
         "provider": "ollama",
         "model": "mistral",
     },
+    "gemini-flash": {
+        "provider": "litellm",
+        "model": "gemini/gemini-1.5-flash",
+    },
+    "gemini-1.5-pro": {
+        "provider": "litellm",
+        "model": "gemini/gemini-1.5-pro",
+    },
+    "gemini-3-flash-lite-preview": {
+        "provider": "litellm",
+        "model": "gemini/gemini-3.1-flash-lite-preview",
+    },
+
 }
 
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")

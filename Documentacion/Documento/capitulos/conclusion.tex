@@ -1,0 +1,37 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SECCIÓN: CONCLUSIONES Y TRABAJO FUTURO
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Conclusiones y Trabajo Futuro}
+\label{sec:conclusiones}
+
+El desarrollo de la primera fase de este Trabajo Terminal surge como respuesta directa a un desafío crítico en la labor docente: la necesidad de transitar hacia nuevos paradigmas de evaluación ante el impacto de la Inteligencia Artificial generativa. Actualmente, los profesores carecen de herramientas que trasciendan el análisis superficial del código, lo que dificulta la validación objetiva del aprendizaje en grupos numerosos. En este contexto, \textbf{Graphito} se ha diseñado no como un calificador automatizado, sino como un Sistema de Soporte a la Decisión. Su propósito central es eficientar el proceso de revisión, dotando al evaluador de métricas bidimensionales (semánticas y estilométricas) que le brinden el sustento técnico necesario para emitir un juicio académico justo e informado. A partir de esta visión, a continuación se detalla el cumplimiento de los objetivos de la presente etapa y la hoja de ruta metodológica.
+
+\section{Cumplimiento de Objetivos de TT-I}
+
+Durante esta etapa de investigación y diseño, se dio cumplimiento prioritario a los pilares que garantizan la viabilidad del sistema:
+
+\begin{itemize}
+    \item \textbf{Selección de Modelos y Arquitecturas:} Mediante una evaluación comparativa del estado del arte, se determinó que la integración de \textit{GraphCodeBERT} para el análisis semántico y \textit{CharCNN} para la estilometría representa la solución óptima. Este proceso validó la necesidad de utilizar Grafos de Flujo de Datos (DFG) para capturar la lógica estructural que las herramientas tradicionales omiten.
+    
+    \item \textbf{Diseño de la Arquitectura de Software:} Se formalizó la estructura del sistema mediante el modelado estándar en UML y BPMN. Se definió la orquestación entre el cliente web en \textit{React}, la API de servicios en \textit{FastAPI} y la persistencia híbrida en \textit{PostgreSQL} y \textit{ChromaDB}, asegurando un flujo de datos eficiente para los motores de IA.
+    
+    \item \textbf{Ingeniería de Datos y generación del conjunto de datos:} Se definió y justificó el uso del \textit{IEEE Programming Homework Dataset} como base de código humano. Asimismo, se desarrollaron los \textit{scripts} de recolección y orquestación necesarios para interactuar con Modelos de Lenguaje Externos (LLMs) y generar las variantes sintéticas. Esto garantiza la disponibilidad de un corpus estructurado y metodológicamente validado para la posterior fase de entrenamiento.
+
+    \item \textbf{Prototipado e Interfaz:} Se completó la maquetación funcional de la plataforma web. Esto permitió validar la experiencia de usuario y la forma en que el docente configurará los parámetros de evaluación y visualizará los índices de similitud, sentando las bases para la integración final.
+\end{itemize}
+
+\section{Perspectivas para Trabajo Terminal II}
+
+Con la base de diseño establecida, el enfoque para el Trabajo Terminal II (TT-II) se desplazará hacia la implementación técnica, el entrenamiento de modelos y la validación experimental, centrándose en los siguientes objetivos:
+
+\begin{enumerate}
+    \item \textbf{Desarrollo del Módulo Semántico:} Integración integral de \textit{GraphCodeBERT} en el \textit{pipeline} de procesamiento para automatizar la extracción de DFGs y el cálculo de la similitud del coseno entre entregas de código.
+    
+    \item \textbf{Entrenamiento del Modelo Estilométrico:} Partiendo del conjunto de datos generado mediante scripts de generación desarrollados en TT-I, se procederá a la implementación arquitectónica y entrenamiento de la red \textit{CharCNN}. El objetivo será ajustar los hiperparámetros del modelo para alcanzar una precisión superior al 85\% en la discriminación entre código humano y sintético.
+    
+    \item \textbf{Integración y Despliegue:} Consolidación de los motores de IA dentro del ecosistema web funcional, habilitando el procesamiento asíncrono y la generación de reportes automáticos.
+    
+    \item \textbf{Evaluación y Pruebas de Desempeño:} Ejecución de simulaciones en un entorno de pruebas controlado utilizando repositorios de ejercicios reales. Se medirán métricas de precisión técnica, tiempos de respuesta y escalabilidad previo a su posible implementación en un escenario de producción académica.
+\end{enumerate}
+
+Al concluir esta fase de diseño, se confirma que el proyecto \textbf{Graphito} posee la solidez necesaria para convertirse en una herramienta de vanguardia que optimice la labor docente de evaluar código fuente frente al paradigma actual.

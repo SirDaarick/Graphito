@@ -31,6 +31,7 @@ modelos/weights/*.bin
 .env.*
 !.env.example
 .dockerignore
+data/.env
 
 # IDE y SO
 .DS_Store

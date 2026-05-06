@@ -165,5 +165,7 @@ def create_provider_from_config(config: dict) -> LLMProvider:
         extra_kwargs["api_key"] = os.getenv("ANTHROPIC_API_KEY")
     elif provider_type == "ollama":
         extra_kwargs["base_url"] = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    elif provider_type == "litellm":
+        extra_kwargs["api_key"] = os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
     
     return get_provider(provider_type, model, **extra_kwargs)

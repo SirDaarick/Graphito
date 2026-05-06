@@ -2,10 +2,32 @@
 import argparse
 import csv
 import sys
+import time
+import json
 from pathlib import Path
 
 import config
 from modelos import create_provider_from_config
+
+CHECKPOINT_FILE = Path("extraer_enunciados_checkpoint.json")
+MAX_RETRIES = 5
+BASE_RETRY_DELAY = 30
+
+
+def load_checkpoint() -> set[tuple[str, str, str]]:
+    if not CHECKPOINT_FILE.exists():
+        return set()
+    try:
+        with CHECKPOINT_FILE.open() as f:
+            data = json.load(f)
+            return set(tuple(item) for item in data)
+    except (json.JSONDecodeError, KeyError):
+        return set()
+
+
+def save_checkpoint(completed: set):
+    with CHECKPOINT_FILE.open("w") as f:
+        json.dump(list(completed), f)
 
 
 def find_problem_folders(base_path: Path) -> list[tuple[str, str, str]]:
@@ -26,9 +48,9 @@ def find_problem_folders(base_path: Path) -> list[tuple[str, str, str]]:
                     continue
                 tarea = tarea_dir.name
                 
-                problemas.append((curso, asignacion, tarea))
+                problems.append((curso, asignacion, tarea))
     
-    return problemas
+    return problems
 
 
 def read_sample_codes(problem_path: Path, num_samples: int = 2) -> list[str]:
@@ -113,24 +135,44 @@ def main():
     problems = find_problem_folders(config.DATASET_PATH)
     print(f"Encontrados {len(problems)} problemas en el dataset")
     
+    completed = load_checkpoint()
+    if completed:
+        print(f"Reanudando desde checkpoint: {len(completed)} problemas ya completados")
+    
     output_file = Path(args.output)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     
+    existing_rows = {}
+    if output_file.exists() and not args.force:
+        with output_file.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                key = (row["curso"], row["carpeta"], row["subcarpeta"])
+                existing_rows[key] = row
+    
     with output_file.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["curso", "carpeta", "subcarpeta", "enunciado", "lenguaje"])
+        writer = csv.DictWriter(f, fieldnames=["curso", "carpeta", "subcarpeta", "enunciado", "lenguaje"])
+        writer.writeheader()
         
         for i, (curso, asignacion, tarea) in enumerate(problems):
             problem_path = config.DATASET_PATH / curso / asignacion / tarea
+            key = (curso, asignacion, tarea)
+            
+            if key in completed or key in existing_rows:
+                if key not in completed:
+                    completed.add(key)
+                    save_checkpoint(completed)
+                print(f"[{i+1}/{len(problems)}] Skipping {curso}/{asignacion}/{tarea} - ya procesado")
+                continue
             
             if not problem_path.exists():
-                print(f"[{i+1}/{len(problems)}]skipping {curso}/{asignacion}/{tarea} - path not found")
+                print(f"[{i+1}/{len(problems)}] skipping {curso}/{asignacion}/{tarea} - path not found")
                 continue
             
             codes = read_sample_codes(problem_path, args.num_samples)
             
             if len(codes) < 1:
-                print(f"[{i+1}/{len(problems)}]skipping {curso}/{asignacion}/{tarea} - no code files")
+                print(f"[{i+1}/{len(problems)}] skipping {curso}/{asignacion}/{tarea} - no code files")
                 continue
             
             code1 = codes[0][:2000]
@@ -141,14 +183,34 @@ def main():
             print(f"[{i+1}/{len(problems)}] Processing {curso}/{asignacion}/{tarea}...", end=" ")
             sys.stdout.flush()
             
+            retries = 0
+            while retries <= MAX_RETRIES:
+                try:
+                    response = provider.generate(prompt)
+                    break
+                except Exception as e:
+                    error_str = str(e)
+                    if any(x in error_str for x in ["RateLimitError", "429", "RESOURCE_EXHAUSTED", "ServiceUnavailableError", "503", "UNAVAILABLE"]):
+                        retry_delay = BASE_RETRY_DELAY * (2 ** retries)
+                        print(f"\nRetryable error ({type(e).__name__}). Retry {retries+1}/{MAX_RETRIES} en {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        retries += 1
+                        continue
+                    print(f"\nError fatal: {e}")
+                    sys.exit(1)
+            else:
+                print(f"\nError: Max retries ({MAX_RETRIES}) alcanzado para {curso}/{asignacion}/{tarea}")
+                sys.exit(1)
+            
             try:
-                response = provider.generate(prompt)
                 enunciado, lenguaje = parse_llm_response(response)
             except Exception as e:
-                print(f"Error: {e}")
-                continue
+                print(f"\nError al parsear respuesta: {e}")
+                sys.exit(1)
             
-            writer.writerow([curso, asignacion, tarea, enunciado, lenguaje])
+            writer.writerow({"curso": curso, "carpeta": asignacion, "subcarpeta": tarea, "enunciado": enunciado, "lenguaje": lenguaje})
+            completed.add(key)
+            save_checkpoint(completed)
             f.flush()
             
             print(f"OK - {enunciado[:50]}...")

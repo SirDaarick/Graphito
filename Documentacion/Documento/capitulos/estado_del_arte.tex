@@ -55,14 +55,14 @@ De manera similar, herramientas como CodeGrade han sido desarrolladas para apoya
 
 \begin{table}[H]
 \centering
-\begin{tabular}{|c|c|c|c|}
+\begin{tabularx}{\textwidth}{|c|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \textbf{Herramienta} & \textbf{Enfoque} & \textbf{Ventaja} & \textbf{Limitación} \\ \hline
 MOSS & Fingerprinting & Eficiente y escalable & No detecta semántica \\ \hline
 JPlag & Tokenización & Detecta similitud estructural & Evadible \\ \hline
 Gradescope & Pruebas & Automatización & No analiza lógica \\ \hline
 CodeGrade & Evaluación automática & Retroalimentación & Limitado \\ \hline
-\end{tabular}
+\end{tabularx}
 \caption{Comparación de herramientas de análisis de código}
 \end{table}
 
@@ -115,13 +115,13 @@ Además de CodeBERT y GraphCodeBERT, investigaciones recientes han propuesto otr
 
 \begin{table}[H]
 \centering
-\begin{tabular}{|c|c|c|c|}
+\begin{tabularx}{\textwidth}{|c|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \textbf{Modelo} & \textbf{Tipo} & \textbf{Característica} & \textbf{Aplicación} \\ \hline
 CodeBERT & Transformer & Representación semántica & Búsqueda de código \\ \hline
 GraphCodeBERT & Transformer + grafos & Usa flujo de datos & Similitud semántica \\ \hline
 UniXcoder & Multimodal & Representación unificada & Análisis avanzado \\ \hline
-\end{tabular}
+\end{tabularx}
 \caption{Modelos basados en Transformers para análisis de código}
 \end{table}
 

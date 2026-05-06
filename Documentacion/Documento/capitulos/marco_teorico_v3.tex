@@ -26,7 +26,7 @@ Para representar estos obstáculos, la literatura identifica los siguientes reto
     \item \textbf{Código generado por IA:} El auge de modelos de lenguaje (LLMs) permite generar múltiples versiones de un mismo programa, introduciendo patrones de similitud difíciles de rastrear mediante métodos tradicionales.
 \end{itemize}
 
-Estos de desafíos evidencian la necesidad de una taxonomía que permita categorizar el grado de semejanza entre programas, lo cual se aborda a través de la clasificación técnica de clones.
+Estos desafíos evidencian la necesidad de una taxonomía que permita categorizar el grado de semejanza entre programas, lo cual se aborda a través de la clasificación técnica de clones.
 
 % =========================================================
 \section{Clones de código}
@@ -38,14 +38,14 @@ La similitud entre programas no es un concepto binario, sino que puede presentar
 \centering
 \caption{Tipos de clones de código según Bellon.}
 \label{tab:clones_bellon}
-\begin{tabular}{|l|l|l|}
+\begin{tabularx}{\textwidth}{|l|l|>{\raggedright\arraybackslash}X|}
 \hline
 \textbf{Tipo} & \textbf{Nivel de Similitud} & \textbf{Descripción} \\ \hline
 Tipo I & Textual / Exacto & Copias idénticas, excepto por espacios y comentarios. \\ \hline
 Tipo II & Sintáctico / Renombrado & Estructura idéntica con cambios en identificadores o tipos. \\ \hline
 Tipo III & Sintáctico / Modificado & Código con sentencias añadidas, eliminadas o modificadas. \\ \hline
 Tipo IV & Semántico / Funcional & Misma lógica implementada con distinta sintaxis. \\ \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 Esta clasificación refleja un incremento progresivo en la complejidad de detección: mientras que los clones de Tipo I y II pueden identificarse mediante análisis superficiales, los clones de Tipo III requieren tolerancia a modificaciones estructurales, y los clones de Tipo IV implican comprender la lógica del programa. Por esta razón, los clones semánticos representan el principal desafío en la detección de similitud de código y motivan el uso de enfoques más avanzados.
@@ -86,7 +86,7 @@ organización lógica del código y las preferencias de diseño del
 programador como la utilización de funciones, modularidad, patrones 
 recurrentes con menor sensibilidad a cambios de formato o nombres de 
 variables \cite{Horvath2026ProgrammerAttribution}. No obstante, estas
-representaciones siguen siendo estáticas, puesto que, no modelan el comportamiento 
+representaciones siguen siendo estáticas, puesto que no modelan el comportamiento 
 dinámico del programa, por lo que cambios equivalentes como sustituir 
 un bucle \texttt{for} por un \texttt{while} pueden producir estructuras 
 distintas sin alterar la funcionalidad, limitando la detección de clones 
@@ -95,8 +95,8 @@ semánticos \cite{Roy2007Survey, karakatic2022software}.
 % -----------------------------
 \subsection{Enfoques basados en semántica}
 
-Los enfoques semánticos analizan el código desde la perspectiva de como funcionan, ya que en lugar de examinar cómo está escrito, buscan 
-comprender lo qué hace, modelando su lógica de ejecución y las relaciones 
+Los enfoques semánticos analizan el código desde la perspectiva de cómo funcionan, ya que en lugar de examinar cómo está escrito, buscan 
+comprender lo que hace, modelando su lógica de ejecución y las relaciones 
 entre datos \cite{Roy2007Survey, Yu2023Graph}. Para ello, en lugar de 
 comparar texto o estructura gramatical, abstraen el programa en 
 representaciones que capturan las dependencias entre instrucciones y el 
@@ -106,7 +106,7 @@ implementado sintácticamente.
 Esta capacidad de abstracción los convierte en los únicos enfoques capaces 
 de detectar clones de Tipo~IV: programas funcionalmente equivalentes con una estructura sintáctica diferente \cite{Roy2007Survey, Yu2023Graph}. Por ejemplo, un bucle \texttt{for} y una recursión que cumplen con la misma tarea serían completamente diferentes para métodos textuales o estructurales, pero equivalentes bajo un análisis semántico.
 
-Sin embargo, esta profundidad analítica tiene un costo, puesto que, comparar programas 
+Sin embargo, esta profundidad analítica tiene un costo, puesto que comparar programas 
 a nivel semántico implica resolver problemas de alta complejidad 
 computacional, lo que limita la escalabilidad de los métodos 
 clásicos \cite{Yu2023Graph}. Investigaciones recientes han respondido a 
@@ -114,7 +114,7 @@ esta limitación con modelos de aprendizaje profundo que aproximan la
 semántica del código de manera más eficiente \cite{Yu2023Graph, 
 Gagnon2025Beyond}. Las representaciones concretas sobre las que operan 
 estos enfoques como grafos de flujo de control, flujo de datos y dependencia 
-de programas se describen en detalle en más adelante. 
+de programas se describen en detalle más adelante. 
 
 % -----------------------------
 \subsection{Enfoques basados en aprendizaje automático}
@@ -123,7 +123,7 @@ El análisis de código fuente ha evolucionado con la consolidación del área
 conocida como \textit{Big Code}, que parte de la premisa de que el código 
 puede interpretarse como un lenguaje altamente estructurado 
 \cite{Le2021DeepLearning}. Bajo este enfoque, los modelos de aprendizaje 
-profundo con capaces de analizar la sintáxis y la semántica de los programas 
+profundo son capaces de analizar la sintaxis y la semántica de los programas 
 sin necesidad de ejecutarlos, transformando el código en representaciones 
 numéricas continuas denominadas \textit{embeddings}, donde fragmentos con 
 comportamientos similares se ubican en regiones cercanas del espacio 
@@ -173,11 +173,7 @@ Los enfoques descritos durante esta sección no son excluyentes entre sí, sino 
 \end{table}
 }
 
-Se puede observar que ningún enfoque resulta absolutamente superior, puesto que los 
-métodos más simples ofrecen alta eficiencia pero carecen de profundidad 
-semántica, mientras que los más avanzados logran capturar equivalencias 
-funcionales a costa de mayor complejidad computacional 
-\cite{Roy2007Survey, karakatic2022software}. Esta limitación demuestra que, si se planea hacer una comparación compleja entre programas no basta con utilizar un sólo enfoque para el análisis. Antes de determinar como afrontar el problema de realizar la comparacion semántica mientras se tiene en cuenta los patrones de autoría, resulta necesario analizar las representaciones internas del codigo sobre las que operan estos enfoques, tema que se aborda en la siguiente sección.
+Esta limitación demuestra que, si se planea hacer una comparación compleja entre programas no basta con utilizar un sólo enfoque para el análisis. Antes de determinar cómo afrontar el problema de realizar la comparación semántica mientras se tiene en cuenta los patrones de autoría, resulta necesario analizar las representaciones internas del código sobre las que operan estos enfoques, tema que se aborda en la siguiente sección.
 %############################################################################
 
 \section{Representaciones del código fuente}
@@ -312,7 +308,7 @@ Las representaciones descritas en las secciones anteriores no son equivalentes e
 \small 
 
 % Ajustamos los anchos: p{2.1cm} y p{2.3cm} para evitar el Overfull de 3pt
-\begin{xltabular}{\textwidth}{>{\RaggedRight\arraybackslash}p{2.3cm} >{\RaggedRight\arraybackslash}p{2.3cm} >{\centering\arraybackslash}p{1.7cm} X X}
+\begin{xltabular}{\textwidth}{>{\RaggedRight\arraybackslash}p{2.5cm} >{\RaggedRight\arraybackslash}p{2.5cm} c >{\RaggedRight\arraybackslash}X >{\RaggedRight\arraybackslash}X}
     \caption{Comparación de representaciones del código fuente} \label{tab:representaciones} \\
     \toprule
     \textbf{Representación} & \textbf{Abstracción} & \textbf{Costo} & \textbf{Ventaja principal} & \textbf{Limitación principal} \\
@@ -390,7 +386,7 @@ la literatura según su nivel de abstracción.
 \renewcommand{\arraystretch}{1.6}
 \small 
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} l p{2cm} X X}
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{2.8cm} l c >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
     \caption{Comparación de métricas de similitud en código fuente} \label{tab:metricas} \\
     
     \toprule
@@ -565,7 +561,7 @@ La evolución de las arquitecturas para el análisis de código refleja un incre
 \renewcommand{\arraystretch}{1.5}
 \small
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.2cm} X X}
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
     \caption{Comparación de modelos preentrenados para análisis de código} \label{tab:modelos} \\
     
     \toprule
@@ -611,7 +607,7 @@ La evolución de las arquitecturas para el análisis de código refleja un incre
 
 } % Fin del grupo small
 
-Una vez agotado el análisis de los modelos orientados a la captura de la semántica algorítmica, es imperativo reconocer que el código fuente no es solo una entidad funcional, sino también un producto de autoría humana. Mientras que el flujo de datos y control define la ejecución del programa, existen rasgos intrínsecos en la escritura que no alteran la lógica, pero que actúan como una huella digital del programador. En consecuencia, el análisis automático de código requiere de una perspectiva complementaria que no se centre en el 'qué' hace el algoritmo, sino en el 'cómo' se manifiesta el estilo individual del autor. Esta disciplina, conocida como estilometría de código, proporciona las herramientas necesarias para abordar la dimensión de identidad, la cual se explora a detalle en la siguiente sección..
+Una vez agotado el análisis de los modelos orientados a la captura de la semántica algorítmica, es imperativo reconocer que el código fuente no es solo una entidad funcional, sino también un producto de autoría humana. Mientras que el flujo de datos y control define la ejecución del programa, existen rasgos intrínsecos en la escritura que no alteran la lógica, pero que actúan como una huella digital del programador. En consecuencia, el análisis automático de código requiere de una perspectiva complementaria que no se centre en el 'qué' hace el algoritmo, sino en el 'cómo' se manifiesta el estilo individual del autor. Esta disciplina, conocida como estilometría de código, proporciona las herramientas necesarias para abordar la dimensión de identidad, la cual se explora en detalle en la siguiente sección.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Análisis estilométrico}
@@ -622,13 +618,13 @@ Su objetivo principal es la atribución de autoría, es decir, determinar quién
 
 \subsection{Taxonomía de rasgos estilométricos}
 
-Para caracterizar estos patrones, Hovarth \cite{Horvath2026ProgrammerAttribution} clasifica los rasgos estilométricos en diferentes niveles de abstracción, desde aspectos superficiales hasta decisiones de diseño y comportamiento.
+Para caracterizar estos patrones, Horvath \cite{Horvath2026ProgrammerAttribution} clasifica los rasgos estilométricos en diferentes niveles de abstracción, desde aspectos superficiales hasta decisiones de diseño y comportamiento.
 
 { % Limitamos el alcance del tamaño de letra
 \renewcommand{\arraystretch}{1.6}
 \small
 
-\begin{xltabular}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{3.5cm} X}
+\begin{xltabular}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
     % --- Título y Etiquetas de la tabla ---
     \caption{Taxonomía de rasgos estilométricos en código fuente} \label{tab:rasgos_estilometricos} \\
     
@@ -728,7 +724,7 @@ estilométrico de código fuente.
 \caption{Comparación de enfoques para el análisis estilométrico}
 \label{tab:enfoques_estilo}
 \renewcommand{\arraystretch}{1.6}
-\begin{tabularx}{\textwidth}{p{2.4cm} p{1.8cm} p{1.8cm} X X}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}p{1.8cm} >{\raggedright\arraybackslash}p{1.8cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
 \toprule
 \textbf{Enfoque} & 
 \textbf{Capacidad semántica} & 
@@ -774,7 +770,7 @@ comportamiento de caja negra \\
 \cite{Horvath2026ProgrammerAttribution}.}
 \end{table}
 
-Una vez conocidos los enfoques para abordar el problema, a continuación se expondran distintos modelos de Inteligencia Artificial aplicados al analisis estilométrico siguiendo los enfoques previamente planteado, analizando sus fortalezas y debilidades.
+Una vez conocidos los enfoques para abordar el problema, a continuación se expondrán distintos modelos de Inteligencia Artificial aplicados al análisis estilométrico siguiendo los enfoques previamente planteados, analizando sus fortalezas y debilidades.
 
 \subsection{Modelos para el análisis estilométrico}
 
@@ -786,7 +782,7 @@ En este contexto, los modelos estilométricos pueden entenderse como una evoluci
 \subsubsection{Modelos basados en n-gramas}
 % ---------------------------------------------------------
 
-Los modelos de n-gramas constituyen un enfoque estadístico basado en frecuencia, donde el código se representa como secuencias contiguas de tokens o caracteres \cite{Burrows2007Ngrams}. Su “arquitectura” no es neuronal, sino un modelo de perfilado: construyen vectores de frecuencia que describen el estilo de un autor.
+Los modelos de n-gramas constituyen un enfoque estadístico basado en frecuencia, donde el código se representa como secuencias contiguas de tokens o caracteres \cite{Burrows2007Ngrams}. Su ``arquitectura'' no es neuronal, sino un modelo de perfilado: construyen vectores de frecuencia que describen el estilo de un autor.
 
 Esta representación es efectiva para estilometría porque captura patrones repetitivos de bajo nivel, como el uso de operadores, palabras clave o convenciones de escritura. Al comparar estos perfiles mediante métricas como similitud del coseno, es posible identificar similitudes entre autores.
 
@@ -849,7 +845,7 @@ estilométrico.
     N-gramas & Estadística (Frecuencias) & Léxicos superficiales & Alta interpretabilidad; independiente del lenguaje \cite{Burrows2007Ngrams}. & Degrada con múltiples autores; requiere muestras largas. \\
     \addlinespace
     
-    CharCNN & ConvNet 1D (Caracteres) & Léxicos y de formato & Detecta "biomarcadores" de estilo invisibles para modelos de tokens \cite{Zhang2015CharCNN}. & Requiere grandes volúmenes de datos para entrenamiento. \\
+    CharCNN & ConvNet 1D (Caracteres) & Léxicos y de formato & Detecta ``biomarcadores'' de estilo invisibles para modelos de tokens \cite{Zhang2015CharCNN}. & Requiere grandes volúmenes de datos para entrenamiento. \\
     \addlinespace
     
     RoBERTa & Transformer (BPE) & Contexto semántico & Maneja identificadores arbitrarios sin perder contexto \cite{Liu2019RoBERTa}. & Sin comprensión estructural; alto costo computacional. \\
@@ -861,7 +857,7 @@ estilométrico.
 
 } % Fin del grupo small
 
-En conjunto, estos modelos ofrecen distintas formas de capturar el estilo de programación, desde patrones superficiales hasta representaciones profundas basadas en contexto. En la siguiente sección se presenta una síntesis que muestra que mediante la integracion de distintos enfoques, se puede conseguir una arquitectura robusta capáz de superar las limitaciones de los modelos previamente presentados. 
+En conjunto, estos modelos ofrecen distintas formas de capturar el estilo de programación, desde patrones superficiales hasta representaciones profundas basadas en contexto. En la siguiente sección se presenta una síntesis que muestra que mediante la integración de distintos enfoques, se puede conseguir una arquitectura robusta capaz de superar las limitaciones de los modelos previamente presentados. 
 
 
 
