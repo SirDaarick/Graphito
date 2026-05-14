@@ -35,7 +35,14 @@ function App() {
 
             {view === "app" ? (
                 <>
-                    <Header onNewCode={() => setIsNewCodeModalOpen(true)} />
+                    <Header
+                        onNewCode={() => setIsNewCodeModalOpen(true)}
+                        onLogout={() => setView("login")}
+                        onViewComparison={(comp) => {
+                            setSelectedComparison(comp);
+                            setIsSimilarityReportOpen(true);
+                        }}
+                    />
                     <Biblioteca
                         onCompare={() => setIsNewComparisonModalOpen(true)}
                         onComparisonClick={(comp) => {
