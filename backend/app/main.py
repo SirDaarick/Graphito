@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.infrastructure.database.session import engine, Base
+import app.infrastructure.database.models  # Registra todas las entidades en Base.metadata
 from app.presentation.api.v1.api import api_router
 
 logging.basicConfig(level=logging.INFO)
