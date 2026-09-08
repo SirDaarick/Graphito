@@ -396,3 +396,31 @@ class TestDFGResult:
         for idx, tok in r.index_to_code.items():
             assert 0 <= idx < len(r.code_tokens)
             assert r.code_tokens[idx] == tok
+
+
+class TestPointersAndAliasing:
+
+    def test_pointer_declaration_with_address_of(self, extractor):
+        code = "int main() { int x = 5; int *p = &x; return 0; }"
+        r = extractor.parse_code(code, "c")
+        assert r.success
+        edge = _find_edge(r.dfg_edges, "computedFrom", "p", r.code_tokens)
+        assert edge is not None
+        assert _edge_has_source(edge, "x", r.code_tokens)
+
+    def test_pointer_dereference_assignment(self, extractor):
+        code = "int main() { int x = 5; int *p = &x; *p = 10; return x; }"
+        r = extractor.parse_code(code, "c")
+        assert r.success
+        ret_edge = _find_edge(r.dfg_edges, "comesFrom", "x", r.code_tokens)
+        assert ret_edge is not None
+        assert _edge_has_source(ret_edge, "p", r.code_tokens)
+
+    def test_pointer_parameters(self, extractor):
+        code = "void f(char *dest, const char *src) { *dest = *src; }"
+        r = extractor.parse_code(code, "c")
+        assert r.success
+        edge = _find_edge(r.dfg_edges, "computedFrom", "dest", r.code_tokens)
+        assert edge is not None
+        assert _edge_has_source(edge, "src", r.code_tokens)
+

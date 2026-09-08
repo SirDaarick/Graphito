@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 
 @dataclass
@@ -13,6 +14,7 @@ class GraphCodeBERTConfig:
     fused_dim: int = 1792
 
     cache_dir: Path = field(default_factory=lambda: Path("modelos/weights"))
+    adapter_path: Optional[Path] = None
 
     fallback_to_text_only: bool = True
 

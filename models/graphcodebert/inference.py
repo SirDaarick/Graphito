@@ -25,9 +25,19 @@ class GraphCodeBERTInference:
         self.tokenizer = RobertaTokenizer.from_pretrained(
             self.config.model_name, cache_dir=str(self.config.cache_dir)
         )
-        self.encoder = RobertaModel.from_pretrained(
+        base_encoder = RobertaModel.from_pretrained(
             self.config.model_name, cache_dir=str(self.config.cache_dir)
         )
+        if self.config.adapter_path and Path(self.config.adapter_path).exists():
+            try:
+                from peft import PeftModel
+                peft_model = PeftModel.from_pretrained(base_encoder, str(self.config.adapter_path))
+                self.encoder = peft_model.merge_and_unload()
+            except Exception:
+                self.encoder = base_encoder
+        else:
+            self.encoder = base_encoder
+
         self.encoder.to(self.device)
         self.encoder.eval()
 

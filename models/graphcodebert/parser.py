@@ -126,6 +126,20 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
 
     function_registry: dict[str, dict] = {}
 
+    def _find_declarator_ident(n: ts.Node) -> Optional[ts.Node]:
+        if n.type == "identifier":
+            return n
+        for c in n.children:
+            if c.type in (
+                "identifier", "pointer_declarator", "reference_declarator",
+                "array_declarator", "parenthesized_declarator",
+                "init_declarator", "declarator",
+            ):
+                res = _find_declarator_ident(c)
+                if res is not None:
+                    return res
+        return None
+
     def _collect_functions(node: ts.Node):
         if node.type == "function_definition":
             func_name = ""
@@ -138,12 +152,12 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                         elif gc.type == "parameter_list":
                             for pc in gc.children:
                                 if pc.type == "parameter_declaration":
-                                    for ppc in pc.children:
-                                        if ppc.type == "identifier":
-                                            pname = ppc.text.decode("utf-8", errors="replace") if ppc.text else ""
-                                            pidx = indices_map.get((ppc.start_byte, ppc.end_byte), -1)
-                                            if pname and pidx >= 0:
-                                                params.append((pname, pidx))
+                                    ppc = _find_declarator_ident(pc)
+                                    if ppc is not None:
+                                        pname = ppc.text.decode("utf-8", errors="replace") if ppc.text else ""
+                                        pidx = indices_map.get((ppc.start_byte, ppc.end_byte), -1)
+                                        if pname and pidx >= 0:
+                                            params.append((pname, pidx))
             if func_name:
                 function_registry[func_name] = {"params": params, "returns": []}
         for child in node.children:
@@ -184,10 +198,8 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                     idxs.extend(all_var_indices(child))
         elif node.type == "subscript_expression":
             for child in node.children:
-                if child.type == "identifier":
-                    i = get_idx(child)
-                    if i >= 0:
-                        idxs.append(i)
+                if child.type in ("identifier", "pointer_expression"):
+                    idxs.extend(all_var_indices(child))
                     break
         elif node.type == "call_expression":
             saw_name = False
@@ -212,7 +224,6 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
         return sorted(set(idxs))
 
     def _resolve_lhs_var_indices(node: ts.Node) -> tuple[Optional[str], list[int]]:
-
         if node.type == "identifier":
             i = get_idx(node)
             name = get_text(node)
@@ -221,7 +232,7 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
             base_name = None
             base_indices: list[int] = []
             for child in node.children:
-                if child.type in ("identifier", "field_expression"):
+                if child.type in ("identifier", "field_expression", "pointer_expression"):
                     n, idxs = _resolve_lhs_var_indices(child)
                     if n:
                         base_name = n
@@ -229,12 +240,47 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
             return base_name, base_indices
         elif node.type == "subscript_expression":
             for child in node.children:
+                if child.type in ("identifier", "pointer_expression"):
+                    return _resolve_lhs_var_indices(child)
+            return None, []
+        elif node.type in ("pointer_expression", "unary_expression"):
+            for child in node.children:
                 if child.type == "identifier":
                     i = get_idx(child)
                     name = get_text(child)
                     return name, [i] if i >= 0 else []
+                elif child.type in (
+                    "update_expression", "parenthesized_expression",
+                    "pointer_expression", "unary_expression",
+                    "binary_expression", "subscript_expression",
+                ):
+                    return _resolve_lhs_var_indices(child)
+            return None, []
+        elif node.type in ("parenthesized_expression", "update_expression"):
+            for child in node.children:
+                if child.type in ("identifier", "pointer_expression", "update_expression"):
+                    return _resolve_lhs_var_indices(child)
             return None, []
         return None, []
+
+    aliases: dict[str, str] = {}
+
+    def _extract_alias_target(expr_node: ts.Node) -> Optional[str]:
+        if expr_node.type in ("pointer_expression", "unary_expression"):
+            has_amp = any(c.type == "&" or get_text(c) == "&" for c in expr_node.children)
+            if has_amp:
+                for c in expr_node.children:
+                    if c.type == "identifier":
+                        return get_text(c)
+        elif expr_node.type == "identifier":
+            id_name = get_text(expr_node)
+            if id_name in aliases:
+                return aliases[id_name]
+        for c in expr_node.children:
+            t = _extract_alias_target(c)
+            if t:
+                return t
+        return None
 
     def walk(node: ts.Node, states: dict[str, list[int]], current_func: str = "") -> dict[str, list[int]]:
         local = dict(states)
@@ -250,12 +296,12 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                         elif gc.type == "parameter_list":
                             for pc in gc.children:
                                 if pc.type == "parameter_declaration":
-                                    for ppc in pc.children:
-                                        if ppc.type == "identifier":
-                                            vn = get_text(ppc)
-                                            idx = get_idx(ppc)
-                                            if idx >= 0:
-                                                local[vn] = [idx]
+                                    ppc = _find_declarator_ident(pc)
+                                    if ppc is not None:
+                                        vn = get_text(ppc)
+                                        idx = get_idx(ppc)
+                                        if idx >= 0:
+                                            local[vn] = [idx]
             local = _walk_children(node, local, func_name)
 
         elif node.type == "declaration":
@@ -263,14 +309,11 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
             for child in node.children:
                 if child.type == "init_declarator":
                     has_init = True
-                    ident = None
+                    ident = _find_declarator_ident(child)
                     rhs_idxs: list[int] = []
                     non_leaf_rhs: list[ts.Node] = []
                     for gc in child.children:
-                        if gc.type == "identifier":
-                            ident = gc
-                    for gc in child.children:
-                        if gc.type not in ("identifier", "=", ",") and gc.type not in _LEAF_TYPES:
+                        if gc != ident and gc.type not in ("=", ",") and gc.type not in _LEAF_TYPES:
                             rhs_idxs.extend(all_var_indices(gc))
                             non_leaf_rhs.append(gc)
 
@@ -284,6 +327,10 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                                 relation="computedFrom",
                             ))
                         local[var_name] = [target_idx]
+                        for r_node in non_leaf_rhs:
+                            alias_target = _extract_alias_target(r_node)
+                            if alias_target:
+                                aliases[var_name] = alias_target
 
                     for rhs_node in non_leaf_rhs:
                         local = walk(rhs_node, local, current_func)
@@ -304,25 +351,29 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                                             target_index=get_idx(ident),
                                             relation="returnToCaller",
                                         ))
-                elif child.type == "identifier":
-                    var_name = get_text(child)
-                    idx = get_idx(child)
-                    if idx >= 0:
-                        local[var_name] = [idx]
+                elif child.type in ("identifier", "pointer_declarator", "reference_declarator", "array_declarator"):
+                    decl_id = _find_declarator_ident(child)
+                    if decl_id is not None:
+                        var_name = get_text(decl_id)
+                        idx = get_idx(decl_id)
+                        if idx >= 0:
+                            local[var_name] = [idx]
             for child in node.children:
-                if child.type not in ("init_declarator", "identifier") and child.type not in _LEAF_TYPES:
+                if child.type not in ("init_declarator", "identifier", "pointer_declarator", "reference_declarator") and child.type not in _LEAF_TYPES:
                     local = walk(child, local, current_func)
 
         elif node.type == "assignment_expression":
             lhs_ident: Optional[ts.Node] = None
             lhs_is_field = False
+            lhs_is_pointer = False
             rhs_indices: list[int] = []
             op_type = None
             op_seen = False
             for child in node.children:
-                if child.type in ("identifier", "field_expression", "subscript_expression") and not op_seen:
+                if child.type in ("identifier", "field_expression", "subscript_expression", "pointer_expression", "unary_expression") and not op_seen:
                     lhs_ident = child
                     lhs_is_field = (child.type in ("field_expression", "subscript_expression"))
+                    lhs_is_pointer = (child.type in ("pointer_expression", "unary_expression"))
                 elif child.type in ("=", "+=", "-=", "*=", "/=", "%=",
                                     "&=", "|=", "^=", "<<=", ">>="):
                     op_seen = True
@@ -331,8 +382,8 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                     rhs_indices.extend(all_var_indices(child))
 
             if lhs_ident and op_type:
+                base_name, base_indices = _resolve_lhs_var_indices(lhs_ident)
                 if lhs_is_field:
-                    base_name, base_indices = _resolve_lhs_var_indices(lhs_ident)
                     if op_type != "=" and base_indices:
                         rhs_indices.extend(base_indices)
                     all_src = sorted(set(rhs_indices + base_indices))
@@ -346,9 +397,24 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                             ))
                     if base_name and base_indices:
                         local[base_name] = base_indices
+                elif lhs_is_pointer:
+                    target_idx = base_indices[0] if base_indices else get_idx(lhs_ident)
+                    ptr_name = base_name or get_text(lhs_ident)
+                    all_src = sorted(set(rhs_indices))
+                    if target_idx >= 0 and all_src:
+                        edges.append(DFGEdge(
+                            source_indices=all_src,
+                            target_index=target_idx,
+                            relation="computedFrom",
+                        ))
+                    if ptr_name:
+                        local[ptr_name] = [target_idx] if target_idx >= 0 else []
+                        if ptr_name in aliases:
+                            aliased_var = aliases[ptr_name]
+                            local[aliased_var] = [target_idx] if target_idx >= 0 else []
                 else:
-                    target_idx = get_idx(lhs_ident)
-                    var_name = get_text(lhs_ident)
+                    target_idx = get_idx(lhs_ident) if not base_indices else base_indices[0]
+                    var_name = base_name or get_text(lhs_ident)
                     if op_type != "=":
                         lhs_idx = get_idx(lhs_ident)
                         if lhs_idx >= 0:
@@ -361,6 +427,11 @@ def DFG_c_cpp(root: ts.Node, code_bytes: bytes) -> tuple[list[str], list[DFGEdge
                                 relation="computedFrom",
                             ))
                         local[var_name] = [target_idx]
+                    for child in node.children:
+                        if op_seen and child.type not in _LEAF_TYPES:
+                            alias_target = _extract_alias_target(child)
+                            if alias_target and var_name:
+                                aliases[var_name] = alias_target
 
             if lhs_ident and op_type:
                 for child in node.children:
