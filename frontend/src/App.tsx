@@ -86,6 +86,7 @@ function App() {
             {view === "app" ? (
                 <>
                     <Header
+                        currentUser={currentUser}
                         onNewCode={() => setIsNewCodeModalOpen(true)}
                         onLogout={handleLogout}
                         onViewComparison={(comp) => {

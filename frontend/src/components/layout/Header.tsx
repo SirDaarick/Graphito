@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Bell, ChevronDown, X, FileText } from "lucide-react";
 import { GradientButton } from "../ui/GradientButton";
+import { Docente } from "../../lib/api";
 
 import logo from "../../assets/logo.png";
 
@@ -16,39 +17,17 @@ interface Notification {
     comparison: Comparison;
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-    {
-        id: "n1",
-        comparison: { id: "c1", title: "Juan Pérez - Boleta 2022630123", subtitle: "Entrega Práctica 2", similarity: 89 },
-    },
-    {
-        id: "n2",
-        comparison: { id: "c2", title: "Maria Garcia - Boleta 2022630456", subtitle: "Tarea Semanal 4", similarity: 12 },
-    },
-    {
-        id: "n3",
-        comparison: { id: "c5", title: "Carlos López - Boleta 2021630987", subtitle: "Proyecto Parcial 1", similarity: 94 },
-    },
-    {
-        id: "n4",
-        comparison: { id: "c8", title: "Pedro Ruiz - Boleta 2022630345", subtitle: "Tarea 3 - Algoritmos", similarity: 76 },
-    },
-    {
-        id: "n5",
-        comparison: { id: "c9", title: "Sofía Díaz - Boleta 2022630567", subtitle: "Práctica de Laboratorio", similarity: 88 },
-    },
-];
-
 interface HeaderProps {
+    currentUser?: Docente | null;
     onNewCode?: () => void;
     onLogout?: () => void;
     onViewComparison?: (comparison: Comparison) => void;
 }
 
-export function Header({ onNewCode, onLogout, onViewComparison }: HeaderProps) {
+export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: HeaderProps) {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
-    const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
 
     const notifRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
@@ -224,14 +203,16 @@ export function Header({ onNewCode, onLogout, onViewComparison }: HeaderProps) {
                             <div className="relative">
                                 <div className="w-10 h-10 rounded-full bg-graphito-card border border-graphito-border overflow-hidden ring-2 ring-transparent group-hover:ring-graphito-blue/50 transition-all">
                                     <div className="w-full h-full bg-gradient-to-tr from-slate-700 to-slate-500 flex items-center justify-center text-white font-bold">
-                                        D
+                                        {(currentUser?.nombre || "D").charAt(0).toUpperCase()}
                                     </div>
                                 </div>
                                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-graphito-dark rounded-full"></div>
                             </div>
 
                             <div className="hidden lg:block text-left">
-                                <p className="font-body text-xs font-bold text-white leading-none">Daarick ESCOM</p>
+                                <p className="font-body text-xs font-bold text-white leading-none">
+                                    {currentUser?.nombre || "Docente"}
+                                </p>
                             </div>
                             <ChevronDown size={14} className="text-slate-500 group-hover:text-white transition-colors" />
                         </button>
@@ -240,8 +221,12 @@ export function Header({ onNewCode, onLogout, onViewComparison }: HeaderProps) {
                         {showUserMenu && (
                             <div className="absolute right-0 top-12 w-48 bg-graphito-card border border-graphito-border rounded-xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-graphito-border">
-                                    <p className="text-xs font-bold text-white">Daarick ESCOM</p>
-                                    <p className="text-[10px] text-slate-500">daarick@example.com</p>
+                                    <p className="text-xs font-bold text-white truncate">
+                                        {currentUser?.nombre || "Docente"}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 truncate">
+                                        {currentUser?.email || "docente@graphito.edu"}
+                                    </p>
                                 </div>
                                 <div className="py-1">
                                     <button
