@@ -1,36 +1,40 @@
 #!/usr/bin/env python3
 """
-contrastive_graphcodebert.py — Fine-tuning contrastivo de GraphCodeBERT
+contrastive_graphcodebert.py — Fine-tuning contrastivo de GraphCodeBERT con DFG
 
-Objetivo: mejorar la discriminación entre código de distintos problemas.
-Aprende a separar embeddings: mismo problema → similar, distinto problema → diferente.
-
-Requisitos:
-  pip install torch transformers peft bitsandbytes
+Objetivo:
+  Entrena un adaptador LoRA para que GraphCodeBERT distinga programas semánticamente
+  equivalentes (incluso con punteros y renombrado) de programas con lógica distinta,
+  utilizando el Grafo de Flujo de Datos (DFG) durante el entrenamiento.
 
 Uso:
-  python contrastive_graphcodebert.py --epochs 3 --save-to ./adaptador-contrastivo
+  python models/graphcodebert/contrastive_graphcodebert.py --epochs 2 --pairs-per-epoch 500
 """
 
 import argparse
 import json
-import math
 import random
+import sys
 from collections import defaultdict
 from pathlib import Path
-from itertools import combinations
+
+# Insert project root
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from transformers import RobertaModel, RobertaTokenizer
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-import bitsandbytes as bnb
+from peft import LoraConfig, get_peft_model, TaskType
+
+from models.graphcodebert.config import GraphCodeBERTConfig
+from models.graphcodebert.inference import GraphCodeBERTInference
 
 SEED = 42
 random.seed(SEED)
 torch.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
 
 
 def collect_by_problem(data_dirs: list[Path]) -> dict[str, list[Path]]:
@@ -42,24 +46,25 @@ def collect_by_problem(data_dirs: list[Path]) -> dict[str, list[Path]]:
             continue
         for ext in ("*.c", "*.cpp"):
             for fp in sorted(d.rglob(ext)):
-                rel = fp.relative_to(d.parent if "raw" in str(d) else d)
-                parts = rel.parts
-                # key = course/assignment/subproblem (primeros 3 segmentos)
-                if len(parts) >= 3:
-                    key = "/".join(parts[:3])
-                elif len(parts) >= 2:
-                    key = "/".join(parts[:2])
-                else:
-                    key = parts[0]
-                problems[key].append(fp)
-    # Filtrar problemas con menos de 2 archivos (no generan pares positivos)
+                try:
+                    rel = fp.relative_to(d.parent if "raw" in str(d) else d)
+                    parts = rel.parts
+                    if len(parts) >= 3:
+                        key = "/".join(parts[:3])
+                    elif len(parts) >= 2:
+                        key = "/".join(parts[:2])
+                    else:
+                        key = parts[0]
+                    problems[key].append(fp)
+                except Exception:
+                    continue
     return {k: v for k, v in problems.items() if len(v) >= 2}
 
 
-class ContrastiveDataset(Dataset):
-    """Genera pares (ancla, positivo, negativo) sobre la marcha."""
+class ContrastiveGraphDataset(Dataset):
+    """Genera tripletas (ancla, positivo, negativo) a partir de problemas C/C++."""
 
-    def __init__(self, problems: dict[str, list[Path]], pairs_per_epoch: int = 10000):
+    def __init__(self, problems: dict[str, list[Path]], pairs_per_epoch: int = 500):
         self.problems = problems
         self.problem_keys = list(problems.keys())
         self.pairs_per_epoch = pairs_per_epoch
@@ -70,115 +75,99 @@ class ContrastiveDataset(Dataset):
     def __getitem__(self, idx):
         rng = random.Random(SEED + idx)
 
-        # Par positivo: mismo problema
+        # Positivo: dos envíos de estudiantes del mismo problema
         pos_key = rng.choice(self.problem_keys)
-        a, b = rng.sample(self.problems[pos_key], 2)
+        a_path, b_path = rng.sample(self.problems[pos_key], 2)
 
-        # Par negativo: problema distinto
+        # Negativo: un envío de un problema completamente distinto
         neg_key = pos_key
         while neg_key == pos_key:
             neg_key = rng.choice(self.problem_keys)
         neg_path = rng.choice(self.problems[neg_key])
 
-        # Leer contenido
         try:
-            a_text = a.read_text(encoding="utf-8", errors="replace")
-            b_text = b.read_text(encoding="utf-8", errors="replace")
-            neg_text = neg_path.read_text(encoding="utf-8", errors="replace")
+            a_text = a_path.read_text(encoding="utf-8", errors="replace")[:2000]
+            b_text = b_path.read_text(encoding="utf-8", errors="replace")[:2000]
+            neg_text = neg_path.read_text(encoding="utf-8", errors="replace")[:2000]
         except Exception:
             return self[(idx + 1) % len(self)]
 
-        return (a_text, b_text, neg_text)
+        return {"a": a_text, "b": b_text, "neg": neg_text}
 
 
-def collate_fn(batch, tokenizer, max_len=512):
-    a_texts, b_texts, neg_texts = zip(*batch)
-    enc_a = tokenizer(list(a_texts), return_tensors="pt", truncation=True,
-                      max_length=max_len, padding="max_length")
-    enc_b = tokenizer(list(b_texts), return_tensors="pt", truncation=True,
-                      max_length=max_len, padding="max_length")
-    enc_neg = tokenizer(list(neg_texts), return_tensors="pt", truncation=True,
-                        max_length=max_len, padding="max_length")
-    return {
-        "a": enc_a, "b": enc_b, "neg": enc_neg,
-    }
+def embed_code_tensor(engine: GraphCodeBERTInference, code: str) -> torch.Tensor:
+    """Extrae el embedding [CLS] con gradientes activos a través de LoRA y DFG."""
+    dfg_result = engine._dfg_extractor.parse_code(code, "c")
+    tokens = dfg_result.code_tokens
+    edges = dfg_result.dfg_edges
+    use_graph = dfg_result.success and len(tokens) > 0 and len(edges) > 0
 
-
-def contrastive_loss(emb_a, emb_b, emb_neg, margin=0.3):
-    """Margin loss: el par positivo debe estar más cerca que el negativo."""
-    sim_pos = F.cosine_similarity(emb_a, emb_b)
-    sim_neg = F.cosine_similarity(emb_a, emb_neg)
-    loss = F.relu(sim_neg - sim_pos + margin).mean()
-    return loss, sim_pos.mean(), sim_neg.mean()
-
-
-def get_embeddings(model, enc, device):
-    """Extrae embedding [CLS] de un batch."""
-    out = model(
-        input_ids=enc["input_ids"].to(device),
-        attention_mask=enc["attention_mask"].to(device),
+    input_ids, position_idx, graph_mask_4d = engine._build_graph_aware_input(
+        tokens, edges if use_graph else []
     )
-    return out.last_hidden_state[:, 0, :]
+
+    code_len = (input_ids[0] != engine.tokenizer.pad_token_id).sum().item()
+    num_dfg = (input_ids[0] == engine.tokenizer.unk_token_id).sum().item()
+    real_code_len = code_len - num_dfg
+
+    token_embeds = engine.encoder.embeddings.word_embeddings(input_ids.to(engine.device))
+    pos_embeds = engine.encoder.embeddings.position_embeddings(position_idx.to(engine.device))
+
+    if use_graph:
+        token_embeds = engine._inject_dfg_embeddings(
+            token_embeds, tokens, edges, code_len=real_code_len, num_dfg=num_dfg
+        )
+
+    embeds = token_embeds + pos_embeds
+    embeds = engine.encoder.embeddings.LayerNorm(embeds)
+    embeds = engine.encoder.embeddings.dropout(embeds)
+
+    out = engine.encoder.encoder(
+        hidden_states=embeds,
+        attention_mask=graph_mask_4d.to(engine.device),
+    )
+    cls_embedding = out.last_hidden_state[:, 0, :]
+    return F.normalize(cls_embedding, p=2, dim=-1)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Contrastive fine-tuning de GraphCodeBERT")
-    parser.add_argument("--data-dirs", nargs="+", type=Path, default=[
-        Path("data/raw/src"), Path("data/output"),
-    ])
-    parser.add_argument("--epochs", type=int, default=3)
-    parser.add_argument("--batch-size", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=2e-4)
+    parser = argparse.ArgumentParser(description="Contrastive fine-tuning de GraphCodeBERT con DFG")
+    parser.add_argument("--data-dirs", nargs="+", type=Path, default=[Path("data/raw/src")])
+    parser.add_argument("--epochs", type=int, default=2)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--margin", type=float, default=0.3)
-    parser.add_argument("--pairs-per-epoch", type=int, default=20000)
-    parser.add_argument("--max-length", type=int, default=512)
-    parser.add_argument("--lora-r", type=int, default=16)
-    parser.add_argument("--lora-alpha", type=int, default=32)
+    parser.add_argument("--pairs-per-epoch", type=int, default=300)
+    parser.add_argument("--lora-r", type=int, default=8)
+    parser.add_argument("--lora-alpha", type=int, default=16)
     parser.add_argument("--save-to", type=Path, default=Path("modelos/weights/graphcodebert-contrastivo"))
-    parser.add_argument("--val-problems", type=int, default=5,
-                        help="Problemas separados para validación")
     args = parser.parse_args()
 
     print("=" * 60)
-    print("CONTRASTIVE LEARNING — GraphCodeBERT")
+    print("CONTRASTIVE LEARNING (GRAPH-GUIDED) — GraphCodeBERT")
     print("=" * 60)
-    print(f"GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.get_device_properties(0).total_memory/1e9:.1f} GB)")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        print(f"GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.get_device_properties(0).total_memory/1e9:.1f} GB)")
+    else:
+        print("Dispositivo: CPU")
 
-    # ─── DATOS ───
-    print("\n[1/4] Escaneando archivos por problema...")
+    # 1. Dataset
+    print("\n[1/4] Escaneando problemas de código C/C++...")
     all_problems = collect_by_problem(args.data_dirs)
     print(f"  Problemas encontrados: {len(all_problems)}")
     print(f"  Archivos totales: {sum(len(v) for v in all_problems.values())}")
 
-    if len(all_problems) < args.val_problems + 2:
-        print(f"  ERROR: necesitamos al menos {args.val_problems + 2} problemas")
-        return
-
-    # Separar validación
     keys = sorted(all_problems.keys())
-    val_keys = set(keys[-args.val_problems:])
+    val_keys = set(keys[-3:])
     train_problems = {k: v for k, v in all_problems.items() if k not in val_keys}
     val_problems = {k: v for k, v in all_problems.items() if k in val_keys}
-    print(f"  Train: {len(train_problems)} problemas | Val: {len(val_problems)} problemas")
 
-    # ─── MODELO ───
-    print("\n[2/4] Cargando GraphCodeBERT + LoRA...")
-    model_name = "microsoft/graphcodebert-base"
-    tokenizer = RobertaTokenizer.from_pretrained(model_name)
+    train_ds = ContrastiveGraphDataset(train_problems, args.pairs_per_epoch)
+    val_ds = ContrastiveGraphDataset(val_problems, max(args.pairs_per_epoch // 5, 50))
 
-    bnb_config = bnb.BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_compute_dtype=torch.float16,
-    )
-    model = RobertaModel.from_pretrained(
-        model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-    )
-    model = prepare_model_for_kbit_training(model)
+    # 2. Engine + LoRA
+    print("\n[2/4] Inicializando GraphCodeBERTInference con DFG + LoRA...")
+    engine = GraphCodeBERTInference(device=device)
 
     lora_config = LoraConfig(
         r=args.lora_r,
@@ -188,142 +177,76 @@ def main():
         task_type=TaskType.FEATURE_EXTRACTION,
         target_modules=["query", "key", "value", "dense"],
     )
-    model = get_peft_model(model, lora_config)
+    engine.encoder = get_peft_model(engine.encoder, lora_config)
+    trainable = sum(p.numel() for p in engine.encoder.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in engine.encoder.parameters())
+    print(f"  Parámetros entrenables LoRA: {trainable:,} / {total:,} ({100*trainable/total:.2f}%)")
 
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total = sum(p.numel() for p in model.parameters())
-    print(f"  Params entrenables: {trainable:,} / {total:,} ({100*trainable/total:.2f}%)")
-
-    model.train()
-
-    # ─── DATALOADER ───
-    print("\n[3/4] Preparando dataloader...")
-    train_ds = ContrastiveDataset(train_problems, args.pairs_per_epoch)
-    val_ds = ContrastiveDataset(val_problems, max(args.pairs_per_epoch // 5, 1000))
-
-    def make_collate():
-        return lambda b: collate_fn(b, tokenizer, args.max_length)
-
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size,
-                              shuffle=False, collate_fn=make_collate(),
-                              num_workers=0)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size,
-                            shuffle=False, collate_fn=make_collate(),
-                            num_workers=0)
-
-    # ─── ENTRENAMIENTO ───
-    print("\n[4/4] Entrenando...")
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs)
-    scaler = torch.cuda.amp.GradScaler()
-
+    # 3. Optimizador
+    optimizer = torch.optim.AdamW(engine.encoder.parameters(), lr=args.lr, weight_decay=0.01)
     args.save_to.mkdir(parents=True, exist_ok=True)
-    best_val_loss = float("inf")
+
+    # 4. Loop de entrenamiento
+    print("\n[3/4] Entrenando con Triplet Margin Loss...")
+    best_val_gap = -1.0
 
     for epoch in range(args.epochs):
-        # ── Train ──
-        model.train()
+        engine.encoder.train()
         train_loss = 0.0
         train_pos = 0.0
         train_neg = 0.0
-        n_batches = 0
 
-        for batch in train_loader:
-            with torch.cuda.amp.autocast():
-                emb_a = get_embeddings(model, batch["a"], device)
-                emb_b = get_embeddings(model, batch["b"], device)
-                emb_neg = get_embeddings(model, batch["neg"], device)
-                loss, sim_pos, sim_neg = contrastive_loss(
-                    emb_a, emb_b, emb_neg, args.margin
-                )
-
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+        for i in range(len(train_ds)):
+            item = train_ds[i]
             optimizer.zero_grad()
+
+            emb_a = embed_code_tensor(engine, item["a"])
+            emb_b = embed_code_tensor(engine, item["b"])
+            emb_neg = embed_code_tensor(engine, item["neg"])
+
+            sim_pos = (emb_a * emb_b).sum(dim=-1)
+            sim_neg = (emb_a * emb_neg).sum(dim=-1)
+            loss = F.relu(sim_neg - sim_pos + args.margin).mean()
+
+            loss.backward()
+            optimizer.step()
 
             train_loss += loss.item()
             train_pos += sim_pos.item()
             train_neg += sim_neg.item()
-            n_batches += 1
 
-        scheduler.step()
+            if (i + 1) % 50 == 0:
+                print(f"  Paso {i+1}/{len(train_ds)}: loss={train_loss/(i+1):.4f} pos={train_pos/(i+1):.4f} neg={train_neg/(i+1):.4f}")
 
-        # ── Val ──
-        model.eval()
-        val_loss = 0.0
+        # Validación
+        engine.encoder.eval()
         val_pos = 0.0
         val_neg = 0.0
-        n_val = 0
-
         with torch.no_grad():
-            for batch in val_loader:
-                emb_a = get_embeddings(model, batch["a"], device)
-                emb_b = get_embeddings(model, batch["b"], device)
-                emb_neg = get_embeddings(model, batch["neg"], device)
-                loss, sim_pos, sim_neg = contrastive_loss(
-                    emb_a, emb_b, emb_neg, args.margin
-                )
-                val_loss += loss.item()
-                val_pos += sim_pos.item()
-                val_neg += sim_neg.item()
-                n_val += 1
+            for j in range(len(val_ds)):
+                v_item = val_ds[j]
+                v_a = embed_code_tensor(engine, v_item["a"])
+                v_b = embed_code_tensor(engine, v_item["b"])
+                v_neg = embed_code_tensor(engine, v_item["neg"])
+                val_pos += (v_a * v_b).sum(dim=-1).item()
+                val_neg += (v_a * v_neg).sum(dim=-1).item()
 
-        avg_train_l = train_loss / n_batches
-        avg_val_l = val_loss / n_val
-        avg_train_pos = train_pos / n_batches
-        avg_train_neg = train_neg / n_batches
-        avg_val_pos = val_pos / n_val
-        avg_val_neg = val_neg / n_val
+        avg_val_pos = val_pos / len(val_ds)
+        avg_val_neg = val_neg / len(val_ds)
+        val_gap = avg_val_pos - avg_val_neg
+        print(f"\n→ Epoch {epoch+1} Final: Val Pos={avg_val_pos:.4f} Val Neg={avg_val_neg:.4f} Gap={val_gap:.4f}\n")
 
-        gap_train = avg_train_pos - avg_train_neg
-        gap_val = avg_val_pos - avg_val_neg
+        if val_gap > best_val_gap:
+            best_val_gap = val_gap
+            engine.encoder.save_pretrained(str(args.save_to / "best"))
+            engine.tokenizer.save_pretrained(str(args.save_to / "best"))
+            print(f"  ★ Guardado mejor checkpoint en {args.save_to / 'best'}")
 
-        print(f"  Epoch {epoch+1}/{args.epochs}: "
-              f"train_loss={avg_train_l:.4f} "
-              f"pos={avg_train_pos:.4f} neg={avg_train_neg:.4f} gap={gap_train:.4f} | "
-              f"val_loss={avg_val_l:.4f} "
-              f"pos={avg_val_pos:.4f} neg={avg_val_neg:.4f} gap={gap_val:.4f}")
-
-        # Guardar mejor modelo
-        if avg_val_l < best_val_loss:
-            best_val_loss = avg_val_loss
-            model.save_pretrained(str(args.save_to / "best"))
-            tokenizer.save_pretrained(str(args.save_to / "best"))
-            print(f"    → Mejor modelo guardado (val_loss={avg_val_l:.4f})")
-
-    # ─── GUARDAR FINAL ───
-    model.save_pretrained(str(args.save_to / "final"))
-    tokenizer.save_pretrained(str(args.save_to / "final"))
-
-    # Mergear para usar como RobertaModel standalone
-    print("\nMergeando adaptador...")
-    model = model.merge_and_unload()
-    encoder = RobertaModel.from_pretrained(model_name)
-    encoder.load_state_dict(model.roberta.state_dict(), strict=False)
-    encoder.save_pretrained(str(args.save_to / "merged"))
-    tokenizer.save_pretrained(str(args.save_to / "merged"))
-
-    print(f"\n✓ Contraste completo!")
-    print(f"  Gap final train: {gap_train:.4f}")
-    print(f"  Gap final val:   {gap_val:.4f}")
-    print(f"  Modelo: {args.save_to}/merged/")
-
-    metrics = {
-        "train_pos": avg_train_pos,
-        "train_neg": avg_train_neg,
-        "train_gap": gap_train,
-        "val_pos": avg_val_pos,
-        "val_neg": avg_val_neg,
-        "val_gap": gap_val,
-        "val_loss": avg_val_l,
-        "margin": args.margin,
-    }
-    with open(args.save_to / "metrics.json", "w") as f:
-        json.dump(metrics, f, indent=2)
+    # Guardar final
+    engine.encoder.save_pretrained(str(args.save_to / "final"))
+    engine.tokenizer.save_pretrained(str(args.save_to / "final"))
+    print(f"\n[4/4] Adaptador LoRA guardado en {args.save_to / 'final'}")
 
 
 if __name__ == "__main__":
-    # Needed for PEFT
-    from peft import TaskType
     main()
