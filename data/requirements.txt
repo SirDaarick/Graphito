@@ -1,3 +1,7 @@
 litellm
 pandas
 python-dotenv
+tree-sitter
+transformers
+torch
+scikit-learn

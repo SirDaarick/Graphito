@@ -18,13 +18,18 @@ venv/
 
 # Datos pesados (No queremos subirlos a la nube)
 data/raw/*
+data/raw.zip
 data/processed/*
+data/output/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
-# Modelos y pesos
-modelos/weights/*.pth
-modelos/weights/*.bin
+# Modelos, pesos y caches
+modelos/
+*.pt
+*.pth
+*.bin
+checkpoint-*/
 
 # Docker y variables de entorno
 .env

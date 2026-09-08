@@ -137,12 +137,55 @@ class LiteLLMProvider(LLMProvider):
         return self.chat([{"role": "user", "content": prompt}])
 
 
+class OpencodeProvider(LLMProvider):
+    """Provider para OpenCode AI (compatible con OpenAI API)."""
+    BASE_URL = "https://opencode.ai/zen/go/v1"
+
+    def __init__(self, model: str, api_key: Optional[str] = None):
+        self.model = model
+        self.api_key = api_key or os.getenv("OPENCODE_API_KEY")
+        if not self.api_key:
+            raise ValueError("OPENCODE_API_KEY not set")
+
+    def chat(self, messages: list[dict]) -> str:
+        try:
+            import requests
+        except ImportError:
+            raise ImportError("requests package not installed. Run: pip install requests")
+
+        response = requests.post(
+            f"{self.BASE_URL}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.model,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 16384,
+            },
+            timeout=300,
+        )
+        response.raise_for_status()
+        data = response.json()
+        msg = data["choices"][0]["message"]
+        content = msg.get("content", "")
+        if not content and "reasoning_content" in msg:
+            content = msg["reasoning_content"]
+        return content
+
+    def generate(self, prompt: str) -> str:
+        return self.chat([{"role": "user", "content": prompt}])
+
+
 def get_provider(provider_type: str, model: str = None, **kwargs) -> LLMProvider:
     providers = {
         "openai": OpenAIProvider,
         "anthropic": AnthropicProvider,
         "ollama": OllamaProvider,
         "litellm": LiteLLMProvider,
+        "opencode": OpencodeProvider,
     }
     
     if provider_type not in providers:

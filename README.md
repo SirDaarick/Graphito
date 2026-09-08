@@ -42,18 +42,36 @@ El sistema opera a través de dos canales paralelos para garantizar una evaluaci
 
 ---
 
+## 📊 Estado Actual del Proyecto
+
+| Componente | Módulo | Estado | Descripción |
+|------------|--------|--------|-------------|
+| **Canal A (Semántica)** | `models/graphcodebert/` | ✅ Completado | Parser AST + DFG con Tree-sitter para C/C++, inferencia graph-aware y fine-tuning contrastivo con LoRA (`adaptador-lora-20k`). |
+| **Canal B (Estilometría)** | `models/char_cnn/` | ✅ Completado | Arquitectura CharCNN a nivel de caracteres, pipeline de preprocesamiento, tokenización e inferencia estilométrica. |
+| **Fusión Multimodal** | `models/fusion.py` | ✅ Completado | Módulo de combinación de similitud semántica y estilométrica con ponderación configurable. |
+| **Pipeline de Datos** | `data/` | ✅ Completado | Generación de referencias sintéticas con soporte para DeepSeek, Google Gemini y Ollama, normalización y extracción. |
+| **Pruebas Automatizadas** | `tests/` | ✅ 38/38 Pasadas | Pruebas unitarias de construcción de grafos DFG, manejo de errores y fallback sintáctico. |
+| **Documentación & Specs** | `sdd/`, `Documentacion/` | ✅ Actualizado | Especificaciones de diseño, tareas estructuradas (SDD) y documentación técnica de Trabajo Terminal. |
+| **Backend API** | `backend/` | 🚧 En Integración | Conexión de FastAPI y LangGraph con los módulos de inferencia y persistencia vectorial. |
+| **Frontend** | `frontend/` | 🚧 En Desarrollo | Interfaz de usuario interactiva en React + Vite + Tailwind CSS. |
+
+---
+
 ## 📂 Estructura del Proyecto
 
 ```plaintext
 graphito/
-├── frontend/               # Interfaz de usuario (React)
-├── backend/                # API REST y orquestación (FastAPI)
-├── models/                 # Inferencia de IA (GraphCodeBERT y CharCNN)
-├── data/                   # Scripts de entorno y procesamiento de datos
-└── Documentacion/          # Documentación técnica, manuales y notas
+├── frontend/               # Interfaz de usuario (React + Vite + Tailwind)
+├── backend/                # API REST y orquestación de agentes (FastAPI + LangGraph)
+├── models/                 # Módulos de IA e inferencia
+│   ├── graphcodebert/      # Canal A: GraphCodeBERT + DFG Parser + Adaptador LoRA
+│   ├── char_cnn/           # Canal B: CharCNN para detección estilométrica
+│   └── fusion.py           # Fusión multimodal (Semántica + Estilometría)
+├── data/                   # Pipeline de generación sintética y datasets
+├── sdd/                    # Especificaciones y roadmap (Spec-Driven Development)
+├── tests/                  # Suite de pruebas automatizadas (Pytest)
+└── Documentacion/          # Documentación técnica, diagramas y Trabajo Terminal
 ```
-
-*(Nota: Esta estructura refleja el estado actual del repositorio).*
 
 ---
 
@@ -79,6 +97,11 @@ graphito/
    docker-compose up --build
    ```
    *Esto levantará tanto el servicio del Frontend (en el puerto 5173) como el laboratorio de datos.*
+
+4. **Ejecutar pruebas unitarias:**
+   ```bash
+   pytest tests/
+   ```
 
 ---
 
