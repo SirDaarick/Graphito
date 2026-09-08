@@ -50,9 +50,9 @@ El sistema opera a través de dos canales paralelos para garantizar una evaluaci
 | **Canal B (Estilometría)** | `models/char_cnn/` | ✅ Completado | Arquitectura CharCNN a nivel de caracteres, pipeline de preprocesamiento, tokenización e inferencia estilométrica. |
 | **Fusión Multimodal** | `models/fusion.py` | ✅ Completado | Módulo de combinación de similitud semántica y estilométrica con ponderación configurable. |
 | **Pipeline de Datos** | `data/` | ✅ Completado | Generación de referencias sintéticas con soporte para DeepSeek, Google Gemini y Ollama, normalización y extracción. |
-| **Pruebas Automatizadas** | `tests/` | ✅ 38/38 Pasadas | Pruebas unitarias de construcción de grafos DFG, manejo de errores y fallback sintáctico. |
+| **Pruebas Automatizadas** | `tests/`, `backend/tests/` | ✅ 40/40 Pasadas | 38 pruebas del parser DFG + 2 pruebas de integración E2E del backend. |
 | **Documentación & Specs** | `sdd/`, `Documentacion/` | ✅ Actualizado | Especificaciones de diseño, tareas estructuradas (SDD) y documentación técnica de Trabajo Terminal. |
-| **Backend API** | `backend/` | 🚧 En Integración | Conexión de FastAPI y LangGraph con los módulos de inferencia y persistencia vectorial. |
+| **Backend API** | `backend/` | ✅ Completado | API REST con FastAPI, Clean Architecture, persistencia híbrida (PostgreSQL + ChromaDB), desacoplamiento con patrón Strategy y orquestador S1-S7. |
 | **Frontend** | `frontend/` | 🚧 En Desarrollo | Interfaz de usuario interactiva en React + Vite + Tailwind CSS. |
 
 ---

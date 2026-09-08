@@ -27,5 +27,52 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-    stdin_open: true
-    tty: true
+  postgres:
+    image: postgres:16-alpine
+    container_name: graphito-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=graphito
+      - POSTGRES_PASSWORD=graphitosecret
+      - POSTGRES_DB=graphito_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: graphito-chroma
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: graphito-backend
+    container_name: graphito-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./models:/models:ro
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://graphito:graphitosecret@postgres:5432/graphito_db
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - postgres
+      - chroma
+
+volumes:
+  postgres_data:
+  chroma_data:
