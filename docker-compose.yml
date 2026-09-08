@@ -69,6 +69,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://graphito:graphitosecret@postgres:5432/graphito_db
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
+      - USE_CHROMA_SERVER=true
     depends_on:
       - postgres
       - chroma
