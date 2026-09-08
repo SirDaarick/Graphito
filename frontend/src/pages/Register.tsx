@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import logo from "../assets/logo.png";
 import { AuthCard } from "../components/layout/AuthCard";
+import { api } from "../lib/api";
 
 // Icono simple de Google
 const GoogleIcon = () => (
@@ -24,6 +25,30 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [agreed, setAgreed] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+
+        if (password !== confirmPassword) {
+            setError("Las contraseñas no coinciden.");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            await api.auth.register(email, password, name);
+            // Iniciar sesión inmediatamente tras registro exitoso
+            await api.auth.login(email, password);
+            onRegister?.();
+        } catch (err: any) {
+            setError(err.message || "Error al registrarse. Intente de nuevo.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="flex-1 w-full flex flex-col items-center justify-center p-4">
@@ -57,8 +82,15 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
                     <div className="flex-grow border-t border-[#2b3346]"></div>
                 </div>
 
+                {/* Error Banner */}
+                {error && (
+                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-xs font-medium">
+                        {error}
+                    </div>
+                )}
+
                 {/* Formulario */}
-                <form onSubmit={(e) => { e.preventDefault(); onRegister?.(); }} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
 
                     {/* Nombre completo */}
                     <div className="space-y-1.5">
@@ -157,9 +189,17 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
                     {/* Submit */}
                     <button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-graphito-blue to-graphito-violet text-white font-bold rounded-xl py-3.5 mt-2 hover:opacity-90 transition-opacity shadow-lg shadow-graphito-blue/20 text-sm"
+                        disabled={isLoading}
+                        className="w-full bg-gradient-to-r from-graphito-blue to-graphito-violet text-white font-bold rounded-xl py-3.5 mt-2 hover:opacity-90 transition-opacity shadow-lg shadow-graphito-blue/20 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        Crear mi cuenta
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Creando cuenta...</span>
+                            </>
+                        ) : (
+                            <span>Crear mi cuenta</span>
+                        )}
                     </button>
                 </form>
 

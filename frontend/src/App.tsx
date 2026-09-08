@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "./components/layout/Header";
 import { Biblioteca } from "./pages/Biblioteca";
 import { Login } from "./pages/Login";
@@ -6,22 +6,72 @@ import { Register } from "./pages/Register";
 import { MouseGlowBackground } from "./components/layout/MouseGlowBackground";
 import { NewReferenceModal } from "./pages/NewReferenceModal";
 import { NewComparisonModal } from "./pages/NewComparisonModal";
-
 import { SimilarityReportModal } from "./pages/SimilarityReportModal";
+import { api, Docente } from "./lib/api";
 
 type View = "login" | "register" | "app";
 
 function App() {
     const [view, setView] = useState<View>("login");
+    const [currentUser, setCurrentUser] = useState<Docente | null>(null);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const [isNewCodeModalOpen, setIsNewCodeModalOpen] = useState(false);
     const [isNewComparisonModalOpen, setIsNewComparisonModalOpen] = useState(false);
     const [selectedComparison, setSelectedComparison] = useState<any>(null);
     const [isSimilarityReportOpen, setIsSimilarityReportOpen] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
-    const handleLogin = () => setView("app");
-    const handleRegister = () => setView("app");
+    useEffect(() => {
+        const verifySession = async () => {
+            if (api.auth.isAuthenticated()) {
+                try {
+                    const user = await api.auth.me();
+                    setCurrentUser(user);
+                    setView("app");
+                } catch {
+                    api.auth.logout();
+                    setView("login");
+                }
+            } else {
+                setView("login");
+            }
+            setIsCheckingAuth(false);
+        };
+        verifySession();
+    }, []);
+
+    const handleLogin = async () => {
+        try {
+            const user = await api.auth.me();
+            setCurrentUser(user);
+        } catch {
+            // ok
+        }
+        setView("app");
+    };
+
+    const handleLogout = () => {
+        api.auth.logout();
+        setCurrentUser(null);
+        setView("login");
+    };
+
+    const handleRegister = async () => {
+        await handleLogin();
+    };
+
     const navigateToRegister = () => setView("register");
     const navigateToLogin = () => setView("login");
+
+    if (isCheckingAuth) {
+        return (
+            <MouseGlowBackground>
+                <div className="flex h-screen items-center justify-center text-slate-300 font-medium text-sm">
+                    Cargando Graphito...
+                </div>
+            </MouseGlowBackground>
+        );
+    }
 
     return (
         <MouseGlowBackground>
@@ -37,13 +87,14 @@ function App() {
                 <>
                     <Header
                         onNewCode={() => setIsNewCodeModalOpen(true)}
-                        onLogout={() => setView("login")}
+                        onLogout={handleLogout}
                         onViewComparison={(comp) => {
                             setSelectedComparison(comp);
                             setIsSimilarityReportOpen(true);
                         }}
                     />
                     <Biblioteca
+                        key={refreshKey}
                         onCompare={() => setIsNewComparisonModalOpen(true)}
                         onComparisonClick={(comp) => {
                             setSelectedComparison(comp);
@@ -52,11 +103,21 @@ function App() {
                     />
                     <NewReferenceModal
                         isOpen={isNewCodeModalOpen}
-                        onClose={() => setIsNewCodeModalOpen(false)}
+                        onClose={() => {
+                            setIsNewCodeModalOpen(false);
+                            setRefreshKey((prev) => prev + 1);
+                        }}
                     />
                     <NewComparisonModal
                         isOpen={isNewComparisonModalOpen}
-                        onClose={() => setIsNewComparisonModalOpen(false)}
+                        onClose={() => {
+                            setIsNewComparisonModalOpen(false);
+                            setRefreshKey((prev) => prev + 1);
+                        }}
+                        onAnalysisComplete={(report) => {
+                            setSelectedComparison(report);
+                            setIsSimilarityReportOpen(true);
+                        }}
                     />
                     <SimilarityReportModal
                         isOpen={isSimilarityReportOpen}

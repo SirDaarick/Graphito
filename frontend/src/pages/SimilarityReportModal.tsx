@@ -28,11 +28,23 @@ function useTypewriter(text: string, speed: number = 15) {
     return displayedText;
 }
 
-interface ComparisonData {
-    id: string;
-    title: string;          // Used as project name/author here
-    subtitle: string;
-    similarity: number;
+export interface IndicadorItem {
+    id?: number;
+    tipo_alerta: string;
+    descripcion: string;
+    severidad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | string;
+}
+
+export interface ComparisonData {
+    id?: string | number;
+    title?: string;
+    subtitle?: string;
+    similarity?: number;
+    similitud_semantica?: number;
+    probabilidad_ia?: number;
+    discrepancia_score?: number;
+    dictamen?: "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE" | string;
+    indicadores?: IndicadorItem[];
 }
 
 interface SimilarityReportModalProps {
@@ -71,10 +83,30 @@ export function SimilarityReportModal({ isOpen, onClose, comparison }: Similarit
         }
     }, [isOpen, shouldRender]);
 
-    // Typewriter effect description
-    const fullInterpretationText = `Basado en el análisis profundo de Graphito, los resultados sugieren una probabilidad muy alta de que el código haya sido adaptado de la misma fuente original o que exista una colaboración no declarada. Aunque los nombres de algunas funciones fueron modificados, la estructura lógica central se mantiene intacta.
+    // Dynamic metrics from backend or mock fallback
+    const semanticPct = comparison?.similitud_semantica !== undefined
+        ? Math.round(comparison.similitud_semantica * 100)
+        : (comparison?.similarity ?? 62);
+    const aiPct = comparison?.probabilidad_ia !== undefined
+        ? Math.round(comparison.probabilidad_ia * 100)
+        : 85;
+    const overallScore = comparison?.similarity ?? semanticPct;
+    const dictamen = comparison?.dictamen || (overallScore > 70 ? 'SOSPECHA_IA' : overallScore > 30 ? 'REVISAR' : 'INTEGRO');
 
-Se recomienda revisar especialmente los módulos de conexión a base de datos, donde los patrones de optimización son virtualmente gemelos, algo poco probable en implementaciones independientes.`;
+    // Typewriter effect description
+    const fullInterpretationText = comparison?.dictamen
+        ? `Dictamen del Sistema: ${comparison.dictamen}
+
+Canal A (Similitud Semántica): ${semanticPct}% de coincidencia con soluciones de referencia mediante Grafos de Flujo de Datos (DFG).
+Canal B (Estilometría CharCNN): ${aiPct}% de probabilidad de generación por IA.
+Puntaje de Discrepancia Asimétrica: ${comparison.discrepancia_score ?? (semanticPct * aiPct / 10000).toFixed(2)}.
+
+${comparison.dictamen === 'SOSPECHA_IA' 
+    ? 'Recomendación Docente: Se identificó una estructura algorítmica altamente convergente acompañada de regularidad léxica típica de modelos LLM. Se sugiere revisión presencial del razonamiento del estudiante.'
+    : 'Recomendación Docente: El código analizado presenta una redacción y lógica compatibles con la autoría humana esperada para el nivel del curso.'}`
+        : `Basado en el análisis profundo de Graphito, los resultados sugieren una probabilidad muy alta de que el código haya sido adaptado de la misma fuente original o que exista una colaboración no declarada. Aunque los nombres de algunas funciones fueron modificados, la estructura lógica central se mantiene intacta.
+
+Se recomienda revisar especialmente los módulos de lógica, donde los patrones de flujo son virtualmente gemelos.`;
 
     const typewriterText = useTypewriter(isOpen ? fullInterpretationText : "", 3);
 
@@ -83,9 +115,7 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
     // SVG Circle Graphic calculations
     const radius = 90;
     const circumference = 2 * Math.PI * radius;
-    // Dash offset calculations: percentage is comparison.similarity
-    // Start offset at full circumference, then animate to actual similarity
-    const strokeDashoffset = isAnimating ? circumference - (comparison.similarity / 100) * circumference : circumference;
+    const strokeDashoffset = isAnimating ? circumference - (overallScore / 100) * circumference : circumference;
 
     return (
         <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4`}>
@@ -174,19 +204,19 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
                                         {/* Score Text */}
                                         <div className="absolute flex flex-col items-center justify-center text-center">
                                             <span className="text-5xl font-black text-white tracking-tight">
-                                                {comparison.similarity}%
+                                                {overallScore}%
                                             </span>
-                                            <span className={`text-xs font-bold uppercase tracking-widest mt-1 ${comparison.similarity > 70 ? 'text-orange-400' :
-                                                comparison.similarity > 30 ? 'text-yellow-400' : 'text-emerald-400'
+                                            <span className={`text-xs font-bold uppercase tracking-widest mt-1 ${overallScore > 70 ? 'text-orange-400' :
+                                                overallScore > 30 ? 'text-yellow-400' : 'text-emerald-400'
                                                 }`}>
-                                                {comparison.similarity > 70 ? 'ALTO' : comparison.similarity > 30 ? 'MEDIO' : 'BAJO'}
+                                                {dictamen}
                                             </span>
                                         </div>
                                     </div>
 
                                     <h3 className="text-lg font-bold text-white mt-8 mb-2">Similitud total</h3>
                                     <p className="text-sm text-center text-slate-400">
-                                        Se detectó una coincidencia {comparison.similarity > 50 ? 'significativa' : 'menor'} en la estructura lógica central del código analizado.
+                                        Se detectó una coincidencia {overallScore > 50 ? 'significativa' : 'menor'} en la estructura lógica central del código analizado.
                                     </p>
                                 </div>
 
@@ -208,26 +238,37 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
                                             <div className="space-y-4">
                                                 <div>
                                                     <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
-                                                        <span>Coincidencia de sintaxis</span>
-                                                        <span className="text-white">85%</span>
+                                                        <span>Probabilidad de IA</span>
+                                                        <span className="text-white">{aiPct}%</span>
                                                     </div>
                                                     <div className="h-1.5 w-full bg-[#2b3346]/60 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-graphito-violet rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating ? '85%' : '0%' }}
+                                                            style={{ width: isAnimating ? `${aiPct}%` : '0%' }}
                                                         ></div>
                                                     </div>
                                                 </div>
 
                                                 <ul className="space-y-3 mt-6">
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
-                                                        <span>Nomenclatura de variables idéntica en funciones principales.</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
-                                                        <span>Estructura de comentarios y espaciado consistente.</span>
-                                                    </li>
+                                                    {comparison.indicadores && comparison.indicadores.length > 0 ? (
+                                                        comparison.indicadores.map((ind, idx) => (
+                                                            <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-300">
+                                                                <CheckCircle2 size={16} className={`${ind.severidad === 'ALTA' || ind.severidad === 'CRITICA' ? 'text-orange-400' : 'text-slate-500'} shrink-0 mt-0.5`} />
+                                                                <span><strong className="text-white">{ind.tipo_alerta}:</strong> {ind.descripcion}</span>
+                                                            </li>
+                                                        ))
+                                                    ) : (
+                                                        <>
+                                                            <li className="flex items-start gap-2.5 text-xs text-slate-300">
+                                                                <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
+                                                                <span>Nomenclatura y patrones sintácticos analizados con CharCNN.</span>
+                                                            </li>
+                                                            <li className="flex items-start gap-2.5 text-xs text-slate-300">
+                                                                <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
+                                                                <span>Estructura léxica y regularidad de comentarios evaluada.</span>
+                                                            </li>
+                                                        </>
+                                                    )}
                                                 </ul>
                                             </div>
                                         </div>
@@ -244,13 +285,13 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
                                             <div className="space-y-4">
                                                 <div>
                                                     <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
-                                                        <span>Flujo algorítmico</span>
-                                                        <span className="text-white">62%</span>
+                                                        <span>Similitud de flujo DFG</span>
+                                                        <span className="text-white">{semanticPct}%</span>
                                                     </div>
                                                     <div className="h-1.5 w-full bg-[#2b3346]/60 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-graphito-blue rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating ? '62%' : '0%' }}
+                                                            style={{ width: isAnimating ? `${semanticPct}%` : '0%' }}
                                                         ></div>
                                                     </div>
                                                 </div>
@@ -258,11 +299,11 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
                                                 <ul className="space-y-3 mt-6">
                                                     <li className="flex items-start gap-2.5 text-xs text-slate-300">
                                                         <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
-                                                        <span>Uso de estructuras de control (loops) en secuencia idéntica.</span>
+                                                        <span>Grafo de flujo de datos (DFG) comparado contra soluciones canónicas.</span>
                                                     </li>
                                                     <li className="flex items-start gap-2.5 text-xs text-slate-300">
                                                         <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
-                                                        <span>Mismo enfoque para el manejo de excepciones de red.</span>
+                                                        <span>Invarianza ante renombramiento de variables y reordenamiento de bloques.</span>
                                                     </li>
                                                 </ul>
                                             </div>
@@ -295,7 +336,7 @@ Se recomienda revisar especialmente los módulos de conexión a base de datos, d
                         {/* Footer */}
                         <div className="flex items-center justify-between px-10 py-6 border-t border-[#2b3346]/40 bg-black/40 mt-auto shrink-0">
                             <div className="text-xs font-medium text-slate-500">
-                                Documento: ID_8829-X
+                                Documento: {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
                             </div>
                             <div className="flex items-center gap-4">
                                 <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-[#2b3346] text-sm font-bold text-white hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all">

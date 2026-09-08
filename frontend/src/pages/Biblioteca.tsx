@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ReferenceCard } from "../components/layout/ReferenceCard";
 import { PaginationControls } from "../components/ui/PaginationControls";
 import { SearchBar } from "../components/layout/SearchBar";
+import { api, Problema } from "../lib/api";
+import { Loader2 } from "lucide-react";
 
 interface Comparison {
     id: string;
@@ -21,86 +23,6 @@ interface Reference {
     comparisons: Comparison[];
 }
 
-const BASE_MOCKS: Omit<Reference, "id" | "title">[] = [
-    {
-        category: "Arrays",
-        categoryColor: "cyan",
-        description: "Implementación del algoritmo Two Sum usando fuerza bruta y optimización con tabla hash en C. Retorna los índices de dos números que sumen el valor objetivo.",
-        updatedAt: "14 Abr, 2026",
-        activeComparisons: 3,
-        comparisons: [
-            { id: "c1", title: "Juan Pérez - Boleta 2022630123", subtitle: "Entrega Práctica 2", similarity: 89 },
-            { id: "c2", title: "Maria Garcia - Boleta 2022630456", subtitle: "Tarea Semanal 4", similarity: 12 },
-            { id: "c3", title: "Repositorio Externo - GitHub", subtitle: "intro_cpp_examples", similarity: 45 },
-        ]
-    },
-    {
-        category: "Cadenas",
-        categoryColor: "purple",
-        description: "Solución al problema de Palindrome Number: determina si un entero es palíndromo sin convertirlo a cadena, manejando correctamente el desbordamiento en C.",
-        updatedAt: "12 Abr, 2026",
-        activeComparisons: 1,
-        comparisons: [
-            { id: "c4", title: "Entrega_Palindromo.c", subtitle: "Subido por: Dr. Arjona", similarity: 5 },
-        ]
-    },
-    {
-        category: "Recursión",
-        categoryColor: "orange",
-        description: "Implementación de la secuencia de Fibonacci con tres enfoques en C: recursivo simple, memoización (top-down) y programación dinámica iterativa (bottom-up).",
-        updatedAt: "10 Abr, 2026",
-        activeComparisons: 2,
-        comparisons: [
-            { id: "c5", title: "Carlos López - Boleta 2021630987", subtitle: "Proyecto Parcial 1", similarity: 94 },
-            { id: "c6", title: "Ana Martínez - Boleta 2022630111", subtitle: "Ejercicio Clase 8", similarity: 23 },
-        ]
-    },
-    {
-        category: "Algoritmos",
-        categoryColor: "cyan",
-        description: "Búsqueda binaria implementada en C sobre arreglos ordenados. Incluye versión iterativa y recursiva con análisis de complejidad O(log n).",
-        updatedAt: "08 Abr, 2026",
-        activeComparisons: 1,
-        comparisons: [
-            { id: "c7", title: "Equipo 3 - Proyecto Final", subtitle: "Estructuras de Datos", similarity: 18 },
-        ]
-    },
-    {
-        category: "Matemáticas",
-        categoryColor: "purple",
-        description: "Verificación de números primos con optimización hasta √n. Incluye la Criba de Eratóstenes para generar primos en rango y comparativa de rendimiento en C.",
-        updatedAt: "05 Abr, 2026",
-        activeComparisons: 4,
-        comparisons: [
-            { id: "c8", title: "Pedro Ruiz - Boleta 2022630345", subtitle: "Tarea 3 - Algoritmos", similarity: 76 },
-            { id: "c9", title: "Sofía Díaz - Boleta 2022630567", subtitle: "Práctica de Laboratorio", similarity: 88 },
-            { id: "c10", title: "Luis Gómez - Boleta 2021630456", subtitle: "Examen Diagnóstico", similarity: 34 },
-            { id: "c11", title: "Repositorio Local - USB", subtitle: "codigos_c_basicos", similarity: 61 },
-        ]
-    }
-];
-
-const TITLES = [
-    "Two Sum — Búsqueda de Pares con Hash",
-    "Palindrome Number — Verificación sin String",
-    "Fibonacci — Recursión vs Iterativo",
-    "Binary Search — Búsqueda en O(log n)",
-    "Números Primos — Criba de Eratóstenes",
-];
-
-const MOCK_REFERENCES: Reference[] = Array.from({ length: 25 }, (_, i) => ({
-    ...BASE_MOCKS[i % BASE_MOCKS.length],
-    id: `ref-${i + 1}`,
-    title: `${TITLES[i % TITLES.length]} (#${i + 1})`,
-} as Reference));
-
-interface Comparison {
-    id: string;
-    title: string;
-    subtitle: string;
-    similarity: number;
-}
-
 export function Biblioteca({
     onCompare,
     onComparisonClick
@@ -110,10 +32,61 @@ export function Biblioteca({
 }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState("");
+    const [references, setReferences] = useState<Reference[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const itemsPerPage = 10;
 
+    useEffect(() => {
+        const fetchProblems = async () => {
+            setIsLoading(true);
+            try {
+                const problems = await api.problems.list();
+                if (problems && problems.length > 0) {
+                    const mapped = await Promise.all(
+                        problems.map(async (p) => {
+                            let subs: any[] = [];
+                            try {
+                                subs = await api.problems.listSubmissions(p.id);
+                            } catch {
+                                // ok
+                            }
+                            return {
+                                id: String(p.id),
+                                title: p.titulo,
+                                category: p.lenguaje.toUpperCase(),
+                                categoryColor: p.lenguaje === "cpp" ? "purple" : "cyan",
+                                description: p.enunciado,
+                                updatedAt: new Date(p.fecha_creacion).toLocaleDateString("es-MX", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                }),
+                                activeComparisons: subs.length,
+                                comparisons: subs.map((s, idx) => ({
+                                    id: String(s.id),
+                                    title: `${s.autor}`,
+                                    subtitle: `Entrega #${idx + 1} (${s.lenguaje})`,
+                                    similarity: 0,
+                                })),
+                            } as Reference;
+                        })
+                    );
+                    setReferences(mapped);
+                } else {
+                    setReferences([]);
+                }
+            } catch (err) {
+                console.error("Error al cargar problemas:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchProblems();
+    }, []);
+
     // Filtrar referencias según el término de búsqueda
-    const filteredReferences = MOCK_REFERENCES.filter((ref) => {
+    const filteredReferences = references.filter((ref) => {
         const term = searchTerm.toLowerCase();
         return (
             ref.title.toLowerCase().includes(term) ||
@@ -146,22 +119,36 @@ export function Biblioteca({
 
             <SearchBar searchTerm={searchTerm} onSearchChange={handleSearchChange} />
 
-            <div className="flex flex-col">
-                {paginatedReferences.map((ref) => (
-                    <ReferenceCard
-                        key={ref.id}
-                        title={ref.title}
-                        category={ref.category}
-                        categoryColor={ref.categoryColor as "cyan" | "purple" | "orange"}
-                        description={ref.description}
-                        updatedAt={ref.updatedAt}
-                        activeComparisons={ref.activeComparisons}
-                        comparisons={ref.comparisons}
-                        onCompare={onCompare}
-                        onComparisonClick={onComparisonClick}
-                    />
-                ))}
-            </div>
+            {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin text-graphito-blue mb-3" />
+                    <p className="text-sm font-medium">Cargando soluciones de referencia...</p>
+                </div>
+            ) : filteredReferences.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 border border-dashed border-[#2b3346] rounded-2xl p-8 text-center my-4 bg-[#121827]/20">
+                    <p className="text-slate-300 font-bold text-lg mb-1">No hay soluciones de referencia registradas</p>
+                    <p className="text-slate-500 text-sm max-w-md">
+                        Comienza agregando tu primera solución de referencia en C o C++ haciendo clic en "Nuevo Código" en la esquina superior.
+                    </p>
+                </div>
+            ) : (
+                <div className="flex flex-col">
+                    {paginatedReferences.map((ref) => (
+                        <ReferenceCard
+                            key={ref.id}
+                            title={ref.title}
+                            category={ref.category}
+                            categoryColor={ref.categoryColor as "cyan" | "purple" | "orange"}
+                            description={ref.description}
+                            updatedAt={ref.updatedAt}
+                            activeComparisons={ref.activeComparisons}
+                            comparisons={ref.comparisons}
+                            onCompare={onCompare}
+                            onComparisonClick={onComparisonClick}
+                        />
+                    ))}
+                </div>
+            )}
 
             {totalItems > itemsPerPage && (
                 <PaginationControls

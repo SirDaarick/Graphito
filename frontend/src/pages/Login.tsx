@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { AtSign, Lock, Eye, EyeOff } from "lucide-react";
+import { AtSign, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import logo from "../assets/logo.png";
 import { AuthCard } from "../components/layout/AuthCard";
+import { api } from "../lib/api";
 
 // Icono simple de Google
 const GoogleIcon = () => (
@@ -22,6 +23,22 @@ export function Login({ onLogin, onNavigateToRegister }: LoginProps) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setIsLoading(true);
+        try {
+            await api.auth.login(email, password);
+            onLogin?.();
+        } catch (err: any) {
+            setError(err.message || "Error al iniciar sesión. Verifique sus credenciales.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="flex-1 w-full flex flex-col items-center justify-center p-4">
@@ -52,8 +69,15 @@ export function Login({ onLogin, onNavigateToRegister }: LoginProps) {
                     <div className="flex-grow border-t border-[#2b3346]"></div>
                 </div>
 
+                {/* Error Banner */}
+                {error && (
+                    <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-xs font-medium">
+                        {error}
+                    </div>
+                )}
+
                 {/* Formulario manual */}
-                <form onSubmit={(e) => { e.preventDefault(); onLogin?.(); }} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     {/* Email */}
                     <div className="space-y-2">
                         <label htmlFor="login-email" className="text-[13px] font-bold text-slate-200 ml-1">
@@ -76,45 +100,53 @@ export function Login({ onLogin, onNavigateToRegister }: LoginProps) {
                     </div>
 
                     {/* Password */}
-<div className="space-y-2">
-                            <div className="flex items-center justify-between ml-1">
-                                <label htmlFor="login-password" className="text-[13px] font-bold text-slate-200">
-                                    Contraseña
-                                </label>
-                                <button type="button" className="text-[10px] font-bold text-graphito-violet hover:text-white transition-colors uppercase tracking-wider">
-                                    ¿Olvidaste tu contraseña?
-                                </button>
-                            </div>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-graphito-blue transition-colors">
-                                    <Lock size={18} />
-                                </div>
-                                <input
-                                    id="login-password"
-                                    type={showPassword ? "text" : "password"}
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    className="w-full bg-[#121827]/30 border border-[#2b3346] text-white rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-500 text-[15px] tracking-widest font-mono"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-white transition-colors"
-                                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between ml-1">
+                            <label htmlFor="login-password" className="text-[13px] font-bold text-slate-200">
+                                Contraseña
+                            </label>
+                            <button type="button" className="text-[10px] font-bold text-graphito-violet hover:text-white transition-colors uppercase tracking-wider">
+                                ¿Olvidaste tu contraseña?
+                            </button>
                         </div>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-graphito-blue transition-colors">
+                                <Lock size={18} />
+                            </div>
+                            <input
+                                id="login-password"
+                                type={showPassword ? "text" : "password"}
+                                required
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full bg-[#121827]/30 border border-[#2b3346] text-white rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-500 text-[15px] tracking-widest font-mono"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-white transition-colors"
+                                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+                    </div>
 
                     {/* Submit */}
                     <button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-graphito-blue to-graphito-violet text-white font-bold rounded-2xl py-4 mt-2 hover:opacity-90 transition-opacity shadow-lg shadow-graphito-blue/20 text-[15px]"
+                        disabled={isLoading}
+                        className="w-full bg-gradient-to-r from-graphito-blue to-graphito-violet text-white font-bold rounded-2xl py-4 mt-2 hover:opacity-90 transition-opacity shadow-lg shadow-graphito-blue/20 text-[15px] flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        Iniciar sesión
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <span>Iniciando sesión...</span>
+                            </>
+                        ) : (
+                            <span>Iniciar sesión</span>
+                        )}
                     </button>
                 </form>
 
