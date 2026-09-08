@@ -26,6 +26,8 @@ data/output/
 
 # Modelos, pesos y caches
 modelos/
+models/char_cnn/logs/
+models/char_cnn/weights/
 *.pt
 *.pth
 *.bin
