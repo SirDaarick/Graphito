@@ -84,6 +84,10 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     def override_vector_store():
         return test_vector_store
 
+    import app.infrastructure.database.session as db_session_module
+    orig_maker = db_session_module.async_session_maker
+    db_session_module.async_session_maker = test_session_maker
+
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_inference_engine] = override_inference
     app.dependency_overrides[get_vector_store] = override_vector_store
@@ -93,3 +97,4 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield c
 
     app.dependency_overrides.clear()
+    db_session_module.async_session_maker = orig_maker

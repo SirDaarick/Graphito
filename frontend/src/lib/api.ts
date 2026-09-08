@@ -94,6 +94,8 @@ export interface ReporteAnalisis {
     probabilidad_ia: number;
     discrepancia_score: number;
     dictamen: "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE";
+    estado?: "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "ERROR";
+    error_mensaje?: string;
     fecha_analisis: string;
     indicadores: IndicadorIntegridad[];
 }
@@ -162,8 +164,14 @@ export const api = {
     },
 
     analysis: {
-        async run(entregaId: string, referenciaId?: string, thresholdSem = 0.85, thresholdAi = 0.70): Promise<ReporteAnalisis> {
-            return request<ReporteAnalisis>("/analysis/run", {
+        async run(
+            entregaId: string,
+            referenciaId?: string,
+            thresholdSem = 0.85,
+            thresholdAi = 0.70,
+            asyncMode = true
+        ): Promise<ReporteAnalisis> {
+            return request<ReporteAnalisis>(`/analysis/run?async_mode=${asyncMode}`, {
                 method: "POST",
                 body: JSON.stringify({
                     entrega_id: entregaId,
@@ -175,6 +183,49 @@ export const api = {
         },
         async getReport(reportId: number): Promise<ReporteAnalisis> {
             return request<ReporteAnalisis>(`/analysis/reports/${reportId}`);
+        },
+        async pollUntilComplete(
+            reportId: number,
+            timeoutMs = 60000,
+            intervalMs = 1000
+        ): Promise<ReporteAnalisis> {
+            const startTime = Date.now();
+            while (Date.now() - startTime < timeoutMs) {
+                const rep = await api.analysis.getReport(reportId);
+                if (rep.estado === "COMPLETADO") {
+                    return rep;
+                }
+                if (rep.estado === "ERROR") {
+                    throw new Error(rep.error_mensaje || "Error durante el análisis bimodal en segundo plano");
+                }
+                await new Promise((resolve) => setTimeout(resolve, intervalMs));
+            }
+            throw new Error("Tiempo de espera agotado esperando el reporte de análisis.");
+        },
+        async downloadPdf(reportId: number, filename?: string): Promise<void> {
+            const token = getAuthToken();
+            const headers: Record<string, string> = {};
+            if (token) {
+                headers["Authorization"] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/analysis/reports/${reportId}/pdf`, {
+                headers,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Error descargando PDF: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename || `reporte_integridad_${reportId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         }
     }
 };

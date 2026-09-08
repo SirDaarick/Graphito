@@ -27,6 +27,13 @@ class DictamenEnum(str, enum.Enum):
     PLAGIO_PROBABLE = "PLAGIO_PROBABLE"
 
 
+class EstadoAnalisisEnum(str, enum.Enum):
+    PENDIENTE = "PENDIENTE"
+    PROCESANDO = "PROCESANDO"
+    COMPLETADO = "COMPLETADO"
+    ERROR = "ERROR"
+
+
 class Docente(Base):
     __tablename__ = "docentes"
 
@@ -88,6 +95,8 @@ class ReporteAnalisis(Base):
     probabilidad_ia = Column(Float, nullable=False, default=0.0)
     discrepancia_score = Column(Float, nullable=False, default=0.0)
     dictamen = Column(Enum(DictamenEnum), nullable=False, default=DictamenEnum.INTEGRO)
+    estado = Column(Enum(EstadoAnalisisEnum), nullable=False, default=EstadoAnalisisEnum.COMPLETADO)
+    error_mensaje = Column(Text, nullable=True)
     fecha_analisis = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     entrega = relationship("CodigoFuente", foreign_keys=[entrega_id], back_populates="reportes_entrega")

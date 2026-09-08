@@ -132,3 +132,34 @@ async def test_complete_graphito_flow(client: AsyncClient):
     fetched_report = get_rep_res.json()
     assert fetched_report["id"] == report_id
     assert fetched_report["entrega_id"] == entrega_id
+    assert fetched_report["estado"] == "COMPLETADO"
+
+    # 8. Descargar Reporte en PDF
+    pdf_res = await client.get(f"/api/v1/analysis/reports/{report_id}/pdf", headers=headers)
+    assert pdf_res.status_code == 200
+    assert pdf_res.headers["content-type"] == "application/pdf"
+    assert pdf_res.content.startswith(b"%PDF")
+    assert len(pdf_res.content) > 500
+
+    # 9. Ejecutar Inferencia Asíncrona (async_mode=true)
+    async_res = await client.post(
+        "/api/v1/analysis/run?async_mode=true",
+        json=analysis_payload,
+        headers=headers,
+    )
+    assert async_res.status_code == 201
+    async_data = async_res.json()
+    async_report_id = async_data["id"]
+    assert async_data["estado"] in ("PROCESANDO", "COMPLETADO")
+
+    # Esperar y verificar que la tarea asíncrona concluya
+    import asyncio
+    for _ in range(20):
+        await asyncio.sleep(0.1)
+        poll_res = await client.get(f"/api/v1/analysis/reports/{async_report_id}", headers=headers)
+        if poll_res.status_code == 200 and poll_res.json()["estado"] == "COMPLETADO":
+            break
+    poll_final = await client.get(f"/api/v1/analysis/reports/{async_report_id}", headers=headers)
+    assert poll_final.status_code == 200
+    assert poll_final.json()["estado"] == "COMPLETADO"
+    assert len(poll_final.json()["indicadores"]) > 0

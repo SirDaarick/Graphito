@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles } fro
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
+import { api } from "../lib/api";
 
 // Helper hook for the typewriter effect (optimized for performance)
 function useTypewriter(text: string, speed: number = 15) {
@@ -56,6 +57,7 @@ interface SimilarityReportModalProps {
 export function SimilarityReportModal({ isOpen, onClose, comparison }: SimilarityReportModalProps) {
     const [isAnimating, setIsAnimating] = useState(false);
     const [shouldRender, setShouldRender] = useState(isOpen);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const backdropRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
@@ -109,6 +111,22 @@ ${comparison.dictamen === 'SOSPECHA_IA'
 Se recomienda revisar especialmente los módulos de lógica, donde los patrones de flujo son virtualmente gemelos.`;
 
     const typewriterText = useTypewriter(isOpen ? fullInterpretationText : "", 3);
+
+    const handleDownloadPdf = async () => {
+        if (!comparison?.id) return;
+        try {
+            setIsDownloadingPdf(true);
+            const reportId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+            if (!isNaN(reportId)) {
+                await api.analysis.downloadPdf(reportId, `reporte_integridad_${reportId}.pdf`);
+            }
+        } catch (err) {
+            console.error("Error al descargar PDF:", err);
+            alert("No se pudo generar o descargar el reporte PDF.");
+        } finally {
+            setIsDownloadingPdf(false);
+        }
+    };
 
     if (!shouldRender || !comparison) return null;
 
@@ -339,9 +357,22 @@ Se recomienda revisar especialmente los módulos de lógica, donde los patrones 
                                 Documento: {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
                             </div>
                             <div className="flex items-center gap-4">
-                                <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-[#2b3346] text-sm font-bold text-white hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                                    <Download size={16} />
-                                    <span>Descargar reporte PDF</span>
+                                <button
+                                    onClick={handleDownloadPdf}
+                                    disabled={isDownloadingPdf || !comparison.id}
+                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-[#2b3346] text-sm font-bold text-white hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    {isDownloadingPdf ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <span>Generando PDF...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={16} />
+                                            <span>Descargar reporte PDF</span>
+                                        </>
+                                    )}
                                 </button>
                                 <button
                                     onClick={onClose}

@@ -19,6 +19,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
     const [code, setCode] = useState("");
     const [fileName, setFileName] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState<string>("Iniciando análisis bimodal...");
     const [error, setError] = useState<string | null>(null);
 
     const [shouldRender, setShouldRender] = useState(isOpen);
@@ -54,32 +55,34 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            setFileName(file.name);
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                setCode(event.target?.result as string);
-            };
-            reader.readAsText(file);
-        }
+        if (!file) return;
+
+        setFileName(file.name);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const content = event.target?.result as string;
+            setCode(content);
+        };
+        reader.readAsText(file);
     };
 
     const handleStartAnalysis = async () => {
         if (!selectedProblemId) {
-            setError("Por favor selecciona un ejercicio/problema de referencia.");
+            setError("Debes seleccionar un problema para comparar.");
             return;
         }
         if (!author.trim()) {
-            setError("Por favor ingresa el nombre o boleta del alumno.");
+            setError("Debes ingresar el nombre o identificador del autor.");
             return;
         }
         if (!code.trim()) {
-            setError("Por favor selecciona o escribe el código de la entrega del alumno.");
+            setError("Debes ingresar o cargar el código fuente.");
             return;
         }
 
         setError(null);
         setIsLoading(true);
+        setLoadingMessage("Guardando entrega del estudiante...");
         try {
             // 1. Registrar entrega del alumno
             const submission = await api.problems.addSubmission(
@@ -88,8 +91,15 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
                 code,
                 "c"
             );
-            // 2. Ejecutar análisis bimodal (Canal A + Canal B + Fusión + ChromaDB)
-            const report = await api.analysis.run(submission.id);
+            // 2. Disparar análisis bimodal en segundo plano (asíncrono)
+            setLoadingMessage("Iniciando inferencia bimodal en segundo plano...");
+            const initialReport = await api.analysis.run(submission.id, undefined, 0.85, 0.70, true);
+
+            let report = initialReport;
+            if (initialReport.estado === "PROCESANDO") {
+                setLoadingMessage("Analizando DFG (Canal A) y estilo CharCNN (Canal B)...");
+                report = await api.analysis.pollUntilComplete(initialReport.id);
+            }
 
             // Adaptar para visualización en SimilarityReportModal
             const adaptedComparison = {
@@ -240,7 +250,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
                                 {isLoading ? (
                                     <>
                                         <Loader2 size={16} className="animate-spin" />
-                                        <span>Procesando análisis dual...</span>
+                                        <span>{loadingMessage}</span>
                                     </>
                                 ) : (
                                     <span>Iniciar Análisis</span>
