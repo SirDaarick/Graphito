@@ -65,10 +65,29 @@ def build_manifest(config: CharCNNConfig) -> dict:
             synth_by_sp[key].append(fp)
 
     rng = random.Random(config.seed)
-    samples: list[dict] = []
-
     common_keys = sorted(set(human_by_sp) & set(synth_by_sp))
     print(f"Subproblemas con ambas fuentes: {len(common_keys)}")
+
+    # Split estricto a nivel de SUBPROBLEMA (0% fuga de datos)
+    shuffled_keys = list(common_keys)
+    rng.shuffle(shuffled_keys)
+
+    n_keys = len(shuffled_keys)
+    n_test_keys = max(1, int(n_keys * config.test_split))
+    n_val_keys = max(1, int(n_keys * config.val_split))
+    n_train_keys = n_keys - n_val_keys - n_test_keys
+
+    train_keys = set(shuffled_keys[:n_train_keys])
+    val_keys = set(shuffled_keys[n_train_keys : n_train_keys + n_val_keys])
+    test_keys = set(shuffled_keys[n_train_keys + n_val_keys :])
+
+    print(f"Partición de subproblemas: train={len(train_keys)} / val={len(val_keys)} / test={len(test_keys)}")
+    assert len(train_keys & test_keys) == 0, "Fuga de datos detectada entre train y test"
+    assert len(train_keys & val_keys) == 0, "Fuga de datos detectada entre train y val"
+
+    train_samples: list[dict] = []
+    val_samples: list[dict] = []
+    test_samples: list[dict] = []
 
     for key in common_keys:
         human_candidates = human_by_sp[key]
@@ -82,29 +101,33 @@ def build_manifest(config: CharCNNConfig) -> dict:
         selected_human = rng.sample(human_candidates, limit)
         selected_synth = rng.sample(synth_candidates, limit)
 
+        target_list = (
+            train_samples if key in train_keys
+            else (val_samples if key in val_keys else test_samples)
+        )
+
         for fp in selected_human:
-            samples.append({"file_path": str(fp.resolve()), "label": 0, "subproblem": key})
+            target_list.append({"file_path": str(fp.resolve()), "label": 0, "subproblem": key})
         for fp in selected_synth:
-            samples.append({"file_path": str(fp.resolve()), "label": 1, "subproblem": key})
+            target_list.append({"file_path": str(fp.resolve()), "label": 1, "subproblem": key})
+
+    rng.shuffle(train_samples)
+    rng.shuffle(val_samples)
+    rng.shuffle(test_samples)
 
     human_only = sorted(set(human_by_sp) - set(synth_by_sp))
     synth_only = sorted(set(synth_by_sp) - set(human_by_sp))
     print(f"Subproblemas solo humanos:  {len(human_only)} ({', '.join(human_only[:5])}{'...' if len(human_only) > 5 else ''})")
     print(f"Subproblemas solo sintéticos: {len(synth_only)} ({', '.join(synth_only[:5])}{'...' if len(synth_only) > 5 else ''})")
 
-    rng.shuffle(samples)
+    total_samples = len(train_samples) + len(val_samples) + len(test_samples)
+    human_count = sum(1 for s in train_samples + val_samples + test_samples if s["label"] == 0)
+    synth_count = sum(1 for s in train_samples + val_samples + test_samples if s["label"] == 1)
 
-    n = len(samples)
-    n_test = int(n * config.test_split)
-    n_val = int(n * config.val_split)
-    n_train = n - n_val - n_test
-
-    human_count = sum(1 for s in samples if s["label"] == 0)
-    synth_count = sum(1 for s in samples if s["label"] == 1)
-    print(f"\nTotal samples: {n}")
+    print(f"\nTotal samples: {total_samples}")
     print(f"  Humano:    {human_count}")
     print(f"  Sintético: {synth_count}")
-    print(f"Split: train={n_train} / val={n_val} / test={n_test}")
+    print(f"Split muestras: train={len(train_samples)} / val={len(val_samples)} / test={len(test_samples)}")
 
     manifest = {
         "config": {
@@ -114,14 +137,21 @@ def build_manifest(config: CharCNNConfig) -> dict:
             "seed": config.seed,
             "alphabet": config.alphabet,
             "seq_length": config.seq_length,
+            "strip_comments": config.strip_comments,
+            "normalize_whitespace": config.normalize_whitespace,
+        },
+        "subproblems": {
+            "train": sorted(train_keys),
+            "val": sorted(val_keys),
+            "test": sorted(test_keys),
         },
         "splits": {
-            "train": samples[:n_train],
-            "val": samples[n_train : n_train + n_val],
-            "test": samples[n_train + n_val :],
+            "train": train_samples,
+            "val": val_samples,
+            "test": test_samples,
         },
         "stats": {
-            "total": n,
+            "total": total_samples,
             "human": human_count,
             "synthetic": synth_count,
             "subproblems_with_both": len(common_keys),

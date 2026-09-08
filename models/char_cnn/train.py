@@ -164,7 +164,7 @@ def run_training(config: CharCNNConfig, preprocessor: CharPreprocessor) -> Path:
     )
     scheduler = ReduceLROnPlateau(
         optimizer, mode="min", factor=config.lr_factor,
-        patience=config.lr_patience, verbose=True,
+        patience=config.lr_patience,
     )
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -216,7 +216,10 @@ def run_training(config: CharCNNConfig, preprocessor: CharPreprocessor) -> Path:
             save_checkpoint(
                 model, optimizer, epoch, val_loss, val_metrics, best_path, config,
             )
-            print(f"  >> Mejor modelo guardado (val_loss={val_loss:.4f})")
+            save_checkpoint(
+                model, optimizer, epoch, val_loss, val_metrics, config.best_model_path, config,
+            )
+            print(f"  >> Mejor modelo guardado en {best_path.name} y {config.best_model_path} (val_loss={val_loss:.4f})")
         else:
             patience_counter += 1
 

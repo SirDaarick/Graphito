@@ -21,6 +21,9 @@ class ComparisonResult:
     reference_path: str = ""
     similarity: float = 0.0
     semantic_similarity: float = 0.0
+    prob_sintetico: float = 0.0
+    is_synthetic: bool = False
+    combined_risk: float = 0.0
 
 
 def _cosine(a: np.ndarray, b: np.ndarray) -> float:
@@ -76,15 +79,13 @@ class BimodalFusion:
         return np.concatenate([semantic, style_pad])
 
     def similarity(self, student_vector: np.ndarray, reference_vector: np.ndarray) -> float:
+        """
+        Calculates semantic cosine similarity between student and reference logic.
+        Decoupled from asymmetric style padding to prevent norm dilution bug.
+        """
         sem_student = student_vector[:self.sem_dim]
         sem_ref = reference_vector[:self.sem_dim]
-
-        numerator = np.dot(sem_student, sem_ref)
-        denom = np.linalg.norm(student_vector) * np.linalg.norm(reference_vector)
-
-        if denom == 0.0:
-            return 0.0
-        return float(numerator / denom)
+        return _cosine(sem_student, sem_ref)
 
     def compare(
         self,
@@ -99,15 +100,18 @@ class BimodalFusion:
         for ref_path in reference_paths:
             ref_vec = self.build_reference_vector(ref_path)
             sim = self.similarity(student_vec, ref_vec)
+            sem_sim = sim
 
-            sem_student = student_vec[:self.sem_dim]
-            sem_ref = ref_vec[:self.sem_dim]
-            sem_sim = _cosine(sem_student, sem_ref)
+            # Combined risk index: weighted combination of semantic logic match and synthetic probability
+            combined_risk = float(0.7 * sim + 0.3 * student_result.prob_sintetico)
 
             results.append(ComparisonResult(
                 reference_path=str(ref_path),
                 similarity=sim,
                 semantic_similarity=sem_sim,
+                prob_sintetico=student_result.prob_sintetico,
+                is_synthetic=student_result.is_synthetic,
+                combined_risk=round(combined_risk, 4),
             ))
 
         results.sort(key=lambda r: r.similarity, reverse=True)
