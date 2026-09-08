@@ -186,29 +186,10 @@ class GraphCodeBERTInference:
 
         input_ids[:code_len] = code_ids
         pos_start = 2
-        position_idx[0] = pos_start
-        position_idx[1 : code_len - 1] = torch.arange(pos_start + 1, pos_start + code_len - 1)
-        position_idx[code_len - 1] = pos_start + code_len - 1
+        position_idx[:code_len] = torch.arange(pos_start, pos_start + code_len)
 
-        for d in range(num_dfg):
-            dfg_pos = code_len + d
-            input_ids[dfg_pos] = self.tokenizer.unk_token_id
-            dfg_pos_id = pos_start + code_len + d
-            if dfg_pos_id < max_len:
-                position_idx[dfg_pos] = dfg_pos_id
-
-        attn_mask_2d = torch.zeros((total_len, total_len), dtype=torch.bool)
-
-        for i in range(code_len):
-            attn_mask_2d[i, :code_len] = True
-
-        for d in range(num_dfg):
-            dfg_pos = code_len + d
-            attn_mask_2d[dfg_pos, :code_len] = True
-            attn_mask_2d[:code_len, dfg_pos] = True
-
+        code_to_subtoken: dict[int, list[int]] = {}
         if num_dfg > 0:
-            code_to_subtoken: dict[int, list[int]] = {}
             subtoken_idx = 1
             for ci in range(len(code_tokens)):
                 tok_text = code_tokens[ci]
@@ -218,26 +199,51 @@ class GraphCodeBERTInference:
                 if subtoken_idx >= code_len - 1:
                     break
 
-            for d in range(num_dfg):
-                edge = dfg_edges[d]
-                dfg_pos = code_len + d
+        for d in range(num_dfg):
+            dfg_pos = code_len + d
+            input_ids[dfg_pos] = self.tokenizer.unk_token_id
+            # Align position embedding with target variable token in code (GraphCodeBERT paper)
+            edge = used_edges[d]
+            tgt_subs = code_to_subtoken.get(edge.target_index, [])
+            if tgt_subs and tgt_subs[0] < code_len:
+                position_idx[dfg_pos] = position_idx[tgt_subs[0]]
+            else:
+                dfg_pos_id = pos_start + code_len + d
+                if dfg_pos_id < max_len:
+                    position_idx[dfg_pos] = dfg_pos_id
 
-                relevant_subtokens: set[int] = set()
-                for src_idx in edge.source_indices:
-                    relevant_subtokens.update(code_to_subtoken.get(src_idx, []))
-                relevant_subtokens.update(code_to_subtoken.get(edge.target_index, []))
+        # Graph-guided masked attention matrix M (Paper Section 3.2)
+        attn_mask_2d = torch.zeros((total_len, total_len), dtype=torch.bool)
 
-                if not relevant_subtokens:
-                    relevant_subtokens = {1}
+        # 1. Code tokens attend to all code tokens
+        attn_mask_2d[:code_len, :code_len] = True
 
-                for st in relevant_subtokens:
-                    if st < code_len:
-                        attn_mask_2d[dfg_pos, st] = True
-                        attn_mask_2d[st, dfg_pos] = True
+        # 2. DFG self-attention & selective code-to-node alignment
+        for d in range(num_dfg):
+            dfg_pos = code_len + d
+            edge = used_edges[d]
 
-            for d1 in range(num_dfg):
-                for d2 in range(num_dfg):
-                    if d1 != d2:
+            # DFG node attends to its target and source subtokens ONLY
+            relevant_subtokens: set[int] = set(code_to_subtoken.get(edge.target_index, []))
+            for src_idx in edge.source_indices:
+                relevant_subtokens.update(code_to_subtoken.get(src_idx, []))
+
+            for st in relevant_subtokens:
+                if st < code_len:
+                    attn_mask_2d[dfg_pos, st] = True
+                    attn_mask_2d[st, dfg_pos] = True
+
+            # Self-loop for DFG node
+            attn_mask_2d[dfg_pos, dfg_pos] = True
+
+        # 3. DFG-to-DFG attention ONLY when connected by data flow
+        for d1 in range(num_dfg):
+            e1 = used_edges[d1]
+            for d2 in range(num_dfg):
+                if d1 != d2:
+                    e2 = used_edges[d2]
+                    if (e1.target_index in e2.source_indices or
+                            e2.target_index in e1.source_indices):
                         attn_mask_2d[code_len + d1, code_len + d2] = True
 
         graph_mask_4d = torch.zeros((1, 1, max_len, max_len), dtype=torch.bool)
