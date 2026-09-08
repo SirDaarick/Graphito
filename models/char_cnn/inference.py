@@ -24,13 +24,17 @@ class CharCNNInference:
 
     def __init__(
         self,
-        checkpoint_path: Path,
+        checkpoint_path: Optional[Path | str] = None,
         config: Optional[CharCNNConfig] = None,
         device: Optional[torch.device] = None,
+        model_path: Optional[Path | str] = None,
     ):
         self.device = device or DEVICE
+        chosen_path = checkpoint_path or model_path or Path("models/char_cnn/best_model.pth")
+        chosen_path = Path(chosen_path)
+
         self.checkpoint = torch.load(
-            checkpoint_path, map_location=self.device, weights_only=False,
+            chosen_path, map_location=self.device, weights_only=False,
         )
 
         ckpt_config = self.checkpoint.get("config", {})
@@ -54,31 +58,20 @@ class CharCNNInference:
 
         self.class_names = {0: "humano", 1: "sintético"}
 
-    def predict(self, file_path: Path) -> dict:
+    def predict(self, file_path: Path | str) -> dict:
+        # Si se pasa un string que no es ruta existente, procesar como texto directamente
+        if isinstance(file_path, str) and not Path(file_path).exists():
+            return self.predict_text(file_path)
 
+        p = Path(file_path)
         try:
-            text = file_path.read_text(encoding="utf-8", errors="replace")
+            text = p.read_text(encoding="utf-8", errors="replace")
         except (OSError, UnicodeDecodeError):
             text = ""
 
-        encoded = self.preprocessor.encode(text)
-        input_tensor = torch.tensor(encoded, dtype=torch.long).unsqueeze(0).to(self.device)
-
-        with torch.no_grad():
-            logits, embedding = self.model(input_tensor, return_embedding=True)
-            probs = torch.softmax(logits, dim=1)
-            pred_class = logits.argmax(dim=1).item()
-            confidence = probs[0, pred_class].item()
-
-        return {
-            "file": str(file_path),
-            "prediction": self.class_names[pred_class],
-            "class_id": pred_class,
-            "confidence": round(confidence, 6),
-            "prob_humano": round(probs[0, 0].item(), 6),
-            "prob_sintetico": round(probs[0, 1].item(), 6),
-            "embedding": embedding.squeeze(0).cpu().tolist(),
-        }
+        res = self.predict_text(text)
+        res["file"] = str(p)
+        return res
 
     def predict_text(self, text: str) -> dict:
 
@@ -90,13 +83,15 @@ class CharCNNInference:
             probs = torch.softmax(logits, dim=1)
             pred_class = logits.argmax(dim=1).item()
             confidence = probs[0, pred_class].item()
+            p_synth = round(probs[0, 1].item(), 6)
 
         return {
             "prediction": self.class_names[pred_class],
             "class_id": pred_class,
             "confidence": round(confidence, 6),
             "prob_humano": round(probs[0, 0].item(), 6),
-            "prob_sintetico": round(probs[0, 1].item(), 6),
+            "prob_sintetico": p_synth,
+            "ai_probability": p_synth,
             "embedding": embedding.squeeze(0).cpu().tolist(),
         }
 
