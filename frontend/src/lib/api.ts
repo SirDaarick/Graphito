@@ -26,6 +26,7 @@ export function setAuthToken(token: string | null) {
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
         ...(options.headers as Record<string, string>),
     };
 
@@ -204,7 +205,9 @@ export const api = {
         },
         async downloadPdf(reportId: number, filename?: string): Promise<void> {
             const token = getAuthToken();
-            const headers: Record<string, string> = {};
+            const headers: Record<string, string> = {
+                "ngrok-skip-browser-warning": "true",
+            };
             if (token) {
                 headers["Authorization"] = `Bearer ${token}`;
             }
