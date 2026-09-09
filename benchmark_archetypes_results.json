@@ -1,0 +1,116 @@
+[
+  {
+    "key": "1_ia_gemini_perfecto",
+    "titulo": "Alumno IA (Gemini / ChatGPT puro)",
+    "descripcion": "Generado íntegramente por LLM con comentarios explicativos, estilo canónico en inglés y nombrado descriptivo.",
+    "raw_sem": 0.8917,
+    "calib_sem": 0.5666,
+    "ai_prob": 0.9954,
+    "hum_prob": 0.0046,
+    "char_pred": "sintético",
+    "dictamen": "SOSPECHA_IA",
+    "discrepancia": 0.564,
+    "indicadores": [
+      {
+        "tipo_alerta": "PATRON_SINTETICO",
+        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.5%).",
+        "severidad": "MEDIA"
+      }
+    ]
+  },
+  {
+    "key": "2_humano_aplicado",
+    "titulo": "Alumno Aplicado (Humano limpio)",
+    "descripcion": "Estudiante responsable que resuelve el problema con funciones, nombres en español y formato estándar de laboratorio.",
+    "raw_sem": 0.9147,
+    "calib_sem": 0.6589,
+    "ai_prob": 0.9961,
+    "hum_prob": 0.0039,
+    "char_pred": "sintético",
+    "dictamen": "SOSPECHA_IA",
+    "discrepancia": 0.6563,
+    "indicadores": [
+      {
+        "tipo_alerta": "PATRON_SINTETICO",
+        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.6%).",
+        "severidad": "MEDIA"
+      }
+    ]
+  },
+  {
+    "key": "3_humano_malas_practicas",
+    "titulo": "Alumno con Malas Prácticas (Espagueti / Desorden)",
+    "descripcion": "Todo en el main, variables de una letra (i, j, b, c), indentación inconsistente y sin funciones separadas.",
+    "raw_sem": 0.8867,
+    "calib_sem": 0.5467,
+    "ai_prob": 0.6897,
+    "hum_prob": 0.3103,
+    "char_pred": "sintético",
+    "dictamen": "INTEGRO",
+    "discrepancia": 0.377,
+    "indicadores": [
+      {
+        "tipo_alerta": "CONFORMIDAD_BASE",
+        "descripcion": "No se detectaron discrepancias críticas de integridad académica.",
+        "severidad": "BAJA"
+      }
+    ]
+  },
+  {
+    "key": "4_humano_intento_fallido",
+    "titulo": "Alumno que 'lo intentó pero no le salió'",
+    "descripcion": "Lógica incompleta o errónea: cuenta divisores de forma deficiente, condición rota (deja pasar pares o no valida 1), imprime basura pero tiene la estructura del intento.",
+    "raw_sem": 0.8981,
+    "calib_sem": 0.5924,
+    "ai_prob": 0.9956,
+    "hum_prob": 0.0044,
+    "char_pred": "sintético",
+    "dictamen": "SOSPECHA_IA",
+    "discrepancia": 0.5898,
+    "indicadores": [
+      {
+        "tipo_alerta": "PATRON_SINTETICO",
+        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.6%).",
+        "severidad": "MEDIA"
+      }
+    ]
+  },
+  {
+    "key": "5_humano_astuto_parafraseo_ia",
+    "titulo": "El Tramposo Astuto (IA parafraseada a mano)",
+    "descripcion": "Tomó la salida de ChatGPT, tradujo nombres a español, borró comentarios de Doxygen y alteró operadores para intentar engañar al detector.",
+    "raw_sem": 0.9167,
+    "calib_sem": 0.6669,
+    "ai_prob": 0.9981,
+    "hum_prob": 0.0019,
+    "char_pred": "sintético",
+    "dictamen": "SOSPECHA_IA",
+    "discrepancia": 0.6656,
+    "indicadores": [
+      {
+        "tipo_alerta": "PATRON_SINTETICO",
+        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.8%).",
+        "severidad": "MEDIA"
+      }
+    ]
+  },
+  {
+    "key": "6_completamente_diferente",
+    "titulo": "El Confundido (Entregó otra práctica completamente diferente)",
+    "descripcion": "Entregó el algoritmo de Ordenamiento Burbuja de un arreglo, no tiene nada que ver con números primos.",
+    "raw_sem": 0.8983,
+    "calib_sem": 0.5934,
+    "ai_prob": 0.9995,
+    "hum_prob": 0.0005,
+    "char_pred": "sintético",
+    "dictamen": "SOSPECHA_IA",
+    "discrepancia": 0.5931,
+    "indicadores": [
+      {
+        "tipo_alerta": "PATRON_SINTETICO",
+        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (100.0%).",
+        "severidad": "MEDIA"
+      }
+    ]
+  }
+]

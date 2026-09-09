@@ -30,7 +30,7 @@ class ReporteAnalisisResponse(BaseModel):
     similitud_semantica: float = 0.0
     probabilidad_ia: float = 0.0
     discrepancia_score: float = 0.0
-    dictamen: DictamenEnum = DictamenEnum.INTEGRO
+    dictamen: DictamenEnum = DictamenEnum.SIN_ALERTAS
     estado: EstadoAnalisisEnum = EstadoAnalisisEnum.COMPLETADO
     error_mensaje: Optional[str] = None
     fecha_analisis: datetime

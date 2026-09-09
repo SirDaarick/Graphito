@@ -105,7 +105,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
             const adaptedComparison = {
                 id: String(report.id),
                 title: `${author} — Entrega`,
-                subtitle: `Dictamen: ${report.dictamen}`,
+                subtitle: `Diagnóstico: ${report.dictamen.replace(/_/g, ' ')}`,
                 similarity: Math.round(report.similitud_semantica * 100),
                 similitud_semantica: report.similitud_semantica,
                 probabilidad_ia: report.probabilidad_ia,

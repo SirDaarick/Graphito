@@ -22,9 +22,14 @@ class TipoCodigoEnum(str, enum.Enum):
 
 
 class DictamenEnum(str, enum.Enum):
-    INTEGRO = "INTEGRO"
-    SOSPECHA_IA = "SOSPECHA_IA"
-    PLAGIO_PROBABLE = "PLAGIO_PROBABLE"
+    SIN_ALERTAS = "SIN_ALERTAS"
+    REVISION_ESTILOMETRICA = "REVISION_ESTILOMETRICA"
+    REVISION_SEMANTICA = "REVISION_SEMANTICA"
+    DISCREPANCIA_DUAL = "DISCREPANCIA_DUAL"
+    # Compatibilidad retroactiva
+    INTEGRO = "SIN_ALERTAS"
+    SOSPECHA_IA = "REVISION_ESTILOMETRICA"
+    PLAGIO_PROBABLE = "REVISION_SEMANTICA"
 
 
 class EstadoAnalisisEnum(str, enum.Enum):
@@ -94,7 +99,7 @@ class ReporteAnalisis(Base):
     similitud_semantica = Column(Float, nullable=False, default=0.0)
     probabilidad_ia = Column(Float, nullable=False, default=0.0)
     discrepancia_score = Column(Float, nullable=False, default=0.0)
-    dictamen = Column(Enum(DictamenEnum), nullable=False, default=DictamenEnum.INTEGRO)
+    dictamen = Column(Enum(DictamenEnum), nullable=False, default=DictamenEnum.SIN_ALERTAS)
     estado = Column(Enum(EstadoAnalisisEnum), nullable=False, default=EstadoAnalisisEnum.COMPLETADO)
     error_mensaje = Column(Text, nullable=True)
     fecha_analisis = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

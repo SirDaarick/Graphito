@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
@@ -93,22 +93,48 @@ export function SimilarityReportModal({ isOpen, onClose, comparison }: Similarit
         ? Math.round(comparison.probabilidad_ia * 100)
         : 85;
     const overallScore = comparison?.similarity ?? semanticPct;
-    const dictamen = comparison?.dictamen || (overallScore > 70 ? 'SOSPECHA_IA' : overallScore > 30 ? 'REVISAR' : 'INTEGRO');
+    const dictamenRaw = comparison?.dictamen || (overallScore > 70 ? 'REVISION_ESTILOMETRICA' : 'SIN_ALERTAS');
+
+    const getAuditInfo = (status: string) => {
+        switch (status) {
+            case "REVISION_ESTILOMETRICA":
+            case "SOSPECHA_IA":
+                return {
+                    label: "Revisión Sugerida (IA)",
+                    color: "text-amber-400",
+                };
+            case "REVISION_SEMANTICA":
+            case "PLAGIO_PROBABLE":
+                return {
+                    label: "Coincidencia Lógica",
+                    color: "text-purple-400",
+                };
+            case "DISCREPANCIA_DUAL":
+                return {
+                    label: "Alerta Dual (Lógica + IA)",
+                    color: "text-rose-400",
+                };
+            default:
+                return {
+                    label: "Conforme (Sin Alertas)",
+                    color: "text-emerald-400",
+                };
+        }
+    };
+    const auditInfo = getAuditInfo(dictamenRaw);
 
     // Typewriter effect description
     const fullInterpretationText = comparison?.dictamen
-        ? `Dictamen del Sistema: ${comparison.dictamen}
+        ? `Diagnóstico de Soporte Docente: ${auditInfo.label}
 
 Canal A (Similitud Semántica): ${semanticPct}% de coincidencia con soluciones de referencia mediante Grafos de Flujo de Datos (DFG).
-Canal B (Estilometría CharCNN): ${aiPct}% de probabilidad de generación por IA.
+Canal B (Estilometría CharCNN): ${aiPct}% de probabilidad de sintaxis afín a modelos generativos (LLM).
 Puntaje de Discrepancia Asimétrica: ${comparison.discrepancia_score ?? (semanticPct * aiPct / 10000).toFixed(2)}.
 
-${comparison.dictamen === 'SOSPECHA_IA' 
-    ? 'Recomendación Docente: Se identificó una estructura algorítmica altamente convergente acompañada de regularidad léxica típica de modelos LLM. Se sugiere revisión presencial del razonamiento del estudiante.'
-    : 'Recomendación Docente: El código analizado presenta una redacción y lógica compatibles con la autoría humana esperada para el nivel del curso.'}`
-        : `Basado en el análisis profundo de Graphito, los resultados sugieren una probabilidad muy alta de que el código haya sido adaptado de la misma fuente original o que exista una colaboración no declarada. Aunque los nombres de algunas funciones fueron modificados, la estructura lógica central se mantiene intacta.
-
-Se recomienda revisar especialmente los módulos de lógica, donde los patrones de flujo son virtualmente gemelos.`;
+${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || dictamenRaw === 'DISCREPANCIA_DUAL'
+    ? 'Recomendación Pericial: Se identificaron regularidades sintácticas afines a modelos generativos. Este dato es una guía orientativa de apoyo; se sugiere formular preguntas conceptuales al estudiante sobre sus decisiones de implementación.'
+    : 'Recomendación Pericial: El código analizado presenta una redacción y estructura acordes a la variabilidad esperada de autoría humana estudiantil.'}`
+        : `Este informe técnico proporciona evidencia cuantitativa para asistir la evaluación académica del docente. La resolución pedagógica final es potestad exclusiva de la cátedra.`;
 
     const typewriterText = useTypewriter(isOpen ? fullInterpretationText : "", 3);
 
@@ -180,6 +206,12 @@ Se recomienda revisar especialmente los módulos de lógica, donde los patrones 
 
                         {/* Body */}
                         <div className="flex-1 overflow-y-auto px-10 pb-8 scrollbar-thin scrollbar-thumb-[#2b3346] scrollbar-track-transparent">
+                            {/* DSS Institutional Banner */}
+                            <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-200">
+                                <Info size={18} className="shrink-0 text-blue-400" />
+                                <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee métricas periciales automatizadas sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
+                            </div>
+
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
                                 {/* Left Column: Big Chart */}
@@ -220,14 +252,12 @@ Se recomienda revisar especialmente los módulos de lógica, donde los patrones 
                                         </svg>
 
                                         {/* Score Text */}
-                                        <div className="absolute flex flex-col items-center justify-center text-center">
+                                        <div className="absolute flex flex-col items-center justify-center text-center px-4">
                                             <span className="text-5xl font-black text-white tracking-tight">
                                                 {overallScore}%
                                             </span>
-                                            <span className={`text-xs font-bold uppercase tracking-widest mt-1 ${overallScore > 70 ? 'text-orange-400' :
-                                                overallScore > 30 ? 'text-yellow-400' : 'text-emerald-400'
-                                                }`}>
-                                                {dictamen}
+                                            <span className={`text-xs font-bold uppercase tracking-wider mt-1.5 ${auditInfo.color}`}>
+                                                {auditInfo.label}
                                             </span>
                                         </div>
                                     </div>
@@ -356,29 +386,51 @@ Se recomienda revisar especialmente los módulos de lógica, donde los patrones 
                             <div className="text-xs font-medium text-slate-500">
                                 Documento: {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => {
+                                        alert("Entrega validada como Conforme por el docente.");
+                                        onClose();
+                                    }}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 active:scale-95 text-xs font-bold transition-all"
+                                    title="El docente valida la entrega como autoría legítima"
+                                >
+                                    <ShieldCheck size={16} />
+                                    <span>Validar Conforme</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        alert("Entrega marcada para entrevista y defensa oral con el estudiante.");
+                                        onClose();
+                                    }}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all"
+                                    title="El docente cita al alumno para justificar sus decisiones de código"
+                                >
+                                    <UserCheck size={16} />
+                                    <span>Citar a Aclaración</span>
+                                </button>
                                 <button
                                     onClick={handleDownloadPdf}
                                     disabled={isDownloadingPdf || !comparison.id}
-                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-[#2b3346] text-sm font-bold text-white hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#2b3346] text-xs font-bold text-white hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
                                     {isDownloadingPdf ? (
                                         <>
                                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            <span>Generando PDF...</span>
+                                            <span>Generando...</span>
                                         </>
                                     ) : (
                                         <>
                                             <Download size={16} />
-                                            <span>Descargar reporte PDF</span>
+                                            <span>Descargar PDF</span>
                                         </>
                                     )}
                                 </button>
                                 <button
                                     onClick={onClose}
-                                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-graphito-blue to-graphito-violet text-sm font-bold text-white hover:opacity-90 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-graphito-blue to-graphito-violet text-xs font-bold text-white hover:opacity-90 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
-                                    Volver a la biblioteca
+                                    Cerrar
                                 </button>
                             </div>
                         </div>

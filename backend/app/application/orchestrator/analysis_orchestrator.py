@@ -201,7 +201,7 @@ class AnalysisOrchestrator:
             similitud_semantica=0.0,
             probabilidad_ia=0.0,
             discrepancia_score=0.0,
-            dictamen=DictamenEnum.INTEGRO,
+            dictamen=DictamenEnum.SIN_ALERTAS,
             estado=EstadoAnalisisEnum.PROCESANDO,
         )
         self.db.add(reporte)
@@ -226,7 +226,7 @@ class AnalysisOrchestrator:
             similitud_semantica=0.0,
             probabilidad_ia=0.0,
             discrepancia_score=0.0,
-            dictamen=DictamenEnum.INTEGRO,
+            dictamen=DictamenEnum.SIN_ALERTAS,
             estado=EstadoAnalisisEnum.PROCESANDO,
             fecha_analisis=reporte.fecha_analisis,
             indicadores=[],

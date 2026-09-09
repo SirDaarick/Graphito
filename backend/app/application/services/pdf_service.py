@@ -129,23 +129,28 @@ class PdfReportService:
         elements.append(meta_table)
         elements.append(Spacer(1, 16))
 
-        # 3. Verdict Banner
+        # 3. Decision Support Diagnostic Banner
         dictamen_val = report.dictamen.value if hasattr(report.dictamen, "value") else str(report.dictamen)
-        if dictamen_val == DictamenEnum.SOSPECHA_IA.value:
+        if dictamen_val in (DictamenEnum.REVISION_ESTILOMETRICA.value, "SOSPECHA_IA"):
             verdict_bg = colors.HexColor("#fff7ed")
             verdict_border = colors.HexColor("#f97316")
             verdict_color = "#c2410c"
-            verdict_text = "DICTAMEN: SOSPECHA DE GENERACION POR INTELIGENCIA ARTIFICIAL"
-        elif dictamen_val == DictamenEnum.PLAGIO_PROBABLE.value:
+            verdict_text = "ALERTA ESTILOMETRICA: PATRONES COMPATIBLES CON MODELOS GENERATIVOS"
+        elif dictamen_val in (DictamenEnum.REVISION_SEMANTICA.value, "PLAGIO_PROBABLE"):
             verdict_bg = colors.HexColor("#fef2f2")
             verdict_border = colors.HexColor("#ef4444")
             verdict_color = "#b91c1c"
-            verdict_text = "DICTAMEN: ALTA PROBABILIDAD DE COPIA / PLAGIO"
+            verdict_text = "ALERTA SEMANTICA: ALTA CONVERGENCIA ESTRUCTURAL CON REFERENCIA"
+        elif dictamen_val == DictamenEnum.DISCREPANCIA_DUAL.value:
+            verdict_bg = colors.HexColor("#faf5ff")
+            verdict_border = colors.HexColor("#8b5cf6")
+            verdict_color = "#6d28d9"
+            verdict_text = "ALERTA DUAL: COINCIDENCIA LOGICA Y ESTILOMETRIA SINTETICA"
         else:
             verdict_bg = colors.HexColor("#f0fdf4")
             verdict_border = colors.HexColor("#22c55e")
             verdict_color = "#15803d"
-            verdict_text = "DICTAMEN: CODIGO INTEGRO (AUTORIA HUMANA ESPERADA)"
+            verdict_text = "CONFORMIDAD: SIN BANDERAS CRITICAS DETECTADAS"
 
         verdict_paragraph = Paragraph(
             f"<font color='{verdict_color}'><b>{verdict_text}</b></font>",
@@ -245,10 +250,10 @@ class PdfReportService:
 
         # 6. Legal / Institutional Footer
         elements.append(Paragraph(
-            "<b>Nota de Certificacion:</b> Este reporte es generado de manera automatizada por la plataforma Graphito "
-            "mediante analisis bimodal de grafos de flujo de datos y clasificadores estilometricos neuronales. "
-            "El dictamen tecnico constituye una herramienta de asistencia al docente y no reemplaza la deliberacion "
-            "academica de la catedra correspondiente.",
+            "<b>Aviso Institucional (Sistema de Soporte a la Decision):</b> Este reporte es generado pericialmente por la plataforma Graphito "
+            "mediante analisis bimodal (Canal Semantico GraphCodeBERT y Canal Estilometrico CharCNN). "
+            "Los resultados proporcionan evidencia tecnica y metricas probabilísticas de orientacion pericial; "
+            "no constituyen una sancion disciplinaria automatica ni sustituyen el juicio academico y pedagogico del docente evaluador.",
             ParagraphStyle(
                 "FooterNote",
                 parent=styles["Normal"],

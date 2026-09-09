@@ -58,31 +58,31 @@ class StubInferenceEngine(InferencePort):
         indicadores = []
 
         if semantic_similarity >= threshold_sem and synthetic_prob >= threshold_ai:
-            dictamen = "SOSPECHA_IA"
+            dictamen = "DISCREPANCIA_DUAL"
             indicadores.append({
                 "tipo_alerta": "DISCREPANCIA_ESTILOMETRICA",
-                "descripcion": f"Alta similitud funcional ({semantic_similarity*100:.1f}%) con alta probabilidad de generación por IA ({synthetic_prob*100:.1f}%).",
+                "descripcion": f"Bandera dual: Alta coincidencia funcional ({semantic_similarity*100:.1f}%) y patrón estilométrico consistente con modelos generativos ({synthetic_prob*100:.1f}%). Sugiere revisión pericial del docente.",
                 "severidad": "ALTA",
             })
         elif semantic_similarity >= threshold_sem:
-            dictamen = "PLAGIO_PROBABLE"
+            dictamen = "REVISION_SEMANTICA"
             indicadores.append({
-                "tipo_alerta": "SIMILITUD_LOGICA_ALTA",
-                "descripcion": f"Estructura algorítmica casi idéntica a la referencia ({semantic_similarity*100:.1f}%).",
+                "tipo_alerta": "CONVERGENCIA_ESTRUCTURAL",
+                "descripcion": f"Bandera semántica: Estructura algorítmica y flujo de datos muy cercanos a la referencia ({semantic_similarity*100:.1f}%).",
                 "severidad": "MEDIA",
             })
         elif synthetic_prob >= threshold_ai:
-            dictamen = "SOSPECHA_IA"
+            dictamen = "REVISION_ESTILOMETRICA"
             indicadores.append({
                 "tipo_alerta": "PATRON_SINTETICO",
-                "descripcion": f"Estilometría con alta probabilidad de redacción por LLM ({synthetic_prob*100:.1f}%).",
+                "descripcion": f"Bandera estilométrica: Patrones de espaciado y caracteres con alta afinidad a código sintético ({synthetic_prob*100:.1f}%).",
                 "severidad": "MEDIA",
             })
         else:
-            dictamen = "INTEGRO"
+            dictamen = "SIN_ALERTAS"
             indicadores.append({
                 "tipo_alerta": "CONFORMIDAD_BASE",
-                "descripcion": "No se detectaron discrepancias críticas de integridad académica.",
+                "descripcion": "Conformidad base: No se detectaron indicadores críticos de coincidencia ni patrones atípicos.",
                 "severidad": "BAJA",
             })
 

@@ -93,7 +93,7 @@ export interface ReporteAnalisis {
     similitud_semantica: number;
     probabilidad_ia: number;
     discrepancia_score: number;
-    dictamen: "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE";
+    dictamen: "SIN_ALERTAS" | "REVISION_ESTILOMETRICA" | "REVISION_SEMANTICA" | "DISCREPANCIA_DUAL" | "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE";
     estado?: "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "ERROR";
     error_mensaje?: string;
     fecha_analisis: string;
