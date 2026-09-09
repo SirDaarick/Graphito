@@ -17,3 +17,9 @@ pytest>=8.0.0
 pytest-asyncio>=0.23.0
 numpy>=1.26.0
 reportlab>=4.1.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+transformers
+tree-sitter>=0.22.0
+tree-sitter-c
+tree-sitter-cpp

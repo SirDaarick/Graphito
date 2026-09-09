@@ -30,6 +30,7 @@ models/char_cnn/logs/
 models/char_cnn/weights/
 *.pt
 *.pth
+!models/char_cnn/best_model.pth
 *.bin
 checkpoint-*/
 

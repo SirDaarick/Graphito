@@ -81,5 +81,7 @@ class MultiScaleCharCNN(nn.Module):
         return self.config.vocab_size
 
 
-# Alias for backward compatibility
+# Aliases for backward compatibility
 CharCNN = MultiScaleCharCNN
+ParallelCharCNN = MultiScaleCharCNN
+
