@@ -39,6 +39,18 @@ class AnalysisOrchestrator:
         self.inference = inference_engine
         self.vector_store = vector_store
 
+    @staticmethod
+    def calibrate_semantic_similarity(raw_sim: float, baseline: float = 0.75) -> float:
+        """
+        Calibra la similitud coseno cruda de GraphCodeBERT para corregir la anisotropía,
+        donde programas no relacionados en C presentan un piso de ~0.70-0.75.
+        Mapea el rango [baseline, 1.0] -> [0.0, 1.0].
+        """
+        if raw_sim <= baseline:
+            return 0.0
+        calibrated = (raw_sim - baseline) / (1.0 - baseline)
+        return max(0.0, min(1.0, round(calibrated, 4)))
+
     async def execute_analysis(
         self,
         docente_id: int,
@@ -100,6 +112,9 @@ class AnalysisOrchestrator:
             else:
                 # Si no hay referencias cargadas aún para el problema
                 semantic_sim = 0.0
+
+        # Calibración de anisotropía (piso ~0.70 de GraphCodeBERT crudo)
+        semantic_sim = self.calibrate_semantic_similarity(semantic_sim)
 
         # Cálculo de Decisión e Indicadores
         decision = self.inference.compute_decision(
@@ -269,6 +284,9 @@ class AnalysisOrchestrator:
                     if matches:
                         target_ref_id = uuid.UUID(matches[0]["reference_id"])
                         semantic_sim = matches[0]["similarity"]
+
+                # Calibración de anisotropía (piso ~0.70 de GraphCodeBERT crudo)
+                semantic_sim = self.calibrate_semantic_similarity(semantic_sim)
 
                 decision = self.inference.compute_decision(
                     semantic_similarity=semantic_sim,

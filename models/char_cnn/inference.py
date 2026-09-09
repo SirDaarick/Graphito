@@ -79,9 +79,9 @@ class CharCNNInference:
         res["file"] = str(p)
         return res
 
-    def predict_text(self, text: str) -> dict:
+    def predict_text(self, text: str, pad: bool = False) -> dict:
 
-        encoded = self.preprocessor.encode(text)
+        encoded = self.preprocessor.encode(text, pad=pad)
         input_tensor = torch.tensor(encoded, dtype=torch.long).unsqueeze(0).to(self.device)
 
         with torch.no_grad():

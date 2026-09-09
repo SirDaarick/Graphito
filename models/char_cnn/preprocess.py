@@ -48,7 +48,7 @@ class CharPreprocessor:
     def idx_to_char(self, idx: int) -> str:
         return self._idx_to_char.get(idx, self.config.unknown_char)
 
-    def encode(self, text: str) -> list[int]:
+    def encode(self, text: str, pad: bool = True) -> list[int]:
         text = self.normalize(text)
         seq_len = self.config.seq_length
 
@@ -60,6 +60,12 @@ class CharPreprocessor:
 
         encoded = [self.char_to_idx(c) for c in text]
         length = len(encoded)
+        if not pad:
+            # Ensure minimum 10 characters for conv kernel sizes up to 9
+            if length < 10:
+                return encoded + [0] * (10 - length)
+            return encoded[:seq_len]
+
         if length >= seq_len:
             return encoded[:seq_len]
         return encoded + [0] * (seq_len - length)
