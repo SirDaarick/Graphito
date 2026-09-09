@@ -28,6 +28,7 @@ data/output/
 modelos/
 *.pt
 *.pth
+!models/char_cnn/best_model.pth
 *.bin
 checkpoint-*/
 

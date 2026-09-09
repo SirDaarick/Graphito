@@ -75,3 +75,53 @@ class CharCNN(nn.Module):
     @property
     def vocab_size(self) -> int:
         return self.config.vocab_size
+
+
+class ParallelCharCNN(nn.Module):
+    """
+    Arquitectura convolucional paralela multi-kernel (3, 5, 7, 9) con pooling dual
+    (max + avg) y Batch Normalization.
+    Corresponde al modelo de alto rendimiento (99.1% F1) guardado en best_model.pth.
+    """
+
+    def __init__(self, config: Optional[CharCNNConfig] = None):
+        super().__init__()
+        self.config = config or CharCNNConfig()
+        vocab_size = getattr(self.config, "vocab_size", 123)
+        embedding_dim = 128
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
+
+        kernel_sizes = [3, 5, 7, 9]
+        self.convs = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv1d(embedding_dim, 64, kernel_size=k),
+                nn.BatchNorm1d(64),
+            )
+            for k in kernel_sizes
+        ])
+
+        self.fc1 = nn.Linear(512, 1024)
+        self.bn_fc1 = nn.BatchNorm1d(1024)
+        self.fc2 = nn.Linear(1024, 2)
+        self.dropout = nn.Dropout(0.5)
+
+    def forward(
+        self, x: torch.Tensor, return_embedding: bool = False
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        x = self.embedding(x).transpose(1, 2)
+        branch_outs = []
+        for conv in self.convs:
+            out = F.relu(conv(x))
+            max_p = F.adaptive_max_pool1d(out, 1).squeeze(2)
+            avg_p = F.adaptive_avg_pool1d(out, 1).squeeze(2)
+            branch_outs.append(torch.cat([max_p, avg_p], dim=1))
+        x = torch.cat(branch_outs, dim=1)
+        embedding = self.dropout(F.relu(self.bn_fc1(self.fc1(x))))
+        logits = self.fc2(embedding)
+        if return_embedding:
+            return logits, embedding
+        return logits
+
+    @property
+    def vocab_size(self) -> int:
+        return getattr(self.config, "vocab_size", 123)

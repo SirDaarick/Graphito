@@ -44,8 +44,14 @@ class CharCNNInference:
         self.preprocessor = CharPreprocessor(self.config)
         self.config.vocab_size = self.preprocessor.vocab_size
 
-        self.model = CharCNN(self.config).to(self.device)
-        self.model.load_state_dict(self.checkpoint["model_state_dict"])
+        state_dict = self.checkpoint["model_state_dict"]
+        if "convs.0.0.weight" in state_dict:
+            from models.char_cnn.model import ParallelCharCNN
+            self.model = ParallelCharCNN(self.config).to(self.device)
+        else:
+            self.model = CharCNN(self.config).to(self.device)
+
+        self.model.load_state_dict(state_dict)
         self.model.eval()
 
         dummy = torch.randint(0, self.config.vocab_size, (1, self.config.seq_length))

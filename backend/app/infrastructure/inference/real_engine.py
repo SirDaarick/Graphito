@@ -35,14 +35,18 @@ class RealBimodalInferenceEngine(InferencePort):
             logger.warning(f"No se pudo cargar GraphCodeBERT: {e}. Se usará fallback simulado.")
 
         try:
+            from pathlib import Path
             from models.char_cnn.inference import CharCNNInference
-            # Si existen pesos entrenados en models/char_cnn
-            weights_path = os.path.join(project_root, "models/char_cnn/best_model.pth")
-            if os.path.exists(weights_path):
-                self.charcnn_engine = CharCNNInference(model_path=weights_path)
+            candidate_paths = [
+                Path("/models/char_cnn/best_model.pth"),
+                Path(project_root) / "models" / "char_cnn" / "best_model.pth",
+            ]
+            weights_path = next((p for p in candidate_paths if p.exists()), None)
+            if weights_path:
+                self.charcnn_engine = CharCNNInference(checkpoint_path=weights_path)
+                logger.info(f"CharCNN engine inicializado con pesos en: {weights_path}")
             else:
-                self.charcnn_engine = CharCNNInference()
-            logger.info("CharCNN engine inicializado exitosamente.")
+                logger.warning("No se encontró best_model.pth para CharCNN. Se usará fallback simulado.")
         except Exception as e:
             logger.warning(f"No se pudo cargar CharCNN: {e}. Se usará fallback simulado.")
 
@@ -59,10 +63,12 @@ class RealBimodalInferenceEngine(InferencePort):
     async def predict_synthetic_prob(self, code: str) -> float:
         if self.charcnn_engine:
             try:
-                res = self.charcnn_engine.predict(code)
-                # CharCNN devuelve dict con probabilidades
-                if isinstance(res, dict) and "ai_probability" in res:
-                    return float(res["ai_probability"])
+                res = self.charcnn_engine.predict_text(code)
+                if isinstance(res, dict):
+                    if "prob_sintetico" in res:
+                        return float(res["prob_sintetico"])
+                    elif "ai_probability" in res:
+                        return float(res["ai_probability"])
                 elif isinstance(res, (float, int)):
                     return float(res)
             except Exception as e:
