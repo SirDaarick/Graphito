@@ -1,13 +1,15 @@
 from typing import List, Optional
 import uuid
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-from app.infrastructure.database.models import Problema, CodigoFuente, TipoCodigoEnum
+from app.infrastructure.database.models import Problema, CodigoFuente, ReporteAnalisis, TipoCodigoEnum
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.presentation.schemas.problem import ProblemaCreate, ProblemaResponse
 from app.presentation.schemas.submission import CodigoFuenteCreate, CodigoFuenteResponse
+from app.presentation.schemas.analysis import ReporteAnalisisResponse
 
 
 class ProblemService:
@@ -105,9 +107,26 @@ class ProblemService:
     async def list_submissions(self, docente_id: int, problema_id: int) -> List[CodigoFuenteResponse]:
         await self.get_problem(docente_id, problema_id)
         result = await self.db.execute(
-            select(CodigoFuente).where(
+            select(CodigoFuente)
+            .options(
+                selectinload(CodigoFuente.reportes_entrega).selectinload(ReporteAnalisis.indicadores)
+            )
+            .where(
                 CodigoFuente.problema_id == problema_id,
                 CodigoFuente.tipo == TipoCodigoEnum.ENTREGA_ALUMNO,
             )
+            .order_by(CodigoFuente.created_at.desc())
         )
-        return [CodigoFuenteResponse.model_validate(c) for c in result.scalars().all()]
+        codigos = result.scalars().all()
+        response_list: List[CodigoFuenteResponse] = []
+        for c in codigos:
+            resp = CodigoFuenteResponse.model_validate(c)
+            if c.reportes_entrega:
+                sorted_reports = sorted(
+                    c.reportes_entrega,
+                    key=lambda r: r.fecha_analisis,
+                    reverse=True,
+                )
+                resp.reporte = ReporteAnalisisResponse.model_validate(sorted_reports[0])
+            response_list.append(resp)
+        return response_list

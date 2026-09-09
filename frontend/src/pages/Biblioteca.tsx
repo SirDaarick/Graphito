@@ -1,16 +1,9 @@
 import { useState, useEffect } from "react";
-import { ReferenceCard } from "../components/layout/ReferenceCard";
+import { ReferenceCard, Comparison } from "../components/layout/ReferenceCard";
 import { PaginationControls } from "../components/ui/PaginationControls";
 import { SearchBar } from "../components/layout/SearchBar";
 import { api, Problema } from "../lib/api";
 import { Loader2 } from "lucide-react";
-
-interface Comparison {
-    id: string;
-    title: string;
-    subtitle: string;
-    similarity: number;
-}
 
 interface Reference {
     id: string;
@@ -62,12 +55,25 @@ export function Biblioteca({
                                     year: "numeric",
                                 }),
                                 activeComparisons: subs.length,
-                                comparisons: subs.map((s, idx) => ({
-                                    id: String(s.id),
-                                    title: `${s.autor}`,
-                                    subtitle: `Entrega #${idx + 1} (${s.lenguaje})`,
-                                    similarity: 0,
-                                })),
+                                comparisons: subs.map((s, idx) => {
+                                    const rep = s.reporte;
+                                    const similarity = rep ? Math.round(rep.similitud_semantica * 100) : 0;
+                                    const subtitle = rep
+                                        ? `Dictamen: ${rep.dictamen} (${s.lenguaje})`
+                                        : `Entrega #${idx + 1} (${s.lenguaje})`;
+
+                                    return {
+                                        id: String(rep?.id || s.id),
+                                        title: `${s.autor}`,
+                                        subtitle,
+                                        similarity,
+                                        similitud_semantica: rep?.similitud_semantica,
+                                        probabilidad_ia: rep?.probabilidad_ia,
+                                        discrepancia_score: rep?.discrepancia_score,
+                                        dictamen: rep?.dictamen,
+                                        indicadores: rep?.indicadores,
+                                    };
+                                }),
                             } as Reference;
                         })
                     );

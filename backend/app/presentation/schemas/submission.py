@@ -3,6 +3,7 @@ from typing import Optional
 import uuid
 from pydantic import BaseModel, ConfigDict
 from app.infrastructure.database.models import TipoCodigoEnum
+from app.presentation.schemas.analysis import ReporteAnalisisResponse
 
 
 class CodigoFuenteCreate(BaseModel):
@@ -23,3 +24,4 @@ class CodigoFuenteResponse(BaseModel):
     contenido: str
     lenguaje: str
     created_at: datetime
+    reporte: Optional[ReporteAnalisisResponse] = None

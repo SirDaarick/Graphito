@@ -78,6 +78,7 @@ export interface CodigoFuente {
     contenido: string;
     lenguaje: string;
     created_at: string;
+    reporte?: ReporteAnalisis;
 }
 
 export interface IndicadorIntegridad {

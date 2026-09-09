@@ -3,11 +3,16 @@ import { Calendar, GitCompare, ChevronDown, Plus } from "lucide-react"
 import { GradientButton } from "../ui/GradientButton"
 import { cn } from "../../lib/utils";
 
-interface Comparison {
+export interface Comparison {
     id: string
     title: string
     subtitle: string
     similarity: number
+    similitud_semantica?: number
+    probabilidad_ia?: number
+    discrepancia_score?: number
+    dictamen?: string
+    indicadores?: any[]
 }
 
 interface ReferenceCardProps {
