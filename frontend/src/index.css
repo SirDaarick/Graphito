@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-slate-50 text-slate-900 dark:bg-graphito-dark dark:text-white transition-colors duration-200 min-h-screen;
+  }
+}

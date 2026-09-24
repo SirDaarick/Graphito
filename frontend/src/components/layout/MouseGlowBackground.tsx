@@ -132,9 +132,9 @@ export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
     }, []);
 
     return (
-        <div className="relative min-h-screen bg-graphito-dark overflow-hidden font-body">
+        <div className="relative min-h-screen bg-slate-50 dark:bg-graphito-dark transition-colors duration-200 overflow-hidden font-body">
             {/* Contenedores de los Resplandores (Glows) */}
-            <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+            <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-40 dark:opacity-100 transition-opacity duration-200">
                 {glows.map((glow) => {
                     const scale = glow.currentScale || 1;
                     const currentSize = glow.size * scale;
@@ -149,7 +149,7 @@ export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
                                 left: `${glow.x - currentSize / 2}px`,
                                 top: `${glow.y - currentSize / 2}px`,
                                 background: `radial-gradient(circle, ${glow.currentColor1} 0%, ${glow.currentColor2} 40%, transparent 80%)`,
-                                opacity: 0.6 + (scale - 1) * 2, // Sutil variación de opacidad también
+                                opacity: 0.6 + (scale - 1) * 2,
                             }}
                         />
                     );

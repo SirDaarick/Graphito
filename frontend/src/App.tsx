@@ -65,79 +65,83 @@ function App() {
 
     if (isCheckingAuth) {
         return (
-            <MouseGlowBackground>
-                <div className="flex h-screen items-center justify-center text-slate-300 font-medium text-sm">
-                    Cargando Graphito...
-                </div>
-            </MouseGlowBackground>
+            <div className="min-h-screen bg-slate-50 dark:bg-graphito-dark text-slate-900 dark:text-white transition-colors duration-200">
+                <MouseGlowBackground>
+                    <div className="flex h-screen items-center justify-center text-slate-600 dark:text-slate-300 font-medium text-sm">
+                        Cargando Graphito...
+                    </div>
+                </MouseGlowBackground>
+            </div>
         );
     }
 
     return (
-        <MouseGlowBackground>
-            {/* Skip link for keyboard navigation */}
-            <a
-                href="#main-content"
-                className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-graphito-blue focus:text-white focus:rounded-lg focus:font-bold"
-            >
-                Saltar al contenido principal
-            </a>
+        <div className="min-h-screen bg-slate-50 dark:bg-graphito-dark text-slate-900 dark:text-white transition-colors duration-200">
+            <MouseGlowBackground>
+                {/* Skip link for keyboard navigation */}
+                <a
+                    href="#main-content"
+                    className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-graphito-blue focus:text-white focus:rounded-lg focus:font-bold"
+                >
+                    Saltar al contenido principal
+                </a>
 
-            {view === "app" ? (
-                <>
-                    <Header
-                        currentUser={currentUser}
-                        onNewCode={() => setIsNewCodeModalOpen(true)}
-                        onLogout={handleLogout}
-                        onViewComparison={(comp) => {
-                            setSelectedComparison(comp);
-                            setIsSimilarityReportOpen(true);
-                        }}
+                {view === "app" ? (
+                    <>
+                        <Header
+                            currentUser={currentUser}
+                            onNewCode={() => setIsNewCodeModalOpen(true)}
+                            onLogout={handleLogout}
+                            onViewComparison={(comp) => {
+                                setSelectedComparison(comp);
+                                setIsSimilarityReportOpen(true);
+                            }}
+                        />
+                        <Biblioteca
+                            key={refreshKey}
+                            onCompare={() => setIsNewComparisonModalOpen(true)}
+                            onComparisonClick={(comp) => {
+                                setSelectedComparison(comp);
+                                setIsSimilarityReportOpen(true);
+                            }}
+                        />
+                        <NewReferenceModal
+                            isOpen={isNewCodeModalOpen}
+                            onClose={() => {
+                                setIsNewCodeModalOpen(false);
+                                setRefreshKey((prev) => prev + 1);
+                            }}
+                        />
+                        <NewComparisonModal
+                            isOpen={isNewComparisonModalOpen}
+                            onClose={() => {
+                                setIsNewComparisonModalOpen(false);
+                                setRefreshKey((prev) => prev + 1);
+                            }}
+                            onAnalysisComplete={(report) => {
+                                setSelectedComparison(report);
+                                setIsSimilarityReportOpen(true);
+                            }}
+                        />
+                        <SimilarityReportModal
+                            isOpen={isSimilarityReportOpen}
+                            onClose={() => setIsSimilarityReportOpen(false)}
+                            comparison={selectedComparison}
+                        />
+                    </>
+                ) : view === "register" ? (
+                    <Register
+                        onRegister={handleRegister}
+                        onNavigateToLogin={navigateToLogin}
                     />
-                    <Biblioteca
-                        key={refreshKey}
-                        onCompare={() => setIsNewComparisonModalOpen(true)}
-                        onComparisonClick={(comp) => {
-                            setSelectedComparison(comp);
-                            setIsSimilarityReportOpen(true);
-                        }}
+                ) : (
+                    <Login
+                        onLogin={handleLogin}
+                        onNavigateToRegister={navigateToRegister}
                     />
-                    <NewReferenceModal
-                        isOpen={isNewCodeModalOpen}
-                        onClose={() => {
-                            setIsNewCodeModalOpen(false);
-                            setRefreshKey((prev) => prev + 1);
-                        }}
-                    />
-                    <NewComparisonModal
-                        isOpen={isNewComparisonModalOpen}
-                        onClose={() => {
-                            setIsNewComparisonModalOpen(false);
-                            setRefreshKey((prev) => prev + 1);
-                        }}
-                        onAnalysisComplete={(report) => {
-                            setSelectedComparison(report);
-                            setIsSimilarityReportOpen(true);
-                        }}
-                    />
-                    <SimilarityReportModal
-                        isOpen={isSimilarityReportOpen}
-                        onClose={() => setIsSimilarityReportOpen(false)}
-                        comparison={selectedComparison}
-                    />
-                </>
-            ) : view === "register" ? (
-                <Register
-                    onRegister={handleRegister}
-                    onNavigateToLogin={navigateToLogin}
-                />
-            ) : (
-                <Login
-                    onLogin={handleLogin}
-                    onNavigateToRegister={navigateToRegister}
-                />
-            )}
-        </MouseGlowBackground>
+                )}
+            </MouseGlowBackground>
+        </div>
     );
 }
 
