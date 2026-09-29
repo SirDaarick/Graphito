@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    @apply bg-slate-50 text-slate-900 dark:bg-graphito-dark dark:text-white transition-colors duration-200 min-h-[100dvh];
+  }
+}
+
+/* Animaciones GPU-friendly para orbes de fondo (evita parpadeos en tablets/móviles) */
+@keyframes ambient-float-1 {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(60px, -40px, 0) scale(1.08);
+  }
+}
+
+@keyframes ambient-float-2 {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-50px, 50px, 0) scale(0.95);
+  }
+}
+
+@keyframes ambient-float-3 {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(40px, 60px, 0) scale(1.05);
+  }
+}
+
+.animate-glow-1 {
+  animation: ambient-float-1 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-glow-2 {
+  animation: ambient-float-2 22s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-glow-3 {
+  animation: ambient-float-3 26s ease-in-out infinite;
+  will-change: transform;
+}

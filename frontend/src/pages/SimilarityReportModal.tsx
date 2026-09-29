@@ -166,20 +166,20 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
             {/* Backdrop */}
             <div
                 ref={backdropRef}
-                className={`absolute inset-0 bg-black/80 backdrop-blur-md opacity-0`}
+                className={`absolute inset-0 bg-black/80 backdrop-blur-sm opacity-0`}
                 onClick={onClose}
             />
 
             {/* Modal Content */}
             <div ref={contentRef} className={`w-full max-w-5xl opacity-0 transform translate-y-8 scale-95`}>
-                <AuthCard className="w-full p-0 overflow-hidden border-[#2b3346]/60 backdrop-blur-2xl bg-[#0f1522]/90">
+                <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
 
                     <div className="flex flex-col h-full max-h-[90vh]">
                         {/* Top Navigation Bar */}
-                        <div className="flex items-center justify-between px-8 py-4 border-b border-[#2b3346]/40 bg-black/20">
+                        <div className="flex items-center justify-between px-8 py-4 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/20">
                             <button
                                 onClick={onClose}
-                                className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                                 <ArrowLeft size={16} />
                                 Volver a la biblioteca
@@ -189,33 +189,33 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                         {/* Header */}
                         <div className="px-10 pt-8 pb-6 flex items-start justify-between">
                             <div>
-                                <h2 className="text-3xl font-display font-black text-white tracking-tight">
+                                <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white tracking-tight">
                                     Reporte de similitud
                                 </h2>
-                                <div className="flex items-center gap-4 mt-2 text-sm text-slate-400 font-medium">
+                                <div className="flex items-center gap-4 mt-2 text-sm text-slate-600 dark:text-slate-400 font-medium">
                                     <span>Proyecto: {comparison.title}</span>
-                                    <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                                    <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-600"></span>
                                     <span>14 de Abril, 2026</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 bg-[#1a2031] border border-[#2b3346] px-4 py-2 rounded-full">
+                            <div className="flex items-center gap-2 bg-slate-100 dark:bg-[#1a2031] border border-slate-200 dark:border-[#2b3346] px-4 py-2 rounded-full">
                                 <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
-                                <span className="text-xs font-bold text-slate-300">Análisis completado</span>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Análisis completado</span>
                             </div>
                         </div>
 
                         {/* Body */}
-                        <div className="flex-1 overflow-y-auto px-10 pb-8 scrollbar-thin scrollbar-thumb-[#2b3346] scrollbar-track-transparent">
+                        <div className="flex-1 overflow-y-auto px-10 pb-8 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent">
                             {/* DSS Institutional Banner */}
-                            <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-200">
-                                <Info size={18} className="shrink-0 text-blue-400" />
+                            <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-700 dark:text-blue-200">
+                                <Info size={18} className="shrink-0 text-blue-500 dark:text-blue-400" />
                                 <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee métricas periciales automatizadas sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
                                 {/* Left Column: Big Chart */}
-                                <div className="lg:col-span-4 flex flex-col items-center justify-center p-8 bg-[#121827]/40 border border-[#2b3346]/60 rounded-3xl h-full">
+                                <div className="lg:col-span-4 flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl h-full">
 
                                     {/* Circular Graph */}
                                     <div className="relative w-64 h-64 flex items-center justify-center">
@@ -225,7 +225,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                                 cx="128"
                                                 cy="128"
                                                 r={radius}
-                                                className="stroke-[#2b3346] fill-none"
+                                                className="stroke-slate-200 dark:stroke-[#2b3346] fill-none"
                                                 strokeWidth="16"
                                             />
 
@@ -253,7 +253,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
 
                                         {/* Score Text */}
                                         <div className="absolute flex flex-col items-center justify-center text-center px-4">
-                                            <span className="text-5xl font-black text-white tracking-tight">
+                                            <span className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">
                                                 {overallScore}%
                                             </span>
                                             <span className={`text-xs font-bold uppercase tracking-wider mt-1.5 ${auditInfo.color}`}>
@@ -262,8 +262,8 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         </div>
                                     </div>
 
-                                    <h3 className="text-lg font-bold text-white mt-8 mb-2">Similitud total</h3>
-                                    <p className="text-sm text-center text-slate-400">
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-2">Similitud total</h3>
+                                    <p className="text-sm text-center text-slate-600 dark:text-slate-400">
                                         Se detectó una coincidencia {overallScore > 50 ? 'significativa' : 'menor'} en la estructura lógica central del código analizado.
                                     </p>
                                 </div>
@@ -275,21 +275,21 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">
 
                                         {/* Stylometry Card */}
-                                        <div className="bg-[#121827]/40 border border-[#2b3346]/60 rounded-3xl p-6 hover:bg-[#121827]/60 transition-colors">
+                                        <div className="bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 hover:bg-slate-100/50 dark:hover:bg-[#121827]/60 transition-colors">
                                             <div className="flex items-center gap-3 mb-6">
                                                 <div className="w-10 h-10 rounded-xl bg-graphito-violet/10 flex items-center justify-center text-graphito-violet">
                                                     <Settings size={20} />
                                                 </div>
-                                                <h4 className="font-bold text-white">Análisis estilométrico</h4>
+                                                <h4 className="font-bold text-slate-900 dark:text-white">Análisis estilométrico</h4>
                                             </div>
 
                                             <div className="space-y-4">
                                                 <div>
-                                                    <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
                                                         <span>Probabilidad de IA</span>
-                                                        <span className="text-white">{aiPct}%</span>
+                                                        <span className="text-slate-900 dark:text-white">{aiPct}%</span>
                                                     </div>
-                                                    <div className="h-1.5 w-full bg-[#2b3346]/60 rounded-full overflow-hidden">
+                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-graphito-violet rounded-full transition-all duration-1000 ease-out"
                                                             style={{ width: isAnimating ? `${aiPct}%` : '0%' }}
@@ -300,19 +300,19 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                                 <ul className="space-y-3 mt-6">
                                                     {comparison.indicadores && comparison.indicadores.length > 0 ? (
                                                         comparison.indicadores.map((ind, idx) => (
-                                                            <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-300">
-                                                                <CheckCircle2 size={16} className={`${ind.severidad === 'ALTA' || ind.severidad === 'CRITICA' ? 'text-orange-400' : 'text-slate-500'} shrink-0 mt-0.5`} />
-                                                                <span><strong className="text-white">{ind.tipo_alerta}:</strong> {ind.descripcion}</span>
+                                                            <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                                                <CheckCircle2 size={16} className={`${ind.severidad === 'ALTA' || ind.severidad === 'CRITICA' ? 'text-orange-500 dark:text-orange-400' : 'text-slate-400 dark:text-slate-500'} shrink-0 mt-0.5`} />
+                                                                <span><strong className="text-slate-900 dark:text-white">{ind.tipo_alerta}:</strong> {ind.descripcion}</span>
                                                             </li>
                                                         ))
                                                     ) : (
                                                         <>
-                                                            <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                                                                <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
+                                                            <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                                                <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
                                                                 <span>Nomenclatura y patrones sintácticos analizados con CharCNN.</span>
                                                             </li>
-                                                            <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                                                                <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
+                                                            <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                                                <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
                                                                 <span>Estructura léxica y regularidad de comentarios evaluada.</span>
                                                             </li>
                                                         </>
@@ -322,21 +322,21 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         </div>
 
                                         {/* Semantic Card */}
-                                        <div className="bg-[#121827]/40 border border-[#2b3346]/60 rounded-3xl p-6 hover:bg-[#121827]/60 transition-colors">
+                                        <div className="bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 hover:bg-slate-100/50 dark:hover:bg-[#121827]/60 transition-colors">
                                             <div className="flex items-center gap-3 mb-6">
                                                 <div className="w-10 h-10 rounded-xl bg-graphito-blue/10 flex items-center justify-center text-graphito-blue">
                                                     <PlayCircle size={20} />
                                                 </div>
-                                                <h4 className="font-bold text-white">Análisis semántico</h4>
+                                                <h4 className="font-bold text-slate-900 dark:text-white">Análisis semántico</h4>
                                             </div>
 
                                             <div className="space-y-4">
                                                 <div>
-                                                    <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
                                                         <span>Similitud de flujo DFG</span>
-                                                        <span className="text-white">{semanticPct}%</span>
+                                                        <span className="text-slate-900 dark:text-white">{semanticPct}%</span>
                                                     </div>
-                                                    <div className="h-1.5 w-full bg-[#2b3346]/60 rounded-full overflow-hidden">
+                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-graphito-blue rounded-full transition-all duration-1000 ease-out"
                                                             style={{ width: isAnimating ? `${semanticPct}%` : '0%' }}
@@ -345,12 +345,12 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                                 </div>
 
                                                 <ul className="space-y-3 mt-6">
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
+                                                    <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                                        <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
                                                         <span>Grafo de flujo de datos (DFG) comparado contra soluciones canónicas.</span>
                                                     </li>
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-500 shrink-0" />
+                                                    <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                                        <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
                                                         <span>Invarianza ante renombramiento de variables y reordenamiento de bloques.</span>
                                                     </li>
                                                 </ul>
@@ -360,17 +360,22 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                     </div>
 
                                     {/* Bottom row: AI Interpretation (Typewriter) */}
-                                    <div className="bg-[#121827]/60 border border-[#2b3346]/60 rounded-3xl p-6 flex-1 hover:border-[#334155] transition-colors relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 w-64 h-64 bg-graphito-blue/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                    <div className="bg-slate-50 dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 flex-1 hover:border-slate-300 dark:hover:border-[#334155] transition-colors relative overflow-hidden group">
+                                        <div
+                                            className="absolute top-0 right-0 w-64 h-64 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
+                                            style={{
+                                                background: "radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.03) 40%, transparent 70%)"
+                                            }}
+                                        />
 
                                         <div className="flex items-center gap-4 mb-4">
                                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-graphito-blue to-graphito-violet flex items-center justify-center text-white shadow-lg shadow-graphito-blue/20">
                                                 <Sparkles size={24} />
                                             </div>
-                                            <h4 className="text-lg font-bold text-white">Interpretación del análisis</h4>
+                                            <h4 className="text-lg font-bold text-slate-900 dark:text-white">Interpretación del análisis</h4>
                                         </div>
 
-                                        <div className="text-sm font-medium text-slate-300 leading-relaxed max-w-3xl whitespace-pre-line break-words format-text min-h-[120px]">
+                                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed max-w-3xl whitespace-pre-line break-words format-text min-h-[120px]">
                                             {typewriterText}
                                             {/* Blinking cursor */}
                                             <span className="inline-block w-1.5 h-4 bg-graphito-blue ml-1 animate-pulse align-middle"></span>
@@ -382,7 +387,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between px-10 py-6 border-t border-[#2b3346]/40 bg-black/40 mt-auto shrink-0">
+                        <div className="flex items-center justify-between px-10 py-6 border-t border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/40 mt-auto shrink-0">
                             <div className="text-xs font-medium text-slate-500">
                                 Documento: {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
                             </div>
@@ -392,7 +397,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         alert("Entrega validada como Conforme por el docente.");
                                         onClose();
                                     }}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 active:scale-95 text-xs font-bold transition-all"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/20 active:scale-95 text-xs font-bold transition-all"
                                     title="El docente valida la entrega como autoría legítima"
                                 >
                                     <ShieldCheck size={16} />
@@ -403,7 +408,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         alert("Entrega marcada para entrevista y defensa oral con el estudiante.");
                                         onClose();
                                     }}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all"
                                     title="El docente cita al alumno para justificar sus decisiones de código"
                                 >
                                     <UserCheck size={16} />
@@ -412,11 +417,11 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                 <button
                                     onClick={handleDownloadPdf}
                                     disabled={isDownloadingPdf || !comparison.id}
-                                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#2b3346] text-xs font-bold text-white hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 dark:border-[#2b3346] text-xs font-bold text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
                                     {isDownloadingPdf ? (
                                         <>
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <div className="w-4 h-4 border-2 border-slate-400 dark:border-white/30 border-t-graphito-blue dark:border-t-white rounded-full animate-spin" />
                                             <span>Generando...</span>
                                         </>
                                     ) : (

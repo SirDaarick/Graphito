@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "supersecretjwtkey_change_in_production_123456789"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    GOOGLE_CLIENT_ID: str = ""
 
     # CORS
     CORS_ORIGINS: List[str] = [

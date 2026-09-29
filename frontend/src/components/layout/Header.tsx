@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, ChevronDown, X, FileText } from "lucide-react";
+import { Bell, ChevronDown, X, FileText, Sun, Moon } from "lucide-react";
 import { GradientButton } from "../ui/GradientButton";
 import { Docente } from "../../lib/api";
+import { useTheme } from "../../context/ThemeContext";
 
 import logo from "../../assets/logo.png";
 
@@ -28,6 +29,8 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
     const [showNotifications, setShowNotifications] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const { isDark, toggleTheme } = useTheme();
+
 
     const notifRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
@@ -60,7 +63,7 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
     };
 
     return (
-        <header className="w-full bg-graphito-dark border-b border-graphito-border px-6 py-4">
+        <header className="w-full bg-white dark:bg-graphito-dark border-b border-slate-200 dark:border-graphito-border px-6 py-4 transition-colors duration-200">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
 
                 {/* Lado Izquierdo: Logo y Nav */}
@@ -77,19 +80,19 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                     </div>
 
                     <nav className="hidden md:flex items-center gap-6">
-                        <a href="#" className="font-body text-sm font-semibold text-white border-b-2 border-graphito-blue pb-1">
+                        <a href="#" className="font-body text-sm font-semibold text-slate-800 dark:text-white border-b-2 border-graphito-blue pb-1">
                             Biblioteca
                         </a>
                         <a
                             href="https://github.com/SirDaarick/Graphito"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-slate-400 hover:text-white transition-colors"
+                            className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
                             aria-label="Repositorio de GitHub"
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-current">
-                                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z" />
-                                </svg>
+                                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z" />
+                            </svg>
                         </a>
                     </nav>
                 </div>
@@ -101,6 +104,20 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                         <span>+ Nuevo código</span>
                     </GradientButton>
 
+                    {/* Botón Switch Modo Claro / Oscuro */}
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-graphito-card rounded-full transition-all focus-visible:outline-none"
+                        aria-label="Cambiar tema"
+                        title={isDark ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
+                    >
+                        {isDark ? (
+                            <Sun size={20} className="text-amber-400 hover:rotate-45 transition-transform" />
+                        ) : (
+                            <Moon size={20} className="text-slate-700 hover:-rotate-12 transition-transform" />
+                        )}
+                    </button>
+
                     {/* Campana de notificaciones */}
                     <div className="relative" ref={notifRef}>
                         <button
@@ -109,22 +126,22 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                                 setShowNotifications(!showNotifications);
                                 setShowUserMenu(false);
                             }}
-                            className="relative p-2 text-slate-400 hover:text-white hover:bg-graphito-card rounded-full transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                            className="relative p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-card rounded-full transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                             aria-label="Notificaciones"
                         >
                             <Bell size={20} />
                             {notifications.length > 0 && (
-                                <span className="absolute top-2 right-2 w-2 h-2 bg-risk-high rounded-full border-2 border-graphito-dark"></span>
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-risk-high rounded-full border-2 border-white dark:border-graphito-dark"></span>
                             )}
                         </button>
 
                         {/* Dropdown de notificaciones */}
                         {showNotifications && (
-                            <div className="absolute right-0 top-12 w-80 bg-graphito-card border border-graphito-border rounded-2xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
-                                <div className="flex items-center justify-between px-4 py-3 border-b border-graphito-border">
-                                    <h3 className="text-sm font-bold text-white">Notificaciones</h3>
+                            <div className="absolute right-0 top-12 w-80 bg-white dark:bg-graphito-card border border-slate-200 dark:border-graphito-border rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 z-50 overflow-hidden">
+                                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-graphito-border">
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
                                     {notifications.length > 0 && (
-                                        <span className="text-[10px] font-bold text-slate-500 bg-graphito-dark px-2 py-0.5 rounded-full">
+                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-graphito-dark px-2 py-0.5 rounded-full">
                                             {notifications.length}
                                         </span>
                                     )}
@@ -135,20 +152,20 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                                             <div
                                                 key={notif.id}
                                                 onClick={() => handleReportClick(notif.comparison)}
-                                                className="px-4 py-3 border-b border-graphito-border/50 hover:bg-graphito-dark/50 transition-colors cursor-pointer"
+                                                className="px-4 py-3 border-b border-slate-100 dark:border-graphito-border/50 hover:bg-slate-50 dark:hover:bg-graphito-dark/50 transition-colors cursor-pointer"
                                             >
                                                 <div className="flex items-start gap-2 mb-2">
                                                     <div className="w-5 h-5 rounded-full bg-graphito-blue/20 flex items-center justify-center shrink-0 mt-0.5">
                                                         <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-semibold text-white leading-tight">
+                                                        <p className="text-xs font-semibold text-slate-800 dark:text-white leading-tight">
                                                             Comparación terminada
                                                         </p>
-                                                        <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
                                                             {notif.comparison.title}
                                                         </p>
-                                                        <p className="text-[10px] text-slate-500 mt-0.5">
+                                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                                                             {notif.comparison.subtitle}
                                                         </p>
                                                     </div>
@@ -159,7 +176,7 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                                                             e.stopPropagation();
                                                             handleReportClick(notif.comparison);
                                                         }}
-                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white bg-graphito-blue/20 hover:bg-graphito-blue/40 rounded-lg transition-colors"
+                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-graphito-blue bg-graphito-blue/10 dark:text-white dark:bg-graphito-blue/20 hover:bg-graphito-blue/30 rounded-lg transition-colors"
                                                     >
                                                         <FileText size={11} />
                                                         Reporte
@@ -169,7 +186,7 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                                                             e.stopPropagation();
                                                             dismissNotification(notif.id);
                                                         }}
-                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium text-slate-400 hover:text-white hover:bg-graphito-dark rounded-lg transition-colors"
+                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-dark rounded-lg transition-colors"
                                                     >
                                                         <X size={11} />
                                                         Cerrar
@@ -187,7 +204,7 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                         )}
                     </div>
 
-                    <div className="h-8 w-[1px] bg-graphito-border"></div>
+                    <div className="h-8 w-[1px] bg-slate-200 dark:bg-graphito-border"></div>
 
                     {/* Menú de usuario */}
                     <div className="relative" ref={userMenuRef}>
@@ -201,27 +218,27 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                             aria-label="Menú de usuario"
                         >
                             <div className="relative">
-                                <div className="w-10 h-10 rounded-full bg-graphito-card border border-graphito-border overflow-hidden ring-2 ring-transparent group-hover:ring-graphito-blue/50 transition-all">
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-graphito-card border border-slate-200 dark:border-graphito-border overflow-hidden ring-2 ring-transparent group-hover:ring-graphito-blue/50 transition-all">
                                     <div className="w-full h-full bg-gradient-to-tr from-slate-700 to-slate-500 flex items-center justify-center text-white font-bold">
                                         {(currentUser?.nombre || "D").charAt(0).toUpperCase()}
                                     </div>
                                 </div>
-                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-graphito-dark rounded-full"></div>
+                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-graphito-dark rounded-full"></div>
                             </div>
 
                             <div className="hidden lg:block text-left">
-                                <p className="font-body text-xs font-bold text-white leading-none">
+                                <p className="font-body text-xs font-bold text-slate-800 dark:text-white leading-none">
                                     {currentUser?.nombre || "Docente"}
                                 </p>
                             </div>
-                            <ChevronDown size={14} className="text-slate-500 group-hover:text-white transition-colors" />
+                            <ChevronDown size={14} className="text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
                         </button>
 
                         {/* Dropdown del usuario */}
                         {showUserMenu && (
-                            <div className="absolute right-0 top-12 w-48 bg-graphito-card border border-graphito-border rounded-xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
-                                <div className="px-4 py-3 border-b border-graphito-border">
-                                    <p className="text-xs font-bold text-white truncate">
+                            <div className="absolute right-0 top-12 w-48 bg-white dark:bg-graphito-card border border-slate-200 dark:border-graphito-border rounded-xl shadow-2xl shadow-black/10 dark:shadow-black/40 z-50 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-slate-200 dark:border-graphito-border">
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                                         {currentUser?.nombre || "Docente"}
                                     </p>
                                     <p className="text-[10px] text-slate-500 truncate">
@@ -234,7 +251,7 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                                             e.stopPropagation();
                                             handleLogout();
                                         }}
-                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-graphito-dark transition-colors"
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-dark transition-colors"
                                     >
                                         <span>Cerrar sesión</span>
                                     </button>

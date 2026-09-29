@@ -1,163 +1,112 @@
-import { useEffect, useState, useRef, ReactNode } from "react";
-
-interface Glow {
-    id: number;
-    x: number;
-    y: number;
-    baseX: number;
-    baseY: number;
-    size: number;
-    colorPhase: number;
-    colorSpeed: number;
-    scalePhase: number;
-    scaleSpeed: number;
-    scaleAmplitude: number;
-    angleOffset: number; // For diamond rotation
-    orbitBaseRadius: number; // Base distance from center
-    orbitPhase: number; // For radius pulsing
-    orbitSpeed: number; // Frequency of radius variation
-    currentScale?: number;
-    currentColor1?: string;
-    currentColor2?: string;
-}
+import { useEffect, useRef, useState, ReactNode } from "react";
 
 interface MouseGlowBackgroundProps {
     children: ReactNode;
 }
 
 export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
-    // Función para generar posiciones aleatorias distribuidas
-    const generateInitialGlows = (): Glow[] => {
-        return [0, 1, 2].map((i) => ({
-            id: i + 1,
-            x: 0,
-            y: 0,
-            baseX: 50,
-            baseY: 50,
-            size: 800 + Math.random() * 600,
-            colorPhase: Math.random() * Math.PI * 2,
-            colorSpeed: 0.1 + Math.random() * 0.2, // Cambio de color muy gradual
-            scalePhase: Math.random() * Math.PI * 2,
-            scaleSpeed: 0.04 + Math.random() * 0.08, // Mucho más lento (pulsación casi imperceptible)
-            scaleAmplitude: 0.1 + Math.random() * 0.1,
-            angleOffset: (i * Math.PI * 2) / 3, // 0, 120, 240 degrees (formación triangular para 3 puntos)
-            orbitBaseRadius: 50 + Math.random() * 35, // Mucho más expansivos (entre 50% y 85% del viewport)
-            orbitPhase: Math.random() * Math.PI * 2,
-            orbitSpeed: 0.02 + Math.random() * 0.03, // Movimiento radial muy lento
-        }));
-    };
-
-    const [_mousePosition, _setMousePosition] = useState({ x: 0, y: 0 });
-    const [glows, setGlows] = useState<Glow[]>(generateInitialGlows);
-
-    const requestRef = useRef<number>();
-    const mouseRef = useRef({ x: 0, y: 0 });
+    const mouseBlobRef = useRef<HTMLDivElement>(null);
+    const [isTouch, setIsTouch] = useState(false);
 
     useEffect(() => {
-        const handleMouseMove = (event: MouseEvent) => {
-            mouseRef.current = { x: event.clientX, y: event.clientY };
+        // Detectar si el dispositivo es táctil (tablet o móvil) o sin puntero fino
+        const isTouchDevice =
+            "ontouchstart" in window ||
+            navigator.maxTouchPoints > 0 ||
+            window.matchMedia("(pointer: coarse)").matches;
+
+        setIsTouch(isTouchDevice);
+
+        if (isTouchDevice) {
+            // En tablets/móviles NO corremos ningún loop de animación JS ni listeners de mouse.
+            // Los orbes flotan 100% mediante animaciones CSS optimizadas en el GPU compositor.
+            return;
+        }
+
+        // En pantallas desktop con mouse físico, seguimos suavemente el cursor sin re-renderizar React
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let currentX = mouseX;
+        let currentY = mouseY;
+        let rafId: number;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        };
+
+        const updatePosition = () => {
+            // Suavizado lerp sin provocar re-renders de React
+            currentX += (mouseX - currentX) * 0.05;
+            currentY += (mouseY - currentY) * 0.05;
+
+            if (mouseBlobRef.current) {
+                mouseBlobRef.current.style.transform = `translate3d(${currentX - 350}px, ${currentY - 350}px, 0)`;
+            }
+
+            rafId = requestAnimationFrame(updatePosition);
         };
 
         window.addEventListener("mousemove", handleMouseMove, { passive: true });
-
-        const animate = (time: number) => {
-            const seconds = time * 0.001;
-            const globalRotationSpeed = 0.025; // Rotación global extremadamente lenta
-
-            // RGB Values from tailwind config
-            const blueRGB = [59, 130, 246];
-            const violetRGB = [167, 139, 250];
-
-            setGlows((prevGlows) =>
-                prevGlows.map((glow) => {
-                    // Variar el radio de órbita dinámicamente de forma más amplia para que salgan de pantalla
-                    const currentOrbitRadius = glow.orbitBaseRadius + Math.sin(seconds * glow.orbitSpeed + glow.orbitPhase) * 20;
-
-                    // Calcular nueva posición base rotando (con radio variable)
-                    const currentAngle = seconds * globalRotationSpeed + glow.angleOffset;
-                    const bX_pct = 50 + Math.cos(currentAngle) * currentOrbitRadius;
-                    const bY_pct = 50 + Math.sin(currentAngle) * currentOrbitRadius;
-
-                    // Convertir porcentajes base a píxeles
-                    const bX = (bX_pct / 100) * window.innerWidth;
-                    const bY = (bY_pct / 100) * window.innerHeight;
-
-                    // Aumentamos el radio de influencia y la intensidad de atracción hacia el mouse
-                    const influenceRadius = 600;
-                    const attractIntensity = 0.45; // 45% de atracción hacia el mouse
-
-                    // Dirección desde la base hacia el mouse
-                    const dx = mouseRef.current.x - bX;
-                    const dy = mouseRef.current.y - bY;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    // Punto objetivo relativo a la base
-                    let targetX = bX;
-                    let targetY = bY;
-
-                    if (distance > 0) {
-                        const moveRatio = Math.min(distance, influenceRadius) / distance;
-                        targetX = bX + dx * moveRatio * attractIntensity;
-                        targetY = bY + dy * moveRatio * attractIntensity;
-                    }
-
-                    // Suavizado (Lerp) para el movimiento
-                    const newX = glow.x + (targetX - glow.x) * 0.02;
-                    const newY = glow.y + (targetY - glow.y) * 0.02;
-
-                    // Update scale based on time using sine wave
-                    const currentScale = 1 + Math.sin(seconds * glow.scaleSpeed + glow.scalePhase) * glow.scaleAmplitude;
-
-                    // Color interpolation logic
-                    const colorT = (Math.sin(seconds * glow.colorSpeed + glow.colorPhase) + 1) / 2;
-                    const r = Math.round(blueRGB[0] * (1 - colorT) + violetRGB[0] * colorT);
-                    const g = Math.round(blueRGB[1] * (1 - colorT) + violetRGB[1] * colorT);
-                    const b = Math.round(blueRGB[2] * (1 - colorT) + violetRGB[2] * colorT);
-
-                    const currentColor1 = `rgba(${r}, ${g}, ${b}, 0.22)`;
-                    const currentColor2 = `rgba(${r}, ${g}, ${b}, 0.08)`;
-
-                    return { ...glow, x: newX, y: newY, currentScale, currentColor1, currentColor2 };
-                })
-            );
-            requestRef.current = requestAnimationFrame(animate);
-        };
-
-        requestRef.current = requestAnimationFrame(animate);
+        rafId = requestAnimationFrame(updatePosition);
 
         return () => {
             window.removeEventListener("mousemove", handleMouseMove);
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+            cancelAnimationFrame(rafId);
         };
     }, []);
 
     return (
-        <div className="relative min-h-screen bg-graphito-dark overflow-hidden font-body">
+        <div className="relative min-h-[100dvh] bg-slate-50 dark:bg-graphito-dark transition-colors duration-200 overflow-hidden font-body">
             {/* Contenedores de los Resplandores (Glows) */}
-            <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-                {glows.map((glow) => {
-                    const scale = glow.currentScale || 1;
-                    const currentSize = glow.size * scale;
+            <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-40 dark:opacity-80 transition-opacity duration-300">
+                {/* Orbe 1: Superior izquierdo (Azul primario Graphito) */}
+                <div
+                    className="absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full animate-glow-1 pointer-events-none"
+                    style={{
+                        background: "radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0.12) 25%, rgba(59, 130, 246, 0.04) 50%, transparent 70%)",
+                        transform: "translateZ(0)",
+                        backfaceVisibility: "hidden",
+                    }}
+                />
 
-                    return (
-                        <div
-                            key={glow.id}
-                            className="absolute rounded-full transition-opacity duration-1000 blur-[80px]"
-                            style={{
-                                width: `${currentSize}px`,
-                                height: `${currentSize}px`,
-                                left: `${glow.x - currentSize / 2}px`,
-                                top: `${glow.y - currentSize / 2}px`,
-                                background: `radial-gradient(circle, ${glow.currentColor1} 0%, ${glow.currentColor2} 40%, transparent 80%)`,
-                                opacity: 0.6 + (scale - 1) * 2, // Sutil variación de opacidad también
-                            }}
-                        />
-                    );
-                })}
+                {/* Orbe 2: Inferior derecho (Violeta Graphito) */}
+                <div
+                    className="absolute -bottom-32 -right-32 w-[650px] h-[650px] rounded-full animate-glow-2 pointer-events-none"
+                    style={{
+                        background: "radial-gradient(circle, rgba(167, 139, 250, 0.20) 0%, rgba(167, 139, 250, 0.10) 25%, rgba(167, 139, 250, 0.03) 50%, transparent 70%)",
+                        transform: "translateZ(0)",
+                        backfaceVisibility: "hidden",
+                    }}
+                />
+
+                {/* Orbe 3: Centro-lateral flotante */}
+                <div
+                    className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[550px] h-[550px] rounded-full animate-glow-3 pointer-events-none"
+                    style={{
+                        background: "radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0.08) 25%, rgba(99, 102, 241, 0.02) 50%, transparent 70%)",
+                        transform: "translateZ(0)",
+                        backfaceVisibility: "hidden",
+                    }}
+                />
+
+                {/* Orbe interactivo: Solo activo en Desktop con mouse */}
+                {!isTouch && (
+                    <div
+                        ref={mouseBlobRef}
+                        className="absolute top-0 left-0 w-[700px] h-[700px] rounded-full transition-opacity duration-500 opacity-60 pointer-events-none"
+                        style={{
+                            background: "radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, rgba(167, 139, 250, 0.08) 30%, rgba(167, 139, 250, 0.02) 55%, transparent 70%)",
+                            transform: "translate3d(-500px, -500px, 0)",
+                            willChange: "transform",
+                            backfaceVisibility: "hidden",
+                        }}
+                    />
+                )}
             </div>
 
             {/* Contenido principal */}
-            <div className="relative z-10 w-full min-h-screen flex flex-col">
+            <div className="relative z-10 w-full min-h-[100dvh] flex flex-col">
                 {children}
             </div>
         </div>

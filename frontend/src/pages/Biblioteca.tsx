@@ -17,9 +17,11 @@ interface Reference {
 }
 
 export function Biblioteca({
+    refreshTrigger = 0,
     onCompare,
     onComparisonClick
 }: {
+    refreshTrigger?: number,
     onCompare?: () => void,
     onComparisonClick?: (comparison: Comparison) => void
 }) {
@@ -31,7 +33,10 @@ export function Biblioteca({
 
     useEffect(() => {
         const fetchProblems = async () => {
-            setIsLoading(true);
+            // Solo activamos spinner si no hay referencias cargadas todavía
+            if (references.length === 0) {
+                setIsLoading(true);
+            }
             try {
                 const problems = await api.problems.list();
                 if (problems && problems.length > 0) {
@@ -89,7 +94,7 @@ export function Biblioteca({
         };
 
         fetchProblems();
-    }, []);
+    }, [refreshTrigger]);
 
     // Filtrar referencias según el término de búsqueda
     const filteredReferences = references.filter((ref) => {
@@ -113,12 +118,12 @@ export function Biblioteca({
     };
 
     return (
-        <main id="main-content" className="max-w-7xl mx-auto p-8 flex-1 w-full flex flex-col" tabIndex={-1}>
+        <main id="main-content" className="max-w-7xl mx-auto p-8 flex-1 w-full flex flex-col transition-colors duration-200" tabIndex={-1}>
             <div className="mb-8">
-                <h2 className="text-3xl font-display font-black text-white">
+                <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white transition-colors">
                     Mi Biblioteca
                 </h2>
-                <p className="text-slate-400 font-body mt-2">
+                <p className="text-slate-600 dark:text-slate-400 font-body mt-2 transition-colors">
                     Gestiona tus soluciones de referencia en C/C++ y supervisa el análisis de similitud entre entregas del curso.
                 </p>
             </div>
@@ -126,14 +131,14 @@ export function Biblioteca({
             <SearchBar searchTerm={searchTerm} onSearchChange={handleSearchChange} />
 
             {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
                     <Loader2 className="w-8 h-8 animate-spin text-graphito-blue mb-3" />
                     <p className="text-sm font-medium">Cargando soluciones de referencia...</p>
                 </div>
             ) : filteredReferences.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 border border-dashed border-[#2b3346] rounded-2xl p-8 text-center my-4 bg-[#121827]/20">
-                    <p className="text-slate-300 font-bold text-lg mb-1">No hay soluciones de referencia registradas</p>
-                    <p className="text-slate-500 text-sm max-w-md">
+                <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-300 dark:border-[#2b3346] rounded-2xl p-8 text-center my-4 bg-white/60 dark:bg-[#121827]/20 transition-colors">
+                    <p className="text-slate-800 dark:text-slate-300 font-bold text-lg mb-1">No hay soluciones de referencia registradas</p>
+                    <p className="text-slate-600 dark:text-slate-500 text-sm max-w-md">
                         Comienza agregando tu primera solución de referencia en C o C++ haciendo clic en "Nuevo Código" en la esquina superior.
                     </p>
                 </div>

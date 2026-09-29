@@ -145,15 +145,15 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
 
             {/* Modal Content */}
             <div ref={contentRef} className={`w-full max-w-xl opacity-0 transform scale-95`}>
-                <AuthCard className="w-full p-0 overflow-hidden border-[#2b3346]/60">
+                <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60">
                     {/* Header */}
-                    <div className="flex items-center justify-between px-8 py-6 border-b border-[#2b3346]/40">
-                        <h2 className="text-xl font-display font-bold text-white">
+                    <div className="flex items-center justify-between px-8 py-6 border-b border-slate-200 dark:border-[#2b3346]/40">
+                        <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white">
                             Nueva Comparación de Código
                         </h2>
                         <button
                             onClick={onClose}
-                            className="p-1 text-slate-500 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                             <X size={20} />
                         </button>
@@ -162,21 +162,21 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
                     {/* Body */}
                     <div className="p-8 space-y-6">
                         {error && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-xs font-medium">
+                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 dark:text-red-300 text-xs font-medium">
                                 {error}
                             </div>
                         )}
 
                         {/* Select Problem */}
                         <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                            <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
                                 Ejercicio / Problema de Referencia
                             </label>
                             {problems.length > 0 ? (
                                 <select
                                     value={selectedProblemId || ""}
                                     onChange={(e) => setSelectedProblemId(Number(e.target.value))}
-                                    className="w-full bg-[#121827] border border-[#2b3346] text-white rounded-xl py-3 px-4 focus:outline-none focus:border-graphito-blue text-sm cursor-pointer"
+                                    className="w-full bg-slate-50 dark:bg-[#121827] border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-xl py-3 px-4 focus:outline-none focus:border-graphito-blue text-sm cursor-pointer"
                                 >
                                     {problems.map((p) => (
                                         <option key={p.id} value={p.id}>
@@ -185,7 +185,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
                                     ))}
                                 </select>
                             ) : (
-                                <p className="text-xs text-orange-400 font-medium">
+                                <p className="text-xs text-orange-500 font-medium">
                                     Primero crea al menos un problema en la biblioteca para comparar entregas.
                                 </p>
                             )}
@@ -193,7 +193,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
 
                         {/* Student Author */}
                         <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                            <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
                                 Alumno / Identificador de la Entrega
                             </label>
                             <input
@@ -201,24 +201,24 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
                                 value={author}
                                 onChange={(e) => setAuthor(e.target.value)}
                                 placeholder="Ej. Carlos López - Boleta 2021630987"
-                                className="w-full bg-[#121827]/40 border border-[#2b3346] text-white rounded-xl py-3 px-4 focus:outline-none focus:border-graphito-blue text-sm"
+                                className="w-full bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-xl py-3 px-4 focus:outline-none focus:border-graphito-blue text-sm"
                             />
                         </div>
 
                         {/* Upload Zone */}
                         <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                            <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
                                 Código de la Entrega {fileName && <span className="text-graphito-blue">({fileName})</span>}
                             </label>
                             <div
                                 onClick={() => fileInputRef.current?.click()}
-                                className="border-2 border-dashed border-[#2b3346] rounded-2xl p-6 flex flex-col items-center justify-center gap-3 bg-[#121827]/30 hover:bg-[#121827]/50 transition-colors cursor-pointer group"
+                                className="border-2 border-dashed border-slate-300 dark:border-[#2b3346] rounded-2xl p-6 flex flex-col items-center justify-center gap-3 bg-slate-50/50 hover:bg-slate-100/50 dark:bg-[#121827]/30 dark:hover:bg-[#121827]/50 transition-colors cursor-pointer group"
                             >
                                 <div className="w-10 h-10 rounded-xl bg-graphito-blue/10 flex items-center justify-center text-graphito-blue group-hover:scale-110 transition-transform">
                                     <Upload size={20} />
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-xs font-bold text-slate-200">
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
                                         {fileName ? "Archivo seleccionado (clic para cambiar)" : "Haz clic para subir archivo .c o .cpp"}
                                     </p>
                                 </div>
@@ -226,18 +226,18 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
                             <textarea
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
-                                className="w-full h-[100px] bg-[#121827]/40 border border-[#2b3346] rounded-xl p-3 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-graphito-blue font-mono resize-none mt-2"
+                                className="w-full h-[100px] bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-graphito-blue font-mono resize-none mt-2"
                                 placeholder="O pega el código fuente del alumno aquí..."
                             />
                         </div>
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-between px-8 py-6 border-t border-[#2b3346]/40 bg-black/5">
+                    <div className="flex items-center justify-between px-8 py-6 border-t border-slate-200 dark:border-[#2b3346]/40 bg-slate-50/50 dark:bg-black/5">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="text-sm font-bold text-slate-400 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#121827] rounded-lg px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            className="text-sm font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                             Cancelar
                         </button>

@@ -24,8 +24,8 @@ export function PaginationControls({
     return (
         <div className="flex items-center justify-between mt-10 px-2 font-body">
             {/* Texto informativo */}
-            <p className="text-sm text-slate-400">
-                Mostrando <span className="text-white font-semibold">{startItem}-{endItem}</span> de <span className="text-white font-semibold">{totalItems}</span> referencias
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+                Mostrando <span className="text-slate-900 dark:text-white font-semibold">{startItem}-{endItem}</span> de <span className="text-slate-900 dark:text-white font-semibold">{totalItems}</span> referencias
             </p>
 
             {/* Controles de página */}
@@ -35,8 +35,8 @@ export function PaginationControls({
                     className={cn(
                         "p-2.5 min-w-11 min-h-11 rounded-lg transition-all border border-transparent",
                         currentPage === 1
-                            ? "text-slate-600 cursor-not-allowed"
-                            : "text-slate-400 hover:text-white hover:bg-graphito-card hover:border-graphito-border focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                            ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-card hover:border-slate-200 dark:hover:border-graphito-border focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                     )}
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage === 1}
@@ -57,7 +57,7 @@ export function PaginationControls({
                                 "h-9 w-9 min-w-9 rounded-xl text-sm font-bold transition-all duration-300",
                                 page === currentPage
                                     ? "bg-graphito-blue text-white shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110"
-                                    : "text-slate-400 hover:text-white hover:bg-graphito-card focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-card focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                             )}
                         >
                             {page}
@@ -70,8 +70,8 @@ export function PaginationControls({
                     className={cn(
                         "p-2.5 min-w-11 min-h-11 rounded-lg transition-all border border-transparent",
                         currentPage === totalPages
-                            ? "text-slate-600 cursor-not-allowed"
-                            : "text-slate-400 hover:text-white hover:bg-graphito-card hover:border-graphito-border focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                            ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-card hover:border-slate-200 dark:hover:border-graphito-border focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
                     )}
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}

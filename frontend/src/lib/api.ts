@@ -118,6 +118,14 @@ export const api = {
             setAuthToken(res.access_token);
             return res;
         },
+        async googleLogin(idToken: string): Promise<{ access_token: string; docente: Docente }> {
+            const res = await request<{ access_token: string; docente: Docente }>("/auth/google", {
+                method: "POST",
+                body: JSON.stringify({ token: idToken }),
+            });
+            setAuthToken(res.access_token);
+            return res;
+        },
         async me(): Promise<Docente> {
             return request<Docente>("/auth/me");
         },
