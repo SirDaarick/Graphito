@@ -77,8 +77,8 @@ Las reglas de negocio definen los criterios que guían el funcionamiento y uso �
 
 	\item \textbf{RN-02:} El sistema se limita a programas de cursos de programación de ESCOM-IPN que sigan los estándares C11 y C++17.
 
-	\item \textbf{RN-03:} Integridad de la referencia: Toda entrega debe ser comparada contra al menos una solución de referencia proporcionada por el docente para ser considerada válida.
-
+	\item \textbf{RN-03:} Para que el sistema pueda hacer una comparación, debe existir al menos un código de referencia previamente cargado. Sin ella, el sistema no tiene un punto de comparación y no puede generar ningún resultado.
+    
 	\item \textbf{RN-04:} La decisión final de calificación es responsabilidad exclusiva del docente; el sistema actúa únicamente como una herramienta objetiva de apoyo a la auditoría académica.
 
 	\item \textbf{RN-05:} Se permite el uso de múltiples soluciones generadas por LLM para ampliar el espectro de comparación lógica, siempre que el docente las valide inicialmente.
@@ -134,7 +134,19 @@ Las trayectorias describen el flujo de interacción entre el docente, el orquest
 \subsection{Trayectoria principal (Flujo de Análisis Estándar)}
 % ---------------------------------------------------------
 
-La trayectoria principal describe el flujo de uso del sistema para procesar una entrega estudiantil contra referencias previamente configuradas.
+La Figura \ref{fig:flujo-analisis} ilustra la trayectoria principal del sistema Graphito, correspondiente al flujo de análisis estándar. Durante este proceso, el docente ingresa el código de referencia y las entregas estudiantiles, configura los parámetros de evaluación e inicia el procesamiento de doble canal. Posteriormente, el sistema ejecuta de manera concurrente el análisis semántico y el análisis estilométrico del código fuente, consolidando métricas e indicadores objetivos que respaldan la toma de decisiones del evaluador.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.9\textheight,
+        keepaspectratio
+    ]{figuras/flujo_analisis.png}
+    \caption{Diagrama de trayectoria principal del sistema Graphito correspondiente al flujo de análisis estándar.}
+    \label{fig:flujo-analisis}
+\end{figure}
+
 
 \begin{enumerate}
 	\item El docente accede a su biblioteca en la plataforma web del sistema.
@@ -692,7 +704,7 @@ Estos niveles permiten priorizar los riesgos y enfocar los esfuerzos de mitigaci
 \subsection{Identificación y evaluación de riesgos}
 % ---------------------------------------------------------
 
-En la Tabla X se presentan los principales riesgos identificados, junto con su probabilidad de ocurrencia, impacto y estrategia de mitigación.
+En la Tabla \ref{tab:riesgos} se presentan los principales riesgos identificados, junto con su probabilidad de ocurrencia, impacto y estrategia de mitigación.
 
 \begin{table}[H]
 	\centering
@@ -719,6 +731,7 @@ En la Tabla X se presentan los principales riesgos identificados, junto con su p
 		\bottomrule
 	\end{tabularx}
 	\caption{Análisis de riesgos del sistema}
+	\label{tab:riesgos}
 \end{table}
 
 % ---------------------------------------------------------
@@ -811,7 +824,7 @@ Para garantizar la consistencia entre ambas clases, todos los \textit{prompts} d
 
 El corpus final se construye con clases estrictamente balanceadas (50\% humano, 50\% IA) para evitar sesgos de clase mayoritaria en las predicciones de la CharCNN. La partición de los datos se realiza a nivel de \textit{problema}; es decir, todas las soluciones (humanas o sintéticas) de un problema específico aparecen exclusivamente en una de las fases (entrenamiento, validación o prueba). Esta restricción arquitectónica previene la fuga de información (\textit{data leakage}), obligando al modelo a clasificar basándose en el estilo y no en la lógica del algoritmo. La Tabla \ref{tab:distribucion_muestras} presenta la distribución cuantitativa establecida.
 
-\begin{table}[ht]
+\begin{table}[H]
 	\centering
 	\caption{Distribución cuantitativa y partición del conjunto de datos}
 	\label{tab:distribucion_muestras}

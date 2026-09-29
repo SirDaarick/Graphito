@@ -28,15 +28,7 @@ Para admitir Google OAuth2 sin degradar la seguridad ni romper las cuentas exist
 
 ## 3. Especificación Técnica Detallada
 
-### 3.1. Sentencia DDL en PostgreSQL
-```sql
-ALTER TABLE docentes ALTER COLUMN hashed_password DROP NOT NULL;
-ALTER TABLE docentes ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE;
-ALTER TABLE docentes ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512);
-CREATE INDEX IF NOT EXISTS ix_docentes_google_id ON docentes(google_id);
-```
-
-### 3.2. Modelo de Datos (`backend/app/infrastructure/database/models.py`)
+### 3.1. Modelo de Datos (`backend/app/infrastructure/database/models.py`)
 ```python
 class Docente(Base):
     __tablename__ = "docentes"
@@ -52,7 +44,7 @@ class Docente(Base):
     problemas = relationship("Problema", back_populates="docente", cascade="all, delete-orphan")
 ```
 
-### 3.3. Servicio de Verificación en Backend (`backend/app/application/services/google_auth.py`)
+### 3.2. Servicio de Verificación en Backend (`backend/app/application/services/google_auth.py`)
 ```python
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -66,6 +58,7 @@ def verify_google_token(token: str) -> dict:
             requests.Request(),
             settings.GOOGLE_CLIENT_ID
         )
+        # Validar emisor
         if id_info["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
             raise ValueError("Token issuer inválido")
             
@@ -83,7 +76,7 @@ def verify_google_token(token: str) -> dict:
         )
 ```
 
-### 3.4. Endpoint de Autenticación (`backend/app/presentation/api/v1/endpoints/auth.py`)
+### 3.3. Endpoint de Autenticación (`backend/app/presentation/api/v1/endpoints/auth.py`)
 ```python
 from pydantic import BaseModel
 
@@ -127,11 +120,43 @@ def login_with_google(
     return TokenResponse(access_token=access_token, token_type="bearer")
 ```
 
+### 3.4. Implementación en Frontend (`frontend/src/pages/Login.tsx`)
+```tsx
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+
+export function LoginView() {
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      const res = await api.auth.googleLogin(credentialResponse.credential);
+      localStorage.setItem("token", res.access_token);
+      window.location.href = "/biblioteca";
+    } catch (err) {
+      console.error("Fallo de autenticación con Google", err);
+    }
+  };
+
+  return (
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <div className="w-full flex justify-center my-4">
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => console.error("Error al conectar con Google")}
+          theme="filled_black"
+          shape="pill"
+          text="continue_with"
+        />
+      </div>
+    </GoogleOAuthProvider>
+  );
+}
+```
+
 ---
 
 ## 4. Riesgos y Anti-Patrones a Evitar
 * ❌ **Falso SSO:** Enviar el correo desde el frontend sin validar el ID Token en el backend. Un atacante podría enviar cualquier email en el JSON.
 * ⚠️ **Manejo de cuentas huérfanas:** Si un usuario entra con Google y después intenta hacer "Login con contraseña", la UI debe indicarle claramente *"Esta cuenta fue registrada con Google. Inicia sesión con Google o configura una contraseña"*.
+* ⚠️ **Restricción de dominios universitarios:** Si la institución exige correos `@ipn.mx` o `@unam.mx`, la validación de dominio debe ejecutarse inmediatamente en el backend tras validar el token.
 
 ---
 

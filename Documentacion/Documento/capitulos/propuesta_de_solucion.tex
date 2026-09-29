@@ -1,15 +1,15 @@
 \chapter{Propuesta de solución}
-La propuesta de solución que se detalla a continuación constituye la respuesta técnica a la problemática de integridad académica analizada en los capítulos precedentes. A partir del planteamiento del problema y su justificación, se ha identificado la necesidad crítica de contar con herramientas de validación capaces de enfrentar los desafíos actuales en la enseñanza de la programación, especialmente ante el auge de soluciones generadas de forma automatizada.
+La propuesta de solución que se detalla a continuación constituye la respuesta técnica a la problemática en el proceso de evaluación analizada en los capítulos precedentes. A partir del planteamiento del problema y su justificación, se ha identificado la necesidad crítica de contar con herramientas de validación capaces de enfrentar los desafíos actuales en la enseñanza de la programación, especialmente ante el auge de soluciones generadas de forma automatizada.
 
-Considerando las limitaciones detectadas en el estudio del estado del arte, donde los métodos de cotejo tradicionales han perdido efectividad frente a las nuevas técnicas de paráfrasis de código, y fundamentándose en los conceptos de análisis semántico y estilométrico explorados en el marco teórico, se propone el desarrollo de Graphito.
+Considerando las limitaciones detectadas en el estudio del estado del arte, donde los métodos de evaluación tradicionales han perdido efectividad frente a las nuevas técnicas de generación de código, y fundamentándose en los conceptos de análisis semántico y estilométrico explorados en el marco teórico, se propone el desarrollo de Graphito.
 
-Graphito se define como un sistema de comparación de código diseñado para actuar como una herramienta de apoyo a la evaluación docente en cursos introductorios de programación en C/C++. La solución se basa en el análisis semántico del código fuente, lo que permite evaluar la similitud lógica entre programas y detectar posibles patrones de generación mediante inteligencia artificial, con el fin de optimizar el proceso de evaluación y fortalecer la integridad académica en el entorno educativo.
+Graphito se define como un sistema de comparación de código diseñado para actuar como una herramienta de apoyo a la evaluación docente en cursos introductorios de programación en C/C++. Para lograr este objetivo, la solución se estructura mediante un pipeline de procesamiento híbrido de doble canal, el cual transforma el código fuente en representaciones vectoriales densas o embeddings. Por un lado, el análisis semántico es impulsado por el modelo GraphCodeBERT, que extrae el Grafo de Flujo de Datos (DFG) para capturar la esencia algorítmica del programa. Por otro lado, el análisis estilométrico emplea la red neuronal CharCNN, la cual procesa el código a nivel de caracteres para identificar patrones de escritura y detectar posibles indicios de generación mediante inteligencia artificial.
 
-De esta manera, el sistema se constituye como un comparador integral que no solo realiza un contraste superficial, sino que coteja la estructura funcional y la identidad de las entregas frente a soluciones de referencia, proporcionando métricas objetivas que refuerzan el proceso de enseñanza-aprendizaje. En las secciones siguientes se describe la estructura operativa de la solución, iniciando con la representación esquemática de sus componentes funcionales y el flujo de procesamiento de la información, tal como se ilustra en el siguiente diagrama de bloques.
+De esta manera, el sistema se constituye como un comparador integral que no solo realiza un contraste superficial, sino que coteja la estructura funcional y los patrones estilométricos de las entregas frente a soluciones de referencia, proporcionando métricas objetivas que fungen como herramienta de apoyo a la decisión, brindando al docente la evidencia técnica necesaria para optimizar y fundamentar el proceso de evaluación de cada código. En las secciones siguientes se describe la estructura operativa de la solución, iniciando con la representación esquemática de sus componentes funcionales y el flujo de procesamiento de la información, tal como se ilustra en el siguiente diagrama de bloques.
 
 \section{Estructura Funcional del Sistema}
 
-Para materializar el proceso de cotejo avanzado, Graphito se articula a través de una arquitectura de bloques funcionales que procesan la información de manera secuencial y paralela. En la Figura~\ref{fig:diagrama_bloques} se presenta el diagrama de bloques que describe el flujo de los datos, desde la ingesta del código fuente hasta la generación del reporte de similitud.
+Para realizar la comparación de código fuente, Graphito se articula a través de una arquitectura de bloques funcionales que procesan la información de manera secuencial y paralela. En la Figura~\ref{fig:diagrama_bloques} se presenta el diagrama de bloques que describe el flujo de los datos, desde la ingesta del código fuente hasta la generación del reporte de similitud.
 
 \begin{figure}[H] % [H] fuerza a que la imagen se quede justo aquí
 	\centering
@@ -18,7 +18,7 @@ Para materializar el proceso de cotejo avanzado, Graphito se articula a través 
 	\label{fig:diagrama_bloques} % Esta es la ``etiqueta'' para referenciarlo
 \end{figure}
 
-A continuación, se describen los componentes core que integran la solución:
+A continuación, se describen los componentes principales que integran la solución:
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -29,7 +29,7 @@ El proceso de comparación comienza con la recepción de dos flujos de informaci
 \begin{itemize}
 	\item \textbf{Entrega del Alumno:} Archivos en formato fuente (.c o .cpp) que contienen la resolución propuesta por el estudiante a un problema en específico. El sistema está diseñado para procesar código basado en los estándares C11 y C++17, enfocándose en temas introductorios a la programación como fundamentos y algoritmos y estructuras de datos.
 
-	\item \textbf{Códigos de Referencia:} Representan el conjunto de comparación, representando una o múltiples soluciones correctas al problema planteado. Este repositorio incluye la solución ideal proporcionada por el docente y, de manera complementaria, un conjunto de variantes funcionalmente equivalentes obtenidas mediante modelos de lenguaje (LLM). Esta diversidad de referencias permite que el sistema realice un cotejo robusto contra múltiples implementaciones lógicas de un mismo problema.
+	\item \textbf{Códigos de Referencia:} Actúan como el parámetro de comparación principal, albergando la solución ideal al problema planteado por el docente. De manera opcional, se complementa este conjunto con variantes funcionalmente equivalentes obtenidas mediante modelos de lenguaje (LLM). Esta diversidad de referencias permite que el sistema ejecute un cotejo robusto contra múltiples implementaciones lógicas de un mismo ejercicio.
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -40,7 +40,7 @@ Una vez ingresados los archivos, el \textbf{Módulo de Preprocesamiento} genera 
 
 \begin{enumerate}
 	\item \textbf{Representación Normalizada (Canal A):} Se realiza una limpieza profunda de ambos conjuntos de código, eliminando comentarios, metadatos y espacios en blanco redundantes. Asimismo, se aplican técnicas de normalización de identificadores. Este proceso garantiza que el análisis semántico se enfoque exclusivamente en la topología del flujo de datos y la lógica algorítmica, ignorando cambios estéticos o de nomenclatura.
-	\item \textbf{Representación Estructural/Raw (Canal B):} Se aplica únicamente a la solución del alumno. El sistema preserva elementos como la indentación, el uso de comentarios, la acentuación y caracteres especiales. Esta decisión técnica es clave para la detección de patrones de generación por IA, ya que permite identificar la ``perfección'' gramatical y hábitos de formato que constituyen la ``huella digital'' del autor o del modelo generativo utilizado.
+	\item \textbf{Representación Estructural/Raw (Canal B):} Se aplica únicamente a la solución del alumno. El sistema preserva elementos como la indentación, el uso de comentarios, la acentuación y caracteres especiales. Esta decisión técnica es clave para la detección de patrones de generación por IA, ya que permite identificar la perfección gramatical y hábitos de formato que constituyen la huella digital del autor o del modelo generativo utilizado.
 \end{enumerate}
 
 Una vez terminados ambos procesos, el flujo sigue hacia los canales de comparación semántica y análisis estilométrico.
@@ -50,7 +50,7 @@ Una vez terminados ambos procesos, el flujo sigue hacia los canales de comparaci
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Canal A: Comparación Semántica}
 
-Este canal constituye el componente principal para la identificación de equivalencias lógicas profundas, permitiendo detectar clones de código que comparten el mismo propósito algorítmico a pesar de presentar variaciones sintácticas.
+Este canal constituye el núcleo para la evaluación de equivalencias lógicas, cuyo objetivo es medir la similitud semántica entre soluciones que resuelven el mismo problema algorítmico, independientemente de sus variaciones sintácticas superficiales.
 
 \subsubsection{Justificación y Selección del Modelo}
 
@@ -58,15 +58,15 @@ La selección de \textbf{GraphCodeBERT} \cite{Guo2021GraphCodeBERT} como motor d
 
 \begin{itemize}
 	\item \textbf{Integración Estructural:} A diferencia de otros modelos que tratan el código como una simple secuencia de texto, GraphCodeBERT integra información estructural mediante el uso de grafos de flujo de datos (DFG). Esto permite que el mecanismo de atención se centre en las conexiones que tienen sentido semántico real.
-	\item \textbf{Resistencia a la Ofuscación:} Debido a que el modelo captura la relación entre variables (\textit{def-use chains}), es altamente efectivo detectando similitudes incluso cuando el código ha sido alterado mediante cambios de nombres de variables, reordenamiento de sentencias o cambios en las estructuras de control.
-	\item \textbf{Especialización Funcional:} Como se detalla en el marco teórico, este modelo se especializa en el comportamiento lógico del programa. Si bien tiende a ignorar rasgos superficiales como el estilo, esta característica se alinea perfectamente con la arquitectura bimodal de Graphito, delegando la responsabilidad del análisis de estilo al Canal B (CharCNN).
+	\item \textbf{Resistencia a la Ofuscación:} Debido a que el modelo captura la relación entre variables, es altamente efectivo detectando similitudes incluso cuando el código ha sido alterado mediante cambios de nombres de variables, reordenamiento de sentencias o cambios en las estructuras de control.
+	\item \textbf{Especialización Funcional:} Como se detalla en el marco teórico, este modelo se especializa en el comportamiento lógico del programa. Si bien tiende a ignorar rasgos superficiales como el estilo, esta característica se alinea perfectamente con la arquitectura de doble canal de Graphito, delegando la responsabilidad del análisis de estilo al Canal B (CharCNN).
 \end{itemize}
 
 
 
 \subsubsection{Extracción de Grafo de Flujo de Datos (DFG)}
 
-Un Grafo de Flujo de Datos (DFG) es una representación dirigida que captura las dependencias funcionales entre las variables de un programa mediante la identificación de sus relaciones de definición y uso (\textit{def-use chains}). De acuerdo con la metodología propuesta por Guo et al. \cite{Guo2021GraphCodeBERT}, los pasos para obtener esta representación son:
+Un Grafo de Flujo de Datos (DFG) es una representación dirigida que captura las dependencias funcionales entre las variables de un programa mediante la identificación de sus relaciones de definición y uso. De acuerdo con la metodología propuesta por Guo et al. \cite{Guo2021GraphCodeBERT}, los pasos para obtener esta representación son:
 
 \begin{enumerate}
 	\item \textbf{Generación del AST (Análisis sintáctico):} El código fuente se procesa para construir su Árbol de Sintaxis Abstracta (AST), obteniendo la jerarquía gramatical del programa.
@@ -90,11 +90,11 @@ Mientras que el Canal A se encarga de la profundidad lógica, el Canal B se enfo
 
 \subsubsection{Justificación y Selección del Modelo}
 
-La elección de una Red Neuronal Convolucional a nivel de caracteres (CharCNN) responde a su capacidad innata para actuar como un escáner de patrones locales. Dado que las CNN son especialistas en visión computacional, al aplicarlas al código fuente ``en bruto'' (\textit{raw code}), el modelo puede identificar automáticamente rasgos que para otros sistemas serían invisibles:
+La elección de una Red Neuronal Convolucional a nivel de caracteres (CharCNN) responde a su capacidad innata para actuar como un escáner de patrones locales. Dado que las CNN son especialistas en visión computacional, al aplicarlas al código fuente en bruto (raw), el modelo puede identificar automáticamente rasgos que para otros sistemas serían invisibles:
 
 \begin{itemize}
 	\item \textbf{Estilo como Señal Visual:} El modelo interpreta la indentación, el uso de espacios y la disposición de caracteres especiales como texturas visuales, permitiendo aprender el estilo del autor sin necesidad de conocer la gramática del lenguaje C++.
-	\item \textbf{Detección de Hiper-perfección:} Mientras que un estudiante suele presentar una escritura heterogénea y con errores humanos de formato, los modelos de lenguaje (LLM) generan código con una estructura y puntuación gramaticalmente perfecta en los comentarios. CharCNN es ideal para detectar esta ``perfección'' sintética que delata el uso de IA.
+    \item \textbf{Detección de consistencia sintética:} A diferencia de un estudiante, cuya escritura presenta errores humanos y variaciones de formato, los modelos de lenguaje generan código con una estructura y gramática sumamente uniformes en sus comentarios. CharCNN resulta ideal para detectar esta estandarización algorítmica, convirtiéndola en una huella digital que evidencia el uso de inteligencia artificial.
 	\item \textbf{Eficiencia Computacional:} Al operar localmente sobre secuencias de caracteres, el modelo aporta una capa de seguridad adicional sin incrementar drásticamente la carga computacional del sistema \textit{backend}.
 \end{itemize}
 
@@ -111,26 +111,25 @@ El procedimiento estructurado para transformar el código fuente en un identific
 	\item \textbf{Reducción de Dimensionalidad (Pooling):} Se seleccionan las características más relevantes detectadas por los filtros, consolidando los rasgos estilísticos más distintivos de la muestra analizada en una representación compacta.
 \end{enumerate}
 
-\subsubsection{Generación de Embedding de Autoría}
+\subsubsection{Cálculo de probabilidad de generación por IA}
 
-Una vez procesada la información por las capas convolucionales, el sistema genera un \textbf{Embedding de Autoría}. Este vector denso representa la ``huella digital'' del emisor, capturando las sutilezas que diferencian la redacción manual de un estudiante de la generación estandarizada de un LLM.
+Al finalizar la extracción de patrones locales mediante los filtros convolucionales, la red CharCNN genera una métrica escalar que determina la \textbf{probabilidad de generación por inteligencia artificial}.
 
-Este embedding es fundamental para Graphito, ya que permite alertar al docente cuando la lógica de un programa coincide con la de una referencia, pero el estilo de escritura sugiere una procedencia no humana. En términos prácticos, el Canal B actúa como el detector de anomalías que complementa el juicio semántico del Canal A.
-
+Esta métrica complementa directamente al Canal A: mientras que el módulo semántico analiza la lógica interna del código para compararla con la solución ideal del profesor, este escalar actúa como un indicador cuantitativo de los patrones estilísticos. Su función es proporcionar al docente evidencia objetiva sobre la homogeneidad sintética del texto y la ausencia de variaciones típicas de la escritura humana, dotándolo de los elementos técnicos necesarios para que tome la decisión de evaluación final bajo su propio criterio.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Fusión de Características}
 
-La fusión de características \cite{MartinezGil2026Improving} representa el proceso de integración donde las salidas de los canales semántico y estilométrico convergen para formar una representación única y bimodal de la entrega.
+La fusión de características \cite{MartinezGil2026Improving} representa el proceso de integración donde las salidas de los canales semántico y estilométrico convergen para formar una representación única de la entrega.
 
 Este bloque técnico es fundamental para el sistema Graphito, ya que permite consolidar dos dimensiones de análisis distintas en un solo espacio vectorial:
 
 \begin{itemize}
-	\item \textbf{Mecanismo de Integración:} El sistema toma el \textbf{Embedding Semántico} (que encapsula la lógica extraída por GraphCodeBERT) y el \textbf{Embedding de Autoría} (que contiene los rasgos estructurales detectados por CharCNN) y los combina mediante una operación de concatenación. En el caso de las soluciones de referencia, se aplica un acolchado de ceros (\textit{zero-padding}) en las dimensiones correspondientes al canal estilométrico, garantizando la homogeneidad dimensional necesaria para el cálculo de similitud.
+	\item \textbf{Mecanismo de Integración:} El sistema toma el \textbf{Embedding Semántico} (que encapsula la lógica extraída por GraphCodeBERT) y la probabilidad de generación por IA (que representa los rasgos estructurales detectados por CharCNN) y los combina mediante una operación de concatenación. En el caso de las soluciones de referencia, se aplica un relleno con ceros (\textit{zero-padding}) en la dimension correspondiente al canal estilométrico, garantizando la homogeneidad dimensional necesaria para el cálculo de similitud.
 
-	\item \textbf{Generación de la Firma Bimodal:} El resultado de esta fusión es un vector de características unificado que actúa como una ``firma digital'' del código. Esta firma no solo describe qué funciones realiza el programa, sino que también preserva los hábitos de escritura y formato del emisor.
+	\item \textbf{Generación de la representación:} El resultado de esta fusión es un vector de características unificado que actúa como una representación del código. Esta no solo describe qué funciones realiza el programa, sino que también preserva los hábitos de escritura y formato del autor del código.
 \end{itemize}
 
-Al integrar ambos tipos de información, la fusión permite que el sistema tenga una comprensión profunda del código, facilitando la detección de anomalías donde la lógica del programa es correcta pero el estilo de redacción es inconsistente con el perfil esperado, lo que constituye un indicio clave de asistencia por inteligencia artificial.
+Al integrar los resultados de ambos canales, el sistema genera un perfil completo del código fuente. Esta unión permite cruzar dos datos clave: qué hace el programa (su lógica) y cómo fue escrito (su estilo). Esto facilita la identificación de casos inusuales; por ejemplo, un código que resuelve el problema de forma idéntica a la referencia, pero que tiene el formato uniforme típico de una inteligencia artificial. Así, el sistema entrega al docente información clara y medible para respaldar su decisión final de evaluación.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 7.5 SIMILITUD DEL COSENO
@@ -146,29 +145,35 @@ La similitud entre la entrega del alumno ($A$) y el código de referencia ($R$) 
 	\label{eq:coseno}
 \end{equation}
 
-El resultado de esta operación oscila en el intervalo $[0, 1]$, donde $1$ representa una coincidencia total de orientación y $0$ una independencia absoluta entre los vectores.
-
-\subsubsection{Importancia de la Métrica en la Fusión de Características}
-
-El uso de esta métrica es fundamental en Graphito debido a la naturaleza asimétrica de la fusión de características. Al combinar el análisis semántico (lógica) y el estilométrico (IA), la similitud del coseno actúa no solo como un comparador, sino como un regulador de integridad académica.
-
-
-
-La relevancia de utilizar este enfoque bimodal radica en los siguientes puntos:
-
+Donde:
 \begin{itemize}
-	\item \textbf{Efecto de la Carga Estilística:} Para el sistema, el código del profesor es el ``estándar de verdad'', por lo que su vector se proyecta con una componente de estilo neutra. Si un alumno entrega un código con lógica perfecta pero generado por una IA, su vector adquirirá una ``carga extra'' en la dimensión del estilo.
-	\item \textbf{Desviación del Vector:} Aunque el código del alumno sea funcionalmente idéntico al del profesor, la presencia de rasgos sintéticos (detectados por el Canal B) hace que el vector del alumno se ``desvíe'' o rote respecto al del profesor. Esta desviación incrementa el ángulo entre ambos, reduciendo automáticamente el valor de la similitud final.
-	\item \textbf{Penalización Intrínseca:} Gracias a la propiedad del denominador en la fórmula (la norma del vector $\|A\|$), cualquier rastro de IA detectado incrementa la magnitud del vector del alumno sin aportar al numerador. Esto castiga la calificación de similitud de manera proporcional a la ``perfección'' sintética detectada, permitiendo diferenciar entre un alumno que programó honestamente y uno que utilizó asistencia externa.
+    \item $A$ y $R$ representan los vectores de características (\textit{embeddings} bimodales) de la entrega del alumno y la solución de referencia, respectivamente.
+    \item $A_i$ y $R_i$ son los valores escalares de dichos vectores en la dimensión $i$.
+    \item $\|A\|$ y $\|R\|$ denotan la norma euclidiana (o magnitud) de cada vector.
+    \item $n$ es la dimensionalidad total del espacio vectorial unificado.
 \end{itemize}
 
-En conclusión, la Similitud del Coseno permite que Graphito entregue un veredicto más justo y profundo. No se limita a decir si el programa ``funciona igual'', sino que evalúa si la forma en que fue construido se alinea con el estándar humano de referencia, convirtiéndola en una métrica esencial para combatir el plagio moderno potenciado por inteligencia artificial.
+El resultado de esta operación oscila en el intervalo $[0, 1]$, donde $1$ representa una coincidencia total de orientación y $0$ una independencia absoluta entre los vectores.
+
+\subsubsection{Importancia de la métrica en la fusión de características}
+
+El uso de la similitud del coseno es fundamental en Graphito debido a que permite comparar dos representaciones en un mismo espacio vectorial: las características lógicas multidimensionales (Canal A) y el escalar de probabilidad estilométrica (Canal B). Al combinarlos, esta métrica matemática proporciona un indicador objetivo que optimiza el proceso de revisión docente.
+
+La pertinencia de utilizar este enfoque radica en su comportamiento geométrico frente a los vectores evaluados:
+
+\begin{itemize}
+	\item \textbf{Impacto del indicador estilométrico:} En el sistema, el código de referencia proporcionado por el profesor se establece con una probabilidad nula de haber sido generado por IA (valor de $0$ en la dimensión estilométrica). Si una entrega estudiantil posee una alta probabilidad de origen sintético, adquiere un valor escalar mayor en dicha dimensión, lo que altera matemáticamente su vector unificado.
+	\item \textbf{Variación en la orientación espacial:} Aunque el código del alumno y el de referencia compartan una alta similitud semántica (lógica algorítmica), el valor adicional aportado por el modelo CharCNN modifica la orientación espacial del vector del estudiante. Este incremento en el ángulo entre ambos vectores se traduce directamente en una reducción del índice de similitud.
+	\item \textbf{Ajuste cuantitativo de la similitud:} De acuerdo con la fórmula matemática, la magnitud del vector de la entrega ($\|A\|$) se encuentra en el denominador. Dado que la probabilidad sintética incrementa esta magnitud sin aportar al producto escalar del numerador (ya que se multiplica por el $0$ de la referencia), el resultado global disminuye naturalmente. Esto permite que el sistema integre la detección de IA como una reducción proporcional en la similitud sin necesidad de programar penalizaciones arbitrarias.
+\end{itemize}
+
+En conclusión, la similitud del coseno permite a Graphito entregar un indicador numérico robusto. En lugar de limitarse a una verificación funcional o textual, el sistema evalúa simultáneamente la topología algorítmica y la huella estilométrica, brindando al docente evidencia cuantitativa clara para agilizar y fundamentar su proceso de evaluación.
 
 
 \section{Conclusión}
 
-La propuesta de solución presentada en este capítulo, denominada \textbf{Graphito}, se aleja de los enfoques de comparación de texto tradicionales para adoptar una arquitectura bimodal basada en aprendizaje profundo. A través de la integración del análisis semántico (Canal A) y el análisis estilométrico (Canal B), el sistema es capaz de evaluar el código fuente no solo por lo que hace, sino por la identidad de su escritura.
+La propuesta de solución presentada en este capítulo, denominada \textbf{Graphito}, se aleja de los enfoques de comparación de texto tradicionales para adoptar una arquitectura de doble canal basada en aprendizaje profundo. A través de la integración del análisis semántico (Canal A) y el análisis estilométrico (Canal B), el sistema es capaz de evaluar el código fuente no solo por lo que hace, sino por el estilo de su escritura.
 
-La principal fortaleza de esta propuesta reside en su capacidad de autorregulación mediante la similitud del coseno asimétrica. Al tratar la lógica como el eje central y el estilo como un factor de penalización, Graphito ofrece una métrica de integridad académica robusta frente a las técnicas modernas de ofuscación y la generación sintética por modelos de lenguaje.
+La principal fortaleza de esta propuesta reside en su capacidad de autorregulación mediante la similitud del coseno. Al tratar la lógica como el eje central y el estilo como un factor de penalización, Graphito ofrece una métrica de integridad académica robusta frente a las técnicas modernas de ofuscación y la generación sintética por modelos de lenguaje.
 
-Con la definición funcional de estos bloques y la fundamentación de sus componentes core, queda establecida la base teórica y metodológica de la solución. En el siguiente capítulo, se procederá con el Análisis, donde se detallará la arquitectura de software, la persistencia de datos y los diagramas de interacción necesarios para la implementación física de esta propuesta.
+Con la definición funcional de estos bloques y la fundamentación de sus componentes principales, queda establecida la base teórica y metodológica de la solución. En el siguiente capítulo, se procederá con el Análisis, donde se detallará la arquitectura de software, la persistencia de datos y los diagramas de interacción necesarios para la implementación física de esta propuesta.

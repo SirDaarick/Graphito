@@ -5,7 +5,7 @@ Un Sistema de Apoyo a la Decisión Docente (DSS) no puede ser una **caja negra**
 
 Para lograr una experiencia de revisión profesional:
 1. **Comparación Visual Lado a Lado (Side-by-Side Diff):** Enfrentar el código de referencia (izquierda) contra el código del estudiante (derecha) con resaltado sintáctico adecuado para C/C++.
-2. **Anotaciones y Comentarios Pedagógicos:** Permitir al profesor insertar comentarios vinculados a líneas específicas o generales para respaldar su evaluación.
+2. **Anotaciones y Comentarios Pedagógicos:** Permitir al profesor insertar comentarios vinculados a líneas específicas o generales para respaldar su evaluación (e.g. *"Uso idéntico del algoritmo de inversión de punteros generado por LLM"*).
 
 ---
 
@@ -13,7 +13,8 @@ Para lograr una experiencia de revisión profesional:
 * **Frontend (React):**
   * Dependencia recomendada: `@monaco-editor/react` (el núcleo de VS Code en el navegador, con soporte nativo de `DiffEditor`, minimapa y cambio de temas) o alternativamente `react-diff-viewer-continued`.
   * Componente `CodeComparisonView.tsx`: Renderiza la vista dividida con sincronización de scroll.
-* **Base de Datos & Backend (FastAPI):**
+  * Componente `LineCommentOverlay.tsx` para agregar anotaciones sobre líneas de código.
+* **Backend (FastAPI):**
   * Nueva tabla `comentarios_revision` en PostgreSQL.
   * Endpoints en `app/presentation/api/v1/endpoints/comments.py` (`POST`, `GET`, `DELETE`).
 
@@ -21,37 +22,23 @@ Para lograr una experiencia de revisión profesional:
 
 ## 3. Especificación Técnica Detallada
 
-### 3.1. Sentencia DDL en PostgreSQL
-```sql
-CREATE TABLE IF NOT EXISTS comentarios_revision (
-    id SERIAL PRIMARY KEY,
-    reporte_id INTEGER NOT NULL REFERENCES reportes_analisis(id) ON DELETE CASCADE,
-    docente_id INTEGER NOT NULL REFERENCES docentes(id) ON DELETE CASCADE,
-    numero_linea INTEGER,
-    contenido TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS ix_comentarios_reporte_id ON comentarios_revision(reporte_id);
-CREATE INDEX IF NOT EXISTS ix_comentarios_docente_id ON comentarios_revision(docente_id);
-```
-
-### 3.2. Modelo Relacional (`backend/app/infrastructure/database/models.py`)
+### 3.1. Modelo Relacional para Comentarios (`backend/app/infrastructure/database/models.py`)
 ```python
 class ComentarioRevision(Base):
     __tablename__ = "comentarios_revision"
 
     id = Column(Integer, primary_key=True, index=True)
-    reporte_id = Column(Integer, ForeignKey("reportes_analisis.id", ondelete="CASCADE"), nullable=False, index=True)
-    docente_id = Column(Integer, ForeignKey("docentes.id", ondelete="CASCADE"), nullable=False, index=True)
+    reporte_id = Column(Integer, ForeignKey("reportes_analisis.id", ondelete="CASCADE"), nullable=False)
+    docente_id = Column(Integer, ForeignKey("docentes.id", ondelete="CASCADE"), nullable=False)
     numero_linea = Column(Integer, nullable=True) # Null si es un comentario general de la entrega
     contenido = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    reporte = relationship("ReporteAnalisis", back_populates="comentarios")
-    docente = relationship("Docente", back_populates="comentarios")
+    reporte = relationship("ReporteAnalisis", backref="comentarios")
+    docente = relationship("Docente")
 ```
 
-### 3.3. Implementación de la Vista Monaco Diff (`frontend/src/components/code/CodeDiffViewer.tsx`)
+### 3.2. Implementación de la Vista Monaco Diff (`frontend/src/components/code/CodeDiffViewer.tsx`)
 ```tsx
 import { DiffEditor } from "@monaco-editor/react";
 import { useTheme } from "../../lib/theme";
@@ -99,14 +86,42 @@ export function CodeDiffViewer({
 }
 ```
 
+### 3.3. Endpoints de Anotaciones (`backend/app/presentation/api/v1/endpoints/comments.py`)
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.presentation.api.v1.deps import get_db, get_current_user
+
+router = APIRouter(prefix="/reports/{reporte_id}/comments", tags=["Comentarios"])
+
+@router.post("/", response_model=ComentarioResponse)
+def agregar_comentario(
+    reporte_id: int,
+    payload: ComentarioCreateSchema,
+    db: Session = Depends(get_db),
+    current_user: Docente = Depends(get_current_user)
+):
+    nuevo_comentario = ComentarioRevision(
+        reporte_id=reporte_id,
+        docente_id=current_user.id,
+        numero_linea=payload.numero_linea,
+        contenido=payload.contenido
+    )
+    db.add(nuevo_comentario)
+    db.commit()
+    db.refresh(nuevo_comentario)
+    return nuevo_comentario
+```
+
 ---
 
 ## 4. Riesgos y Anti-Patrones a Evitar
-* ❌ **Carga pesada de Monaco Editor:** Monaco Editor es un paquete voluminoso. Debe cargarse de forma perezosa (`React.lazy()`) para no degradar el First Contentful Paint (FCP).
+* ❌ **Carga pesada de Monaco Editor:** Monaco Editor es un paquete voluminoso (~4MB). Debe cargarse de forma perezosa (`React.lazy()` o dynamic import) para no degradar el First Contentful Paint (FCP) de la aplicación inicial.
+* ⚠️ **Desalineación por comentarios sintéticos:** Los códigos generados por LLM frecuentemente contienen comentarios verbosos que desalinean el diff visual respecto al código conciso del docente. Se recomienda incluir un interruptor en la UI: *"Ocultar comentarios al comparar"* para ver la estructura pura del código.
 
 ---
 
 ## 5. Criterios de Aceptación y Pruebas
 1. El docente puede abrir una entrega y ver el código del alumno frente al código de referencia en paralelo.
 2. Las líneas con divergencias estructurales se resaltan nítidamente.
-3. El profesor puede agregar una observación en una línea específica y esta queda guardada.
+3. El profesor puede agregar una observación en una línea específica y esta queda guardada y visible para futuras revisiones o descargas de reporte PDF.

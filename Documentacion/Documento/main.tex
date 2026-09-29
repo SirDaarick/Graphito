@@ -19,6 +19,7 @@
 % ===================== TABLAS Y GRÁFICOS =====================
 \usepackage{graphicx}
 \usepackage{tikz}
+\usetikzlibrary{babel, positioning}
 \usepackage{booktabs}    % Necesario para \toprule, \midrule, \bottomrule
 \usepackage{array}       % Necesario para alineaciones especiales en tablas
 \usepackage{tabularx}    % Tablas con ancho fijo
@@ -30,10 +31,21 @@
 % ===================== MATEMÁTICAS Y CÓDIGO =====================
 \usepackage{amsmath, amsfonts, mathtools}
 \usepackage{latexsym}    % Símbolos adicionales
-\usepackage{nccmath}     % Matemáticas adicionales
 \usepackage{listings}    % Para bloques de código
-\usepackage{minted}      % Si prefieres minted para C/C++
-\usepackage{url}
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    breakatwhitespace=true,
+    columns=flexible,
+    frame=single,
+    rulecolor=\color{black!25},
+    numbers=none,
+    showstringspaces=false,
+    tabsize=4,
+    xleftmargin=1.5em,
+    xrightmargin=1.5em,
+    backgroundcolor=\color{gray!4}
+}
 \usepackage{enumitem}    % Listas enumeradas
 \usepackage{fancyhdr}    % Encabezados y pies de página
 \setlength{\headheight}{14.5pt}
@@ -47,7 +59,7 @@
 % ===================== TÍTULOS Y NAVEGACIÓN =====================
 \usepackage{titlesec}
 \usepackage{tocloft}
-\usepackage[pdftex]{hyperref}
+\usepackage{hyperref}
 
 \hypersetup{
     colorlinks=true,
@@ -69,9 +81,9 @@
 \titlespacing*{\subsection}{0pt}{10pt}{5pt}
 \titlespacing*{\subsubsection}{0pt}{8pt}{4pt}
 
-% ======================================================================
-%                               DOCUMENTO
-% ======================================================================
+% Optimización de compilación modular (descomentar para compilar solo un capítulo):
+% \includeonly{capitulos/ingenieria_de_datos}
+
 \begin{document}
 
 % --- PORTADAS ---
@@ -101,7 +113,10 @@
 
 % NOTA: Si renombraste el archivo a 'diseno.tex', cámbialo aquí:
 \include{capitulos/diseño} 
-\include{capitulos/conclusion}
+\include{capitulos/ingenieria_de_datos}
+\include{capitulos/modelado}
+\include{capitulos/despliegue}
+\include{capitulos/conclusiones}
 
 % --- REFERENCIAS ---
 \newpage

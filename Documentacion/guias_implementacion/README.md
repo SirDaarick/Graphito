@@ -8,12 +8,27 @@ Cada guía ha sido formulada bajo principios de **Clean Architecture**, patrones
 
 ## 🗄️ Estado y Migración de la Base de Datos
 
-Las entidades de dominio y modelos SQLAlchemy se encuentran descritos en cada guía y corresponden al backend en:
-👉 `backend/app/infrastructure/database/models.py`
+Las entidades de dominio y modelos SQLAlchemy ya se encuentran actualizados en:
+👉 [`backend/app/infrastructure/database/models.py`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/backend/app/infrastructure/database/models.py)
 
 ### ¿Cómo aplicar los cambios a la base de datos PostgreSQL?
 
-Dado que `Base.metadata.create_all` en SQLAlchemy solo crea tablas nuevas y **no altera tablas existentes**, cada guía detalla los comandos DDL de PostgreSQL (`ALTER TABLE`, `CREATE TABLE`, `CREATE INDEX`).
+Dado que `Base.metadata.create_all` en SQLAlchemy solo crea tablas nuevas y **no altera tablas existentes**, se han preparado dos mecanismos inmediatos:
+
+#### Opción 1: Ejecutar el script automatizado en Python (Recomendado)
+Desde la raíz del proyecto o dentro del contenedor del backend:
+```bash
+python backend/apply_migrations.py
+```
+*Este script se conecta mediante el motor asíncrono configurado en `.env` y aplica el script DDL de forma idempotente.*
+
+#### Opción 2: Ejecutar el script SQL directo en PostgreSQL
+Si utilizas DBeaver, pgAdmin o `docker exec`:
+```bash
+docker exec -i graphito-postgres psql -U graphito -d graphito_db < backend/migrations/migration_features.sql
+```
+El archivo de migración con las sentencias DDL se encuentra en:
+👉 [`backend/migrations/migration_features.sql`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/backend/migrations/migration_features.sql)
 
 ---
 

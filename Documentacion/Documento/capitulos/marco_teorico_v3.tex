@@ -173,7 +173,7 @@ Los enfoques descritos durante esta sección no son excluyentes entre sí, sino 
 \end{table}
 }
 
-Esta limitación demuestra que, si se planea hacer una comparación compleja entre programas no basta con utilizar un sólo enfoque para el análisis. Antes de determinar cómo afrontar el problema de realizar la comparación semántica mientras se tiene en cuenta los patrones de autoría, resulta necesario analizar las representaciones internas del código sobre las que operan estos enfoques, tema que se aborda en la siguiente sección.
+Esta limitación demuestra que, si se planea hacer una comparación compleja entre programas, no basta con utilizar un sólo enfoque para el análisis. Antes de determinar cómo afrontar el problema de realizar la comparación semántica mientras se tiene en cuenta los patrones de autoría, resulta necesario analizar las representaciones internas del código sobre las que operan estos enfoques, tema que se aborda en la siguiente sección.
 %############################################################################
 
 \section{Representaciones del código fuente}
@@ -496,8 +496,6 @@ El modelo representa el código como una secuencia lineal de tokens, combinándo
 En cuanto a su entrenamiento, CodeBERT utiliza una función híbrida que combina el Modelado de Lenguaje Enmascarado (MLM) y la Detección de Tokens Reemplazados (RTD), aprovechando grandes volúmenes de datos provenientes de repositorios públicos. Este enfoque le permite aprender patrones tanto léxicos como contextuales.
 
 En conjunto, estos modelos demuestran que es posible obtener representaciones útiles del código a partir de su forma textual. Sin embargo, sus limitaciones evidencian la necesidad de incorporar información estructural más rica, lo que ha motivado el desarrollo de modelos basados en representaciones sintácticas y semánticas, como se aborda en la siguiente sección.
-
-Sin embargo, al no incorporar información estructural del programa, presenta limitaciones para capturar relaciones semánticas profundas, especialmente en escenarios donde diferentes implementaciones comparten funcionalidad pero no forma.
 
 \subsection{Modelos basados en Árboles de Sintaxis Abstracta}
 
@@ -859,6 +857,62 @@ estilométrico.
 
 En conjunto, estos modelos ofrecen distintas formas de capturar el estilo de programación, desde patrones superficiales hasta representaciones profundas basadas en contexto. En la siguiente sección se presenta una síntesis que muestra que mediante la integración de distintos enfoques, se puede conseguir una arquitectura robusta capaz de superar las limitaciones de los modelos previamente presentados. 
 
+% =========================================================
+\subsection{Métricas de evaluación basadas en la matriz de confusión}
+% =========================================================
+
+De acuerdo con \cite{Sathyanarayanan2024}, la matriz de confusión es una herramienta de evaluación detallada en la ciencia de datos que permite analizar el rendimiento de un clasificador mediante el desglose de predicciones acertadas y erróneas para cada clase. Esta estructura matricial de tamaño $N \times N$ ofrece una visión clara de cómo el modelo confunde o acierta las etiquetas reales frente a las predichas.
+
+
+
+Para el caso de una clasificación binaria, los componentes fundamentales que integran esta matriz se describen en la Tabla \ref{tab:componentes_matriz}.
+
+\begin{table}[H]
+    \centering
+    \caption{Componentes fundamentales de la matriz de confusión binaria.}
+    \label{tab:componentes_matriz}
+    \begin{tabularx}{\textwidth}{l X}
+        \toprule
+        \textbf{Componente} & \textbf{Definición técnica} \\
+        \midrule
+        Verdadero Positivo ($TP$) & Instancias donde tanto el valor real como la predicción del modelo son positivos. \\
+        Verdadero Negativo ($TN$) & Instancias donde el valor real es negativo y la predicción es igualmente negativa. \\
+        Falso Positivo ($FP$) & Casos donde la predicción es positiva pero el valor real es negativo (Error de Tipo I). \\
+        Falso Negativo ($FN$) & Casos donde la predicción es negativa pero el valor real es positivo (Error de Tipo II). \\
+        \bottomrule
+    \end{tabularx}
+    \vspace{4pt}
+    \small{\textit{Elaboración propia basada en \cite{Sathyanarayanan2024}.}}
+\end{table}
+
+A partir de estos cuatro estados, se calculan indicadores de desempeño que permiten cuantificar la eficacia del modelo bajo distintas perspectivas (ver Tabla \ref{tab:metricas_rendimiento}).
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas de rendimiento derivadas de la matriz de confusión.}
+    \label{tab:metricas_rendimiento}
+    \begin{tabularx}{\textwidth}{l c X}
+        \toprule
+        \textbf{Métrica} & \textbf{Fórmula} & \textbf{Propósito analítico} \\
+        \midrule
+        Exactitud & $\frac{TP + TN}{Total}$ & Mide la fracción total de predicciones correctas. Es útil en clases balanceadas. \\
+        \addlinespace
+        Precisión & $\frac{TP}{TP + FP}$ & Evalúa la exactitud de las predicciones positivas; busca minimizar los falsos positivos. \\
+        \addlinespace
+        Recall & $\frac{TP}{TP + FN}$ & Mide la capacidad del modelo para capturar la totalidad de los casos positivos reales. \\
+        \addlinespace
+        Puntuación $F_1$ & $\frac{2 \cdot P \cdot R}{P + R}$ & Media armónica que equilibra precisión y exhaustividad, ideal para datos desbalanceados. \\
+        \addlinespace
+        Especificidad & $\frac{TN}{TN + FP}$ & Cuantifica qué tan bien el modelo identifica los resultados negativos reales. \\
+        \bottomrule
+    \end{tabularx}
+    \vspace{4pt}
+    \small{\textit{Elaboración propia basada en \cite{Sathyanarayanan2024}.}}
+\end{table}
+
+
+
+Finalmente, el análisis se complementa con la curva ROC y el valor AUC (\textit{Area Under the Curve}). La curva ROC permite visualizar el equilibrio entre la tasa de verdaderos positivos y falsos positivos a través de distintos umbrales, mientras que el AUC proporciona una medida agregada de la capacidad del modelo para distinguir entre clases, donde un valor de 1.0 representa un clasificador perfecto.
 
 
 \section{Integración y fusión de características (\textit{Feature Fusion})}

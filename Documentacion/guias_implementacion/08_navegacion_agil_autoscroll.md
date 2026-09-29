@@ -8,14 +8,15 @@ Si un profesor califica 40 entregas y para cada una debe:
 2. Revisar las métricas y el código,
 3. Emitir el dictamen,
 4. Cerrar el modal,
-5. Hacer scroll en la biblioteca buscando al siguiente alumno...
+5. Hacer scroll en la biblioteca buscando al siguiente alumno,
+6. Abrir el siguiente modal...
 
 El usuario realiza más de **240 interacciones mecánicas redundantes**.
 
 La solución es una **arquitectura de Cola de Revisión Secuencial (Review Carousel / Queue)** con:
 * Avance automático suave al siguiente elemento tras emitir dictamen.
-* Transiciones fluidas asistidas por GSAP.
-* Soporte de **atajos de teclado (Keyboard Shortcuts)** para revisión rápida.
+* Transiciones fluidas asistidas por GSAP (ya instalado en el proyecto).
+* Soporte opcional de **atajos de teclado (Keyboard Shortcuts)** para revisión ultrarrápida.
 
 ---
 
@@ -25,7 +26,7 @@ La solución es una **arquitectura de Cola de Revisión Secuencial (Review Carou
     * Recibir la lista completa de entregas `comparisons: ComparisonData[]` y el índice activo `currentIndex: number`.
     * Control de navegación: `goToNext()`, `goToPrev()`.
     * Efecto de transición visual (slide / cross-fade con GSAP).
-    * Hook para escuchar eventos de teclado (`keydown`: `A` -> Aceptar, `D` -> Duda, `R` -> Rechazar, flechas).
+    * Hook para escuchar eventos de teclado (`keydown`: `A` -> Aceptar, `D` -> Duda, `R` -> Rechazar, `->` -> Siguiente).
 * **Backend:** Sin impacto directo (utiliza el endpoint de veredicto de la Guía 07).
 
 ---
@@ -61,6 +62,7 @@ export function FastReviewModal({
     if (newIndex < 0 || newIndex >= submissions.length || isTransitioning) return;
     
     setIsTransitioning(true);
+    // Animación de salida y entrada con GSAP
     gsap.to(cardContainerRef.current, {
       opacity: 0,
       x: -20,
@@ -78,19 +80,24 @@ export function FastReviewModal({
 
   const handleVerdictAndAdvance = async (verdict: "APROBADO" | "RECHAZADO" | "EN_DUDA") => {
     if (!currentItem?.id) return;
+    // 1. Guardar en backend
     await onUpdateVerdict(currentItem.id, verdict);
     
+    // 2. Avanzar automáticamente si hay más elementos
     if (hasNext) {
       navigateTo(currentIndex + 1);
     } else {
+      // Fin del lote
       onClose();
     }
   };
 
+  // Atajos de teclado para productividad extrema
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si el usuario está escribiendo en un input o textarea
       if (["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) return;
 
       if (e.key === "a" || e.key === "A") handleVerdictAndAdvance("APROBADO");
@@ -106,6 +113,7 @@ export function FastReviewModal({
   }, [isOpen, currentIndex, hasNext, currentItem]);
 
   return (
+    // Estructura de Modal con encabezado de progreso: "Entrega 14 de 35 (40% revisado)"
     <div className="modal-container">
       <div className="flex justify-between items-center pb-4 border-b border-line-subtle">
         <span className="text-xs uppercase font-mono text-content-muted">
@@ -132,6 +140,13 @@ export function FastReviewModal({
 
 ---
 
-## 4. Criterios de Aceptación y Pruebas
+## 4. Riesgos y Anti-Patrones a Evitar
+* ❌ **Pérdida de foco o saltos abruptos:** Cambiar el contenido sin una transición sutil desorienta al usuario, haciéndole dudar si la acción se registró o no. Un indicador de éxito y una microanimación son esenciales.
+* ⚠️ **Manejo de errores de red:** Si la petición HTTP de veredicto falla al emitir el dictamen, **NO se debe avanzar automáticamente al siguiente alumno**. Se debe mostrar una alerta de error y mantener al docente en la entrega actual para evitar inconsistencias.
+
+---
+
+## 5. Criterios de Aceptación y Pruebas
 1. Al pulsar `[Aceptar]`, `[Duda]` o `[Rechazar]`, la decisión se persiste y la vista transiciona inmediatamente a la siguiente entrega sin cerrar el modal.
-2. Los atajos de teclado (`A`, `D`, `R`, flechas) funcionan correctamente.
+2. La barra de progreso superior se actualiza en tiempo real (ej. *"15 de 40"*).
+3. Los atajos de teclado (`A`, `D`, `R`, flechas) funcionan correctamente sin interferir cuando el profesor redacta un comentario de texto.

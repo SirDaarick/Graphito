@@ -1,0 +1,49 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CAPÍTULO: CONCLUSIONES Y TRABAJO FUTURO
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Conclusiones y Trabajo Futuro}
+\label{cap:conclusiones}
+
+El presente Trabajo Terminal se desarrolló como respuesta técnica y pedagógica ante la disrupción ocasionada por los Modelos de Lenguaje de Gran Escala en la enseñanza de la programación. Frente a la insuficiencia de los detectores léxicos tradicionales y la creciente necesidad de evaluar objetivamente el aprendizaje en cursos iniciales, el sistema \textbf{Graphito} se consolidó como una plataforma integral de soporte a la decisión docente, fundamentada en un enfoque bimodal que combina la equivalencia semántica y el análisis estilométrico.
+
+Siguiendo de forma rigurosa el ciclo de vida de la metodología \textbf{Komorebi} para proyectos de \textit{Data \& Machine Learning} \cite{verges_como_2023}, se articularon las etapas de planificación, adquisición de datos, preparación, modelado, evaluación, despliegue y monitorización. A continuación, se sintetizan las conclusiones alcanzadas respecto a los objetivos planteados y se delinea la hoja de ruta para el trabajo futuro.
+
+% ======================================================================
+\section{Cumplimiento de Objetivos y Resultados Técnicos}
+\label{sec:cumplimiento_objetivos}
+% ======================================================================
+
+El desarrollo del proyecto permitió alcanzar los siguientes hitos de ingeniería:
+
+\begin{enumerate}
+    \item \textbf{Ingeniería de Datos y Paridad Lingüística (Capítulo 7):} Se conformó un corpus balanceado de 20,000 muestras sobre 72 problemas algorítmicos. Se resolvió la carencia de especificaciones del dataset de Sarajevo mediante ingeniería inversa con LLMs, se neutralizó el sesgo lingüístico generando soluciones sintéticas en serbocroata con cuatro perfiles de estudiante, y se mitigó la fuga de información (*data leakage*) por auto-formateo moderno aplicando una normalización selectiva de indentación (\texttt{indent\_only.py}).
+    
+    \item \textbf{Modelado Bimodal y Adaptación Eficiente (Capítulo 8):} Se implementó una arquitectura de doble canal:
+    \begin{itemize}
+        \item El canal semántico empleó \textit{GraphCodeBERT} adaptado mediante matrices de bajo rango (\textbf{LoRA}, $r=8, \alpha=16$), capturando la lógica del Grafo de Flujo de Datos (DFG) y eliminando la saturación espuria en pares de problemas distintos.
+        \item El canal estilométrico utilizó la red convolucional multiescala \textbf{MultiScaleCharCNN} ($k \in \{3, 5, 7, 9\}$ con \textit{Global Adaptive Pooling}), reduciendo los parámetros a menos de 2 millones frente a las arquitecturas clásicas de 21.6 millones.
+    \end{itemize}
+    
+    \item \textbf{Validación Experimental y Requerimientos de Calidad:} En las pruebas ciegas sobre problemas no observados durante el entrenamiento, el sistema alcanzó una exactitud del 92.4\,\%, una precisión del 91.8\,\% (superando la meta de 80\,\% de RNF-04), un $F_1$-score de 92.4\,\% (superando la meta de 85\,\% de RNF-03) y una tasa de falsos positivos del 8.2\,\% (cumpliendo la restricción de RNF-06 de $< 10$\,\%). Asimismo, el benchmark demostró robustez ante los cuatro tipos de clones de Bellon y confirmó que el modelo no penaliza el código desordenado de alumnos novatos.
+    
+    \item \textbf{Despliegue y Persistencia Híbrida (Capítulo 9):} Se construyó un backend modular bajo \textit{Clean Architecture} con FastAPI y Uvicorn, implementando persistencia dual en PostgreSQL (datos relacionales) y ChromaDB (búsquedas vectoriales k-NN en sub-segundos). La interfaz en React y Tailwind CSS garantizó una visualización bimodal clara y respetuosa del principio \textit{Human-in-the-loop} (RN-04).
+\end{enumerate}
+
+% ======================================================================
+\section{Trabajo Futuro y Líneas de Investigación}
+\label{sec:trabajo_futuro}
+% ======================================================================
+
+Para continuar la evolución de Graphito como herramienta de auditoría académica, se plantean las siguientes líneas de desarrollo:
+
+\begin{enumerate}
+    \item \textbf{Expansión a Otros Lenguajes de Programación:} Adaptar los extractores de DFG basados en Tree-sitter y calibrar los modelos para materias intermedias que utilizan Python, Java o Rust.
+    
+    \item \textbf{Integración con Plataformas de Aprendizaje (LMS):} Desarrollar plugins estándar compatibles con LTI (\textit{Learning Tools Interoperability}) para integrar Graphito directamente con plataformas institucionales como Google Classroom, Moodle o Canvas.
+    
+    \item \textbf{Evolución Continua ante Nuevos Modelos Generativos:} Implementar un pipeline automatizado de MLOps que detecte desviaciones en la distribución de datos (*concept drift*) y ejecute re-entrenamientos periódicos de la red CharCNN al liberarse nuevas familias de LLMs comerciales y abiertos.
+    
+    \item \textbf{Explicabilidad y Retroalimentación Pedagógica:} Incorporar mapas de atención visuales (*Grad-CAM* sobre caracteres y grafos de atención de atención de Tree-sitter) que resalten ante el docente las regiones específicas del código que motivaron la alerta de autoría o de discrepancia lógica.
+\end{enumerate}
+
+Con la conclusión de estas etapas, Graphito demuestra la viabilidad técnica y pedagógica de combinar modelos de lenguaje estructurados y redes convolucionales sobre caracteres, ofreciendo una solución ética, precisa y fundamentada para salvaguardar la formación de los futuros ingenieros en computación.

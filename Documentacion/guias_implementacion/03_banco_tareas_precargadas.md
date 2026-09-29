@@ -20,7 +20,7 @@ Para resolverlo, la arquitectura debe incorporar el patrón **Prototype / Cloner
   * Opción recomendada por simplicidad y consistencia: Agregar a la tabla `problemas`:
     * `es_plantilla`: `Boolean`, default `False`, indexado.
     * `dificultad`: `String(50)`, nullable `True` (`"Principiante"`, `"Intermedio"`, `"Avanzado"`).
-    * `docente_id`: Permitir `nullable=True` para plantillas del sistema.
+    * `docente_id`: Permitir `nullable=True` para plantillas del sistema, o asignar un usuario especial `System/Admin` (ID: 1).
 * **Base de Datos Vectorial (ChromaDB):**
   * Los códigos de referencia clonados pueden reutilizar los embeddings existentes o re-indexarse bajo el ID del nuevo problema.
 * **Backend (FastAPI):**
@@ -35,15 +35,7 @@ Para resolverlo, la arquitectura debe incorporar el patrón **Prototype / Cloner
 
 ## 3. Especificación Técnica Detallada
 
-### 3.1. Sentencia DDL en PostgreSQL
-```sql
-ALTER TABLE problemas ALTER COLUMN docente_id DROP NOT NULL;
-ALTER TABLE problemas ADD COLUMN IF NOT EXISTS es_plantilla BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE problemas ADD COLUMN IF NOT EXISTS dificultad VARCHAR(50) DEFAULT 'Principiante';
-CREATE INDEX IF NOT EXISTS ix_problemas_es_plantilla ON problemas(es_plantilla);
-```
-
-### 3.2. Modelo de Datos (`backend/app/infrastructure/database/models.py`)
+### 3.1. Modelo de Datos (`backend/app/infrastructure/database/models.py`)
 ```python
 class Problema(Base):
     __tablename__ = "problemas"
@@ -53,7 +45,7 @@ class Problema(Base):
     titulo = Column(String(255), nullable=False)
     enunciado = Column(Text, nullable=False)
     lenguaje = Column(String(50), default="c", nullable=False)
-    es_plantilla = Column(Boolean, default=False, nullable=False, index=True)
+    es_plantilla = Column(Boolean, default=False, index=True)
     dificultad = Column(String(50), default="Principiante")
     fecha_creacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -61,7 +53,7 @@ class Problema(Base):
     codigos = relationship("CodigoFuente", back_populates="problema", cascade="all, delete-orphan")
 ```
 
-### 3.3. Lógica de Clonación Profunda Transaccional (`backend/app/application/services/plantilla_service.py`)
+### 3.2. Lógica de Clonación Profunda Transaccional (`backend/app/application/services/plantilla_service.py`)
 ```python
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -70,6 +62,7 @@ from app.infrastructure.database.models import Problema, CodigoFuente, TipoCodig
 class PlantillaService:
     @staticmethod
     def adoptar_plantilla(db: Session, plantilla_id: int, docente_id: int) -> Problema:
+        # 1. Obtener la plantilla original
         plantilla = db.query(Problema).filter(
             Problema.id == plantilla_id,
             Problema.es_plantilla == True
@@ -78,6 +71,7 @@ class PlantillaService:
         if not plantilla:
             raise HTTPException(status_code=404, detail="La plantilla solicitada no existe.")
 
+        # 2. Iniciar transacción de clonación
         try:
             nuevo_problema = Problema(
                 docente_id=docente_id,
@@ -88,8 +82,9 @@ class PlantillaService:
                 dificultad=plantilla.dificultad
             )
             db.add(nuevo_problema)
-            db.flush()
+            db.flush() # Obtener el nuevo ID generado
 
+            # 3. Clonar los códigos de referencia asociados
             referencias_originales = db.query(CodigoFuente).filter(
                 CodigoFuente.problema_id == plantilla.id,
                 CodigoFuente.tipo == TipoCodigoEnum.REFERENCIA
@@ -114,10 +109,51 @@ class PlantillaService:
             raise HTTPException(status_code=500, detail=f"Error al clonar plantilla: {str(e)}")
 ```
 
+### 3.3. Sembrado de Datos Inicial (Seed Script: `backend/scripts/seed_plantillas.py`)
+```python
+TEMPLATES = [
+    {
+        "titulo": "Búsqueda Binaria en Arreglos Ordenados",
+        "enunciado": "Implementar una función en C que busque un elemento en un arreglo de enteros previamente ordenado...",
+        "lenguaje": "c",
+        "dificultad": "Principiante",
+        "referencia": """#include <stdio.h>
+int busquedaBinaria(int arr[], int l, int r, int x) {
+    while (l <= r) {
+        int m = l + (r - l) / 2;
+        if (arr[m] == x) return m;
+        if (arr[m] < x) l = m + 1;
+        else r = m - 1;
+    }
+    return -1;
+}"""
+    },
+    {
+        "titulo": "Inversión de Lista Enlazada Simple",
+        "enunciado": "Escribir un programa en C++ que construya una lista simplemente enlazada y revierta los punteros in-situ...",
+        "lenguaje": "cpp",
+        "dificultad": "Intermedio",
+        "referencia": """#include <iostream>
+struct Nodo { int dato; Nodo* sig; };
+Nodo* revertir(Nodo* cabeza) {
+    Nodo *prev = nullptr, *act = cabeza, *sig = nullptr;
+    while (act != nullptr) {
+        sig = act->sig;
+        act->sig = prev;
+        prev = act;
+        act = sig;
+    }
+    return prev;
+}"""
+    }
+]
+```
+
 ---
 
 ## 4. Riesgos y Anti-Patrones a Evitar
 * ❌ **Copias Superficiales (Shallow Copy):** Vincular los mismos registros de `CodigoFuente` al nuevo problema. Si el profesor decide modificar la referencia para ajustarla a su rúbrica, alteraría la plantilla global. **Debe ser Deep Copy siempre.**
+* ⚠️ **Desincronización Vectorial:** Al clonar un código de referencia, se debe decidir si se generan nuevos embeddings en ChromaDB para el nuevo `codigo_id` o si el recuperador vectorial soporta búsqueda cruzada. Para mantener Clean Architecture, registrar el embedding del nuevo código garantiza independencia total.
 
 ---
 

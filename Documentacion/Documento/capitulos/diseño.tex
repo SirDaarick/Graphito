@@ -122,69 +122,42 @@ A continuación, se describen las etapas clave representadas en el modelo:
 \end{itemize}
 
 % =========================================================
-\section{Diseño del pipeline de modelos}
+\section{Metodología de Desarrollo: Ciclo de Vida Komorebi}
+\label{sec:metodologia_komorebi}
 % =========================================================
 
-Para estructurar el ciclo de vida de los modelos de inteligencia artificial dentro del sistema \textbf{Graphito}, se adoptó la metodología \textbf{Komorebi}. Este marco de trabajo rige el flujo de datos desde su recolección hasta su despliegue y monitoreo en el entorno de producción, garantizando la trazabilidad y la reproducibilidad de los experimentos.
+Para estructurar el ciclo de vida de los datos y los modelos de inteligencia artificial dentro del sistema \textbf{Graphito}, se adoptó la metodología \textbf{Komorebi} propuesta por Díaz Vergés \cite{verges_como_2023}. En la ingeniería de software tradicional, los proyectos suelen gestionarse mediante ciclos secuenciales o iterativos convencionales (definir, diseñar, desarrollar, probar y desplegar) donde los requerimientos son deterministas y los datos sobre los que opera el sistema son estables y predecibles.
 
-Dado que la fase inicial de \textbf{Planificación} (análisis de requerimientos y definición arquitectónica) se encuentra cubierta en los capítulos previos de este documento, el \textit{pipeline} técnico se enfoca en las etapas operativas. En la Figura~\ref{fig:pipeline_komorebi} se ilustra la arquitectura de este flujo, diseñado secuencialmente para orquestar la extracción semántica y el entrenamiento estilométrico.
+Sin embargo, como argumenta Díaz Vergés \cite{verges_como_2023}, los proyectos de Inteligencia Artificial y Aprendizaje Automático poseen una naturaleza cualitativamente distinta: combinan desarrollo de software con investigación empírica e innovación científica. Esto introduce un elevado grado de incertidumbre respecto a la convergencia de los modelos, la calidad intrínseca de las fuentes de información y la representatividad de las características extraídas. Bajo este paradigma, la metodología Komorebi plantea una gestión ágil adaptada específicamente a proyectos de \textit{Data \& Machine Learning}, estructurando el flujo técnico en etapas iterativas que garantizan la trazabilidad, reproducibilidad y gobernanza de los experimentos.
+
+En el sistema \textbf{Graphito}, la metodología Komorebi actúa como el marco metodológico rector que gobierna el pipeline de procesamiento bimodal (semántico y estilométrico). En la Figura~\ref{fig:pipeline_komorebi} se ilustra la arquitectura global de este flujo operativo.
 
 \begin{figure}[H]
     \centering
-    % Reemplaza 'tu_imagen.png' con el nombre del archivo exportado desde Mermaid
     \includegraphics[width=\textwidth]{figuras/pipeline.png} 
     \caption{Flujo secuencial del pipeline de modelos basado en la metodología Komorebi.}
     \label{fig:pipeline_komorebi}
 \end{figure}
 
-A continuación, se detalla la implementación técnica de cada una de las fases operativas de la metodología.
+A nivel documental y de ingeniería, las fases del ciclo de vida de Komorebi se articulan y desarrollan a lo largo de este Trabajo Terminal de la siguiente manera:
 
-% ---------------------------------------------------------
-\subsection{Adquisición de Datos}
-% ---------------------------------------------------------
+\begin{enumerate}
+    \item \textbf{Fase I. Planificación y Comprensión del Problema:} Consiste en el levantamiento de requerimientos técnicos, delimitación del contexto educativo (la paradoja cognitiva de la IA en cursos de programación) y el establecimiento de métricas de éxito (RNF-03 a RNF-07), aspectos detallados en los Capítulos~1, 4 y 5.
+    
+    \item \textbf{Fase II. Adquisición de Datos (\textit{Data Ingestion}):} Comprende la recolección del corpus humano representativo (\textit{IEEE Programming Homework Dataset}), la ingeniería inversa asistida por LLMs para recuperar los enunciados algorítmicos (\texttt{extraer\_enunciados.py}) y la síntesis del conjunto de código generado por IA con generadores comerciales y abiertos (\texttt{generar\_referencias.py}). Esta etapa se formaliza detalladamente en el Capítulo~\ref{cap:ingenieria_datos} (Sección~\ref{sec:adquisicion_datos}).
+    
+    \item \textbf{Fase III. Preparación y Normalización de Datos:} Introduce la bifurcación arquitectónica divergente del código fuente para alimentar de forma especializada al canal semántico (depuración léxica, AST y Grafo de Flujo de Datos) y al canal estilométrico (código \textit{raw} y cuantización matricial 1D de caracteres), aplicando una partición agrupada por problema para prevenir fuga de información (\textit{data leakage}). Su desarrollo exhaustivo se expone en el Capítulo~\ref{cap:ingenieria_datos} (Sección~\ref{sec:preparacion_datos}).
+    
+    \item \textbf{Fase IV. Entrenamiento y Modelado de IA:} Abarca la configuración de las redes neuronales: el uso de \textit{GraphCodeBERT} como extractor de características semánticas mediante grafos de dependencias enriquecidos con adaptadores LoRA, el entrenamiento de la red convolucional \textit{CharCNN} para clasificación de autoría mediante convoluciones 1D sobre caracteres, y el algoritmo de \textbf{Fusión de Características (\textit{Feature Fusion})} que consolida el vector multimodal de 769 dimensiones.
+    
+    \item \textbf{Fase V. Evaluación y Validación Experimental:} Comprende la evaluación estadística rigurosa de los clasificadores (matriz de confusión, $F_1$-Score, curvas ROC-AUC), el análisis de invariancia de la similitud del coseno ante la taxonomía de clones de Bellon, y la contrastación empírica con arquetipos de entregas estudiantiles.
+    
+    \item \textbf{Fase VI. Despliegue de Modelos:} Corresponde a la integración de los modelos empaquetados dentro de los servicios backend en FastAPI (bajo principios de \textit{Clean Architecture}), la orquestación del almacenamiento híbrido (PostgreSQL y ChromaDB) y la interfaz interactiva para el docente en React.
+    
+    \item \textbf{Fase VII. Monitorización y Calibración Continua:} Fase de estabilización operativa enfocada en la ejecución de pruebas unitarias y de estrés automatizadas, la calibración empírica de umbrales para mantener la tasa de falsos positivos por debajo del 10\,\%, y la integración del principio \textit{Human-in-the-loop}, donde la herramienta asiste al docente sin sustituir su juicio pedagógico.
+\end{enumerate}
 
-Esta fase garantiza la disponibilidad del insumo principal para el sistema dual. Se consolida un corpus balanceado a partir de dos fuentes: la recolección de entregas académicas reales en C/C++ (\textit{IEEE Programming Homework Dataset}) que conforman la clase humana, y la generación automatizada de variantes equivalentes utilizando Modelos de Lenguaje (LLMs) que conforman la clase sintética. 
-
-Una vez balanceadas las clases, en esta misma fase se realiza la \textbf{Partición del Corpus} en los conjuntos de Entrenamiento (\textit{Train}), Validación (\textit{Val}) y Prueba (\textit{Test}). Realizar esta separación antes de cualquier procesamiento asegura que no exista fuga de información (\textit{data leakage}) entre las muestras, garantizando que los modelos se evalúen con datos matemáticamente aislados.
-
-% ---------------------------------------------------------
-\subsection{Preparación de Datos}
-% ---------------------------------------------------------
-
-Dado el enfoque de doble canal, los datos crudos sufren transformaciones divergentes dependiendo del modelo de destino:
-\begin{itemize}
-    \item \textbf{Canal Semántico:} El código es sometido a un proceso de limpieza y normalización que elimina ruido léxico. Posteriormente, se procesa para extraer la topología lógica, construyendo el Grafo de Flujo de Datos (DFG).
-    \item \textbf{Canal Estilométrico:} Se preserva el formato original (incluyendo indentación y comentarios). El código se mapea a un espacio vectorial unidimensional (cuantización a nivel de caracteres), generando la matriz secuencial que la red convolucional utilizará para identificar patrones sintéticos.
-\end{itemize}
-
-% ---------------------------------------------------------
-\subsection{Entrenamiento de Modelos}
-% ---------------------------------------------------------
-
-En esta etapa se define el comportamiento de aprendizaje de la arquitectura. Se implementaron dos estrategias diametralmente opuestas para optimizar recursos computacionales y maximizar la precisión:
-
-\begin{itemize}
-    \item \textbf{Extracción de Características (GraphCodeBERT):} Debido a que este modelo fundacional ya posee un preentrenamiento masivo en estructuras de código, se utiliza estrictamente en modo de extracción de características. No requiere ajuste de pesos, utilizando la representación densa (\textit{embedding}) directa para el análisis espacial.
-    \item \textbf{Entrenamiento del Clasificador (CharCNN):} La red neuronal convolucional se entrena para la tarea de clasificación binaria. Para evitar que el modelo simplemente memorice los datos, se aplican estrategias de prevención de sobreajuste (\textit{overfitting}), tales como el procesamiento por lotes pequeños (\textit{mini-batches}), desactivación aleatoria de neuronas (\textit{dropout}) y el paro anticipado (\textit{early stopping}) basado en el conjunto de validación.
-\end{itemize}
-
-% ---------------------------------------------------------
-\subsection{Evaluación de Modelos}
-% ---------------------------------------------------------
-
-Una vez finalizado el ajuste de la red CharCNN, se procede a la validación rigurosa utilizando exclusivamente el conjunto de pruebas (\textit{Test}). Esta fase corrobora que los modelos cumplan con los objetivos de desempeño base (RNF-03 y RNF-04). Se calculan las métricas de clasificación (Exactitud, Precisión, Recall y F1-Score) para garantizar la confiabilidad en la detección de IA. Por su parte, la calidad del espacio vectorial semántico se valida comprobando la coherencia en los valores de la similitud del coseno ante algoritmos lógicamente idénticos.
-
-% ---------------------------------------------------------
-\subsection{Despliegue de Modelos}
-% ---------------------------------------------------------
-
-Los modelos empaquetados y validados se integran al núcleo del sistema. Esta fase implica la carga de los pesos definitivos en el entorno del \textit{backend} (API REST). Aquí se codifica la \textbf{Fusión de Características (\textit{Feature Fusion})}, el algoritmo interno que concatena el vector semántico y la probabilidad estilométrica en una sola estructura analítica lista para ser consultada por el docente.
-
-% ---------------------------------------------------------
-\subsection{Monitorización de Modelos}
-% ---------------------------------------------------------
-
-La fase final asegura la estabilidad del sistema en el entorno operativo. Consiste en la ejecución de pruebas de integración continua diseñadas para verificar que el orquestador respeta las Reglas de Negocio establecidas, y que el rendimiento general del sistema (como los tiempos de latencia durante la inferencia híbrida) se mantiene dentro de los márgenes de los Requerimientos No Funcionales.
+Esta articulación metodológica garantiza que las decisiones de diseño expuestas en las siguientes secciones (modelo relacional, almacenamiento vectorial y arquitectura de interfaz) se encuentren perfectamente integradas con las fases operativas de ingeniería de datos y modelado.
 
 % ---------------------------------------------------------
 \section{Diseño de Base de Datos}

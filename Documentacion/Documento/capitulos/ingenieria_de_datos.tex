@@ -1,0 +1,375 @@
+\chapter{Ingeniería de Datos}
+\label{cap:ingenieria_datos}
+
+En el desarrollo de sistemas de aprendizaje automático aplicados al análisis de código fuente, la calidad y el balance de los datos son determinantes. Si el conjunto de datos contiene sesgos o información inconsistente, los modelos aprenderán patrones erróneos que afectarán su desempeño en casos reales.
+
+Siguiendo la metodología \textbf{Komorebi} para la gestión de proyectos de Inteligencia Artificial \cite{verges_como_2023}, las fases iniciales de \textbf{Adquisición de Datos} y \textbf{Preparación de Datos} establecen las bases del sistema \textbf{Graphito}. En este capítulo se documenta cómo se recolectó el código escrito por estudiantes, cómo se reconstruyeron los enunciados de las prácticas mediante ingeniería inversa con modelos de lenguaje, el método utilizado para generar código equivalente con inteligencia artificial y el proceso de preparación y normalización para alimentar los modelos predictivos.
+
+% ======================================================================
+\section{Adquisición de Datos}
+\label{sec:adquisicion_datos}
+% ======================================================================
+
+El objetivo de la adquisición de datos fue conformar un conjunto balanceado y representativo de programación en cursos universitarios iniciales. El problema exigía comparar dos grupos de código: programas escritos por estudiantes y programas generados por inteligencia artificial, asegurando que ambos resolvieran exactamente las mismas tareas algorítmicas y con el mismo contexto de lenguaje.
+
+En la Figura~\ref{fig:pipeline_adquisicion} se muestra el flujo general de adquisición e ingeniería inversa diseñado para construir este conjunto de datos.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.85cm and 0cm,
+        box/.style={rectangle, draw=black!60, fill=blue!6, rounded corners=3pt, text width=11.5cm, align=center, inner sep=7pt, font=\small},
+        proc/.style={rectangle, draw=black!60, fill=cyan!8, rounded corners=3pt, text width=11.5cm, align=center, inner sep=7pt, font=\small},
+        data/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=11.5cm, align=center, inner sep=7pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[box, fill=gray!12] (ieee) {\textbf{IEEE Plagiarism Dataset (Universidad de Sarajevo)}\\Entregas reales en C y C++ de estudiantes (2016--2017) en serbocroata};
+        \node[proc, below=of ieee] (extraer) {\textbf{Paso 1: Inferencia de Enunciados (\texttt{extraer\_enunciados.py})}\\Análisis cruzado de soluciones con modelos de lenguaje};
+        \node[data, below=of extraer] (csv) {\textbf{Catálogo de Tareas (\texttt{enunciados\_srb.csv} / \texttt{enunciados.csv})}\\72 problemas algorítmicos documentados en serbocroata y español};
+        \node[proc, below=of csv] (generar) {\textbf{Paso 2: Generación Sintética (\texttt{generar\_referencias.py})}\\Generación con LLMs usando 4 perfiles de estilo estudiantil};
+        \node[box, fill=green!12, below=of generar] (corpus) {\textbf{Corpus Consolidado de Graphito}\\20,000 códigos (50\,\% humano / 50\,\% IA) sobre los 72 problemas};
+
+        \draw[arrow] (ieee.south) -- (extraer.north);
+        \draw[arrow] (extraer.south) -- (csv.north);
+        \draw[arrow] (csv.south) -- (generar.north);
+        \draw[arrow] (generar.south) -- (corpus.north);
+    \end{tikzpicture}
+    \caption{Flujo general de adquisición e ingeniería inversa de datos.}
+    \label{fig:pipeline_adquisicion}
+\end{figure}
+
+% ----------------------------------------------------------------------
+\subsection{Requerimientos del Conjunto de Datos}
+\label{subsec:requerimientos_dataset}
+
+Para que los datos fueran útiles en el contexto de las asignaciones de programación en la Escuela Superior de Cómputo (ESCOM-IPN), se definieron dos condiciones indispensables:
+
+\begin{enumerate}
+    \item \textbf{Autoría humana verificada (Pre-LLM):} 
+    Actualmente, recolectar código reciente de repositorios abiertos como GitHub implica dos riesgos metodológicos severos documentados en la literatura. Por un lado, Lopes et al. \cite{Lopes2017DejaVu} demostraron mediante el estudio DéjàVu que más del 70\,\% del código en GitHub corresponde a duplicados o variantes triviales de archivos existentes, lo que induce una alta contaminación del corpus (\textit{corpus contamination}). Por otro lado, como advierten Zhou et al. \cite{Zhou2023Contamination}, los modelos generativos contemporáneos han sido preentrenados sobre estos repositorios masivos, existiendo el peligro latente de contaminar los conjuntos evaluativos o de incluir código autocompletado por IA. Si un clasificador se entrena con código supuestamente humano que contiene trazas sintéticas, aprenderá fronteras de decisión difusas. Por ello, fue indispensable utilizar un conjunto de datos recolectado con anterioridad a la popularización masiva de los modelos de lenguaje a finales de 2022.
+    
+    \item \textbf{Nivel académico introductorio:} 
+    Graphito apoya la revisión en materias como Fundamentos de Programación y Estructuras de Datos. Por lo tanto, no se requería código profesional con patrones de diseño avanzados o características complejas de C++ moderno, sino código típico de estudiantes: variables con nombres sencillos, estructuras de control básicas (\texttt{if}, \texttt{for}, \texttt{while}), funciones modulares, arreglos y punteros elementales, incluyendo los errores de formato comunes en principiantes.
+\end{enumerate}
+
+% ----------------------------------------------------------------------
+\subsection{Selección del Dataset Base: IEEE Programming Homework Dataset}
+\label{subsec:seleccion_dataset_ieee}
+
+Cumpliendo con estas condiciones, se seleccionó el conjunto de datos \textit{Programming Homework Dataset for Plagiarism Detection}, publicado por Vedran Ljubovic y Elma Pajic en IEEE Dataport \cite{Ljubovic2020}. 
+
+Este dataset fue recolectado en la Facultad de Ingeniería Eléctrica de la \textbf{Universidad de Sarajevo} (Bosnia y Herzegovina) y ofrece ventajas clave para este trabajo:
+
+\begin{itemize}
+    \item \textbf{Fecha de recolección (2016--2017):} Al ser anterior a la salida de los modelos de lenguaje modernos, garantiza que el código fue escrito enteramente por humanos.
+    
+    \item \textbf{Validación con defensas orales:} Incluye registros de casos de plagio no solo por similitud estática, sino también mediante entrevistas y exámenes orales individuales (registrados en el archivo \texttt{ground-truth-}\allowbreak\texttt{dynamic-}\allowbreak\texttt{anon.txt}), donde los profesores confirmaron si el alumno entendía realmente el código entregado.
+    
+    \item \textbf{Registros de actividad del IDE (\textit{stats}):} Contiene archivos JSON con métricas de trabajo del estudiante: tiempo total invertido (\texttt{total\_time}), número de compilaciones (\texttt{builds}) y pruebas realizadas (\texttt{testings}), lo que demuestra el proceso real de desarrollo.
+\end{itemize}
+
+El dataset abarca cuatro cohortes académicas, cuyas características se resumen en la Tabla~\ref{tab:dimensiones_dataset_ieee}.
+
+\begin{table}[H]
+    \centering
+    \caption{Estructura del conjunto de datos IEEE Plagiarism.}
+    \label{tab:dimensiones_dataset_ieee}
+    \begin{tabularx}{\textwidth}{|l|X|}
+        \hline
+        \textbf{Aspecto} & \textbf{Detalle} \\ \hline
+        Cursos evaluados & 4 cohortes: A2016 (C), A2017 (C), B2016 (C++), B2017 (C++) \\ \hline
+        Lenguajes & C (estándar C11) y C++ (estándar C++17) \\ \hline
+        Estudiantes & Entre 100 y 150 por cada cohorte académica \\ \hline
+        Tareas y problemas & 16 a 22 asignaciones por curso, con un total de 72 problemas únicos \\ \hline
+        Registros de desarrollo & Archivos JSON con eventos de edición, compilación y pruebas \\ \hline
+        Anonimización & Nombres sustituidos por identificadores como \texttt{student\{id\}} \\ \hline
+    \end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------
+\subsection{Limitaciones del Dataset: Idioma Serbocroata y Falta de Enunciados}
+\label{subsec:limitaciones_dataset}
+
+Durante la exploración de los archivos en \texttt{data/raw/IEEE\_plagiarism/}, se identificaron dos retos importantes:
+
+\begin{enumerate}
+    \item \textbf{Código escrito en serbocroata:} 
+    Al provenir de la Universidad de Sarajevo, los estudiantes escribieron sus variables, mensajes en pantalla y comentarios en serbocroata con caracteres latinos (por ejemplo: \texttt{unos} para entrada, \texttt{broj} para número, \texttt{suma} para adición y \texttt{niz} para arreglo). Si este aspecto no se consideraba al generar el código con IA, los modelos aprenderían a distinguir entre idiomas (inglés frente a serbocroata) en lugar de aprender el estilo de programación.
+    
+    \item \textbf{Ausencia de los enunciados de las tareas:} 
+    Las carpetas contenían los códigos de los alumnos clasificados por códigos de tarea (como \texttt{src/A2016/Z1/Z1/student2956.c}), pero los autores no incluyeron las descripciones de los problemas. Sin el enunciado exacto, no era posible pedirle a una inteligencia artificial que resolviera el mismo ejercicio.
+\end{enumerate}
+
+% ----------------------------------------------------------------------
+\subsection{Ingeniería Inversa y Reconstrucción de Enunciados}
+\label{subsec:ingenieria_inversa}
+
+Para recuperar los enunciados de forma sistemática, se desarrolló un script en Python denominado \texttt{extraer\_}\allowbreak\texttt{enunciados.py}, el cual deduce la tarea original analizando el código de estudiantes con soluciones correctas:
+
+\begin{enumerate}
+    \item \textbf{Muestreo por problema:} Para cada uno de los 72 problemas, el script toma de 2 a 3 códigos de estudiantes distintos que compilaron correctamente y pasaron las pruebas unitarias del curso.
+    
+    \item \textbf{Análisis con LLM:} El script envía estos códigos a \textit{GPT-4o-mini} mediante una consulta estructurada, pidiéndole comparar las soluciones, identificar los elementos comunes y redactar el enunciado del problema junto con las reglas de validación de entradas y salidas.
+    
+    \item \textbf{Generación de dos versiones del catálogo:}
+    \begin{itemize}
+        \item \texttt{enunciados.csv}: Enunciados traducidos al español para que los profesores y evaluadores de ESCOM puedan auditar y entender los ejercicios fácilmente.
+        \item \texttt{enunciados\_srb.csv}: Enunciados redactados en serbocroata para usarlos como entrada en la generación de código con IA, asegurando la paridad con el código original de los alumnos.
+    \end{itemize}
+    
+    \item \textbf{Mecanismos de control:} El script guarda puntos de control en el archivo \texttt{extraer\_}\allowbreak\texttt{enunciados\_}\allowbreak\texttt{checkpoint.json} para retomar el proceso si ocurre alguna falla de red o límite de peticiones de la API.
+\end{enumerate}
+
+En la Tabla~\ref{tab:ejemplos_enunciados_inferidos} se presentan ejemplos de los requerimientos obtenidos mediante este método.
+
+\begin{table}[H]
+    \centering
+    \caption{Ejemplos de requerimientos algorítmicos recuperados por ingeniería inversa.}
+    \label{tab:ejemplos_enunciados_inferidos}
+    \renewcommand{\arraystretch}{1.3}
+    \small
+    \begin{tabularx}{\textwidth}{|c|c|c|c|X|}
+        \hline
+        \textbf{Curso} & \textbf{Asig.} & \textbf{Prob.} & \textbf{Leng.} & \textbf{Enunciado Algorítmico Deducido} \\ \hline
+        A2016 & Z1 & Z1 & C & Calcular la suma de puntos de tres estudiantes (Tarik, Bojan y Mirza) en una materia con cinco rubros: primer parcial (máx. 20 pts), segundo parcial (máx. 20 pts), asistencia (máx. 10 pts), tareas (máx. 10 pts) y examen final (máx. 40 pts). Validar que los datos estén en los rangos correctos y mostrar error si algún valor no es válido. \\ \hline
+        A2016 & Z1 & Z2 & C & Con los coeficientes de dos rectas en la forma $y = a_1x + b_1$ y $y = a_2x + b_2$, indicar si son paralelas, coincidentes o secantes. Si se cruzan, calcular el punto $(x, y)$ donde se cortan. \\ \hline
+        A2016 & Z1 & Z3 & C & Leer una serie de letras que representan colores de autos (\texttt{c}: negro, \texttt{b}: blanco, \texttt{s}: gris, \texttt{v}: rojo, \texttt{p}: azul), terminando con la letra \texttt{'k'}. Calcular el total de autos, el porcentaje de cada color y determinar el color más frecuente. \\ \hline
+        A2016 & Z1 & Z4 & C & Pedir un número entero $n$ ($0 < n \le 50$) y mostrar en pantalla una figura con forma de letra 'W' hecha con asteriscos, con una altura de $n$ filas. \\ \hline
+    \end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------
+\subsection{Generación de Código con IA en Serbocroata y Perfiles de Estudiante}
+\label{subsec:generacion_ia}
+
+Para entrenar el modelo estilométrico (CharCNN) y evaluar el modelo semántico (GraphCodeBERT), se requería un conjunto de datos balanceado con 50\,\% de código humano y 50\,\% de código generado por IA sobre los mismos 72 problemas. Esta estrategia de curación dirigida se fundamenta en los hallazgos de Gunasekar et al. \cite{Gunasekar2023Textbooks} en su trabajo \textit{Textbooks Are All You Need}, donde demostraron empíricamente que un conjunto de datos sintético curado con alta densidad pedagógica y perfiles controlados permite a los modelos de lenguaje capturar y generalizar conceptos algorítmicos con mayor efectividad que colecciones masivas no filtradas.
+
+La generación se realizó mediante el script \texttt{generar\_referencias.py}, aplicando soluciones a los desafíos identificados:
+
+\subsubsection{Control del Sesgo de Idioma}
+Si las respuestas de la IA se generaban en inglés, el clasificador aprendería a distinguir entre palabras en inglés y serbocroata en lugar de reconocer el estilo de escritura. Para evitarlo, los prompts se redactaron en serbocroata, indicando de forma explícita que las variables, funciones y mensajes al usuario debían escribirse en serbocroata (usando nombres como \texttt{broj}, \texttt{zbir}, \texttt{unos}, \texttt{temp}).
+
+\subsubsection{Perfiles de Estudiante y Cuota de Comentarios}
+Al revisar los archivos del dataset de Sarajevo, se observó un dato relevante: \textbf{solo el 38\,\% de los códigos reales entregados por los estudiantes contiene comentarios}. En cambio, los modelos de IA suelen incluir comentarios largos y explicaciones por defecto. Para que la presencia de comentarios no fuera un atajo de clasificación, el script \texttt{generar\_}\allowbreak\texttt{referencias.py} utilizó cuatro perfiles de generación que se turnan de forma rotativa, descritos en la Tabla~\ref{tab:perfiles_generacion}.
+
+\begin{table}[H]
+    \centering
+    \caption{Perfiles de simulación de estudiantes en la generación sintética.}
+    \label{tab:perfiles_generacion}
+    \begin{tabularx}{\textwidth}{|l|c|X|}
+        \hline
+        \textbf{Perfil} & \textbf{Temp. ($T$)} & \textbf{Comportamiento Estilístico} \\ \hline
+        \texttt{descuidado} & $0.85$ & Simula un estudiante promedio: variables cortas (\texttt{i, j, temp, a, b}), código simple y \textbf{sin comentarios}. \\ \hline
+        \texttt{aplicado} & $0.40$ & Simula un estudiante dedicado: variables descriptivas (\texttt{brojacKaraktera, sumaBodova}), código ordenado y \textbf{sin comentarios}. \\ \hline
+        \texttt{kompaktan} & $0.70$ & Simula un estudiante que escribe poco: variables de una sola letra, todo dentro de \texttt{main()}, \textbf{sin comentarios}. \\ \hline
+        \texttt{comentado-bueno} & $0.40$ & Simula un estudiante que documenta su solución: comentarios explicativos en serbocroata, calibrado para cubrir el 38\,\% de códigos comentados. \\ \hline
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Variedad de Modelos de Lenguaje}
+Para que el sistema no se ajuste al estilo de una sola empresa, se generaron muestras con modelos comerciales vía API (\textit{GPT-4o, Claude 3.5, Gemini 1.5}) y con modelos abiertos ejecutados localmente mediante \textbf{Ollama} (\textit{CodeLlama 7B, DeepSeek-Coder, Qwen2.5-Coder}).
+
+% ----------------------------------------------------------------------
+\subsection{Ejemplo Comparativo: Código Humano vs. Código de IA}
+\label{subsec:caso_estudio_comparativo}
+
+Para apreciar las diferencias que procesa Graphito, los Listados~\ref{lst:codigo_humano_srb} y~\ref{lst:codigo_ia_srb} muestran dos soluciones en C para el problema A2016/Z1/Z1 (cálculo de notas de estudiantes). Ambos programas resuelven el mismo problema y están en serbocroata.
+
+\begin{lstlisting}[language=C, caption={Código humano: Estudiante real del curso A2016.}, label={lst:codigo_humano_srb}]
+#include <stdio.h>
+
+int main() {
+    float p1, p2, prisustvo, zadace, zavrsni;
+    float ukupno;
+    
+    printf("Unesite bodove za Tarika: \n");
+    printf("I parcijalni ispit: ");
+    scanf("%f", &p1);
+    if (p1 < 0 || p1 > 20) {
+        printf("Neispravan broj bodova");
+        return 0;
+    }
+    printf("II parcijalni ispit: ");
+    scanf("%f", &p2);
+    if (p2 < 0 || p2 > 20) {
+        printf("Neispravan broj bodova");
+        return 0;
+    }
+    printf("Prisustvo: ");
+    scanf("%f", &prisustvo);
+    if (prisustvo < 0 || prisustvo > 10) {
+        printf("Neispravan broj bodova");
+        return 0;
+    }
+    
+    ukupno = p1 + p2 + prisustvo;
+    return 0;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={Código sintético: Generado por IA en serbocroata (perfil aplicado).}, label={lst:codigo_ia_srb}]
+#include <stdio.h>
+#include <stdbool.h>
+
+bool validirajUnos(float p1, float p2, float pris) {
+    if (p1 < 0.0f || p1 > 20.0f) return false;
+    if (p2 < 0.0f || p2 > 20.0f) return false;
+    if (pris < 0.0f || pris > 10.0f) return false;
+    return true;
+}
+
+int main(void) {
+    float parcijalni1, parcijalni2, prisustvoBodovi;
+    float ukupnaOcjena;
+    
+    printf("Unesite bodove za prvog studenta:\n");
+    scanf("%f %f %f", &parcijalni1, &parcijalni2, &prisustvoBodovi);
+    
+    if (!validirajUnos(parcijalni1, parcijalni2, prisustvoBodovi)) {
+        printf("Neispravan broj bodova\n");
+        return 0;
+    }
+    
+    ukupnaOcjena = parcijalni1 + parcijalni2 + prisustvoBodovi;
+    return 0;
+}
+\end{lstlisting}
+
+En este escenario donde el enunciado del problema y las condiciones de ejecución son idénticas, se hacen evidentes las divergencias estructurales y de superficie que fundamentan la necesidad del enfoque bimodal. En la Tabla~\ref{tab:caso_estudio_humano_ia} se sintetiza el contraste entre ambas implementaciones a través de cinco dimensiones analíticas clave.
+
+\begin{table}[H]
+    \centering
+    \caption{Contraste de características entre implementación humana y sintética (Caso de Estudio).}
+    \label{tab:caso_estudio_humano_ia}
+    \renewcommand{\arraystretch}{1.25}
+    \small
+    \begin{tabularx}{\textwidth}{|l|X|X|X|}
+        \hline
+        \textbf{Dimensión} & \textbf{Implementación Humana} & \textbf{Implementación Sintética (IA)} & \textbf{Implicación para el Modelo} \\ \hline
+        Modularidad & Monolítica (\texttt{main}), lógica y control integrados en un bloque único. & Modular (\texttt{validirajUnos}), separación explícita de responsabilidades. & El canal semántico debe abstraer funciones auxiliares sin alterar el flujo de datos. \\ \hline
+        Identificadores & Nombres abreviados y concisos (\texttt{p1}, \texttt{p2}, \texttt{pris}). & Nombres auto-descriptivos (\texttt{parcijalni1}, \texttt{prisustvoBodovi}). & Requiere normalización semántica e invariancia léxica en GraphCodeBERT. \\ \hline
+        Tipado y Literales & Conversión implícita de tipos enteros (\texttt{0}, \texttt{10}, \texttt{20}). & Constantes de punto flotante explícitas (\texttt{0.0f}, \texttt{20.0f}). & Patrón estilométrico detectable a nivel de flujo de caracteres por CharCNN. \\ \hline
+        Estilo y Formato & Espaciado compacto, indentación irregular y flujo lineal. & Formato canónico, sangría regular y saltos de línea estructurados. & Justifica la normalización selectiva para evitar atajos espurios (\textit{shortcuts}). \\ \hline
+        Equivalencia Lógica & Resuelve el cálculo de notas con validación en cascada. & Idéntica cobertura de requisitos y rangos de validez algorítmica. & Demuestra la necesidad de grafos DFG para capturar similitud funcional. \\ \hline
+    \end{tabularx}
+\end{table}
+
+Como se desprende de la Tabla~\ref{tab:caso_estudio_humano_ia}, evaluar la originalidad de un código no puede depender de una sola dimensión: mientras que la lógica algorítmica de ambos códigos converge hacia un mismo objetivo funcional (requiriendo una abstracción profunda de grafos de flujo de datos), la microestructura de caracteres y los hábitos de escritura revelan patrones estilométricos marcadamente dispares.
+
+% ======================================================================
+\section{Preparación y Preprocesamiento de Datos}
+\label{sec:preparacion_datos}
+% ======================================================================
+
+Una vez reunido el conjunto de datos, los archivos deben transformarse para que los modelos neuronales puedan procesarlos adecuadamente. A diferencia de los flujos convencionales, Graphito divide el procesamiento en dos canales independientes.
+
+% ----------------------------------------------------------------------
+\subsection{Bifurcación del Pipeline de Datos}
+\label{subsec:bifurcacion_pipeline}
+
+El principio rector de Graphito reside en que ningún modelo individual puede resolver simultáneamente la comprensión de lógica algorítmica y la detección de huellas de autoría sin comprometer su precisión. En consecuencia, cada archivo fuente se somete a una bifurcación de preprocesamiento especializada: el canal semántico requiere maximizar la invariancia ante variaciones léxicas, mientras que el canal estilométrico exige preservar con fidelidad la microestructura del texto. En la Tabla~\ref{tab:pipeline_dual_preprocesamiento} se comparan las transformaciones aplicadas a cada componente del código fuente en ambos canales.
+
+\begin{table}[H]
+    \centering
+    \caption{Tratamiento diferencial en el pipeline dual de preprocesamiento.}
+    \label{tab:pipeline_dual_preprocesamiento}
+    \renewcommand{\arraystretch}{1.25}
+    \small
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        \textbf{Componente} & \textbf{Canal Semántico (GraphCodeBERT)} & \textbf{Canal Estilométrico (CharCNN)} \\ \hline
+        Comentarios & Removidos en su totalidad (no aportan a la semántica ejecutable). & Conservados íntegramente (reflejan hábitos de documentación y estilo). \\ \hline
+        Nombres de Variables & Mapeados a nodos de flujo de datos (DFG); tokens normalizados. & Preservados carácter por carácter (capturan patrones de nomenclatura). \\ \hline
+        Indentación & Normalizada a profundidad sintáctica para evitar sesgos espurios. & Normalizada selectivamente (llaves), preservando espacios periféricos. \\ \hline
+        Espacios y Saltos & Condensados o ignorados por el tokenizador BPE. & Conservados como caracteres literales (densidad y espaciado de operadores). \\ \hline
+        Representación Final & Secuencia de tokens BPE + Aristas DFG (longitud máx. 512). & Matriz de índices de caracteres (vocabulario 97, longitud 4096). \\ \hline
+        Objetivo Analítico & Abstraer el propósito y equivalencia lógica del algoritmo. & Capturar la huella estilométrica y distribución visual del autor. \\ \hline
+    \end{tabularx}
+\end{table}
+
+Esta bifurcación garantiza que cada modelo reciba la representación matemática óptima para su tarea: GraphCodeBERT razona sobre dependencias y semántica formal, mientras que MultiScaleCharCNN inspecciona las sutiles marcas tipográficas y morfológicas dejadas por el programador o el generador de IA.
+
+
+% ----------------------------------------------------------------------
+\subsection{Normalización Selectiva de Indentación}
+\label{subsec:normalizacion_indentacion}
+
+Durante el análisis del dataset base de 2016, se detectó un factor importante: muchos estudiantes de esa época escribían código sin indentar o con sangrías irregulares. En contraste, los estudiantes actuales trabajan habitualmente con editores de código modernos (como Visual Studio Code, CLion o Code::Blocks) que aplican auto-indentación de manera automática al escribir o guardar los archivos.
+
+Si los códigos generados por inteligencia artificial presentan siempre una indentación uniforme y los códigos de alumnos antiguos conservan sangrías desalineadas o nulas, la red neuronal podría aprender un atajo engañoso: clasificar como humano todo código mal indentado y como IA todo código bien indentado. Este comportamiento responde al fenómeno formalizado por Geirhos et al. \cite{Geirhos2020Shortcut} como \textit{aprendizaje de atajos} (\textit{shortcut learning}), en el cual las redes neuronales profundas explotan correlaciones estadísticas superficiales y espurias (en este caso, los patrones de espaciado impuestos por los entornos de desarrollo) en lugar de abstraer las características semánticas o estilométricas subyacentes. Esto provocaría una fuga de información (\textit{data leakage}) que invalidaría el desempeño del clasificador frente a entregas de alumnos actuales.
+
+Para mitigar este riesgo, se desarrolló la herramienta \texttt{indent\_}\allowbreak\texttt{only.py} (ubicada en \texttt{data/}). Este script aplica una \textbf{normalización selectiva de indentación} sobre la totalidad de los archivos (tanto humanos como sintéticos), simulando el comportamiento de un editor actual:
+
+\begin{itemize}
+    \item Ajusta únicamente la profundidad de sangría según los niveles de anidamiento de llaves (\texttt{\{} y \texttt{\}}).
+    \item Deja completamente intacto el resto del estilo del autor: espacios alrededor de operadores, posición de apertura de llaves, estilo y contenido de comentarios, y saltos de línea.
+\end{itemize}
+
+De esta manera, la indentación queda estandarizada en ambos grupos, obligando a los modelos a aprender patrones de autoría reales y no la simple presencia de auto-formateo en el editor.
+
+% ----------------------------------------------------------------------
+\subsection{Preprocesamiento para el Canal Semántico (GraphCodeBERT)}
+\label{subsec:prep_semantica}
+
+El procesamiento del canal semántico, implementado en el script \texttt{parser.py} (módulo \texttt{models/}\allowbreak\texttt{graphcodebert/}), comprende cuatro pasos:
+
+\begin{enumerate}
+    \item \textbf{Limpieza de comentarios:} Se eliminan los comentarios simples (\texttt{//}) y multilínea (\texttt{/* ... */}) protegiendo el contenido de las cadenas de texto. Se reducen los espacios múltiples a un solo espacio.
+    \item \textbf{Normalización de variables:} Los identificadores definidos por el usuario se convierten a nombres estandarizados (\texttt{VAR\_0}, \texttt{VAR\_1}, \texttt{FUNC\_0}), evitando que el renombre de variables altere la comparación.
+    \item \textbf{Generación del AST con Tree-sitter:} Se procesa el código fuente mediante el analizador sintáctico incremental \textbf{Tree-sitter} \cite{Brunsfeld2021Treesitter} para C y C++. Basado en algoritmos de análisis sintáctico GLR (\textit{Generalized Left-to-right Rightmost}) tolerantes a fallos, Tree-sitter permite derivar árboles de sintaxis abstracta consistentes incluso ante código estudiantil incompleto o con errores de sintaxis locales.
+    \item \textbf{Construcción del Grafo de Flujo de Datos (DFG):} Se recorren las variables en el AST y se crean aristas dirigidas desde donde una variable recibe su valor hacia donde ese valor se utiliza, conectando la secuencia de tokens con las relaciones de datos.
+\end{enumerate}
+
+% ----------------------------------------------------------------------
+\subsection{Preprocesamiento para el Canal Estilométrico (CharCNN)}
+\label{subsec:prep_estilometria}
+
+El procesamiento estilométrico, desarrollado en la clase \texttt{CharPreprocessor} (módulo \texttt{models/}\allowbreak\texttt{char\_cnn/}\allowbreak\texttt{preprocess.py}), trata el código como una secuencia continua de caracteres:
+
+\begin{enumerate}
+    \item \textbf{Preservación de formato original:} Se conserva la distribución del archivo una vez normalizada la indentación: espacios junto a operadores, ubicación de llaves y comentarios.
+    \item \textbf{Mapeo a vocabulario de caracteres:} Se define un conjunto de $96$ caracteres ASCII imprimibles (letras, dígitos, signos de puntuación de C/C++ y espacios controlados). El índice $0$ se reserva para caracteres no reconocidos o relleno, conformando un vocabulario de $97$ dimensiones.
+    \item \textbf{Ajuste a longitud fija ($L = 4096$):} Para procesar el código en lotes de tamaño uniforme en la red convolucional, se utiliza la estrategia \textit{Head-Tail}:
+    \begin{equation}
+        \text{Texto}_{ajustado} = \text{Texto}[0 : 1024] + \text{Texto}[-(L - 1024) : ]
+    \end{equation}
+    Esto conserva los primeros $1024$ caracteres (cabecera con directivas \texttt{\#include} y declaraciones) y los últimos $3072$ caracteres (donde suele estar la lógica de la función principal y el cierre del programa). Si el archivo tiene menos de $4096$ caracteres, se completa con ceros a la derecha (\textit{zero-padding}).
+\end{enumerate}
+
+% ----------------------------------------------------------------------
+\subsection{Partición por Problema para Evitar Fuga de Información}
+\label{subsec:particion_datos}
+
+En el entrenamiento de modelos de aprendizaje automático orientados a código fuente, realizar una división aleatoria convencional a nivel de archivo introduce severas distorsiones empíricas. Como demostró formalmente Allamanis \cite{Allamanis2019Adverse} al estudiar los efectos adversos de la duplicación en modelos de código, la superposición de soluciones o fragmentos sintácticos similares entre los conjuntos de entrenamiento y prueba infla artificialmente las métricas de rendimiento ($F_1$-score y exactitud) hasta en un 100\,\%, enmascarando una incapacidad real del modelo para generalizar ante problemas no observados.
+
+Para evitar esta fuga de información (\textit{data leakage}) y garantizar una evaluación genuinamente ciega, la división del corpus en Graphito se realiza \textbf{estrictamente agrupada por problema} (\textit{grouped split}):
+
+\begin{itemize}
+    \item Todas las soluciones asociadas a un mismo problema algorítmico (tanto las escritas por estudiantes como las generadas por los distintos modelos de IA) se asignan en bloque a un único conjunto (entrenamiento, validación o prueba).
+\end{itemize}
+
+El conjunto consolidado contiene $20,000$ muestras divididas de forma equitativa (50\,\% humano y 50\,\% IA), distribuidas como se indica en la Tabla~\ref{tab:particion_corpus}.
+
+\begin{table}[H]
+    \centering
+    \caption{Distribución y partición del conjunto de datos consolidado.}
+    \label{tab:particion_corpus}
+    \begin{tabularx}{\textwidth}{|l|c|c|X|}
+        \hline
+        \textbf{Subconjunto} & \textbf{Porcentaje} & \textbf{Muestras} & \textbf{Uso en el Proyecto} \\ \hline
+        Entrenamiento (\textit{Train}) & 70\,\% & 14,000 & Ajuste de pesos de la red convolucional 1D. \\ \hline
+        Validación (\textit{Val}) & 15\,\% & 3,000 & Ajuste de hiperparámetros y paro anticipado (\textit{early stopping}). \\ \hline
+        Prueba (\textit{Test}) & 15\,\% & 3,000 & Evaluación final del modelo con datos no vistos. \\ \hline
+        \hline
+        \textbf{Total} & \textbf{100\,\%} & \textbf{20,000} & \textbf{Conjunto balanceado y agrupado por problema.} \\ \hline
+    \end{tabularx}
+\end{table}
+
+% ======================================================================
+\section{Conclusión del capítulo}
+\label{sec:conclusion_ingenieria_datos}
+% ======================================================================
+
+Las etapas de Adquisición y Preparación de datos permitieron construir una base experimental sólida para Graphito. Se resolvió la falta de enunciados del dataset de Sarajevo mediante ingeniería inversa con modelos de lenguaje, se controló el sesgo lingüístico generando código sintético directamente en serbocroata con perfiles de alumnos, se previno la fuga de información por formateadores modernos mediante una normalización selectiva de indentación y se dividió el procesamiento en dos canales independientes para satisfacer los requerimientos de los modelos.
+
+Con este conjunto de datos preparado, en el siguiente capítulo se aborda la fase de **Modelado y Experimentación**, detallando la arquitectura de la red CharCNN, el uso de GraphCodeBERT con adaptadores LoRA y la evaluación de los resultados obtenidos.
