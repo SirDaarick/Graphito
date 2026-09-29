@@ -43,12 +43,12 @@ flowchart LR
 
 ## ✨ Características Principales
 
-- 💻 **Visualizador Diff Side-by-Side con Tema Synthwave '84:** Cotejo en pantalla completa (expandible al 94%-98% del viewport) del código del alumno contra la solución de referencia o soluciones previas.
+- 💻 **Visualizador Diff Side-by-Side con Tema Synthwave '84:** Cotejo en pantalla completa (expandible al 94%-98% del viewport) del código del alumno contra la solución de referencia o soluciones previas con telemetría Hero HUD en tiempo real.
 - 💬 **Anotaciones Pedagógicas en Línea:** Posibilidad de registrar observaciones vinculadas a líneas concretas o notas generales, persistidas en base de datos.
-- ⚡ **Dashboard Pericial Ejecutivo (Hero HUD):** Métricas clave en gran formato numérico (`Similitud Global`, `Semántica DFG`, `Estilometría IA`, `Discrepancia`), eliminando ruido visual y gráficos pesados.
+- 📊 **Reporte Técnico de Integridad Académica:** Vista pericial con gráfico circular de similitud total, desglose estilométrico y semántico, e interpretación diagnóstica orientada a la cátedra.
 - 🏷️ **Triaje Docente Rápido:** Calificación ágil de entregas con atajos de teclado (`A` para *Conforme*, `R` para *Citar a Aclaración / Duda*) y reflejo reactivo inmediato en la lista de tareas.
-- 🖨️ **Dictamen Pericial Oficial (PDF & `@media print`):** Exportación institucional generada por el backend (ReportLab) e impresión directa en navegador, incluyendo código fuente evaluado con numeración de líneas y observaciones docentes.
-- 🌙 **Sistema de Diseño Ergonómico:** Scrollbars oscuros personalizados, transiciones cinemáticas fluidas con GSAP y soporte para modos visuales.
+- 🖨️ **Dictamen Pericial Oficial en PDF:** Exportación institucional generada por el backend (ReportLab) con métricas bimodales, código fuente numerado y anotaciones del docente.
+- 🌙 **Sistema de Diseño Ergonómico:** Scrollbars oscuros personalizados, navegación ágil con atajos (`←` / `→`) y diseño adaptable.
 
 ---
 

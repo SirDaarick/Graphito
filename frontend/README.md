@@ -53,10 +53,10 @@ frontend/
 - **Scroll Sincronizado:** Desplazamiento bidireccional suave con banderas de bloqueo para prevenir bucles recursivos de eventos de scroll.
 - **Comentarios del Docente:** Soporte para agregar notas asociadas a líneas específicas de código o conclusiones generales con renderizado interactivo.
 
-### 2. Dashboard Pericial Minimalista (`SimilarityReportModal.tsx`)
-- **Barra Hero HUD:** Lectura pericial instantánea en gran formato (`text-4xl` / `text-5xl`) para Similitud Global, Semántica DFG, Estilometría IA y Discrepancia Asimétrica.
+### 2. Modal de Reporte Pericial y Telemetría (`SimilarityReportModal.tsx`)
+- **Modo Diff con Barra Hero HUD:** Lectura pericial instantánea en gran formato (`text-4xl` / `text-5xl`) para Similitud Global, Semántica DFG, Estilometría IA y Discrepancia Asimétrica durante el cotejo de código.
+- **Modo Reporte Técnico Completo:** Gráfico circular de similitud total con desglose pericial estilométrico y semántico, banderas de severidad HITL e interpretación diagnóstica.
 - **Botones Icónicos Intuitivos:** Botones limpios sin texto redundante con tooltips flotantes animados y atajos de teclado (`A` para Conforme, `R` para Aclaración/Duda, `Esc` para Cerrar, `←` / `→` para navegar entregas).
-- **Exportación & `@media print`:** Preparado para impresión directa en papel o PDF con código fuente numerado y notas pedagógicas.
 
 ### 3. Veredictos Reactivos en Lista de Tareas (`ReferenceCard.tsx`)
 - Indicadores visuales en verde esmeralda (`Conforme`) y amarillo ámbar (`Duda`) que se actualizan de forma inmediata al evaluar una entrega en el modal.
