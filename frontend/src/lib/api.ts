@@ -98,8 +98,27 @@ export interface ReporteAnalisis {
     dictamen: "SIN_ALERTAS" | "REVISION_ESTILOMETRICA" | "REVISION_SEMANTICA" | "DISCREPANCIA_DUAL" | "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE";
     estado?: "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "ERROR";
     error_mensaje?: string;
-    fecha_analisis: string;
     indicadores: IndicadorIntegridad[];
+}
+
+export interface ReportCodeComparison {
+    reporte_id: number;
+    student_author: string;
+    student_code: string;
+    reference_author: string;
+    reference_code: string;
+    language: string;
+    problem_title: string;
+}
+
+export interface ComentarioRevision {
+    id: number;
+    reporte_id: number;
+    docente_id: number;
+    numero_linea: number | null;
+    contenido: string;
+    created_at: string;
+    autor_nombre?: string;
 }
 
 export const api = {
@@ -238,6 +257,29 @@ export const api = {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+        },
+        async getCode(reportId: number): Promise<ReportCodeComparison> {
+            return request<ReportCodeComparison>(`/analysis/reports/${reportId}/code`);
+        }
+    },
+
+    comments: {
+        async list(reportId: number): Promise<ComentarioRevision[]> {
+            return request<ComentarioRevision[]>(`/reports/${reportId}/comments`);
+        },
+        async create(
+            reportId: number,
+            data: { numero_linea?: number | null; contenido: string }
+        ): Promise<ComentarioRevision> {
+            return request<ComentarioRevision>(`/reports/${reportId}/comments`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            });
+        },
+        async delete(reportId: number, commentId: number): Promise<void> {
+            return request<void>(`/reports/${reportId}/comments/${commentId}`, {
+                method: "DELETE",
+            });
         }
     }
-};
+};

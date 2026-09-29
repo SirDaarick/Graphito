@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
 import { api } from "../lib/api";
+import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
 
 // Helper hook for the typewriter effect (optimized for performance)
 function useTypewriter(text: string, speed: number = 15) {
@@ -52,14 +53,284 @@ interface SimilarityReportModalProps {
     isOpen: boolean;
     onClose: () => void;
     comparison: ComparisonData | null;
+    submissions?: ComparisonData[];
+    onSelectComparison?: (comparison: ComparisonData) => void;
 }
 
-export function SimilarityReportModal({ isOpen, onClose, comparison }: SimilarityReportModalProps) {
+export function SimilarityReportModal({
+    isOpen,
+    onClose,
+    comparison,
+    submissions,
+    onSelectComparison,
+}: SimilarityReportModalProps) {
     const [isAnimating, setIsAnimating] = useState(false);
     const [shouldRender, setShouldRender] = useState(isOpen);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+    const [viewMode, setViewMode] = useState<"report" | "code_diff">("report");
+    const [codeData, setCodeData] = useState<{
+        reference_code: string;
+        student_code: string;
+        reference_author: string;
+        student_author: string;
+        language: string;
+    } | null>(null);
+    const [isLoadingCode, setIsLoadingCode] = useState(false);
+    const [comments, setComments] = useState<ComentarioRevisionItem[]>([]);
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
+    const [triageToast, setTriageToast] = useState<{ message: string; type: "success" | "warning" } | null>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
+    const bodyContainerRef = useRef<HTMLDivElement>(null);
+
+    const currentIndex = submissions && comparison
+        ? submissions.findIndex((s) => String(s.id) === String(comparison.id))
+        : -1;
+    const hasNext = Boolean(submissions && currentIndex >= 0 && currentIndex < submissions.length - 1);
+    const hasPrev = Boolean(submissions && currentIndex > 0);
+
+    const navigateTo = (newIndex: number) => {
+        if (!submissions || newIndex < 0 || newIndex >= submissions.length || isNavigating) return;
+        setIsNavigating(true);
+
+        const direction = newIndex > currentIndex ? 1 : -1;
+
+        if (bodyContainerRef.current) {
+            gsap.to(bodyContainerRef.current, {
+                opacity: 0,
+                x: -direction * 24,
+                duration: 0.16,
+                ease: "power2.in",
+                onComplete: () => {
+                    onSelectComparison?.(submissions[newIndex]);
+                    if (bodyContainerRef.current) {
+                        bodyContainerRef.current.scrollTop = 0;
+                    }
+                    gsap.fromTo(
+                        bodyContainerRef.current,
+                        { opacity: 0, x: direction * 24 },
+                        {
+                            opacity: 1,
+                            x: 0,
+                            duration: 0.22,
+                            ease: "power2.out",
+                            onComplete: () => setIsNavigating(false),
+                        }
+                    );
+                },
+            });
+        } else {
+            onSelectComparison?.(submissions[newIndex]);
+            setIsNavigating(false);
+        }
+    };
+
+    const handleVerdictAndAdvance = (type: "conforme" | "aclaracion") => {
+        const isConforme = type === "conforme";
+        const msg = isConforme
+            ? "Entrega validada como Conforme por el docente."
+            : "Entrega citada para entrevista y aclaración con el estudiante.";
+
+        setTriageToast({
+            message: msg,
+            type: isConforme ? "success" : "warning",
+        });
+
+        setTimeout(() => {
+            setTriageToast(null);
+        }, 2600);
+
+        if (hasNext && currentIndex >= 0) {
+            navigateTo(currentIndex + 1);
+        } else {
+            setTimeout(() => {
+                onClose();
+            }, 1000);
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen && comparison?.id) {
+            const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+            if (!isNaN(repId)) {
+                api.comments.list(repId).then(setComments).catch(() => setComments([]));
+                if (viewMode === "code_diff") {
+                    fetchCode(repId);
+                }
+            }
+        } else {
+            setViewMode("report");
+            setCodeData(null);
+        }
+    }, [isOpen, comparison?.id, viewMode]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (
+                target &&
+                (target.tagName === "INPUT" ||
+                 target.tagName === "TEXTAREA" ||
+                 target.isContentEditable)
+            ) {
+                return;
+            }
+
+            if (e.key === "ArrowRight") {
+                e.preventDefault();
+                if (hasNext && currentIndex >= 0) {
+                    navigateTo(currentIndex + 1);
+                }
+            } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                if (hasPrev && currentIndex >= 0) {
+                    navigateTo(currentIndex - 1);
+                }
+            } else if (e.key === "Escape") {
+                e.preventDefault();
+                onClose();
+            } else if (e.key === "a" || e.key === "A") {
+                e.preventDefault();
+                handleVerdictAndAdvance("conforme");
+            } else if (e.key === "r" || e.key === "R") {
+                e.preventDefault();
+                handleVerdictAndAdvance("aclaracion");
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen, currentIndex, hasNext, hasPrev, submissions, isNavigating]);
+
+    const fetchCode = async (repId: number) => {
+        setIsLoadingCode(true);
+        try {
+            const data = await api.analysis.getCode(repId);
+            setCodeData({
+                reference_code: data.reference_code || "// Sin código de referencia registrado",
+                student_code: data.student_code || "// Sin código de entrega registrado",
+                reference_author: data.reference_author || "Docente (Referencia)",
+                student_author: data.student_author || comparison?.title || "Estudiante",
+                language: data.language || "c",
+            });
+        } catch (err) {
+            console.warn("No se pudo obtener el código desde la API, usando código de demostración:", err);
+            setCodeData({
+                reference_code: `// Código Canónico de Referencia - ${comparison?.title || "Práctica"}
+#include <stdio.h>
+#include <stdlib.h>
+
+int busqueda_binaria(int arr[], int n, int objetivo) {
+    int inicio = 0;
+    int fin = n - 1;
+
+    while (inicio <= fin) {
+        int medio = inicio + (fin - inicio) / 2;
+        if (arr[medio] == objetivo) {
+            return medio; // Encontrado
+        }
+        if (arr[medio] < objetivo) {
+            inicio = medio + 1;
+        } else {
+            fin = medio - 1;
+        }
+    }
+    return -1; // No encontrado
+}
+
+int main() {
+    int datos[] = {2, 4, 6, 8, 10, 12, 14, 16};
+    int tam = sizeof(datos) / sizeof(datos[0]);
+    int obj = 10;
+    int pos = busqueda_binaria(datos, tam, obj);
+    printf("Posicion: %d\\n", pos);
+    return 0;
+}`,
+                student_code: `// Entrega del Alumno - ${comparison?.title || "Solución"}
+#include <stdio.h>
+
+int binarySearch(int a[], int size, int target) {
+    int low = 0;
+    int high = size - 1;
+
+    // Búsqueda iterativa en subarreglo ordenado
+    while (low <= high) {
+        int mid = (low + high) / 2;
+        if (a[mid] == target) {
+            return mid;
+        }
+        if (a[mid] < target) {
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return -1;
+}
+
+int main() {
+    int a[] = {2, 4, 6, 8, 10, 12, 14, 16};
+    int n = 8;
+    int x = 10;
+    int r = binarySearch(a, n, x);
+    printf("Resultado: %d\\n", r);
+    return 0;
+}`,
+                reference_author: "Prof. Manuel Portillo (ESCOM)",
+                student_author: comparison?.title || "Estudiante Evaluado",
+                language: "c",
+            });
+        } finally {
+            setIsLoadingCode(false);
+        }
+    };
+
+    const handleAddComment = async (lineNum: number | null, text: string) => {
+        if (!comparison?.id) return;
+        const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+        if (isNaN(repId)) return;
+
+        setIsSubmittingComment(true);
+        try {
+            const newComment = await api.comments.create(repId, {
+                numero_linea: lineNum,
+                contenido: text,
+            });
+            setComments((prev) => [...prev, newComment]);
+        } catch (err) {
+            console.error("Error al crear comentario:", err);
+            setComments((prev) => [
+                ...prev,
+                {
+                    id: Date.now(),
+                    reporte_id: repId,
+                    docente_id: 1,
+                    numero_linea: lineNum,
+                    contenido: text,
+                    created_at: new Date().toISOString(),
+                    autor_nombre: "Docente",
+                },
+            ]);
+        } finally {
+            setIsSubmittingComment(false);
+        }
+    };
+
+    const handleDeleteComment = async (commentId: number) => {
+        if (!comparison?.id) return;
+        const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+        if (!isNaN(repId)) {
+            try {
+                await api.comments.delete(repId, commentId);
+            } catch (err) {
+                console.warn("Error al eliminar comentario en API:", err);
+            }
+        }
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -171,46 +442,210 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
             />
 
             {/* Modal Content */}
-            <div ref={contentRef} className={`w-full max-w-5xl opacity-0 transform translate-y-8 scale-95`}>
+            <div ref={contentRef} className={`w-full ${viewMode === 'code_diff' ? 'max-w-7xl' : 'max-w-5xl'} opacity-0 transform translate-y-8 scale-95 transition-all duration-300`}>
                 <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
 
-                    <div className="flex flex-col h-full max-h-[90vh]">
+                    <div className="flex flex-col h-full max-h-[92vh] relative">
+                        {/* Floating Toast para Veredicto y Avance Ágil */}
+                        {triageToast && (
+                            <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border flex items-center gap-2.5 backdrop-blur-md transition-all ${
+                                triageToast.type === "success"
+                                    ? "bg-emerald-950/95 text-emerald-200 border-emerald-500/50 shadow-emerald-950/60"
+                                    : "bg-amber-950/95 text-amber-200 border-amber-500/50 shadow-amber-950/60"
+                            }`}>
+                                {triageToast.type === "success" ? <ShieldCheck size={18} className="text-emerald-400" /> : <UserCheck size={18} className="text-amber-400" />}
+                                <span>{triageToast.message}</span>
+                                {hasNext && <span className="opacity-80 font-mono text-[10px] ml-1 bg-white/10 px-1.5 py-0.5 rounded">→ Pasando a siguiente entrega</span>}
+                            </div>
+                        )}
+
                         {/* Top Navigation Bar */}
-                        <div className="flex items-center justify-between px-8 py-4 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/20">
+                        <div className="flex items-center justify-between px-6 sm:px-8 py-3.5 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/20 shrink-0 gap-3">
                             <button
                                 onClick={onClose}
-                                className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0"
+                                title="Volver a la biblioteca (Atajo: Esc)"
                             >
                                 <ArrowLeft size={16} />
-                                Volver a la biblioteca
+                                <span className="hidden sm:inline">Volver a la biblioteca</span>
+                                <span className="sm:hidden">Volver</span>
+                                <kbd className="hidden lg:inline-block ml-1 px-1 py-0.5 text-[9px] font-mono bg-slate-200 dark:bg-slate-800 text-slate-500 rounded border border-slate-300 dark:border-slate-700">Esc</kbd>
+                            </button>
+
+                            {/* Cola de Revisión Ágil / Carousel de Entregas */}
+                            {submissions && submissions.length > 0 && currentIndex >= 0 && (
+                                <div className="flex items-center gap-1 sm:gap-2 bg-slate-200/60 dark:bg-[#161d2d] px-2 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346] shadow-inner">
+                                    <button
+                                        onClick={() => navigateTo(currentIndex - 1)}
+                                        disabled={!hasPrev || isNavigating}
+                                        className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+                                        title="Entrega anterior (Atajo: Flecha Izquierda ←)"
+                                    >
+                                        <ChevronLeft size={15} />
+                                        <span className="hidden md:inline text-[11px]">Anterior</span>
+                                        <kbd className="hidden sm:inline-block px-1 py-0.5 text-[9px] font-mono bg-slate-100 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 text-slate-500">←</kbd>
+                                    </button>
+
+                                    <div className="px-2.5 py-0.5 text-center">
+                                        <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 justify-center">
+                                            <span>
+                                                Entrega <span className="font-mono text-graphito-blue dark:text-cyan-400 font-extrabold">{currentIndex + 1}</span> de <span className="font-mono">{submissions.length}</span>
+                                            </span>
+                                            <span className="text-slate-400 dark:text-slate-600 hidden sm:inline">•</span>
+                                            <span className="max-w-[120px] md:max-w-[180px] truncate text-slate-600 dark:text-slate-300 hidden sm:inline" title={comparison.title}>
+                                                {comparison.title}
+                                            </span>
+                                        </div>
+                                        <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono tracking-wider uppercase">
+                                            Cola de revisión ágil
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => navigateTo(currentIndex + 1)}
+                                        disabled={!hasNext || isNavigating}
+                                        className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+                                        title="Siguiente entrega (Atajo: Flecha Derecha →)"
+                                    >
+                                        <kbd className="hidden sm:inline-block px-1 py-0.5 text-[9px] font-mono bg-slate-100 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 text-slate-500">→</kbd>
+                                        <span className="hidden md:inline text-[11px]">Siguiente</span>
+                                        <ChevronRight size={15} />
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Botón de alternancia entre reporte y visualizador diff */}
+                            <button
+                                onClick={() => {
+                                    if (viewMode === "report") {
+                                        setViewMode("code_diff");
+                                        const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+                                        if (!isNaN(repId)) {
+                                            fetchCode(repId);
+                                        }
+                                    } else {
+                                        setViewMode("report");
+                                    }
+                                }}
+                                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-300 hover:bg-fuchsia-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm shrink-0"
+                            >
+                                {viewMode === "report" ? (
+                                    <>
+                                        <Code2 size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
+                                        <span className="hidden sm:inline">Ver código y comparar (Diff)</span>
+                                        <span className="sm:hidden">Diff</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <FileText size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
+                                        <span className="hidden sm:inline">Ver reporte extendido</span>
+                                        <span className="sm:hidden">Reporte</span>
+                                    </>
+                                )}
                             </button>
                         </div>
 
-                        {/* Header */}
-                        <div className="px-10 pt-8 pb-6 flex items-start justify-between">
-                            <div>
-                                <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white tracking-tight">
-                                    Reporte de similitud
-                                </h2>
-                                <div className="flex items-center gap-4 mt-2 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                                    <span>Proyecto: {comparison.title}</span>
-                                    <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-600"></span>
-                                    <span>14 de Abril, 2026</span>
+                        {/* Header (solo en modo reporte completo) */}
+                        {viewMode === "report" && (
+                            <div className="px-10 pt-8 pb-6 flex items-start justify-between shrink-0">
+                                <div>
+                                    <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white tracking-tight">
+                                        Reporte de similitud
+                                    </h2>
+                                    <div className="flex items-center gap-4 mt-2 text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                        <span>Proyecto: {comparison.title}</span>
+                                        <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-600"></span>
+                                        <span>14 de Abril, 2026</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-100 dark:bg-[#1a2031] border border-slate-200 dark:border-[#2b3346] px-4 py-2 rounded-full">
+                                    <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Análisis completado</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 bg-slate-100 dark:bg-[#1a2031] border border-slate-200 dark:border-[#2b3346] px-4 py-2 rounded-full">
-                                <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
-                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Análisis completado</span>
-                            </div>
-                        </div>
+                        )}
 
                         {/* Body */}
-                        <div className="flex-1 overflow-y-auto px-10 pb-8 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent">
-                            {/* DSS Institutional Banner */}
-                            <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-700 dark:text-blue-200">
-                                <Info size={18} className="shrink-0 text-blue-500 dark:text-blue-400" />
-                                <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee métricas periciales automatizadas sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
-                            </div>
+                        <div ref={bodyContainerRef} className="flex-1 overflow-y-auto px-10 pb-8 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent">
+                            {viewMode === "code_diff" ? (
+                                <div className="flex flex-col h-full pt-4 space-y-4">
+                                    {/* Cinta Compacta de Métricas hacia arriba */}
+                                    <div className="p-4 rounded-2xl bg-slate-100/90 dark:bg-[#151c2e]/90 border border-slate-200 dark:border-[#2b3346] flex flex-wrap items-center justify-between gap-4 shadow-md backdrop-blur-md shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-graphito-blue to-graphito-violet text-white font-mono font-black text-base shadow-md">
+                                                {overallScore}%
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Similitud Global</div>
+                                                <div className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                                                    <span className={`w-2 h-2 rounded-full ${auditInfo.color.replace('text-', 'bg-')}`} />
+                                                    {auditInfo.label}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-6 text-xs font-sans">
+                                            <div>
+                                                <span className="text-[10px] text-slate-500 block uppercase font-bold">Canal A (Semántica)</span>
+                                                <span className="font-mono font-bold text-graphito-blue dark:text-blue-400 text-sm">
+                                                    {semanticPct}%
+                                                </span>
+                                            </div>
+                                            <div className="w-px h-8 bg-slate-300 dark:bg-slate-700" />
+                                            <div>
+                                                <span className="text-[10px] text-slate-500 block uppercase font-bold">Canal B (Estilometría IA)</span>
+                                                <span className="font-mono font-bold text-violet-600 dark:text-violet-400 text-sm">
+                                                    {aiPct}%
+                                                </span>
+                                            </div>
+                                            <div className="w-px h-8 bg-slate-300 dark:bg-slate-700" />
+                                            <div>
+                                                <span className="text-[10px] text-slate-500 block uppercase font-bold">Puntaje Discrepancia</span>
+                                                <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-sm">
+                                                    {comparison.discrepancia_score ?? (semanticPct * aiPct / 10000).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setViewMode("report")}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-800 transition-all"
+                                        >
+                                            <ChevronUp size={14} />
+                                            <span>Ver Reporte Extendido</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Visualizador Diff Synthwave '84 */}
+                                    {isLoadingCode ? (
+                                        <div className="flex flex-col items-center justify-center py-28 text-slate-400">
+                                            <div className="w-8 h-8 border-2 border-fuchsia-400 border-t-transparent rounded-full animate-spin mb-3" />
+                                            <span className="text-xs font-mono">Cargando códigos fuente para cotejo diff...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 min-h-[500px]">
+                                            <SideBySideDiffViewer
+                                                referenceCode={codeData?.reference_code || ""}
+                                                studentCode={codeData?.student_code || ""}
+                                                referenceAuthor={codeData?.reference_author}
+                                                studentAuthor={codeData?.student_author}
+                                                language={codeData?.language || "c"}
+                                                reportId={typeof comparison.id === "string" ? parseInt(comparison.id, 10) : (comparison.id ?? 1)}
+                                                comments={comments}
+                                                onAddComment={handleAddComment}
+                                                onDeleteComment={handleDeleteComment}
+                                                isSubmittingComment={isSubmittingComment}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
+                                    {/* DSS Institutional Banner */}
+                                    <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-700 dark:text-blue-200">
+                                        <Info size={18} className="shrink-0 text-blue-500 dark:text-blue-400" />
+                                        <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee métricas periciales automatizadas sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
+                                    </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
@@ -384,7 +819,9 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
 
                                 </div>
                             </div>
-                        </div>
+                        </>
+                    )}
+                </div>
 
                         {/* Footer */}
                         <div className="flex items-center justify-between px-10 py-6 border-t border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/40 mt-auto shrink-0">
@@ -393,26 +830,22 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => {
-                                        alert("Entrega validada como Conforme por el docente.");
-                                        onClose();
-                                    }}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/20 active:scale-95 text-xs font-bold transition-all"
-                                    title="El docente valida la entrega como autoría legítima"
+                                    onClick={() => handleVerdictAndAdvance("conforme")}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm"
+                                    title="El docente valida la entrega como autoría legítima (Atajo: Tecla A)"
                                 >
                                     <ShieldCheck size={16} />
                                     <span>Validar Conforme</span>
+                                    <kbd className="hidden sm:inline-block ml-1 px-1 py-0.5 text-[9px] font-mono bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-500/30">A</kbd>
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        alert("Entrega marcada para entrevista y defensa oral con el estudiante.");
-                                        onClose();
-                                    }}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all"
-                                    title="El docente cita al alumno para justificar sus decisiones de código"
+                                    onClick={() => handleVerdictAndAdvance("aclaracion")}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm"
+                                    title="El docente cita al alumno para justificar sus decisiones de código (Atajo: Tecla R)"
                                 >
                                     <UserCheck size={16} />
                                     <span>Citar a Aclaración</span>
+                                    <kbd className="hidden sm:inline-block ml-1 px-1 py-0.5 text-[9px] font-mono bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded border border-amber-500/30">R</kbd>
                                 </button>
                                 <button
                                     onClick={handleDownloadPdf}

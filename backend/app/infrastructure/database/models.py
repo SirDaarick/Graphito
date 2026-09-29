@@ -49,6 +49,7 @@ class Docente(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     problemas = relationship("Problema", back_populates="docente", cascade="all, delete-orphan")
+    comentarios = relationship("ComentarioRevision", back_populates="docente", cascade="all, delete-orphan")
 
 
 class Problema(Base):
@@ -107,6 +108,7 @@ class ReporteAnalisis(Base):
     entrega = relationship("CodigoFuente", foreign_keys=[entrega_id], back_populates="reportes_entrega")
     referencia = relationship("CodigoFuente", foreign_keys=[referencia_id], back_populates="reportes_referencia")
     indicadores = relationship("IndicadorIntegridad", back_populates="reporte", cascade="all, delete-orphan")
+    comentarios = relationship("ComentarioRevision", back_populates="reporte", cascade="all, delete-orphan")
 
 
 class IndicadorIntegridad(Base):
@@ -119,3 +121,17 @@ class IndicadorIntegridad(Base):
     severidad = Column(String(50), default="MEDIA", nullable=False)
 
     reporte = relationship("ReporteAnalisis", back_populates="indicadores")
+
+
+class ComentarioRevision(Base):
+    __tablename__ = "comentarios_revision"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reporte_id = Column(Integer, ForeignKey("reportes_analisis.id", ondelete="CASCADE"), nullable=False, index=True)
+    docente_id = Column(Integer, ForeignKey("docentes.id", ondelete="CASCADE"), nullable=False, index=True)
+    numero_linea = Column(Integer, nullable=True)
+    contenido = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    reporte = relationship("ReporteAnalisis", back_populates="comentarios")
+    docente = relationship("Docente", back_populates="comentarios")

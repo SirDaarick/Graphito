@@ -24,7 +24,7 @@ interface ReferenceCardProps {
     activeComparisons: number
     comparisons: Comparison[]
     onCompare?: () => void
-    onComparisonClick?: (comparison: Comparison) => void
+    onComparisonClick?: (comparison: Comparison, allComparisons?: Comparison[]) => void
 }
 
 // Mapeamos los colores de categoría a tu paleta
@@ -119,7 +119,7 @@ export function ReferenceCard({
                                     {comparisons.map((comparison) => (
                                         <div
                                             key={comparison.id}
-                                            onClick={() => onComparisonClick?.(comparison)}
+                                            onClick={() => onComparisonClick?.(comparison, comparisons)}
                                             className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 dark:bg-graphito-dark/50 border border-slate-200 dark:border-graphito-border rounded-xl hover:border-graphito-blue/30 transition-colors cursor-pointer group"
                                         >
                                             <div className="flex flex-col">

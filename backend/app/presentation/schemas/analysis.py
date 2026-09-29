@@ -35,3 +35,15 @@ class ReporteAnalisisResponse(BaseModel):
     error_mensaje: Optional[str] = None
     fecha_analisis: datetime
     indicadores: List[IndicadorResponse] = []
+
+
+class ReportCodeComparisonResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    reporte_id: int
+    student_author: str
+    student_code: str
+    reference_author: str
+    reference_code: str
+    language: str
+    problem_title: str

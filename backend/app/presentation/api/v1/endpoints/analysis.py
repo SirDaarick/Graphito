@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
-from app.infrastructure.database.models import Docente
+from app.infrastructure.database.models import Docente, CodigoFuente, TipoCodigoEnum
+from sqlalchemy import select
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.infrastructure.inference import get_inference_engine
@@ -10,7 +11,11 @@ from app.infrastructure.vector_store import get_vector_store
 from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
 from app.application.services.pdf_service import PdfReportService
 from app.presentation.api.v1.deps import get_current_docente
-from app.presentation.schemas.analysis import AnalysisRunRequest, ReporteAnalisisResponse
+from app.presentation.schemas.analysis import (
+    AnalysisRunRequest,
+    ReporteAnalisisResponse,
+    ReportCodeComparisonResponse,
+)
 
 router = APIRouter()
 
@@ -72,4 +77,53 @@ async def download_report_pdf(
             "Content-Disposition": f"attachment; filename={filename}",
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
+    )
+
+
+@router.get("/reports/{report_id}/code", response_model=ReportCodeComparisonResponse)
+async def get_report_code(
+    report_id: int,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+    inference: InferencePort = Depends(get_inference_engine),
+    vector_store: VectorStorePort = Depends(get_vector_store),
+):
+    orchestrator = AnalysisOrchestrator(db, inference, vector_store)
+    report = await orchestrator.get_report_model(report_id)
+
+    student_author = report.entrega.autor if report.entrega else "Estudiante"
+    student_code = report.entrega.contenido if report.entrega else ""
+    language = report.entrega.lenguaje if report.entrega else "c"
+    problem_title = (
+        report.entrega.problema.titulo
+        if (report.entrega and report.entrega.problema)
+        else "Ejercicio"
+    )
+
+    reference_author = "Docente"
+    reference_code = ""
+
+    if report.referencia:
+        reference_author = report.referencia.autor
+        reference_code = report.referencia.contenido
+    elif report.entrega and report.entrega.problema_id:
+        # Buscar referencia canonica del problema
+        ref_stmt = select(CodigoFuente).where(
+            CodigoFuente.problema_id == report.entrega.problema_id,
+            CodigoFuente.tipo == TipoCodigoEnum.REFERENCIA,
+        )
+        ref_res = await db.execute(ref_stmt)
+        canonical_ref = ref_res.scalars().first()
+        if canonical_ref:
+            reference_author = canonical_ref.autor
+            reference_code = canonical_ref.contenido
+
+    return ReportCodeComparisonResponse(
+        reporte_id=report.id,
+        student_author=student_author,
+        student_code=student_code,
+        reference_author=reference_author,
+        reference_code=reference_code,
+        language=language,
+        problem_title=problem_title,
     )

@@ -18,6 +18,7 @@ function App() {
     const [isNewCodeModalOpen, setIsNewCodeModalOpen] = useState(false);
     const [isNewComparisonModalOpen, setIsNewComparisonModalOpen] = useState(false);
     const [selectedComparison, setSelectedComparison] = useState<any>(null);
+    const [comparisonList, setComparisonList] = useState<any[]>([]);
     const [isSimilarityReportOpen, setIsSimilarityReportOpen] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -92,14 +93,16 @@ function App() {
                             onLogout={handleLogout}
                             onViewComparison={(comp) => {
                                 setSelectedComparison(comp);
+                                setComparisonList([comp]);
                                 setIsSimilarityReportOpen(true);
                             }}
                         />
                         <Biblioteca
                             refreshTrigger={refreshTrigger}
                             onCompare={() => setIsNewComparisonModalOpen(true)}
-                            onComparisonClick={(comp) => {
+                            onComparisonClick={(comp, allComps) => {
                                 setSelectedComparison(comp);
+                                setComparisonList(allComps && allComps.length > 0 ? allComps : [comp]);
                                 setIsSimilarityReportOpen(true);
                             }}
                         />
@@ -113,6 +116,7 @@ function App() {
                             onClose={() => setIsNewComparisonModalOpen(false)}
                             onAnalysisComplete={(report) => {
                                 setSelectedComparison(report);
+                                setComparisonList([report]);
                                 setIsSimilarityReportOpen(true);
                                 setRefreshTrigger((prev) => prev + 1);
                             }}
@@ -121,6 +125,8 @@ function App() {
                             isOpen={isSimilarityReportOpen}
                             onClose={() => setIsSimilarityReportOpen(false)}
                             comparison={selectedComparison}
+                            submissions={comparisonList}
+                            onSelectComparison={(comp) => setSelectedComparison(comp)}
                         />
 
                     </>

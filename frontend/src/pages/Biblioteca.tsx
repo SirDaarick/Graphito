@@ -23,7 +23,7 @@ export function Biblioteca({
 }: {
     refreshTrigger?: number,
     onCompare?: () => void,
-    onComparisonClick?: (comparison: Comparison) => void
+    onComparisonClick?: (comparison: Comparison, allComparisons?: Comparison[]) => void
 }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState("");
