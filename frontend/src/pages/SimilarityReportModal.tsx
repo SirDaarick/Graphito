@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
@@ -68,6 +68,7 @@ export function SimilarityReportModal({
     const [shouldRender, setShouldRender] = useState(isOpen);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const [viewMode, setViewMode] = useState<"report" | "code_diff">("report");
+    const [isUltraWide, setIsUltraWide] = useState(false);
     const [codeData, setCodeData] = useState<{
         reference_code: string;
         student_code: string;
@@ -433,7 +434,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
     const strokeDashoffset = isAnimating ? circumference - (overallScore / 100) * circumference : circumference;
 
     return (
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center ${viewMode === 'code_diff' ? 'p-2 sm:p-3 md:p-4' : 'p-4'}`}>
             {/* Backdrop */}
             <div
                 ref={backdropRef}
@@ -442,10 +443,17 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
             />
 
             {/* Modal Content */}
-            <div ref={contentRef} className={`w-full ${viewMode === 'code_diff' ? 'max-w-7xl' : 'max-w-5xl'} opacity-0 transform translate-y-8 scale-95 transition-all duration-300`}>
+            <div
+                ref={contentRef}
+                className={`w-full ${
+                    viewMode === 'code_diff'
+                        ? (isUltraWide ? 'w-[98vw] max-w-[99vw]' : 'w-[92vw] sm:w-[94vw] max-w-[96vw] 2xl:max-w-[2500px]')
+                        : 'max-w-5xl'
+                } opacity-0 transform translate-y-8 scale-95 transition-all duration-300`}
+            >
                 <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
 
-                    <div className="flex flex-col h-full max-h-[92vh] relative">
+                    <div className={`flex flex-col h-full ${viewMode === 'code_diff' ? 'h-[95vh] max-h-[96vh]' : 'max-h-[92vh]'} relative`}>
                         {/* Floating Toast para Veredicto y Avance Ágil */}
                         {triageToast && (
                             <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border flex items-center gap-2.5 backdrop-blur-md transition-all ${
@@ -514,35 +522,48 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                 </div>
                             )}
 
-                            {/* Botón de alternancia entre reporte y visualizador diff */}
-                            <button
-                                onClick={() => {
-                                    if (viewMode === "report") {
-                                        setViewMode("code_diff");
-                                        const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-                                        if (!isNaN(repId)) {
-                                            fetchCode(repId);
-                                        }
-                                    } else {
-                                        setViewMode("report");
-                                    }
-                                }}
-                                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-300 hover:bg-fuchsia-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm shrink-0"
-                            >
-                                {viewMode === "report" ? (
-                                    <>
-                                        <Code2 size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
-                                        <span className="hidden sm:inline">Ver código y comparar (Diff)</span>
-                                        <span className="sm:hidden">Diff</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <FileText size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
-                                        <span className="hidden sm:inline">Ver reporte extendido</span>
-                                        <span className="sm:hidden">Reporte</span>
-                                    </>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {viewMode === "code_diff" && (
+                                    <button
+                                        onClick={() => setIsUltraWide(!isUltraWide)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-[#1a2234] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 text-xs font-semibold transition-all shadow-sm shrink-0"
+                                        title={isUltraWide ? "Ajustar ancho a 94%" : "Expandir pantalla a 98% (Ultra-Ancho)"}
+                                    >
+                                        {isUltraWide ? <Minimize2 size={14} className="text-cyan-400" /> : <Maximize2 size={14} className="text-cyan-400" />}
+                                        <span className="hidden md:inline">{isUltraWide ? "94% Ancho" : "98% Ultra-Ancho"}</span>
+                                    </button>
                                 )}
-                            </button>
+
+                                {/* Botón de alternancia entre reporte y visualizador diff */}
+                                <button
+                                    onClick={() => {
+                                        if (viewMode === "report") {
+                                            setViewMode("code_diff");
+                                            const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+                                            if (!isNaN(repId)) {
+                                                fetchCode(repId);
+                                            }
+                                        } else {
+                                            setViewMode("report");
+                                        }
+                                    }}
+                                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-300 hover:bg-fuchsia-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm shrink-0"
+                                >
+                                    {viewMode === "report" ? (
+                                        <>
+                                            <Code2 size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
+                                            <span className="hidden sm:inline">Ver código y comparar (Diff)</span>
+                                            <span className="sm:hidden">Diff</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileText size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
+                                            <span className="hidden sm:inline">Ver reporte extendido</span>
+                                            <span className="sm:hidden">Reporte</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Header (solo en modo reporte completo) */}
@@ -566,7 +587,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                         )}
 
                         {/* Body */}
-                        <div ref={bodyContainerRef} className="flex-1 overflow-y-auto px-10 pb-8 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent">
+                        <div ref={bodyContainerRef} className={`flex-1 overflow-y-auto ${viewMode === 'code_diff' ? 'px-3 sm:px-5 md:px-6 pb-4' : 'px-10 pb-8'} scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent`}>
                             {viewMode === "code_diff" ? (
                                 <div className="flex flex-col h-full pt-4 space-y-4">
                                     {/* Cinta Compacta de Métricas hacia arriba */}

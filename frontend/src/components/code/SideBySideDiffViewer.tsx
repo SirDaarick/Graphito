@@ -247,7 +247,7 @@ export function SideBySideDiffViewer({
                     ref={leftScrollRef}
                     onScroll={() => handleScroll("left")}
                     className="overflow-y-auto overflow-x-auto border-r border-[#2d2244] bg-[#1a1427] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ maxHeight: "calc(80vh - 220px)" }}
+                    style={{ height: "calc(93vh - 270px)", minHeight: "480px" }}
                 >
                     <table className="w-full border-collapse">
                         <tbody>
@@ -267,11 +267,11 @@ export function SideBySideDiffViewer({
                                         }`}
                                     >
                                         {/* Line Number */}
-                                        <td className="w-12 py-0.5 px-3 text-right text-slate-600 font-mono text-[12px] select-none border-r border-[#291e3e]">
+                                        <td className="w-12 sm:w-14 py-1 px-3 text-right text-slate-500 font-mono text-[12px] sm:text-[13px] select-none border-r border-[#291e3e]">
                                             {index < refLines.length ? lineNum : ""}
                                         </td>
                                         {/* Code Content */}
-                                        <td className={`py-0.5 px-4 font-mono whitespace-pre ${isDiff ? "border-l-2 border-[#36f9f6]/40" : ""}`}>
+                                        <td className={`py-1 px-4 font-mono text-[13px] sm:text-[13.5px] leading-relaxed whitespace-pre ${isDiff ? "border-l-2 border-[#36f9f6]/40" : ""}`}>
                                             {index < refLines.length ? (
                                                 <SynthwaveLine line={refLine} />
                                             ) : (
@@ -290,7 +290,7 @@ export function SideBySideDiffViewer({
                     ref={rightScrollRef}
                     onScroll={() => handleScroll("right")}
                     className="overflow-y-auto overflow-x-auto bg-[#181324] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ maxHeight: "calc(80vh - 220px)" }}
+                    style={{ height: "calc(93vh - 270px)", minHeight: "480px" }}
                 >
                     <table className="w-full border-collapse">
                         <tbody>
@@ -312,7 +312,7 @@ export function SideBySideDiffViewer({
                                             }`}
                                         >
                                             {/* Line Number & Comment Trigger Button */}
-                                            <td className="w-14 py-0.5 px-2 text-right text-slate-600 font-mono text-[12px] select-none border-r border-[#291e3e] relative">
+                                            <td className="w-14 sm:w-16 py-1 px-2 text-right text-slate-500 font-mono text-[12px] sm:text-[13px] select-none border-r border-[#291e3e] relative">
                                                 {index < stuLines.length && (
                                                     <div className="flex items-center justify-end gap-1">
                                                         {lineComments.length > 0 && (
@@ -337,7 +337,7 @@ export function SideBySideDiffViewer({
                                             </td>
 
                                             {/* Code Content */}
-                                            <td className={`py-0.5 px-4 font-mono whitespace-pre ${isDiff ? "border-l-2 border-[#ff7edb]/40" : ""}`}>
+                                            <td className={`py-1 px-4 font-mono text-[13px] sm:text-[13.5px] leading-relaxed whitespace-pre ${isDiff ? "border-l-2 border-[#ff7edb]/40" : ""}`}>
                                                 {index < stuLines.length ? (
                                                     <SynthwaveLine line={stuLine} />
                                                 ) : (
