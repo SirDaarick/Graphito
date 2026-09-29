@@ -65,20 +65,18 @@ function App() {
 
     if (isCheckingAuth) {
         return (
-            <div className="min-h-screen bg-slate-50 dark:bg-graphito-dark text-slate-900 dark:text-white transition-colors duration-200">
-                <MouseGlowBackground>
-                    <div className="flex h-screen items-center justify-center text-slate-600 dark:text-slate-300 font-medium text-sm">
-                        Cargando Graphito...
-                    </div>
-                </MouseGlowBackground>
-            </div>
+            <MouseGlowBackground>
+                <div className="flex h-screen items-center justify-center text-slate-600 dark:text-slate-300 font-medium text-sm">
+                    Cargando Graphito...
+                </div>
+            </MouseGlowBackground>
         );
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-graphito-dark text-slate-900 dark:text-white transition-colors duration-200">
-            <MouseGlowBackground>
-                {/* Skip link for keyboard navigation */}
+        <MouseGlowBackground>
+            {/* Skip link for keyboard navigation */}
+
                 <a
                     href="#main-content"
                     className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-graphito-blue focus:text-white focus:rounded-lg focus:font-bold"
@@ -141,8 +139,8 @@ function App() {
                     />
                 )}
             </MouseGlowBackground>
-        </div>
     );
 }
+
 
 export default App;
