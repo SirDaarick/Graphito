@@ -62,9 +62,9 @@ export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
             <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-40 dark:opacity-80 transition-opacity duration-300">
                 {/* Orbe 1: Superior izquierdo (Azul primario Graphito) */}
                 <div
-                    className="absolute -top-32 -left-32 w-[550px] h-[550px] rounded-full blur-[90px] animate-glow-1"
+                    className="absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full animate-glow-1 pointer-events-none"
                     style={{
-                        background: "radial-gradient(circle, rgba(59, 130, 246, 0.28) 0%, rgba(59, 130, 246, 0.08) 50%, transparent 80%)",
+                        background: "radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0.12) 25%, rgba(59, 130, 246, 0.04) 50%, transparent 70%)",
                         transform: "translateZ(0)",
                         backfaceVisibility: "hidden",
                     }}
@@ -72,9 +72,9 @@ export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
 
                 {/* Orbe 2: Inferior derecho (Violeta Graphito) */}
                 <div
-                    className="absolute -bottom-32 -right-32 w-[600px] h-[600px] rounded-full blur-[90px] animate-glow-2"
+                    className="absolute -bottom-32 -right-32 w-[650px] h-[650px] rounded-full animate-glow-2 pointer-events-none"
                     style={{
-                        background: "radial-gradient(circle, rgba(167, 139, 250, 0.25) 0%, rgba(167, 139, 250, 0.06) 50%, transparent 80%)",
+                        background: "radial-gradient(circle, rgba(167, 139, 250, 0.20) 0%, rgba(167, 139, 250, 0.10) 25%, rgba(167, 139, 250, 0.03) 50%, transparent 70%)",
                         transform: "translateZ(0)",
                         backfaceVisibility: "hidden",
                     }}
@@ -82,9 +82,9 @@ export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
 
                 {/* Orbe 3: Centro-lateral flotante */}
                 <div
-                    className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full blur-[90px] animate-glow-3"
+                    className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[550px] h-[550px] rounded-full animate-glow-3 pointer-events-none"
                     style={{
-                        background: "radial-gradient(circle, rgba(99, 102, 241, 0.20) 0%, rgba(99, 102, 241, 0.05) 50%, transparent 80%)",
+                        background: "radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0.08) 25%, rgba(99, 102, 241, 0.02) 50%, transparent 70%)",
                         transform: "translateZ(0)",
                         backfaceVisibility: "hidden",
                     }}
@@ -94,9 +94,9 @@ export function MouseGlowBackground({ children }: MouseGlowBackgroundProps) {
                 {!isTouch && (
                     <div
                         ref={mouseBlobRef}
-                        className="absolute top-0 left-0 w-[700px] h-[700px] rounded-full blur-[90px] transition-opacity duration-500 opacity-60"
+                        className="absolute top-0 left-0 w-[700px] h-[700px] rounded-full transition-opacity duration-500 opacity-60 pointer-events-none"
                         style={{
-                            background: "radial-gradient(circle, rgba(59, 130, 246, 0.20) 0%, rgba(167, 139, 250, 0.08) 40%, transparent 75%)",
+                            background: "radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, rgba(167, 139, 250, 0.08) 30%, rgba(167, 139, 250, 0.02) 55%, transparent 70%)",
                             transform: "translate3d(-500px, -500px, 0)",
                             willChange: "transform",
                             backfaceVisibility: "hidden",

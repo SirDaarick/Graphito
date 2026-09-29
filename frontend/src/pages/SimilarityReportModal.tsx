@@ -166,13 +166,13 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
             {/* Backdrop */}
             <div
                 ref={backdropRef}
-                className={`absolute inset-0 bg-black/80 backdrop-blur-md opacity-0`}
+                className={`absolute inset-0 bg-black/80 backdrop-blur-sm opacity-0`}
                 onClick={onClose}
             />
 
             {/* Modal Content */}
             <div ref={contentRef} className={`w-full max-w-5xl opacity-0 transform translate-y-8 scale-95`}>
-                <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60 backdrop-blur-2xl bg-white/95 dark:bg-[#0f1522]/90">
+                <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
 
                     <div className="flex flex-col h-full max-h-[90vh]">
                         {/* Top Navigation Bar */}
@@ -361,7 +361,12 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
 
                                     {/* Bottom row: AI Interpretation (Typewriter) */}
                                     <div className="bg-slate-50 dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 flex-1 hover:border-slate-300 dark:hover:border-[#334155] transition-colors relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 w-64 h-64 bg-graphito-blue/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                        <div
+                                            className="absolute top-0 right-0 w-64 h-64 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
+                                            style={{
+                                                background: "radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.03) 40%, transparent 70%)"
+                                            }}
+                                        />
 
                                         <div className="flex items-center gap-4 mb-4">
                                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-graphito-blue to-graphito-violet flex items-center justify-center text-white shadow-lg shadow-graphito-blue/20">
