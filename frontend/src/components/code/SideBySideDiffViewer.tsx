@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { MessageSquare, Plus, Trash2, X, Send, User, Sparkles, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageSquare, MessageSquarePlus, Plus, Trash2, X, Send, User, Sparkles, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { SynthwaveLine } from "./SynthwaveHighlighter";
 
 export interface ComentarioRevisionItem {
@@ -214,11 +214,13 @@ export function SideBySideDiffViewer({
                         )}
                         <button
                             onClick={() => setShowGeneralComposer(!showGeneralComposer)}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-fuchsia-950/40 border border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-900/40 text-[11px] font-semibold transition-all active:scale-95"
-                            title="Añadir conclusión o nota general"
+                            aria-label={showGeneralComposer ? "Cerrar redactor de nota" : "Añadir conclusión o nota general del docente"}
+                            className="group relative p-1.5 rounded-lg bg-fuchsia-950/40 border border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-900/50 hover:text-fuchsia-200 transition-all active:scale-95 flex items-center justify-center shadow-sm"
                         >
-                            <MessageSquare size={12} />
-                            <span>{showGeneralComposer ? "Cerrar" : "+ Nota general"}</span>
+                            {showGeneralComposer ? <X size={14} /> : <MessageSquarePlus size={14} />}
+                            <div role="tooltip" className="absolute right-0 top-full mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0e0a1a]/95 border border-fuchsia-500/40 text-fuchsia-200 text-[11px] font-sans font-medium whitespace-nowrap shadow-2xl z-[120]">
+                                <span>{showGeneralComposer ? "Cerrar redactor de nota" : "Añadir conclusión o nota general del docente"}</span>
+                            </div>
                         </button>
                     </div>
                 </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
@@ -472,73 +472,69 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                             {/* Left: Volver */}
                             <button
                                 onClick={onClose}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 rounded-lg px-2 py-1 transition-all shrink-0"
-                                title="Volver a la biblioteca (Atajo: Esc)"
+                                aria-label="Volver a la biblioteca"
+                                className="group relative p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0"
                             >
-                                <ArrowLeft size={14} />
-                                <span className="hidden sm:inline">Volver</span>
-                                <kbd className="hidden md:inline-block ml-1 px-1 py-0.2 text-[9px] font-mono bg-slate-200 dark:bg-slate-800 text-slate-500 rounded border border-slate-300 dark:border-slate-700">Esc</kbd>
+                                <ArrowLeft size={16} />
+                                <div role="tooltip" className="absolute top-full left-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[120]">
+                                    <span>Volver a la biblioteca</span>
+                                    <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-white/10 rounded border border-white/20">Esc</kbd>
+                                </div>
                             </button>
 
-                            {/* Center: In Diff Mode, show Agile Carousel + Key Metrics inline */}
+                            {/* Center: In Diff Mode, show Agile Carousel */}
                             {viewMode === "code_diff" ? (
                                 <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto py-0.5">
-                                    {/* Carousel Alumno */}
                                     {submissions && submissions.length > 0 && currentIndex >= 0 && (
-                                        <div className="flex items-center gap-1 bg-slate-200/50 dark:bg-[#161d2d] px-1.5 py-0.5 rounded-xl border border-slate-300/40 dark:border-slate-700/60 shrink-0">
+                                        <div className="flex items-center gap-1.5 bg-slate-200/50 dark:bg-[#141b2a] px-2 py-1 rounded-xl border border-slate-300/40 dark:border-slate-800 shrink-0">
                                             <button
                                                 onClick={() => navigateTo(currentIndex - 1)}
                                                 disabled={!hasPrev || isNavigating}
-                                                className="p-1 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                                title="Entrega anterior (←)"
+                                                aria-label="Entrega anterior"
+                                                className="group relative p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                             >
-                                                <ChevronLeft size={13} />
+                                                <ChevronLeft size={14} />
+                                                <div role="tooltip" className="absolute top-full left-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
+                                                    <span>Entrega anterior</span>
+                                                    <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">←</kbd>
+                                                </div>
                                             </button>
-                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 px-1 font-mono">
-                                                {currentIndex + 1}/{submissions.length}
+                                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 px-1 font-mono">
+                                                {currentIndex + 1} / {submissions.length}
                                             </span>
-                                            <span className="text-xs text-slate-400 max-w-[130px] truncate hidden sm:inline" title={comparison.title}>
+                                            <span className="text-xs text-slate-500 dark:text-slate-400 max-w-[200px] truncate hidden sm:inline font-medium" title={comparison.title}>
                                                 {comparison.title}
                                             </span>
                                             <button
                                                 onClick={() => navigateTo(currentIndex + 1)}
                                                 disabled={!hasNext || isNavigating}
-                                                className="p-1 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                                title="Siguiente entrega (→)"
+                                                aria-label="Siguiente entrega"
+                                                className="group relative p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                             >
-                                                <ChevronRight size={13} />
+                                                <ChevronRight size={14} />
+                                                <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
+                                                    <span>Siguiente entrega</span>
+                                                    <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">→</kbd>
+                                                </div>
                                             </button>
                                         </div>
                                     )}
-
-                                    {/* Slim Metrics Pill Inline */}
-                                    <div className="flex items-center gap-2.5 text-xs font-mono bg-slate-200/40 dark:bg-[#161d2d] px-3 py-1 rounded-xl border border-slate-300/40 dark:border-slate-800/80 shrink-0">
-                                        <span className="flex items-center gap-1.5 font-bold">
-                                            <span className={`w-2 h-2 rounded-full ${auditInfo.color.replace('text-', 'bg-')}`} />
-                                            <span className="text-slate-800 dark:text-slate-100 font-extrabold">{overallScore}%</span>
-                                            <span className="text-[11px] text-slate-400 font-sans font-normal hidden lg:inline">({auditInfo.label})</span>
-                                        </span>
-                                        <span className="text-slate-400 dark:text-slate-600">•</span>
-                                        <span className="text-slate-600 dark:text-slate-300">
-                                            <span className="text-slate-400 font-sans text-[11px]">Semántica:</span> <strong className="text-cyan-600 dark:text-cyan-400">{semanticPct}%</strong>
-                                        </span>
-                                        <span className="text-slate-400 dark:text-slate-600">•</span>
-                                        <span className="text-slate-600 dark:text-slate-300">
-                                            <span className="text-slate-400 font-sans text-[11px]">IA:</span> <strong className="text-violet-600 dark:text-violet-400">{aiPct}%</strong>
-                                        </span>
-                                    </div>
                                 </div>
                             ) : (
-                                /* In Report Mode: Standard Carousel */
+                                /* In Report Mode: Carousel */
                                 submissions && submissions.length > 0 && currentIndex >= 0 ? (
-                                    <div className="flex items-center gap-2 bg-slate-200/60 dark:bg-[#161d2d] px-2 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346]">
+                                    <div className="flex items-center gap-1.5 bg-slate-200/60 dark:bg-[#161d2d] px-2 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346]">
                                         <button
                                             onClick={() => navigateTo(currentIndex - 1)}
                                             disabled={!hasPrev || isNavigating}
-                                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                            aria-label="Entrega anterior"
+                                            className="group relative p-1.5 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                         >
-                                            <ChevronLeft size={14} />
-                                            <span className="text-[11px]">Anterior</span>
+                                            <ChevronLeft size={15} />
+                                            <div role="tooltip" className="absolute top-full left-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
+                                                <span>Entrega anterior</span>
+                                                <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">←</kbd>
+                                            </div>
                                         </button>
                                         <span className="text-xs font-bold text-slate-800 dark:text-slate-200 px-2 font-mono">
                                             {currentIndex + 1} de {submissions.length} — {comparison.title}
@@ -546,10 +542,14 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         <button
                                             onClick={() => navigateTo(currentIndex + 1)}
                                             disabled={!hasNext || isNavigating}
-                                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                            aria-label="Siguiente entrega"
+                                            className="group relative p-1.5 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                         >
-                                            <span className="text-[11px]">Siguiente</span>
-                                            <ChevronRight size={14} />
+                                            <ChevronRight size={15} />
+                                            <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
+                                                <span>Siguiente entrega</span>
+                                                <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">→</kbd>
+                                            </div>
                                         </button>
                                     </div>
                                 ) : null
@@ -560,11 +560,13 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                 {viewMode === "code_diff" && (
                                     <button
                                         onClick={() => setIsUltraWide(!isUltraWide)}
-                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-[#1a2234] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold transition-all"
-                                        title={isUltraWide ? "Ajustar ancho a 94%" : "Expandir pantalla a 98%"}
+                                        aria-label={isUltraWide ? "Ajustar ancho a 94%" : "Expandir ancho a 98%"}
+                                        className="group relative p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-[#1a2234] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-sm"
                                     >
-                                        {isUltraWide ? <Minimize2 size={13} className="text-cyan-400" /> : <Maximize2 size={13} className="text-cyan-400" />}
-                                        <span className="hidden xl:inline text-[11px]">{isUltraWide ? "94%" : "98%"}</span>
+                                        {isUltraWide ? <Minimize2 size={16} className="text-cyan-400" /> : <Maximize2 size={16} className="text-cyan-400" />}
+                                        <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[120]">
+                                            <span>{isUltraWide ? "Ajustar ancho (94% pantalla)" : "Modo Ultra-Ancho (98% pantalla)"}</span>
+                                        </div>
                                     </button>
                                 )}
 
@@ -581,22 +583,90 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                             setViewMode("report");
                                         }
                                     }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all shadow-sm"
+                                    aria-label={viewMode === "report" ? "Abrir comparación diff" : "Ver reporte completo"}
+                                    className="group relative p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 active:scale-95 transition-all shadow-sm"
                                 >
                                     {viewMode === "report" ? (
-                                        <>
-                                            <Code2 size={14} className="text-cyan-500" />
-                                            <span>Ver Diff</span>
-                                        </>
+                                        <Code2 size={16} className="text-cyan-500" />
                                     ) : (
-                                        <>
-                                            <FileText size={14} className="text-slate-400" />
-                                            <span>Reporte Completo</span>
-                                        </>
+                                        <FileText size={16} className="text-violet-400" />
                                     )}
+                                    <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[120]">
+                                        <span>{viewMode === "report" ? "Abrir cotejo de código (Diff Synthwave '84)" : "Ver reporte técnico completo"}</span>
+                                    </div>
                                 </button>
                             </div>
                         </div>
+
+                        {/* Hero Metrics HUD Telemetry Bar (Exclusive in Code Diff Mode) */}
+                        {viewMode === "code_diff" && (
+                            <div className="px-5 sm:px-8 py-3 bg-slate-100/90 dark:bg-[#0a0f1d] border-b border-slate-200 dark:border-[#1a2337] flex items-center justify-between gap-4 overflow-x-auto shrink-0 scrollbar-none">
+                                <div className="flex items-center gap-5 sm:gap-8 lg:gap-10">
+                                    {/* Metric 1: Global Similarity (Hero) */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className={`text-2xl sm:text-3xl lg:text-4xl font-black font-mono tracking-tight ${auditInfo.color}`}>
+                                                    {overallScore}%
+                                                </span>
+                                                <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border font-sans ${
+                                                    dictamenRaw === 'INTEGRO' || dictamenRaw === 'SIN_ALERTAS'
+                                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                                        : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                }`}>
+                                                    {auditInfo.label}
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Similitud Global
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Metric 2: Canal A (Semántica DFG) */}
+                                    <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-cyan-500 dark:text-cyan-400 tracking-tight">
+                                                {semanticPct}%
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Semántica (Grafo DFG)
+                                        </span>
+                                    </div>
+
+                                    {/* Metric 3: Canal B (Estilometría IA) */}
+                                    <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-violet-500 dark:text-violet-400 tracking-tight">
+                                                {aiPct}%
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Sintaxis IA (CharCNN)
+                                        </span>
+                                    </div>
+
+                                    {/* Metric 4: Discrepancia Asimétrica */}
+                                    <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-amber-500 dark:text-amber-300 tracking-tight">
+                                                {comparison.discrepancia_score ?? (semanticPct * aiPct / 10000).toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Discrepancia
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* HITL Assistant Tag */}
+                                <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-200/50 dark:bg-[#12192b] border border-slate-300/50 dark:border-slate-800 text-[11px] text-slate-400 font-sans">
+                                    <Sparkles size={13} className="text-cyan-400 shrink-0" />
+                                    <span>Telemetría HITL</span>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Header (solo en modo reporte completo) */}
                         {viewMode === "report" && (
@@ -831,50 +901,77 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
 
                         {/* Footer */}
                         <div className={`flex items-center justify-between ${viewMode === 'code_diff' ? 'px-6 py-2.5 bg-slate-50 dark:bg-[#0f1422]' : 'px-10 py-5 bg-slate-50 dark:bg-black/40'} border-t border-slate-200 dark:border-[#2b3346]/40 mt-auto shrink-0`}>
-                            <div className="text-xs font-medium text-slate-500">
-                                Documento: {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
+                            <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+                                <span className="font-mono font-semibold text-slate-600 dark:text-slate-400">
+                                    {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
+                                </span>
+                                <div className="hidden md:flex items-center gap-2.5 text-[11px] text-slate-400 border-l border-slate-300 dark:border-slate-800 pl-4 font-mono">
+                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">←</kbd> <kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">→</kbd> navegar</span>
+                                    <span>•</span>
+                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">A</kbd> conforme</span>
+                                    <span>•</span>
+                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">R</kbd> aclaración</span>
+                                    <span>•</span>
+                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">Esc</kbd> cerrar</span>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2.5">
+                                {/* Validar Conforme */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("conforme")}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm"
-                                    title="El docente valida la entrega como autoría legítima (Atajo: Tecla A)"
+                                    aria-label="Validar Conforme: Autoría legítima (Atajo: A)"
+                                    className="group relative p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center"
                                 >
-                                    <ShieldCheck size={16} />
-                                    <span>Validar Conforme</span>
-                                    <kbd className="hidden sm:inline-block ml-1 px-1 py-0.5 text-[9px] font-mono bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-500/30">A</kbd>
+                                    <ShieldCheck size={19} />
+                                    <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-mono font-bold bg-emerald-500/30 text-emerald-700 dark:text-emerald-200 border border-emerald-500/50 rounded">A</span>
+                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-emerald-500/40 text-emerald-100 text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
+                                        <span>Validar Conforme: Autoría legítima</span>
+                                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-emerald-500/30 text-emerald-200 rounded border border-emerald-500/40">A</kbd>
+                                    </div>
                                 </button>
+
+                                {/* Citar a Aclaración */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("aclaracion")}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm"
-                                    title="El docente cita al alumno para justificar sus decisiones de código (Atajo: Tecla R)"
+                                    aria-label="Citar a Aclaración: Defensa oral (Atajo: R)"
+                                    className="group relative p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center"
                                 >
-                                    <UserCheck size={16} />
-                                    <span>Citar a Aclaración</span>
-                                    <kbd className="hidden sm:inline-block ml-1 px-1 py-0.5 text-[9px] font-mono bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded border border-amber-500/30">R</kbd>
+                                    <UserCheck size={19} />
+                                    <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-mono font-bold bg-amber-500/30 text-amber-700 dark:text-amber-200 border border-amber-500/50 rounded">R</span>
+                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-amber-500/40 text-amber-100 text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
+                                        <span>Citar a Aclaración: Programar defensa oral</span>
+                                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-amber-500/30 text-amber-200 rounded border border-amber-500/40">R</kbd>
+                                    </div>
                                 </button>
+
+                                {/* Descargar PDF */}
                                 <button
                                     onClick={handleDownloadPdf}
                                     disabled={isDownloadingPdf || !comparison.id}
-                                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 dark:border-[#2b3346] text-xs font-bold text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    aria-label="Descargar reporte en PDF"
+                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center"
                                 >
                                     {isDownloadingPdf ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-slate-400 dark:border-white/30 border-t-graphito-blue dark:border-t-white rounded-full animate-spin" />
-                                            <span>Generando...</span>
-                                        </>
+                                        <div className="w-[19px] h-[19px] border-2 border-slate-400 dark:border-white/30 border-t-graphito-blue dark:border-t-white rounded-full animate-spin" />
                                     ) : (
-                                        <>
-                                            <Download size={16} />
-                                            <span>Descargar PDF</span>
-                                        </>
+                                        <Download size={19} />
                                     )}
+                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
+                                        <span>Descargar Informe Pericial en PDF</span>
+                                    </div>
                                 </button>
+
+                                {/* Cerrar */}
                                 <button
                                     onClick={onClose}
-                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-graphito-blue to-graphito-violet text-xs font-bold text-white hover:opacity-90 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    aria-label="Cerrar visor (Esc)"
+                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-rose-500 hover:border-rose-500/40 hover:bg-rose-500/10 active:scale-95 transition-all shadow-sm flex items-center justify-center"
                                 >
-                                    Cerrar
+                                    <X size={19} />
+                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
+                                        <span>Cerrar visor</span>
+                                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-white/10 text-white rounded border border-white/20">Esc</kbd>
+                                    </div>
                                 </button>
                             </div>
                         </div>
