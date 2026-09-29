@@ -467,70 +467,104 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                             </div>
                         )}
 
-                        {/* Top Navigation Bar */}
-                        <div className="flex items-center justify-between px-6 sm:px-8 py-3.5 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/20 shrink-0 gap-3">
+                        {/* Top Navigation Bar — Zen Unified Header */}
+                        <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-[#0f1422] shrink-0 gap-3">
+                            {/* Left: Volver */}
                             <button
                                 onClick={onClose}
-                                className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0"
+                                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 rounded-lg px-2 py-1 transition-all shrink-0"
                                 title="Volver a la biblioteca (Atajo: Esc)"
                             >
-                                <ArrowLeft size={16} />
-                                <span className="hidden sm:inline">Volver a la biblioteca</span>
-                                <span className="sm:hidden">Volver</span>
-                                <kbd className="hidden lg:inline-block ml-1 px-1 py-0.5 text-[9px] font-mono bg-slate-200 dark:bg-slate-800 text-slate-500 rounded border border-slate-300 dark:border-slate-700">Esc</kbd>
+                                <ArrowLeft size={14} />
+                                <span className="hidden sm:inline">Volver</span>
+                                <kbd className="hidden md:inline-block ml-1 px-1 py-0.2 text-[9px] font-mono bg-slate-200 dark:bg-slate-800 text-slate-500 rounded border border-slate-300 dark:border-slate-700">Esc</kbd>
                             </button>
 
-                            {/* Cola de Revisión Ágil / Carousel de Entregas */}
-                            {submissions && submissions.length > 0 && currentIndex >= 0 && (
-                                <div className="flex items-center gap-1 sm:gap-2 bg-slate-200/60 dark:bg-[#161d2d] px-2 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346] shadow-inner">
-                                    <button
-                                        onClick={() => navigateTo(currentIndex - 1)}
-                                        disabled={!hasPrev || isNavigating}
-                                        className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
-                                        title="Entrega anterior (Atajo: Flecha Izquierda ←)"
-                                    >
-                                        <ChevronLeft size={15} />
-                                        <span className="hidden md:inline text-[11px]">Anterior</span>
-                                        <kbd className="hidden sm:inline-block px-1 py-0.5 text-[9px] font-mono bg-slate-100 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 text-slate-500">←</kbd>
-                                    </button>
-
-                                    <div className="px-2.5 py-0.5 text-center">
-                                        <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 justify-center">
-                                            <span>
-                                                Entrega <span className="font-mono text-graphito-blue dark:text-cyan-400 font-extrabold">{currentIndex + 1}</span> de <span className="font-mono">{submissions.length}</span>
+                            {/* Center: In Diff Mode, show Agile Carousel + Key Metrics inline */}
+                            {viewMode === "code_diff" ? (
+                                <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto py-0.5">
+                                    {/* Carousel Alumno */}
+                                    {submissions && submissions.length > 0 && currentIndex >= 0 && (
+                                        <div className="flex items-center gap-1 bg-slate-200/50 dark:bg-[#161d2d] px-1.5 py-0.5 rounded-xl border border-slate-300/40 dark:border-slate-700/60 shrink-0">
+                                            <button
+                                                onClick={() => navigateTo(currentIndex - 1)}
+                                                disabled={!hasPrev || isNavigating}
+                                                className="p-1 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                                title="Entrega anterior (←)"
+                                            >
+                                                <ChevronLeft size={13} />
+                                            </button>
+                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 px-1 font-mono">
+                                                {currentIndex + 1}/{submissions.length}
                                             </span>
-                                            <span className="text-slate-400 dark:text-slate-600 hidden sm:inline">•</span>
-                                            <span className="max-w-[120px] md:max-w-[180px] truncate text-slate-600 dark:text-slate-300 hidden sm:inline" title={comparison.title}>
+                                            <span className="text-xs text-slate-400 max-w-[130px] truncate hidden sm:inline" title={comparison.title}>
                                                 {comparison.title}
                                             </span>
+                                            <button
+                                                onClick={() => navigateTo(currentIndex + 1)}
+                                                disabled={!hasNext || isNavigating}
+                                                className="p-1 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                                title="Siguiente entrega (→)"
+                                            >
+                                                <ChevronRight size={13} />
+                                            </button>
                                         </div>
-                                        <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono tracking-wider uppercase">
-                                            Cola de revisión ágil
-                                        </div>
-                                    </div>
+                                    )}
 
-                                    <button
-                                        onClick={() => navigateTo(currentIndex + 1)}
-                                        disabled={!hasNext || isNavigating}
-                                        className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
-                                        title="Siguiente entrega (Atajo: Flecha Derecha →)"
-                                    >
-                                        <kbd className="hidden sm:inline-block px-1 py-0.5 text-[9px] font-mono bg-slate-100 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 text-slate-500">→</kbd>
-                                        <span className="hidden md:inline text-[11px]">Siguiente</span>
-                                        <ChevronRight size={15} />
-                                    </button>
+                                    {/* Slim Metrics Pill Inline */}
+                                    <div className="flex items-center gap-2.5 text-xs font-mono bg-slate-200/40 dark:bg-[#161d2d] px-3 py-1 rounded-xl border border-slate-300/40 dark:border-slate-800/80 shrink-0">
+                                        <span className="flex items-center gap-1.5 font-bold">
+                                            <span className={`w-2 h-2 rounded-full ${auditInfo.color.replace('text-', 'bg-')}`} />
+                                            <span className="text-slate-800 dark:text-slate-100 font-extrabold">{overallScore}%</span>
+                                            <span className="text-[11px] text-slate-400 font-sans font-normal hidden lg:inline">({auditInfo.label})</span>
+                                        </span>
+                                        <span className="text-slate-400 dark:text-slate-600">•</span>
+                                        <span className="text-slate-600 dark:text-slate-300">
+                                            <span className="text-slate-400 font-sans text-[11px]">Semántica:</span> <strong className="text-cyan-600 dark:text-cyan-400">{semanticPct}%</strong>
+                                        </span>
+                                        <span className="text-slate-400 dark:text-slate-600">•</span>
+                                        <span className="text-slate-600 dark:text-slate-300">
+                                            <span className="text-slate-400 font-sans text-[11px]">IA:</span> <strong className="text-violet-600 dark:text-violet-400">{aiPct}%</strong>
+                                        </span>
+                                    </div>
                                 </div>
+                            ) : (
+                                /* In Report Mode: Standard Carousel */
+                                submissions && submissions.length > 0 && currentIndex >= 0 ? (
+                                    <div className="flex items-center gap-2 bg-slate-200/60 dark:bg-[#161d2d] px-2 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346]">
+                                        <button
+                                            onClick={() => navigateTo(currentIndex - 1)}
+                                            disabled={!hasPrev || isNavigating}
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <ChevronLeft size={14} />
+                                            <span className="text-[11px]">Anterior</span>
+                                        </button>
+                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 px-2 font-mono">
+                                            {currentIndex + 1} de {submissions.length} — {comparison.title}
+                                        </span>
+                                        <button
+                                            onClick={() => navigateTo(currentIndex + 1)}
+                                            disabled={!hasNext || isNavigating}
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <span className="text-[11px]">Siguiente</span>
+                                            <ChevronRight size={14} />
+                                        </button>
+                                    </div>
+                                ) : null
                             )}
 
+                            {/* Right Actions */}
                             <div className="flex items-center gap-2 shrink-0">
                                 {viewMode === "code_diff" && (
                                     <button
                                         onClick={() => setIsUltraWide(!isUltraWide)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-[#1a2234] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 text-xs font-semibold transition-all shadow-sm shrink-0"
-                                        title={isUltraWide ? "Ajustar ancho a 94%" : "Expandir pantalla a 98% (Ultra-Ancho)"}
+                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-[#1a2234] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold transition-all"
+                                        title={isUltraWide ? "Ajustar ancho a 94%" : "Expandir pantalla a 98%"}
                                     >
-                                        {isUltraWide ? <Minimize2 size={14} className="text-cyan-400" /> : <Maximize2 size={14} className="text-cyan-400" />}
-                                        <span className="hidden md:inline">{isUltraWide ? "94% Ancho" : "98% Ultra-Ancho"}</span>
+                                        {isUltraWide ? <Minimize2 size={13} className="text-cyan-400" /> : <Maximize2 size={13} className="text-cyan-400" />}
+                                        <span className="hidden xl:inline text-[11px]">{isUltraWide ? "94%" : "98%"}</span>
                                     </button>
                                 )}
 
@@ -547,19 +581,17 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                             setViewMode("report");
                                         }
                                     }}
-                                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-300 hover:bg-fuchsia-500/20 active:scale-95 text-xs font-bold transition-all shadow-sm shrink-0"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all shadow-sm"
                                 >
                                     {viewMode === "report" ? (
                                         <>
-                                            <Code2 size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
-                                            <span className="hidden sm:inline">Ver código y comparar (Diff)</span>
-                                            <span className="sm:hidden">Diff</span>
+                                            <Code2 size={14} className="text-cyan-500" />
+                                            <span>Ver Diff</span>
                                         </>
                                     ) : (
                                         <>
-                                            <FileText size={15} className="text-fuchsia-500 dark:text-fuchsia-400" />
-                                            <span className="hidden sm:inline">Ver reporte extendido</span>
-                                            <span className="sm:hidden">Reporte</span>
+                                            <FileText size={14} className="text-slate-400" />
+                                            <span>Reporte Completo</span>
                                         </>
                                     )}
                                 </button>
@@ -587,56 +619,9 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                         )}
 
                         {/* Body */}
-                        <div ref={bodyContainerRef} className={`flex-1 overflow-y-auto ${viewMode === 'code_diff' ? 'px-3 sm:px-5 md:px-6 pb-4' : 'px-10 pb-8'} scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent`}>
+                        <div ref={bodyContainerRef} className={`flex-1 overflow-y-auto ${viewMode === 'code_diff' ? 'p-3' : 'px-10 pb-8'} scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent`}>
                             {viewMode === "code_diff" ? (
-                                <div className="flex flex-col h-full pt-4 space-y-4">
-                                    {/* Cinta Compacta de Métricas hacia arriba */}
-                                    <div className="p-4 rounded-2xl bg-slate-100/90 dark:bg-[#151c2e]/90 border border-slate-200 dark:border-[#2b3346] flex flex-wrap items-center justify-between gap-4 shadow-md backdrop-blur-md shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-graphito-blue to-graphito-violet text-white font-mono font-black text-base shadow-md">
-                                                {overallScore}%
-                                            </div>
-                                            <div>
-                                                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Similitud Global</div>
-                                                <div className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
-                                                    <span className={`w-2 h-2 rounded-full ${auditInfo.color.replace('text-', 'bg-')}`} />
-                                                    {auditInfo.label}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-6 text-xs font-sans">
-                                            <div>
-                                                <span className="text-[10px] text-slate-500 block uppercase font-bold">Canal A (Semántica)</span>
-                                                <span className="font-mono font-bold text-graphito-blue dark:text-blue-400 text-sm">
-                                                    {semanticPct}%
-                                                </span>
-                                            </div>
-                                            <div className="w-px h-8 bg-slate-300 dark:bg-slate-700" />
-                                            <div>
-                                                <span className="text-[10px] text-slate-500 block uppercase font-bold">Canal B (Estilometría IA)</span>
-                                                <span className="font-mono font-bold text-violet-600 dark:text-violet-400 text-sm">
-                                                    {aiPct}%
-                                                </span>
-                                            </div>
-                                            <div className="w-px h-8 bg-slate-300 dark:bg-slate-700" />
-                                            <div>
-                                                <span className="text-[10px] text-slate-500 block uppercase font-bold">Puntaje Discrepancia</span>
-                                                <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-sm">
-                                                    {comparison.discrepancia_score ?? (semanticPct * aiPct / 10000).toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={() => setViewMode("report")}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-800 transition-all"
-                                        >
-                                            <ChevronUp size={14} />
-                                            <span>Ver Reporte Extendido</span>
-                                        </button>
-                                    </div>
-
+                                <div className="flex flex-col h-full">
                                     {/* Visualizador Diff Synthwave '84 */}
                                     {isLoadingCode ? (
                                         <div className="flex flex-col items-center justify-center py-28 text-slate-400">
@@ -644,7 +629,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                             <span className="text-xs font-mono">Cargando códigos fuente para cotejo diff...</span>
                                         </div>
                                     ) : (
-                                        <div className="flex-1 min-h-[500px]">
+                                        <div className="flex-1 min-h-[520px]">
                                             <SideBySideDiffViewer
                                                 referenceCode={codeData?.reference_code || ""}
                                                 studentCode={codeData?.student_code || ""}
@@ -845,7 +830,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                 </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between px-10 py-6 border-t border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/40 mt-auto shrink-0">
+                        <div className={`flex items-center justify-between ${viewMode === 'code_diff' ? 'px-6 py-2.5 bg-slate-50 dark:bg-[#0f1422]' : 'px-10 py-5 bg-slate-50 dark:bg-black/40'} border-t border-slate-200 dark:border-[#2b3346]/40 mt-auto shrink-0`}>
                             <div className="text-xs font-medium text-slate-500">
                                 Documento: {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
                             </div>

@@ -106,37 +106,9 @@ export function SideBySideDiffViewer({
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#181324] rounded-2xl overflow-hidden border border-fuchsia-500/20 shadow-2xl font-mono text-[13px]">
-            {/* Top Synthwave Bar */}
-            <div className="h-1 bg-gradient-to-r from-[#ff7edb] via-[#36f9f6] to-[#fede5d] shadow-[0_0_12px_rgba(255,126,219,0.7)]" />
-
-            {/* Sub-Header con Acciones */}
-            <div className="flex items-center justify-between px-6 py-2.5 bg-[#201830] border-b border-[#2d2244] shrink-0">
-                <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#2d2244] text-[#36f9f6] text-xs font-bold border border-[#36f9f6]/30">
-                        <Sparkles size={13} className="text-[#36f9f6]" />
-                        Synthwave '84
-                    </span>
-                    <span className="text-xs text-slate-400 font-sans">
-                        Lado a lado con alineación de flujo
-                    </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowGeneralComposer(!showGeneralComposer)}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fuchsia-600/20 border border-fuchsia-500/40 text-fuchsia-300 hover:bg-fuchsia-600/30 text-xs font-sans font-semibold transition-all active:scale-95"
-                    >
-                        <MessageSquare size={13} />
-                        <span>{showGeneralComposer ? "Ocultar anotación" : "+ Nota general"}</span>
-                    </button>
-                    {comments.length > 0 && (
-                        <span className="text-[11px] font-sans text-slate-400 bg-[#291e3d] px-2 py-0.5 rounded-full border border-slate-700">
-                            {comments.length} {comments.length === 1 ? "observación" : "observaciones"}
-                        </span>
-                    )}
-                </div>
-            </div>
+        <div className="flex flex-col h-full bg-[#151020] rounded-xl overflow-hidden border border-[#2d2244]/80 shadow-xl font-mono text-[13px]">
+            {/* Subtle Top Accent */}
+            <div className="h-[2px] bg-gradient-to-r from-fuchsia-500/60 via-cyan-400/60 to-amber-300/60" />
 
             {/* General Comment Composer Dropdown */}
             {showGeneralComposer && (
@@ -218,25 +190,37 @@ export function SideBySideDiffViewer({
                 </div>
             )}
 
-            {/* Column Headers */}
-            <div className="grid grid-cols-2 border-b border-[#2d2244] bg-[#1e1730] text-xs font-sans font-bold shrink-0">
-                <div className="px-6 py-2.5 flex items-center justify-between border-r border-[#2d2244]">
-                    <span className="text-[#36f9f6] flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#36f9f6] shadow-[0_0_6px_#36f9f6]" />
-                        {referenceAuthor}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">
+            {/* Column Headers — Zen Single Toolbar */}
+            <div className="grid grid-cols-2 border-b border-[#2d2244] bg-[#1a1427] text-xs font-sans shrink-0">
+                <div className="px-5 py-2 flex items-center justify-between border-r border-[#2d2244]">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#36f9f6]" />
+                        <span className="font-semibold text-slate-200 text-xs">{referenceAuthor}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">
                         {language.toUpperCase()} CANÓNICO
                     </span>
                 </div>
-                <div className="px-6 py-2.5 flex items-center justify-between">
-                    <span className="text-[#ff7edb] flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#ff7edb] shadow-[0_0_6px_#ff7edb]" />
-                        {studentAuthor}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">
-                        ENTREGA
-                    </span>
+                <div className="px-5 py-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#ff7edb]" />
+                        <span className="font-semibold text-slate-200 text-xs">{studentAuthor}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {comments.length > 0 && (
+                            <span className="text-[10px] text-slate-400 bg-[#251d38] px-2 py-0.5 rounded-full border border-slate-700 font-mono">
+                                {comments.length} {comments.length === 1 ? "nota" : "notas"}
+                            </span>
+                        )}
+                        <button
+                            onClick={() => setShowGeneralComposer(!showGeneralComposer)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-fuchsia-950/40 border border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-900/40 text-[11px] font-semibold transition-all active:scale-95"
+                            title="Añadir conclusión o nota general"
+                        >
+                            <MessageSquare size={12} />
+                            <span>{showGeneralComposer ? "Cerrar" : "+ Nota general"}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -247,7 +231,7 @@ export function SideBySideDiffViewer({
                     ref={leftScrollRef}
                     onScroll={() => handleScroll("left")}
                     className="overflow-y-auto overflow-x-auto border-r border-[#2d2244] bg-[#1a1427] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ height: "calc(93vh - 270px)", minHeight: "480px" }}
+                    style={{ height: "calc(95vh - 145px)", minHeight: "520px" }}
                 >
                     <table className="w-full border-collapse">
                         <tbody>
@@ -290,7 +274,7 @@ export function SideBySideDiffViewer({
                     ref={rightScrollRef}
                     onScroll={() => handleScroll("right")}
                     className="overflow-y-auto overflow-x-auto bg-[#181324] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ height: "calc(93vh - 270px)", minHeight: "480px" }}
+                    style={{ height: "calc(95vh - 145px)", minHeight: "520px" }}
                 >
                     <table className="w-full border-collapse">
                         <tbody>
