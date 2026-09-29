@@ -17,9 +17,11 @@ interface Reference {
 }
 
 export function Biblioteca({
+    refreshTrigger = 0,
     onCompare,
     onComparisonClick
 }: {
+    refreshTrigger?: number,
     onCompare?: () => void,
     onComparisonClick?: (comparison: Comparison) => void
 }) {
@@ -31,7 +33,10 @@ export function Biblioteca({
 
     useEffect(() => {
         const fetchProblems = async () => {
-            setIsLoading(true);
+            // Solo activamos spinner si no hay referencias cargadas todavía
+            if (references.length === 0) {
+                setIsLoading(true);
+            }
             try {
                 const problems = await api.problems.list();
                 if (problems && problems.length > 0) {
@@ -89,7 +94,7 @@ export function Biblioteca({
         };
 
         fetchProblems();
-    }, []);
+    }, [refreshTrigger]);
 
     // Filtrar referencias según el término de búsqueda
     const filteredReferences = references.filter((ref) => {

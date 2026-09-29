@@ -9,9 +9,10 @@ import { api } from "../lib/api";
 interface NewReferenceModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSuccess?: () => void;
 }
 
-export function NewReferenceModal({ isOpen, onClose }: NewReferenceModalProps) {
+export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceModalProps) {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [code, setCode] = useState("");
@@ -84,6 +85,11 @@ export function NewReferenceModal({ isOpen, onClose }: NewReferenceModalProps) {
         try {
             const prob = await api.problems.create(title, description || "Solución de referencia", language);
             await api.problems.addReference(prob.id, "Docente", code, language);
+            setTitle("");
+            setDescription("");
+            setCode("");
+            setFileName(null);
+            onSuccess?.();
             onClose();
         } catch (err: any) {
             setError(err.message || "Error al agregar la referencia.");

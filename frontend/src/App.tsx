@@ -19,7 +19,7 @@ function App() {
     const [isNewComparisonModalOpen, setIsNewComparisonModalOpen] = useState(false);
     const [selectedComparison, setSelectedComparison] = useState<any>(null);
     const [isSimilarityReportOpen, setIsSimilarityReportOpen] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     useEffect(() => {
         const verifySession = async () => {
@@ -96,7 +96,7 @@ function App() {
                             }}
                         />
                         <Biblioteca
-                            key={refreshKey}
+                            refreshTrigger={refreshTrigger}
                             onCompare={() => setIsNewComparisonModalOpen(true)}
                             onComparisonClick={(comp) => {
                                 setSelectedComparison(comp);
@@ -105,20 +105,16 @@ function App() {
                         />
                         <NewReferenceModal
                             isOpen={isNewCodeModalOpen}
-                            onClose={() => {
-                                setIsNewCodeModalOpen(false);
-                                setRefreshKey((prev) => prev + 1);
-                            }}
+                            onClose={() => setIsNewCodeModalOpen(false)}
+                            onSuccess={() => setRefreshTrigger((prev) => prev + 1)}
                         />
                         <NewComparisonModal
                             isOpen={isNewComparisonModalOpen}
-                            onClose={() => {
-                                setIsNewComparisonModalOpen(false);
-                                setRefreshKey((prev) => prev + 1);
-                            }}
+                            onClose={() => setIsNewComparisonModalOpen(false)}
                             onAnalysisComplete={(report) => {
                                 setSelectedComparison(report);
                                 setIsSimilarityReportOpen(true);
+                                setRefreshTrigger((prev) => prev + 1);
                             }}
                         />
                         <SimilarityReportModal
@@ -126,6 +122,7 @@ function App() {
                             onClose={() => setIsSimilarityReportOpen(false)}
                             comparison={selectedComparison}
                         />
+
                     </>
                 ) : view === "register" ? (
                     <Register
