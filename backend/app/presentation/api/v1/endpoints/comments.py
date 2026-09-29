@@ -18,6 +18,17 @@ async def list_comments(
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Lista cronológicamente todos los comentarios y observaciones pedagógicas asociados a un reporte pericial.
+
+    Args:
+        reporte_id (int): Identificador del reporte de análisis.
+        current_user (Docente): Docente autenticado solicitante.
+        db (AsyncSession): Sesión asíncrona de base de datos.
+
+    Returns:
+        List[ComentarioResponse]: Lista de anotaciones con autor y línea asociada.
+    """
     # Verificar que el reporte exista
     res = await db.execute(
         select(ReporteAnalisis).where(ReporteAnalisis.id == reporte_id)
@@ -63,6 +74,18 @@ async def create_comment(
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Crea una anotación u observación pericial (general o vinculada a una línea de código específica).
+
+    Args:
+        reporte_id (int): Identificador del reporte pericial.
+        data (ComentarioCreate): Contenido del comentario y número opcional de línea.
+        current_user (Docente): Docente evaluador autenticado.
+        db (AsyncSession): Sesión asíncrona de base de datos.
+
+    Returns:
+        ComentarioResponse: Registro persistido del comentario con metadatos de autoría.
+    """
     # Verificar existencia de reporte
     res = await db.execute(
         select(ReporteAnalisis).where(ReporteAnalisis.id == reporte_id)
@@ -105,6 +128,15 @@ async def delete_comment(
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Elimina un comentario u observación pedagógica. Solo el docente autor del comentario tiene autorización para eliminarlo.
+
+    Args:
+        reporte_id (int): Identificador del reporte pericial.
+        comment_id (int): Identificador del comentario a remover.
+        current_user (Docente): Docente evaluador autenticado.
+        db (AsyncSession): Sesión asíncrona de base de datos.
+    """
     stmt = select(ComentarioRevision).where(
         ComentarioRevision.id == comment_id,
         ComentarioRevision.reporte_id == reporte_id,

@@ -1,7 +1,20 @@
+/**
+ * @file SideBySideDiffViewer.tsx
+ * @description Componente de cotejo visual lado a lado (Side-by-Side Diff) para análisis de integridad académica.
+ * Provee:
+ * 1. Visualización sincronizada de código de referencia (docente) vs. entrega evaluada (alumno).
+ * 2. Resaltado léxico con paleta Synthwave '84 para C/C++.
+ * 3. Hilo interactivo de anotaciones y observaciones pedagógicas (en línea y generales).
+ * 4. Sincronización bidireccional de desplazamiento (scroll) con bloqueo preventivo de bucles.
+ */
+
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { MessageSquare, MessageSquarePlus, Plus, Trash2, X, Send, User, Sparkles, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { SynthwaveLine } from "./SynthwaveHighlighter";
 
+/**
+ * Representa una anotación pedagógica registrada por un docente en una revisión.
+ */
 export interface ComentarioRevisionItem {
     id: number;
     reporte_id: number;
@@ -12,6 +25,9 @@ export interface ComentarioRevisionItem {
     autor_nombre?: string;
 }
 
+/**
+ * Propiedades del componente SideBySideDiffViewer.
+ */
 interface SideBySideDiffViewerProps {
     referenceCode: string;
     studentCode: string;

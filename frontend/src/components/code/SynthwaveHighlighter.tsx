@@ -1,3 +1,10 @@
+/**
+ * @file SynthwaveHighlighter.tsx
+ * @description Resaltador sintáctico y léxico de alto rendimiento inspirado en el tema "Synthwave '84" de VS Code.
+ * Implementa un tokenizador determinista de paso único sin dependencias pesadas de runtime para C/C++,
+ * optimizado para baja latencia en renderizado simultáneo de miles de líneas de código en vistas Diff.
+ */
+
 import React, { useMemo } from "react";
 
 interface SynthwaveHighlighterProps {

@@ -1,121 +1,165 @@
 <div align="center">
   <h1 align="center">🔍 Graphito</h1>
-  <h3>Sistema de Comparación de Código en C/C++ mediante Similitud Semántica</h3>
+  <h3>Sistema de Apoyo a la Decisión Docente para Integridad Académica en C/C++</h3>
+  <p>Evaluación bimodal de código mediante Grafos de Flujo de Datos (DFG) y Estilometría con Deep Learning</p>
 </div>
 
 <br/>
 
-**Graphito** es un Sistema de Apoyo a la Decisión Docente (DSS) diseñado para automatizar la evaluación de integridad académica en cursos introductorios de programación. A diferencia de las herramientas tradicionales basadas en texto, Graphito utiliza un **enfoque bimodal** que analiza tanto la lógica funcional como la "huella digital" del autor para detectar código generado por Inteligencia Artificial.
+**Graphito** es una plataforma pericial basada en el principio ético **Human-in-the-Loop (HITL)**, diseñada para asistir a los profesores en la evaluación de la autoría e integridad de soluciones de software en lenguajes C y C++. 
+
+A diferencia de los verificadores tradicionales basados únicamente en cadenas de texto o árboles sintácticos rígidos, Graphito implementa una **arquitectura de análisis bimodal asimétrica** que examina simultáneamente la lógica algorítmica profunda y la huella estilométrica generativa.
 
 ---
 
-## 🚀 Innovación: Análisis Bimodal
+## 🚀 Arquitectura de Análisis Bimodal
 
-El sistema opera a través de dos canales paralelos para garantizar una evaluación integral:
+```mermaid
+flowchart LR
+    A["Código Evaluado (C/C++)"] --> B["Normalizador Léxico & Tree-sitter"]
+    B --> C["Canal A: Semántica Lógica"]
+    B --> D["Canal B: Estilometría IA"]
+    
+    C --> E["Grafo de Flujo de Datos (DFG) + GraphCodeBERT"]
+    D --> F["Red Neuronal Convolucional (CharCNN)"]
+    
+    E --> G["Búsqueda Vectorial (ChromaDB)"]
+    G --> H["Fusión Multimodal Asimétrica"]
+    F --> H
+    
+    H --> I["Dashboard Minimalista HITL & Diff Synthwave '84"]
+    I --> J["Decisión Docente: Conforme / Duda"]
+```
 
-- 🧠 **Canal A (Semántica):** Utiliza el modelo `GraphCodeBERT` e integra Grafos de Flujo de Datos (DFG) para capturar la lógica algorítmica profunda, ignorando cambios superficiales en la sintaxis.
-- ✍️ **Canal B (Estilometría):** Implementa una red `CharCNN` (Convolutional Neural Network a nivel de caracteres) para identificar patrones de escritura y detectar la "perfección sintética" propia de los modelos de lenguaje (LLMs).
+1. 🧠 **Canal A (Semántica Algorítmica):**
+   - Extrae el Grafo de Flujo de Datos (**DFG**) con *Tree-sitter*, capturando el flujo de valores entre variables a través de ciclos y condicionales.
+   - Aplica **GraphCodeBERT** optimizado con adaptadores **LoRA** (`adaptador-lora-20k`) para garantizar invarianza ante renombramiento de variables y reordenamiento de bloques.
+2. ✍️ **Canal B (Estilometría y Detección de Sintaxis de LLMs):**
+   - Implementa una arquitectura **CharCNN** (Convolutional Neural Network a nivel de caracteres) que analiza la cadencia sintáctica, regularidad léxica y patrones estilométricos característicos de modelos generativos (como ChatGPT, Claude o Copilot).
+3. ⚖️ **Fusión Multimodal y Penalización por Discrepancia:**
+   - Si un código presenta una similitud semántica alta con una solución canónica pero una probabilidad de estilo de IA significativa, el sistema calcula un **Índice de Discrepancia Asimétrica** que alerta al docente sobre una posible reelaboración sintética.
 
 ---
 
 ## ✨ Características Principales
 
-- 🧹 **Normalización Inteligente:** Eliminación de ruido y preservación de estructuras de estilo según el canal de análisis.
-- 🤖 **Referencias Sintéticas:** Generación automática de múltiples versiones funcionalmente equivalentes mediante modelos LLM externos para robustecer la comparación.
-- ⚖️ **Métrica de Integridad:** Uso de la Similitud del Coseno asimétrica para penalizar discrepancias entre la lógica esperada y el estilo detectado.
-- 📊 **Reportes Visuales:** Visualización interactiva y clara del índice de similitud semántica y probabilidad de autoría.
+- 💻 **Visualizador Diff Side-by-Side con Tema Synthwave '84:** Cotejo en pantalla completa (expandible al 94%-98% del viewport) del código del alumno contra la solución de referencia o soluciones previas.
+- 💬 **Anotaciones Pedagógicas en Línea:** Posibilidad de registrar observaciones vinculadas a líneas concretas o notas generales, persistidas en base de datos.
+- ⚡ **Dashboard Pericial Ejecutivo (Hero HUD):** Métricas clave en gran formato numérico (`Similitud Global`, `Semántica DFG`, `Estilometría IA`, `Discrepancia`), eliminando ruido visual y gráficos pesados.
+- 🏷️ **Triaje Docente Rápido:** Calificación ágil de entregas con atajos de teclado (`A` para *Conforme*, `R` para *Citar a Aclaración / Duda*) y reflejo reactivo inmediato en la lista de tareas.
+- 🖨️ **Dictamen Pericial Oficial (PDF & `@media print`):** Exportación institucional generada por el backend (ReportLab) e impresión directa en navegador, incluyendo código fuente evaluado con numeración de líneas y observaciones docentes.
+- 🌙 **Sistema de Diseño Ergonómico:** Scrollbars oscuros personalizados, transiciones cinemáticas fluidas con GSAP y soporte para modos visuales.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-### Frontend
-- **React** (con Vite) + **Tailwind CSS**
-
-### Backend & Inteligencia Artificial
-- **FastAPI** (Python)
-- **PyTorch** y **LangGraph** (Orquestación de agentes de decisión)
-
-### Persistencia Híbrida
-- **PostgreSQL:** Gestión de metadatos relacionales.
-- **ChromaDB:** Base de datos vectorial para el almacenamiento y búsqueda de embeddings de alta dimensionalidad.
+| Capa | Tecnologías |
+| :--- | :--- |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, GSAP, Lucide Icons |
+| **Backend API** | FastAPI, Python 3.11+, SQLAlchemy 2.0 (Asíncrono), Pydantic v2 |
+| **Inteligencia Artificial** | PyTorch, HuggingFace Transformers (GraphCodeBERT), CharCNN, Tree-sitter |
+| **Persistencia** | PostgreSQL (Metadatos relacionales), ChromaDB (Embeddings vectoriales) |
+| **Documentación & Reportes** | LaTeX (IEEEtran), ReportLab (PDF Engine) |
 
 ---
 
-## 📊 Estado Actual del Proyecto
-
-| Componente | Módulo | Estado | Descripción |
-|------------|--------|--------|-------------|
-| **Canal A (Semántica)** | `models/graphcodebert/` | ✅ Completado | Parser AST + DFG con Tree-sitter para C/C++, inferencia graph-aware y fine-tuning contrastivo con LoRA (`adaptador-lora-20k`). |
-| **Canal B (Estilometría)** | `models/char_cnn/` | ✅ Completado | Arquitectura CharCNN a nivel de caracteres, pipeline de preprocesamiento, tokenización e inferencia estilométrica. |
-| **Fusión Multimodal** | `models/fusion.py` | ✅ Completado | Módulo de combinación de similitud semántica y estilométrica con ponderación configurable. |
-| **Pipeline de Datos** | `data/` | ✅ Completado | Generación de referencias sintéticas con soporte para DeepSeek, Google Gemini y Ollama, normalización y extracción. |
-| **Pruebas Automatizadas** | `tests/`, `backend/tests/` | ✅ 40/40 Pasadas | 38 pruebas del parser DFG + 2 pruebas de integración E2E del backend. |
-| **Documentación & Specs** | `sdd/`, `Documentacion/` | ✅ Actualizado | Especificaciones de diseño, tareas estructuradas (SDD) y documentación técnica de Trabajo Terminal. |
-| **Backend API** | `backend/` | ✅ Completado | API REST con FastAPI, Clean Architecture, persistencia híbrida (PostgreSQL + ChromaDB), desacoplamiento con patrón Strategy y orquestador S1-S7. |
-| **Frontend** | `frontend/` | 🚧 En Desarrollo | Interfaz de usuario interactiva en React + Vite + Tailwind CSS. |
-
----
-
-## 📂 Estructura del Proyecto
+## 📂 Estructura General del Repositorio
 
 ```plaintext
 graphito/
-├── frontend/               # Interfaz de usuario (React + Vite + Tailwind)
-├── backend/                # API REST y orquestación de agentes (FastAPI + LangGraph)
-├── models/                 # Módulos de IA e inferencia
-│   ├── graphcodebert/      # Canal A: GraphCodeBERT + DFG Parser + Adaptador LoRA
-│   ├── char_cnn/           # Canal B: CharCNN para detección estilométrica
-│   └── fusion.py           # Fusión multimodal (Semántica + Estilometría)
+├── frontend/               # Aplicación cliente web (React + Vite + Tailwind)
+│   ├── src/components/     # SideBySideDiffViewer, SynthwaveHighlighter, ReferenceCard
+│   ├── src/pages/          # Biblioteca, SimilarityReportModal
+│   └── README.md           # Guía de arquitectura del frontend
+├── backend/                # Servicio REST y motor analítico (FastAPI + Clean Architecture)
+│   ├── app/domain/         # Entidades puras y puertos (InferencePort, VectorStorePort)
+│   ├── app/application/    # Orquestador pericial S1-S7 y generación de PDF
+│   ├── app/infrastructure/ # SQLAlchemy, adaptadores de inferencia y ChromaDB
+│   ├── app/presentation/   # Endpoints de API v1, esquemas y dependencias
+│   └── README.md           # Guía técnica del backend
+├── models/                 # Modelos de Machine Learning e inferencia
+│   ├── graphcodebert/      # Parser DFG y adaptador LoRA para Canal A
+│   ├── char_cnn/           # Modelo convolucional a nivel de caracteres para Canal B
+│   └── fusion.py           # Algoritmo de combinación y cálculo de discrepancia
 ├── data/                   # Pipeline de generación sintética y datasets
-├── sdd/                    # Especificaciones y roadmap (Spec-Driven Development)
-├── tests/                  # Suite de pruebas automatizadas (Pytest)
-└── Documentacion/          # Documentación técnica, diagramas y Trabajo Terminal
+├── Documentacion/          # Documentación formal de Trabajo Terminal y guías
+│   ├── Documento/          # Proyecto LaTeX compilable (capítulos, figuras, main.tex)
+│   ├── guias_implementacion/ # 10 guías maestras de diseño e implementación
+│   └── PLAN_METODOLOGIA_KOMOREBI.md
+├── tests/                  # Suite de pruebas automatizadas con Pytest
+├── docker-compose.yml      # Despliegue orquestado con contenedores
+└── README.md               # Este documento
 ```
 
 ---
 
-## ⚙️ Instalación y Configuración
+## ⚙️ Instalación y Puesta en Marcha
 
 ### Prerrequisitos
-- **Docker** y **Docker Compose** instalados en tu sistema.
-- Claves de API de modelos LLM externos y credenciales correspondientes.
+- **Git**
+- **Docker** y **Docker Compose** (recomendado para entorno completo)
+- O en su defecto: **Python 3.11+**, **Node.js 18+**, **PostgreSQL** y **ChromaDB**.
 
-### Paso a paso
+### Opción A: Despliegue con Docker Compose (Recomendado)
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone https://github.com/tu-usuario/graphito.git
-   cd graphito
-   ```
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/SirDaarick/Graphito.git
+cd Graphito
 
-2. **Configurar variables de entorno:**
-   Establece tus variables en el archivo `.env` en la raíz del proyecto para definir las API Keys y conexiones a las bases de datos.
+# 2. Configurar variables de entorno
+cp .env.example .env  # Ajustar credenciales según sea necesario
 
-3. **Ejecutar mediante Docker (Recomendado):**
-   ```bash
-   docker-compose up --build
-   ```
-   *Esto levantará tanto el servicio del Frontend (en el puerto 5173) como el laboratorio de datos.*
+# 3. Levantar servicios
+docker-compose up --build
+```
+- Frontend: `http://localhost:5173`
+- Backend Swagger Docs: `http://localhost:8000/docs`
 
-4. **Ejecutar pruebas unitarias:**
-   ```bash
-   pytest tests/
-   ```
+### Opción B: Ejecución Local por Módulos
+
+#### Backend:
+```bash
+cd backend
+python -m venv venv
+# Activar entorno (Windows: venv\Scripts\activate | Linux/Mac: source venv/bin/activate)
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+#### Frontend:
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ---
 
-## 👥 Autores
+## 🧪 Pruebas y Validación
 
-- **García Rodríguez Erick Daniel**
-- **Sánchez García Claudia Emilia**
+```bash
+# Ejecutar suite de pruebas de backend e inferencia
+pytest tests/ backend/tests/ -v
 
-**Directores:**
-- M. en C. Portillo Cedillo Manuel
-- M. en C. Aragón García Maribel
+# Validar compilación de producción del frontend
+cd frontend && npm run build
+```
+
+---
+
+## 👥 Autores y Dirección
+
+- **Erick Daniel García Rodríguez**
+- **Claudia Emilia Sánchez García**
+
+**Directores de Trabajo Terminal:**
+- **M. en C. Manuel Portillo Cedillo**
+- **M. en C. Maribel Aragón García**
 
 ---
 
 <p align="center">
-  <i>Este proyecto es un Trabajo Terminal desarrollado en la <b>Escuela Superior de Cómputo (ESCOM)</b> del <b>Instituto Politécnico Nacional (IPN)</b>.</i>
+  <i>Trabajo Terminal desarrollado en la <b>Escuela Superior de Cómputo (ESCOM)</b> del <b>Instituto Politécnico Nacional (IPN)</b>.</i>
 </p>

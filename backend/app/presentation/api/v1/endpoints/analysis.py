@@ -55,6 +55,11 @@ async def download_report_pdf(
     inference: InferencePort = Depends(get_inference_engine),
     vector_store: VectorStorePort = Depends(get_vector_store),
 ):
+    """
+    Genera y descarga en streaming el dictamen pericial institucional en formato PDF,
+    incluyendo métricas bimodales, señales forenses, código fuente con numeración de líneas
+    y anotaciones pedagógicas registradas por el docente.
+    """
     orchestrator = AnalysisOrchestrator(db, inference, vector_store)
     report = await orchestrator.get_report_model(report_id)
 
@@ -92,6 +97,10 @@ async def get_report_code(
     inference: InferencePort = Depends(get_inference_engine),
     vector_store: VectorStorePort = Depends(get_vector_store),
 ):
+    """
+    Obtiene los códigos fuente necesarios para el cotejo visual lado a lado (Side-by-Side Diff):
+    código evaluado del estudiante frente al código canónico de referencia del problema o entrega contrastada.
+    """
     orchestrator = AnalysisOrchestrator(db, inference, vector_store)
     report = await orchestrator.get_report_model(report_id)
 
