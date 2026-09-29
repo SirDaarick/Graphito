@@ -59,14 +59,18 @@ async def download_report_pdf(
     report = await orchestrator.get_report_model(report_id)
 
     student_author = report.entrega.autor if report.entrega else None
+    student_code = report.entrega.codigo_fuente if report.entrega else None
     problem_title = report.entrega.problema.titulo if (report.entrega and report.entrega.problema) else None
     language = report.entrega.lenguaje if report.entrega else None
+    comments = list(report.comentarios) if hasattr(report, "comentarios") and report.comentarios else []
 
     pdf_buffer = PdfReportService.generate_pdf(
         report=report,
         student_author=student_author,
         problem_title=problem_title,
         language=language,
+        student_code=student_code,
+        comments=comments,
     )
 
     filename = f"reporte_integridad_{report_id}.pdf"

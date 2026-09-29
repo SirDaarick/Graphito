@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize2, Minimize2, X, Printer } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
 import { api } from "../lib/api";
+import { saveVerdict } from "../lib/verdicts";
 import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
 
 // Helper hook for the typewriter effect (optimized for performance)
@@ -133,6 +134,10 @@ export function SimilarityReportModal({
             ? "Entrega validada como Conforme por el docente."
             : "Entrega citada para entrevista y aclaración con el estudiante.";
 
+        if (comparison?.id) {
+            saveVerdict(comparison.id, isConforme ? "CONFORME" : "DUDA");
+        }
+
         setTriageToast({
             message: msg,
             type: isConforme ? "success" : "warning",
@@ -156,15 +161,13 @@ export function SimilarityReportModal({
             const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
             if (!isNaN(repId)) {
                 api.comments.list(repId).then(setComments).catch(() => setComments([]));
-                if (viewMode === "code_diff") {
-                    fetchCode(repId);
-                }
+                fetchCode(repId);
             }
-        } else {
+        } else if (!isOpen) {
             setViewMode("report");
             setCodeData(null);
         }
-    }, [isOpen, comparison?.id, viewMode]);
+    }, [isOpen, comparison?.id]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -350,10 +353,10 @@ int main() {
 
         if (isOpen) {
             gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" });
-            gsap.fromTo(contentRef.current, { opacity: 0, scale: 0.95, y: 32 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "back.out(1.2)" });
+            gsap.fromTo(contentRef.current, { opacity: 0, scale: 0.96, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 0.35, ease: "power3.out" });
         } else {
-            gsap.to(backdropRef.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
-            gsap.to(contentRef.current, { opacity: 0, scale: 0.95, y: 32, duration: 0.3, ease: "power2.in", onComplete: () => setShouldRender(false) });
+            gsap.to(backdropRef.current, { opacity: 0, duration: 0.25, ease: "power2.in" });
+            gsap.to(contentRef.current, { opacity: 0, scale: 0.96, y: 16, duration: 0.25, ease: "power2.in", onComplete: () => setShouldRender(false) });
         }
     }, [isOpen, shouldRender]);
 
@@ -448,8 +451,8 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                 className={`w-full ${
                     viewMode === 'code_diff'
                         ? (isUltraWide ? 'w-[98vw] max-w-[99vw]' : 'w-[92vw] sm:w-[94vw] max-w-[96vw] 2xl:max-w-[2500px]')
-                        : 'max-w-5xl'
-                } opacity-0 transform translate-y-8 scale-95 transition-all duration-300`}
+                        : 'w-[92vw] max-w-5xl'
+                } opacity-0 transform translate-y-8 scale-95 transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]`}
             >
                 <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
 
@@ -670,20 +673,40 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
 
                         {/* Header (solo en modo reporte completo) */}
                         {viewMode === "report" && (
-                            <div className="px-10 pt-8 pb-6 flex items-start justify-between shrink-0">
+                            <div className="px-6 sm:px-10 pt-6 pb-4 flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-[#20273a] bg-slate-50/50 dark:bg-[#0d1220]/60 shrink-0 gap-3">
                                 <div>
-                                    <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white tracking-tight">
-                                        Reporte de similitud
-                                    </h2>
-                                    <div className="flex items-center gap-4 mt-2 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                                        <span>Proyecto: {comparison.title}</span>
-                                        <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-600"></span>
-                                        <span>14 de Abril, 2026</span>
+                                    <div className="flex items-center gap-2.5">
+                                        <h2 className="text-2xl sm:text-3xl font-display font-black text-slate-900 dark:text-white tracking-tight">
+                                            Reporte de Integridad Académica
+                                        </h2>
+                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                                            dictamenRaw === 'INTEGRO' || dictamenRaw === 'SIN_ALERTAS'
+                                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                        }`}>
+                                            {auditInfo.label}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                        <span>Entrega: <strong className="text-slate-700 dark:text-slate-200">{comparison.title}</strong></span>
+                                        <span>•</span>
+                                        <span>ID: <code className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">{comparison.id ? `REP_${comparison.id}` : 'REP_LIVE'}</code></span>
+                                        <span>•</span>
+                                        <span className="hidden md:inline">Auditoría Bimodal HITL</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 bg-slate-100 dark:bg-[#1a2031] border border-slate-200 dark:border-[#2b3346] px-4 py-2 rounded-full">
-                                    <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Análisis completado</span>
+                                <div className="flex items-center gap-2 self-start sm:self-center">
+                                    <button
+                                        onClick={() => {
+                                            setViewMode("code_diff");
+                                            const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+                                            if (!isNaN(repId)) fetchCode(repId);
+                                        }}
+                                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 text-xs font-bold transition-all active:scale-95 shadow-sm"
+                                    >
+                                        <Code2 size={15} />
+                                        <span>Comparar Código Diff</span>
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -717,185 +740,218 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                 </div>
                             ) : (
                                 <>
-                                    {/* DSS Institutional Banner */}
-                                    <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-700 dark:text-blue-200">
-                                        <Info size={18} className="shrink-0 text-blue-500 dark:text-blue-400" />
-                                        <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee métricas periciales automatizadas sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
-                                    </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-                                {/* Left Column: Big Chart */}
-                                <div className="lg:col-span-4 flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl h-full">
-
-                                    {/* Circular Graph */}
-                                    <div className="relative w-64 h-64 flex items-center justify-center">
-                                        {/* Background Circle */}
-                                        <svg className="w-full h-full transform -rotate-90">
-                                            <circle
-                                                cx="128"
-                                                cy="128"
-                                                r={radius}
-                                                className="stroke-slate-200 dark:stroke-[#2b3346] fill-none"
-                                                strokeWidth="16"
-                                            />
-
-                                            {/* Gradient defs */}
-                                            <defs>
-                                                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                    <stop offset="0%" stopColor="#3b82f6" />
-                                                    <stop offset="100%" stopColor="#a78bfa" />
-                                                </linearGradient>
-                                            </defs>
-
-                                            {/* Foreground Circle - Animated */}
-                                            <circle
-                                                cx="128"
-                                                cy="128"
-                                                r={radius}
-                                                className="fill-none transition-all duration-1000 ease-out"
-                                                stroke="url(#scoreGradient)"
-                                                strokeWidth="16"
-                                                strokeLinecap="round"
-                                                strokeDasharray={circumference}
-                                                strokeDashoffset={strokeDashoffset}
-                                            />
-                                        </svg>
-
-                                        {/* Score Text */}
-                                        <div className="absolute flex flex-col items-center justify-center text-center px-4">
-                                            <span className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                                                {overallScore}%
-                                            </span>
-                                            <span className={`text-xs font-bold uppercase tracking-wider mt-1.5 ${auditInfo.color}`}>
-                                                {auditInfo.label}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-2">Similitud total</h3>
-                                    <p className="text-sm text-center text-slate-600 dark:text-slate-400">
-                                        Se detectó una coincidencia {overallScore > 50 ? 'significativa' : 'menor'} en la estructura lógica central del código analizado.
-                                    </p>
-                                </div>
-
-                                {/* Right Column: Breakdown & Interpretation */}
-                                <div className="lg:col-span-8 flex flex-col gap-6">
-
-                                    {/* Top row: Two metric cards */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">
-
-                                        {/* Stylometry Card */}
-                                        <div className="bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 hover:bg-slate-100/50 dark:hover:bg-[#121827]/60 transition-colors">
-                                            <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 rounded-xl bg-graphito-violet/10 flex items-center justify-center text-graphito-violet">
-                                                    <Settings size={20} />
-                                                </div>
-                                                <h4 className="font-bold text-slate-900 dark:text-white">Análisis estilométrico</h4>
+                                    {/* 4 Hero KPI Cards */}
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                                        {/* Similitud Global */}
+                                        <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-[#384358] transition-colors shadow-sm">
+                                            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                <span>Similitud Global</span>
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                                    overallScore > 75 
+                                                        ? 'bg-rose-500/10 text-rose-500 border-rose-500/30' 
+                                                        : overallScore > 40 
+                                                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' 
+                                                        : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                                                }`}>
+                                                    {auditInfo.label}
+                                                </span>
                                             </div>
-
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
-                                                        <span>Probabilidad de IA</span>
-                                                        <span className="text-slate-900 dark:text-white">{aiPct}%</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-graphito-violet rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating ? `${aiPct}%` : '0%' }}
-                                                        ></div>
-                                                    </div>
-                                                </div>
-
-                                                <ul className="space-y-3 mt-6">
-                                                    {comparison.indicadores && comparison.indicadores.length > 0 ? (
-                                                        comparison.indicadores.map((ind, idx) => (
-                                                            <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                                <CheckCircle2 size={16} className={`${ind.severidad === 'ALTA' || ind.severidad === 'CRITICA' ? 'text-orange-500 dark:text-orange-400' : 'text-slate-400 dark:text-slate-500'} shrink-0 mt-0.5`} />
-                                                                <span><strong className="text-slate-900 dark:text-white">{ind.tipo_alerta}:</strong> {ind.descripcion}</span>
-                                                            </li>
-                                                        ))
-                                                    ) : (
-                                                        <>
-                                                            <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                                <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                                <span>Nomenclatura y patrones sintácticos analizados con CharCNN.</span>
-                                                            </li>
-                                                            <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                                <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                                <span>Estructura léxica y regularidad de comentarios evaluada.</span>
-                                                            </li>
-                                                        </>
-                                                    )}
-                                                </ul>
+                                            <div className="my-2">
+                                                <span className="text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
+                                                    {overallScore}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-700" 
+                                                    style={{ width: `${Math.min(100, overallScore)}%` }}
+                                                />
                                             </div>
                                         </div>
 
-                                        {/* Semantic Card */}
-                                        <div className="bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 hover:bg-slate-100/50 dark:hover:bg-[#121827]/60 transition-colors">
-                                            <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 rounded-xl bg-graphito-blue/10 flex items-center justify-center text-graphito-blue">
-                                                    <PlayCircle size={20} />
-                                                </div>
-                                                <h4 className="font-bold text-slate-900 dark:text-white">Análisis semántico</h4>
+                                        {/* Semántica DFG */}
+                                        <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-[#384358] transition-colors shadow-sm">
+                                            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                <span>Semántica DFG</span>
+                                                <span className="text-[10px] font-mono text-blue-500 dark:text-blue-400">Flujo Datos</span>
                                             </div>
-
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
-                                                        <span>Similitud de flujo DFG</span>
-                                                        <span className="text-slate-900 dark:text-white">{semanticPct}%</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-graphito-blue rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating ? `${semanticPct}%` : '0%' }}
-                                                        ></div>
-                                                    </div>
-                                                </div>
-
-                                                <ul className="space-y-3 mt-6">
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                        <span>Grafo de flujo de datos (DFG) comparado contra soluciones canónicas.</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                        <span>Invarianza ante renombramiento de variables y reordenamiento de bloques.</span>
-                                                    </li>
-                                                </ul>
+                                            <div className="my-2">
+                                                <span className="text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
+                                                    {semanticPct}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-blue-500 rounded-full transition-all duration-700" 
+                                                    style={{ width: `${Math.min(100, semanticPct)}%` }}
+                                                />
                                             </div>
                                         </div>
 
-                                    </div>
-
-                                    {/* Bottom row: AI Interpretation (Typewriter) */}
-                                    <div className="bg-slate-50 dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 flex-1 hover:border-slate-300 dark:hover:border-[#334155] transition-colors relative overflow-hidden group">
-                                        <div
-                                            className="absolute top-0 right-0 w-64 h-64 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                                            style={{
-                                                background: "radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.03) 40%, transparent 70%)"
-                                            }}
-                                        />
-
-                                        <div className="flex items-center gap-4 mb-4">
-                                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-graphito-blue to-graphito-violet flex items-center justify-center text-white shadow-lg shadow-graphito-blue/20">
-                                                <Sparkles size={24} />
+                                        {/* Estilometría IA */}
+                                        <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-[#384358] transition-colors shadow-sm">
+                                            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                <span>Estilometría IA</span>
+                                                <span className="text-[10px] font-mono text-purple-500 dark:text-purple-400">CharCNN</span>
                                             </div>
-                                            <h4 className="text-lg font-bold text-slate-900 dark:text-white">Interpretación del análisis</h4>
+                                            <div className="my-2">
+                                                <span className="text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
+                                                    {aiPct}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-purple-500 rounded-full transition-all duration-700" 
+                                                    style={{ width: `${Math.min(100, aiPct)}%` }}
+                                                />
+                                            </div>
                                         </div>
 
-                                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed max-w-3xl whitespace-pre-line break-words format-text min-h-[120px]">
-                                            {typewriterText}
-                                            {/* Blinking cursor */}
-                                            <span className="inline-block w-1.5 h-4 bg-graphito-blue ml-1 animate-pulse align-middle"></span>
+                                        {/* Discrepancia Forense */}
+                                        <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-[#384358] transition-colors shadow-sm">
+                                            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                <span>Discrepancia</span>
+                                                <span className="text-[10px] font-mono text-slate-400">Asimetría</span>
+                                            </div>
+                                            <div className="my-2">
+                                                <span className="text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
+                                                    {comparison.discrepancia_score !== undefined ? Number(comparison.discrepancia_score).toFixed(2) : ((semanticPct * aiPct) / 10000).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                Índice divergente DFG vs Léxico
+                                            </div>
                                         </div>
                                     </div>
 
-                                </div>
-                            </div>
-                        </>
+                                    {/* Two Columns: Forensic Signals & HITL Interpretation */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+                                        {/* Indicadores / Señales de Auditoría */}
+                                        <div className="lg:col-span-5 bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5 flex flex-col">
+                                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-3 flex items-center justify-between">
+                                                <span>Señales e Indicadores Periciales</span>
+                                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                                    {comparison.indicadores?.length || 0} detectados
+                                                </span>
+                                            </h4>
+
+                                            <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[220px] pr-1 scrollbar-thin">
+                                                {comparison.indicadores && comparison.indicadores.length > 0 ? (
+                                                    comparison.indicadores.map((ind, idx) => (
+                                                        <div key={idx} className="p-2.5 rounded-xl bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800/80 text-xs">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className="font-semibold text-slate-900 dark:text-slate-100">{ind.tipo_alerta}</span>
+                                                                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                                                                    ind.severidad === 'CRITICA' || ind.severidad === 'ALTA'
+                                                                        ? 'bg-rose-500/10 text-rose-500 border-rose-500/30'
+                                                                        : 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                                                                }`}>
+                                                                    {ind.severidad}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">{ind.descripcion}</p>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                                                        <CheckCircle2 size={24} className="text-emerald-500 mb-2" />
+                                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Sin anomalías estructurales detectadas</span>
+                                                        <span className="text-[11px] text-slate-400 mt-1">Estructura canónica y comentarios acordes al desarrollo regular.</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Interpretación y Guía HITL */}
+                                        <div className="lg:col-span-7 bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <Sparkles size={16} className="text-blue-500" />
+                                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                                                        Interpretación Automatizada & Guía Docente
+                                                    </h4>
+                                                </div>
+                                                <div className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line break-words min-h-[100px] p-3 rounded-xl bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800/80 font-mono">
+                                                    {typewriterText}
+                                                    <span className="inline-block w-1.5 h-3.5 bg-blue-500 ml-1 animate-pulse align-middle" />
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                                                <Info size={14} className="shrink-0 text-blue-500" />
+                                                <span><strong>HITL:</strong> Graphito provee evidencia pericial; la calificación final corresponde a la evaluación docente.</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Comentarios del Docente y Código Fuente Evaluado (Visible e Imprimible) */}
+                                    <div className="space-y-6 break-inside-avoid">
+                                        {/* Comentarios del Docente */}
+                                        {comments && comments.length > 0 && (
+                                            <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5">
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-3 flex items-center justify-between">
+                                                    <span>Observaciones y Anotaciones del Docente</span>
+                                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                                        {comments.length} nota{comments.length > 1 ? 's' : ''}
+                                                    </span>
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {comments.map((comm) => (
+                                                        <div key={comm.id} className="p-3 rounded-xl bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800/80 text-xs">
+                                                            <div className="flex items-center justify-between mb-1.5 text-[11px]">
+                                                                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                                    {comm.docente_nombre || "Docente Evaluador"}
+                                                                </span>
+                                                                <span className="font-mono text-slate-400">
+                                                                    {comm.linea_numero ? `Línea #${comm.linea_numero}` : 'Observación general'}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
+                                                                {comm.comentario}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Código Fuente Evaluado */}
+                                        <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/60 rounded-2xl p-5">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                                    <Code2 size={15} className="text-blue-500" />
+                                                    <span>Código Fuente Evaluado — {codeData?.student_author || comparison.student || "Estudiante"}</span>
+                                                </h4>
+                                                <span className="text-[10px] font-mono text-slate-400">
+                                                    {codeData?.language ? codeData.language.toUpperCase() : "C"}
+                                                </span>
+                                            </div>
+
+                                            {isLoadingCode ? (
+                                                <div className="p-8 text-center text-xs text-slate-400">Cargando código evaluado...</div>
+                                            ) : codeData?.student_code ? (
+                                                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[#0f1422] text-slate-100 overflow-x-auto p-4 font-mono text-xs max-h-96 overflow-y-auto scrollbar-thin">
+                                                    <pre className="space-y-0.5">
+                                                        {codeData.student_code.split("\n").map((line, idx) => (
+                                                            <div key={idx} className="flex leading-5 hover:bg-white/5 px-1 rounded">
+                                                                <span className="w-10 select-none text-slate-600 text-right pr-4 text-[11px] shrink-0 font-mono">
+                                                                    {idx + 1}
+                                                                </span>
+                                                                <span className="text-slate-200 whitespace-pre font-mono">
+                                                                    {line || " "}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </pre>
+                                                </div>
+                                            ) : (
+                                                <div className="p-6 text-center text-xs text-slate-400">
+                                                    Código fuente no disponible para visualización en este reporte.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
                     )}
                 </div>
 
@@ -958,6 +1014,18 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                     )}
                                     <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
                                         <span>Descargar Informe Pericial en PDF</span>
+                                    </div>
+                                </button>
+
+                                {/* Imprimir Reporte Completo */}
+                                <button
+                                    onClick={() => window.print()}
+                                    aria-label="Imprimir reporte pericial completo (con código y anotaciones)"
+                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 transition-all shadow-sm flex items-center justify-center"
+                                >
+                                    <Printer size={19} />
+                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
+                                        <span>Imprimir Reporte (con código y notas)</span>
                                     </div>
                                 </button>
 

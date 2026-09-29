@@ -10,6 +10,7 @@ from app.infrastructure.database.models import (
     CodigoFuente,
     ReporteAnalisis,
     IndicadorIntegridad,
+    ComentarioRevision,
     TipoCodigoEnum,
     DictamenEnum,
     EstadoAnalisisEnum,
@@ -349,6 +350,7 @@ class AnalysisOrchestrator:
                 selectinload(ReporteAnalisis.indicadores),
                 selectinload(ReporteAnalisis.entrega).selectinload(CodigoFuente.problema),
                 selectinload(ReporteAnalisis.referencia),
+                selectinload(ReporteAnalisis.comentarios).selectinload(ComentarioRevision.docente),
             )
             .where(ReporteAnalisis.id == report_id)
         )

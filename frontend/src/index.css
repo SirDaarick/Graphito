@@ -10,6 +10,78 @@
   html, body {
     @apply bg-slate-50 text-slate-900 dark:bg-graphito-dark dark:text-white transition-colors duration-200 min-h-[100dvh];
   }
+
+  /* Scrollbars Personalizados - Minimalista Zen sin fondos blancos */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.28);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.5);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(71, 85, 105, 0.45);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.75);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  }
+
+  .dark * {
+    scrollbar-color: rgba(71, 85, 105, 0.5) transparent;
+  }
+}
+
+/* Reglas de Impresión Limpia (@media print) */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Ocultar elementos interactivos de pantalla */
+  button,
+  .no-print,
+  nav,
+  header,
+  [role="tooltip"] {
+    display: none !important;
+  }
+
+  /* Adaptar modales fijos para impresión continua en papel/PDF */
+  .fixed.inset-0 {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .fixed.inset-0 > div:first-child {
+    display: none !important; /* Ocultar backdrop oscuro */
+  }
+
+  /* Evitar cortes a mitad de tarjeta */
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 /* Animaciones GPU-friendly para orbes de fondo (evita parpadeos en tablets/móviles) */

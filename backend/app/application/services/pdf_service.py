@@ -1,6 +1,6 @@
 import io
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Any
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -12,6 +12,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     HRFlowable,
+    Preformatted,
 )
 from app.infrastructure.database.models import ReporteAnalisis, DictamenEnum
 
@@ -28,6 +29,8 @@ class PdfReportService:
         student_author: Optional[str] = None,
         problem_title: Optional[str] = None,
         language: Optional[str] = None,
+        student_code: Optional[str] = None,
+        comments: Optional[List[Any]] = None,
     ) -> io.BytesIO:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -245,10 +248,74 @@ class PdfReportService:
                 body_style,
             ))
 
-        elements.append(Spacer(1, 24))
+        # 6. Observaciones y Anotaciones del Docente (si existen)
+        if comments and len(comments) > 0:
+            elements.append(Spacer(1, 14))
+            elements.append(Paragraph("Anotaciones y Observaciones del Docente", h2_style))
+            comment_table_data = [
+                [
+                    Paragraph("<b>Ubicacion</b>", body_style),
+                    Paragraph("<b>Autor</b>", body_style),
+                    Paragraph("<b>Fecha</b>", body_style),
+                    Paragraph("<b>Observacion / Comentario</b>", body_style),
+                ]
+            ]
+            for c in comments:
+                line_val = getattr(c, "numero_linea", None)
+                loc = f"Linea {line_val}" if line_val else "Nota General"
+                autor = getattr(c, "autor_nombre", None) or (c.docente.nombre if getattr(c, "docente", None) else "Docente")
+                c_date = c.created_at.strftime("%d/%m/%Y %H:%M") if hasattr(c, "created_at") and hasattr(c.created_at, "strftime") else "Reciente"
+                comment_table_data.append([
+                    Paragraph(f"<b>{loc}</b>", body_style),
+                    Paragraph(autor, body_style),
+                    Paragraph(c_date, body_style),
+                    Paragraph(str(getattr(c, "contenido", "")).replace("\n", "<br/>"), body_style),
+                ])
+            comm_table = Table(comment_table_data, colWidths=[85, 105, 80, 250])
+            comm_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f5f3ff")),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#ddd6fe")),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            elements.append(comm_table)
+
+        # 7. Codigo Fuente Evaluado (si esta disponible)
+        if student_code:
+            elements.append(Spacer(1, 16))
+            elements.append(Paragraph(f"Codigo Fuente Evaluado ({student_author or 'Estudiante'})", h2_style))
+            code_lines = student_code.splitlines()
+            formatted_lines = []
+            for i, line in enumerate(code_lines, 1):
+                safe_line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                formatted_lines.append(f"{i:3d} | {safe_line}")
+            code_text = "\n".join(formatted_lines)
+            code_style = ParagraphStyle(
+                "CodeBlock",
+                parent=styles["Normal"],
+                fontName="Courier",
+                fontSize=7.5,
+                leading=10,
+                textColor=colors.HexColor("#0f172a"),
+            )
+            code_p = Preformatted(code_text, code_style)
+            code_table = Table([[code_p]], colWidths=[520])
+            code_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e1")),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ]))
+            elements.append(code_table)
+
+        elements.append(Spacer(1, 20))
         elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#94a3b8"), spaceAfter=10))
 
-        # 6. Legal / Institutional Footer
+        # 8. Legal / Institutional Footer
         elements.append(Paragraph(
             "<b>Aviso Institucional (Sistema de Soporte a la Decision):</b> Este reporte es generado pericialmente por la plataforma Graphito "
             "mediante analisis bimodal (Canal Semantico GraphCodeBERT y Canal Estilometrico CharCNN). "
