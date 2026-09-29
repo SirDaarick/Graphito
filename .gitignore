@@ -16,13 +16,18 @@ __pycache__/
 env/
 venv/
 
-# Datos pesados (No queremos subirlos a la nube)
+# Datos pesados y bases de datos locales (No queremos subirlos a la nube)
 data/raw/*
 data/raw.zip
 data/processed/*
 data/output/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+chroma_data/
+backend/chroma_data/
+*.sqlite3
+*.sqlite
+
 
 # Modelos, pesos y caches
 modelos/
