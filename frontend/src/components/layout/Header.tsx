@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bell, ChevronDown, X, FileText, Sun, Moon } from "lucide-react";
 import { GradientButton } from "../ui/GradientButton";
 import { Docente } from "../../lib/api";
+import { useTheme } from "../../context/ThemeContext";
 
 import logo from "../../assets/logo.png";
 
@@ -28,21 +29,8 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
     const [showNotifications, setShowNotifications] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const { isDark, toggleTheme } = useTheme();
 
-    // Estado del Modo Claro / Oscuro
-    const [isDark, setIsDark] = useState(() => {
-        return document.documentElement.classList.contains("dark");
-    });
-
-    const toggleTheme = () => {
-        const nextState = !isDark;
-        setIsDark(nextState);
-        if (nextState) {
-            document.documentElement.classList.add("dark");
-        } else {
-            document.documentElement.classList.remove("dark");
-        }
-    };
 
     const notifRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
