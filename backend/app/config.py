@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # Inference Engine (STUB | REAL)
     INFERENCE_MODE: str = "STUB"
+    DEMO_MODE: bool = False
 
     # Security
     JWT_SECRET: str = "supersecretjwtkey_change_in_production_123456789"

@@ -7,12 +7,12 @@ import { MouseGlowBackground } from "./components/layout/MouseGlowBackground";
 import { NewReferenceModal } from "./pages/NewReferenceModal";
 import { NewComparisonModal } from "./pages/NewComparisonModal";
 import { SimilarityReportModal } from "./pages/SimilarityReportModal";
-import { api, Docente } from "./lib/api";
+import { api, Docente, IS_DEMO_MODE } from "./lib/api";
 
 type View = "login" | "register" | "app";
 
 function App() {
-    const [view, setView] = useState<View>("login");
+    const [view, setView] = useState<View>(IS_DEMO_MODE ? "app" : "login");
     const [currentUser, setCurrentUser] = useState<Docente | null>(null);
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const [isNewCodeModalOpen, setIsNewCodeModalOpen] = useState(false);
@@ -24,6 +24,18 @@ function App() {
 
     useEffect(() => {
         const verifySession = async () => {
+            if (IS_DEMO_MODE) {
+                try {
+                    const demoUser = await api.auth.me();
+                    setCurrentUser(demoUser);
+                    setView("app");
+                } catch {
+                    // fallback
+                }
+                setIsCheckingAuth(false);
+                return;
+            }
+
             if (api.auth.isAuthenticated()) {
                 try {
                     const user = await api.auth.me();

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Bell, ChevronDown, X, FileText, Sun, Moon } from "lucide-react";
 import { GradientButton } from "../ui/GradientButton";
-import { Docente } from "../../lib/api";
+import { Docente, IS_DEMO_MODE } from "../../lib/api";
 import { useTheme } from "../../context/ThemeContext";
 
 import logo from "../../assets/logo.png";
@@ -77,6 +77,12 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                         <span className="text-2xl font-display font-extrabold tracking-tighter bg-gradient-to-r from-graphito-blue to-graphito-violet bg-clip-text text-transparent">
                             Graphito
                         </span>
+                        {IS_DEMO_MODE && (
+                            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                Modo Demo
+                            </span>
+                        )}
                     </div>
 
                     <nav className="hidden md:flex items-center gap-6">

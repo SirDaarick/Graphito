@@ -4,7 +4,7 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
 import { GradientButton } from "../components/ui/GradientButton";
-import { api, Problema } from "../lib/api";
+import { api, Problema, IS_DEMO_MODE } from "../lib/api";
 
 interface NewComparisonModalProps {
     isOpen: boolean;
@@ -67,6 +67,11 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
     };
 
     const handleStartAnalysis = async () => {
+        if (IS_DEMO_MODE) {
+            setError("El análisis de nuevas entregas y subida de archivos está deshabilitado en el Modo Demostración.");
+            return;
+        }
+
         if (!selectedProblemId) {
             setError("Debes seleccionar un problema para comparar.");
             return;
@@ -161,6 +166,15 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
 
                     {/* Body */}
                     <div className="p-8 space-y-6">
+                        {IS_DEMO_MODE && (
+                            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
+                                <span className="text-base leading-none">ℹ️</span>
+                                <div>
+                                    <span className="font-bold">Modo Demostración (Solo Lectura):</span> El análisis de nuevas entregas y subida de archivos está desactivado. Puedes explorar los análisis y reportes detallados ya procesados en la biblioteca.
+                                </div>
+                            </div>
+                        )}
+
                         {error && (
                             <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 dark:text-red-300 text-xs font-medium">
                                 {error}

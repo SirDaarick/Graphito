@@ -2,6 +2,19 @@
  * Graphito Backend API Client
  */
 
+import {
+    DEMO_DOCENTE,
+    DEMO_PROBLEMAS,
+    DEMO_SUBMISSIONS,
+    DEMO_REPORTS,
+    DEMO_CODE_COMPARISONS,
+    DEMO_COMMENTS,
+} from "./demoData";
+
+export const IS_DEMO_MODE: boolean =
+    import.meta.env.DEMO_MODE === "true" ||
+    import.meta.env.VITE_DEMO_MODE === "true";
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 class ApiError extends Error {
@@ -121,15 +134,25 @@ export interface ComentarioRevision {
     autor_nombre?: string;
 }
 
+// In-memory comments store for demo mode
+const demoCommentsStore: Record<number, ComentarioRevision[]> = JSON.parse(JSON.stringify(DEMO_COMMENTS));
+
 export const api = {
     auth: {
         async register(email: string, password: string, nombre: string): Promise<Docente> {
+            if (IS_DEMO_MODE) {
+                return DEMO_DOCENTE;
+            }
             return request<Docente>("/auth/register", {
                 method: "POST",
                 body: JSON.stringify({ email, password, nombre }),
             });
         },
         async login(email: string, password: string): Promise<{ access_token: string; docente: Docente }> {
+            if (IS_DEMO_MODE) {
+                setAuthToken("demo_token_showcase");
+                return { access_token: "demo_token_showcase", docente: DEMO_DOCENTE };
+            }
             const res = await request<{ access_token: string; docente: Docente }>("/auth/login", {
                 method: "POST",
                 body: JSON.stringify({ email, password }),
@@ -138,6 +161,10 @@ export const api = {
             return res;
         },
         async googleLogin(idToken: string): Promise<{ access_token: string; docente: Docente }> {
+            if (IS_DEMO_MODE) {
+                setAuthToken("demo_token_showcase");
+                return { access_token: "demo_token_showcase", docente: DEMO_DOCENTE };
+            }
             const res = await request<{ access_token: string; docente: Docente }>("/auth/google", {
                 method: "POST",
                 body: JSON.stringify({ token: idToken }),
@@ -146,36 +173,59 @@ export const api = {
             return res;
         },
         async me(): Promise<Docente> {
+            if (IS_DEMO_MODE) {
+                return DEMO_DOCENTE;
+            }
             return request<Docente>("/auth/me");
         },
         logout() {
             setAuthToken(null);
         },
         isAuthenticated(): boolean {
+            if (IS_DEMO_MODE) {
+                return true;
+            }
             return !!getAuthToken();
         }
     },
 
     problems: {
         async list(): Promise<Problema[]> {
+            if (IS_DEMO_MODE) {
+                return DEMO_PROBLEMAS;
+            }
             return request<Problema[]>("/problems/");
         },
         async create(titulo: string, enunciado: string, lenguaje = "c"): Promise<Problema> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, "El modo demo está configurado en solo lectura para exhibición.");
+            }
             return request<Problema>("/problems/", {
                 method: "POST",
                 body: JSON.stringify({ titulo, enunciado, lenguaje }),
             });
         },
         async get(id: number): Promise<Problema> {
+            if (IS_DEMO_MODE) {
+                const found = DEMO_PROBLEMAS.find(p => p.id === id);
+                if (found) return found;
+                return DEMO_PROBLEMAS[0];
+            }
             return request<Problema>(`/problems/${id}`);
         },
         async addReference(problemId: number, autor: string, contenido: string, lenguaje = "c"): Promise<CodigoFuente> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, "El modo demo no permite subir nuevas referencias (solo lectura).");
+            }
             const params = new URLSearchParams({ autor, contenido, lenguaje });
             return request<CodigoFuente>(`/problems/${problemId}/references?${params.toString()}`, {
                 method: "POST",
             });
         },
         async addSubmission(problemId: number, autor: string, contenido: string, lenguaje = "c"): Promise<CodigoFuente> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, "El modo demo no permite subir nuevos archivos de entrega (solo lectura).");
+            }
             return request<CodigoFuente>(`/problems/${problemId}/submissions`, {
                 method: "POST",
                 body: JSON.stringify({
@@ -188,6 +238,9 @@ export const api = {
             });
         },
         async listSubmissions(problemId: number): Promise<CodigoFuente[]> {
+            if (IS_DEMO_MODE) {
+                return DEMO_SUBMISSIONS[problemId] || [];
+            }
             return request<CodigoFuente[]>(`/problems/${problemId}/submissions`);
         }
     },
@@ -200,6 +253,9 @@ export const api = {
             thresholdAi = 0.70,
             asyncMode = true
         ): Promise<ReporteAnalisis> {
+            if (IS_DEMO_MODE) {
+                return DEMO_REPORTS[101];
+            }
             return request<ReporteAnalisis>(`/analysis/run?async_mode=${asyncMode}`, {
                 method: "POST",
                 body: JSON.stringify({
@@ -211,6 +267,9 @@ export const api = {
             });
         },
         async getReport(reportId: number): Promise<ReporteAnalisis> {
+            if (IS_DEMO_MODE) {
+                return DEMO_REPORTS[reportId] || DEMO_REPORTS[101];
+            }
             return request<ReporteAnalisis>(`/analysis/reports/${reportId}`);
         },
         async pollUntilComplete(
@@ -218,6 +277,9 @@ export const api = {
             timeoutMs = 60000,
             intervalMs = 1000
         ): Promise<ReporteAnalisis> {
+            if (IS_DEMO_MODE) {
+                return DEMO_REPORTS[reportId] || DEMO_REPORTS[101];
+            }
             const startTime = Date.now();
             while (Date.now() - startTime < timeoutMs) {
                 const rep = await api.analysis.getReport(reportId);
@@ -232,6 +294,43 @@ export const api = {
             throw new Error("Tiempo de espera agotado esperando el reporte de análisis.");
         },
         async downloadPdf(reportId: number, filename?: string): Promise<void> {
+            if (IS_DEMO_MODE) {
+                const rep = DEMO_REPORTS[reportId] || DEMO_REPORTS[101];
+                const codeComp = DEMO_CODE_COMPARISONS[reportId] || DEMO_CODE_COMPARISONS[101];
+                const textContent = [
+                    "========================================================",
+                    "REPORTE DE INTEGRIDAD ACADÉMICA - GRAPHITO (MODO DEMO)",
+                    "========================================================",
+                    "",
+                    `Problema: ${codeComp.problem_title}`,
+                    `Estudiante Evaluado: ${codeComp.student_author}`,
+                    `Dictamen Automático: ${rep.dictamen}`,
+                    `Similitud Semántica (AST / DFG): ${(rep.similitud_semantica * 100).toFixed(1)}%`,
+                    `Probabilidad Generación IA (CharCNN): ${(rep.probabilidad_ia * 100).toFixed(1)}%`,
+                    `Discrepancia Score: ${rep.discrepancia_score}`,
+                    "",
+                    "Indicadores de Integridad:",
+                    ...(rep.indicadores.length > 0
+                        ? rep.indicadores.map(i => `  • [${i.severidad}] ${i.tipo_alerta}: ${i.descripcion}`)
+                        : ["  • Sin alertas críticas detectadas."]),
+                    "",
+                    "Docente Evaluador: Dr. Alan Turing",
+                    "Plataforma: Graphito In-Memory Demonstration",
+                    "========================================================",
+                ].join("\n");
+
+                const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename || `reporte_integridad_${reportId}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                return;
+            }
+
             const token = getAuthToken();
             const headers: Record<string, string> = {
                 "ngrok-skip-browser-warning": "true",
@@ -259,24 +358,52 @@ export const api = {
             document.body.removeChild(a);
         },
         async getCode(reportId: number): Promise<ReportCodeComparison> {
+            if (IS_DEMO_MODE) {
+                return DEMO_CODE_COMPARISONS[reportId] || DEMO_CODE_COMPARISONS[101];
+            }
             return request<ReportCodeComparison>(`/analysis/reports/${reportId}/code`);
         }
     },
 
     comments: {
         async list(reportId: number): Promise<ComentarioRevision[]> {
+            if (IS_DEMO_MODE) {
+                return demoCommentsStore[reportId] || [];
+            }
             return request<ComentarioRevision[]>(`/reports/${reportId}/comments`);
         },
         async create(
             reportId: number,
             data: { numero_linea?: number | null; contenido: string }
         ): Promise<ComentarioRevision> {
+            if (IS_DEMO_MODE) {
+                const newComment: ComentarioRevision = {
+                    id: Date.now(),
+                    reporte_id: reportId,
+                    docente_id: 1,
+                    numero_linea: data.numero_linea || null,
+                    contenido: data.contenido,
+                    created_at: new Date().toISOString(),
+                    autor_nombre: DEMO_DOCENTE.nombre,
+                };
+                if (!demoCommentsStore[reportId]) {
+                    demoCommentsStore[reportId] = [];
+                }
+                demoCommentsStore[reportId].push(newComment);
+                return newComment;
+            }
             return request<ComentarioRevision>(`/reports/${reportId}/comments`, {
                 method: "POST",
                 body: JSON.stringify(data),
             });
         },
         async delete(reportId: number, commentId: number): Promise<void> {
+            if (IS_DEMO_MODE) {
+                if (demoCommentsStore[reportId]) {
+                    demoCommentsStore[reportId] = demoCommentsStore[reportId].filter(c => c.id !== commentId);
+                }
+                return;
+            }
             return request<void>(`/reports/${reportId}/comments/${commentId}`, {
                 method: "DELETE",
             });
