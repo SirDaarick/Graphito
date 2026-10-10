@@ -45,6 +45,20 @@ def calibration(tmp_path, manifest):
     return C.load_calibration(path)
 
 
+def test_gzip_manifest_path_records_decompressed_sha256(tmp_path):
+    import gzip
+    import hashlib
+
+    payload = b'{"schema": "graphito.split/v1"}\n'
+    path = tmp_path / "split_v1.json.gz"
+    path.write_bytes(gzip.compress(payload, mtime=0))
+    ctx = R.RunContext.create(
+        "channel_b", seed=7, split="test", mode="uncalibrated", manifest_path=path,
+        root=tmp_path / "runs", now=NOW, argv=["benchmark_suite.py"],
+    )
+    assert ctx.config["manifest_sha256"] == hashlib.sha256(payload).hexdigest()
+
+
 def _run(tmp_path, manifest, calibration=None, *, y=None, p=None, now=NOW, **metric_kwargs):
     if y is None:
         y, p = _scores()

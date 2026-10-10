@@ -20,6 +20,7 @@ import numpy as np
 
 from . import metrics as M
 from . import provenance
+from .manifest import manifest_sha256 as manifest_hash
 
 METRICS_SCHEMA = "graphito.metrics/v1"
 CONFIG_SCHEMA = "graphito.run_config/v1"
@@ -344,7 +345,8 @@ class RunContext:
     ) -> "RunContext":
         """Create a fresh run directory and write `config.json` (provenance inside)."""
         if manifest_sha256 is None and manifest_path is not None:
-            manifest_sha256 = provenance.file_sha256(manifest_path)
+            # Hash the decompressed canonical JSON so .json and .json.gz copies agree (DS4.1).
+            manifest_sha256 = manifest_hash(manifest_path)
         if not manifest_sha256:
             raise ValueError("a run must record the split manifest sha256 (manifest_path or manifest_sha256)")
         calibration_sha256 = provenance.file_sha256(calibration_path) if calibration_path else None

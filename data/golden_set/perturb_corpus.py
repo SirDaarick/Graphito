@@ -11,12 +11,12 @@ Transforms:
     clang-format   : run `clang-format -style=Google` (needs the binary, e.g. `pip install clang-format`)
 
 The source is a golden set rebuilt by build_corpus.py from the split manifest; its
-`provenance.json` is copied next to the output. `--split-manifest <split_v1.json> --split test`
+`provenance.json` is copied next to the output. `--split-manifest <split_v1.json.gz> --split test`
 further restricts the output to problems (assignments) of that split; train is refused.
 
 Usage:
     python data/golden_set/perturb_corpus.py --transform strip-comments \\
-        --split-manifest data/splits/split_v1.json --split test \\
+        --split-manifest data/splits/split_v1.json.gz --split test \\
         --out data/golden_set/corpus_strip-comments
 """
 
@@ -138,7 +138,7 @@ def main(argv=None) -> int:
     parser.add_argument("--transform", choices=["none", "strip-comments", "clang-format"], required=True)
     parser.add_argument("--out", type=Path, default=None, help="Default: data/golden_set/corpus_<transform>")
     parser.add_argument("--split-manifest", type=Path, default=None,
-                        help="Split manifest (data/splits/split_v1.json): keep only problems of --split")
+                        help="Split manifest (data/splits/split_v1.json.gz): keep only problems of --split")
     parser.add_argument("--split", choices=PERTURB_SPLITS, default="test")
     parser.add_argument("--force", action="store_true", help="Delete --out first if it exists")
     args = parser.parse_args(argv)
