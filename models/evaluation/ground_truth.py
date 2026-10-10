@@ -19,6 +19,13 @@ CLUSTER_ID_RULE = (
     "<assignment>#NN"
 )
 
+LABEL_RULE = (
+    "positive = member of a static cluster; ambiguous = listed only in the dynamic/full ground "
+    "truth of that assignment; negative = any other file of an assignment with a static header; "
+    "unlabeled = course without ground truth or assignment without a static header (the dataset "
+    "readme does not guarantee that unheaded assignments were inspected)"
+)
+
 
 class HumanFile(NamedTuple):
     """A human submission on disk. `excluded` files (broken, ...) never join a cluster."""
@@ -49,7 +56,9 @@ class Resolution:
     unresolved: List[Dict[str, str]]  # {cluster, assignment, student, reason: no_file | excluded}
     merged_lines: int  # GT lines absorbed by another line sharing a student
     unlabeled_courses: List[str]  # courses on disk with no ground truth at all
+    unlabeled_assignments: List[str]  # assignments of labelled courses without a static header
     rule: str = CLUSTER_ID_RULE
+    label_rule: str = LABEL_RULE
 
 
 def parse_ground_truth(path: "str | Path") -> Dict[str, List[Set[str]]]:
@@ -88,6 +97,8 @@ def resolve_clusters(
     `ambiguous_gt` (dynamic/full ground truth) only marks students absent from the static
     clusters of that assignment as `ambiguous`. Excluded files are never labelled; a student
     whose files are all excluded or missing is recorded in `unresolved`, never fabricated.
+    Files of an assignment without a static header are `unlabeled`, never negatives
+    (see `LABEL_RULE`).
     """
     files = list(files)
     by_key: Dict[Tuple[str, str], List[HumanFile]] = {}
@@ -149,6 +160,7 @@ def resolve_clusters(
     assignment_of: Dict[str, str] = {}
     student_of: Dict[str, str] = {}
     unlabeled: Set[str] = set()
+    unheaded: Set[str] = set()
     for f in sorted(files, key=lambda f: f.id):
         if f.excluded:
             continue
@@ -161,6 +173,9 @@ def resolve_clusters(
             gt_status[f.id] = "positive"
         elif f.student in ambiguous.get(f.assignment, ()):
             gt_status[f.id] = "ambiguous"
+        elif f.assignment not in gt:
+            gt_status[f.id] = "unlabeled"
+            unheaded.add(f.assignment)
         else:
             gt_status[f.id] = "negative"
 
@@ -174,6 +189,7 @@ def resolve_clusters(
         unresolved=unresolved,
         merged_lines=merged_lines,
         unlabeled_courses=sorted(unlabeled),
+        unlabeled_assignments=sorted(unheaded),
     )
 
 

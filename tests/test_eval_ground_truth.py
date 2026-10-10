@@ -133,6 +133,20 @@ def test_course_absent_from_ground_truth_is_unlabeled(tmp_path, files):
     assert res.gt_status["data/raw/src/A2016/Z1/Z1/student9.c"] == "negative"
 
 
+def test_assignment_without_header_in_labelled_course_is_unlabeled(tmp_path, files):
+    # data/raw/readme.txt does not guarantee that unheaded assignments were inspected,
+    # so their files are unlabeled, never negatives.
+    unheaded = [_file("A2016/Z2/Z1", f"student{i}") for i in (1, 9)]
+    res = resolve_clusters(parse_ground_truth(_write_gt(tmp_path)), files + unheaded)
+
+    assert res.gt_status["data/raw/src/A2016/Z2/Z1/student1.c"] == "unlabeled"
+    assert res.gt_status["data/raw/src/A2016/Z2/Z1/student9.c"] == "unlabeled"
+    assert res.unlabeled_assignments == ["A2016/Z2/Z1"]
+    assert res.gt_status["data/raw/src/A2016/Z1/Z1/student9.c"] == "negative"  # headed assignment
+    assert "header" in res.label_rule
+    assert not any("/Z2/Z1/" in a for a, _, _ in pairs(res))
+
+
 def test_students_only_in_dynamic_ground_truth_are_ambiguous(tmp_path, files):
     static = parse_ground_truth(_write_gt(tmp_path))
     dynamic = parse_ground_truth(
