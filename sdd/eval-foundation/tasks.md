@@ -127,6 +127,10 @@ Decisions needed from the user (tasks flagged DECISION):
   - `build_corpus` validates ids while copying; validate every id before the first copy.
   - The KeyError path for unachievable fused operating points is untested.
   - Run path rebasing is a substring replace that skips `calibration_*` files; document it or make it explicit.
+  - `_publish` rebasing writes and the restore loop sit outside the try block: a write failure (disk full, locked file) escapes as raw OSError, not `PublishError` (review of d82e90c).
+  - `PublishError` reaches the user as a traceback; catch it in `main()` and print the kept staged path.
+  - User-selectable options that raise `ValueError` (e.g. Platt/temperature on Channel A scores outside [0, 1]) should be converted to `BenchmarkError` at the source.
+  - Rename the BS2 helper `_threshold_literals` to reflect that it flags every float literal except 0.0/1.0.
 
 ## WU12: Real data (depends on all; 12.1-12.3 may run right after WU5 to de-risk, in the design's commit slot 6)
 
