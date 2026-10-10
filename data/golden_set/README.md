@@ -69,6 +69,11 @@ python data/golden_set/perturb_corpus.py --transform strip-comments \
     --split-manifest data/splits/split_v1.json.gz --split test
 ```
 
+Committed perturbed manifests: `manifest_none.json` and `manifest_strip-comments.json` (rebuilt
+from `split_v1.json.gz`). The old `manifest_clang-format.json` was removed because it came from the
+leaky pre-split golden set; regenerate it with `--transform clang-format` once the `clang-format`
+binary is installed.
+
 The transform is applied to every class, `provenance.json` is copied, and `--split-manifest`
 restricts the output to problems of that split (test or val; never train). With that filter the
 copied provenance keeps only the selected problems' files and recounts `problems` and the
