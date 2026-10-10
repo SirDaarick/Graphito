@@ -1,17 +1,25 @@
 """Split builder: discovery, hygiene, dedup grouping, assignment and CLI on a synthetic tree."""
 
+import hashlib
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 from eval_factory import MODELS, PROFILES, make_tree
 from models.evaluation.splits import (
     ENTRY_KEYS,
+    SPLITS,
     SplitConfig,
     build_split,
+    dumps_manifest,
     hygiene_flags,
     parse_path,
     scan,
+    validate,
+    write_manifest,
 )
 
 
@@ -191,3 +199,194 @@ class TestHygieneDedup:
         extra.write_text("int main(void) { int q = 4; while (q > 0) { q = q - 1; } return q * 7; }\n")
         second = {e["id"]: e["dup_group"] for e in build_split(_config(tree))["entries"]}
         assert all(second[i] == g for i, g in first.items())
+
+
+# --- assignment (DS3.1-3.9) --------------------------------------------------------------------
+
+
+def _by(entries, key, included_only=False):
+    out = {}
+    for e in entries.values():
+        if e[key] is None or (included_only and e["excluded"]):
+            continue
+        out.setdefault(e[key], set()).add(e["split"])
+    return out
+
+
+class TestAssignment:
+    def test_rebuild_with_same_seed_is_byte_identical(self, tmp_path):
+        tree = make_tree(tmp_path / "corpus")
+        first, second, other = tmp_path / "a.json", tmp_path / "b.json", tmp_path / "c.json"
+        write_manifest(build_split(_config(tree, seed=7)), first)
+        write_manifest(build_split(_config(tree, seed=7)), second)
+        assert first.read_bytes() == second.read_bytes()
+        reseeded = build_split(_config(tree, seed=8))
+        validate(reseeded)
+        write_manifest(reseeded, other)
+        assert json.loads(other.read_text(encoding="utf-8"))["config"]["seed"] == 8
+
+    def test_parallel_file_analysis_matches_serial(self, tmp_path):
+        tree = make_tree(tmp_path / "corpus", n_blocks=5)
+        serial = dumps_manifest(build_split(_config(tree, workers=1)))
+        parallel = dumps_manifest(build_split(_config(tree, workers=2)))
+        assert parallel == serial
+
+    def test_manifest_file_is_lf_sorted_and_one_entry_per_line(self, built, tmp_path):
+        tree, manifest, _ = built
+        path = tmp_path / "split.json"
+        write_manifest(manifest, path)
+        data = path.read_bytes()
+        assert b"\r" not in data and data.endswith(b"\n")
+        assert json.loads(data.decode("utf-8")) == json.loads(json.dumps(manifest))
+        lines = data.decode("utf-8").splitlines()
+        entry_lines = [ln for ln in lines if ln.startswith('{"assignment":')]
+        assert len(entry_lines) == len(manifest["entries"])
+        assert list(json.loads(data)) == sorted(manifest)
+        assert dumps_manifest(manifest) == data.decode("utf-8")
+        assert tree.repo_root.as_posix() not in data.decode("utf-8")
+
+    def test_one_split_per_block_dup_group_and_cluster(self, entries):
+        assert all(e["split"] in SPLITS for e in entries.values())
+        for key, included in (("block", False), ("dup_group", True), ("cluster_id", False)):
+            spans = {k: v for k, v in _by(entries, key, included).items() if len(v) > 1}
+            assert not spans, (key, spans)
+
+    def test_blocks_section_maps_every_block_to_its_split(self, built, entries):
+        blocks = built[1]["blocks"]
+        assert sorted(blocks) == [f"{L}/Z{z}" for L in "AB" for z in range(1, 7)]
+        assert blocks["A/Z1"]["courses"] == ["A2016", "A2017"]
+        for block, info in blocks.items():
+            members = [e for e in entries.values() if e["block"] == block]
+            assert info["n_samples"] == len(members)
+            assert {e["split"] for e in members} == {info["split"]}
+
+    def test_test_and_val_get_at_least_two_blocks_and_fractions_are_recorded(self, built):
+        manifest = built[1]
+        for letter in "AB":
+            splits = [v["split"] for k, v in manifest["blocks"].items() if k.startswith(letter)]
+            assert splits.count("test") >= 2 and splits.count("val") >= 2
+            assert splits.count("train") >= 1
+            actual = manifest["config"]["fractions"]["actual"][letter]
+            assert actual == manifest["stats"]["blocks"][letter]
+            assert actual["n_blocks"] == 6 and actual["test"] == splits.count("test")
+            assert actual["test_fraction"] == round(splits.count("test") / 6, 6)
+        assert manifest["config"]["attempt"] >= 0
+
+    def test_cross_block_dup_is_pinned_to_most_held_out_split(self, built, entries):
+        ids = [v for k, v in built[0].ids.items() if k.startswith("cross_exact_")]
+        members = [entries[i] for i in ids]
+        assert {m["split"] for m in members} == {"train", "val", "test"}  # spans all of course A
+        for m in members:
+            if m["split"] == "test":
+                assert not m["excluded"] and "cross_split_dup" not in m["flags"]
+            else:
+                assert m["excluded"] and "cross_split_dup" in m["flags"]
+        dedup = built[1]["stats"]["dedup"]
+        assert dedup["pinned_exclusions"] == sum(m["split"] != "test" for m in members) == 4
+        assert dedup["pinned_groups"] >= 1
+
+    def test_unresolved_member_is_in_stats_and_not_in_entries(self, built, entries):
+        unresolved = built[1]["stats"]["unresolved_cluster_members"]
+        assert {"assignment": "A2016/Z2/Z1", "cluster": "A2016/Z2/Z1#02", "reason": "no_file",
+                "student": "student1999"} in unresolved
+        assert not any("student1999" in i for i in entries)
+
+    def test_overlapping_gt_lines_share_one_cluster(self, built, entries):
+        ids = built[0].ids
+        assert entries[ids["gt_overlap_a"]]["cluster_id"] == "A2016/Z1/Z1#01"
+        assert entries[ids["gt_overlap_b"]]["cluster_id"] == "A2016/Z1/Z1#01"
+        assert built[1]["config"]["ground_truth"]["cluster_id_rule"]
+        assert "header" in built[1]["config"]["ground_truth"]["label_rule"]
+
+    def test_course_without_gt_is_unlabeled_with_null_cluster(self, entries):
+        b2017 = [e for e in entries.values() if e["course"] == "B2017" and e["source"] == "human"]
+        assert b2017
+        assert all(e["cluster_id"] is None and e["gt_status"] == "unlabeled" for e in b2017)
+        unheaded = [e for e in entries.values() if e["assignment"] == "A2017/Z6/Z1" and e["source"] == "human"]
+        assert unheaded and all(e["gt_status"] == "unlabeled" for e in unheaded)
+        assert all(e["gt_status"] == "n/a" for e in entries.values() if e["source"] == "ai")
+
+    def test_student_clusters_in_several_splits_are_reported(self, built):
+        # student1001 is clustered in every A2016 assignment, so its clusters span splits; the
+        # link is reported as overlap instead of merging blocks (see tasks.md WU4 evidence).
+        gt = built[1]["stats"]["gt"]
+        assert gt["cross_split_student_clusters"] >= 1
+        assert sum(gt["clusters_by_split"].values()) == len(built[1]["groups"]["clusters"])
+
+    def test_three_block_course_raises_on_two_block_minimum(self, tmp_path):
+        tree = make_tree(tmp_path, n_blocks=3, planted=False)
+        with pytest.raises(ValueError, match="2-block minimum"):
+            build_split(_config(tree))
+
+    def test_unfillable_stratum_raises_naming_it(self, tmp_path):
+        tree = make_tree(tmp_path, lang_b="c", cpp_blocks=1, planted=False)
+        with pytest.raises(ValueError, match="lang=cpp"):
+            build_split(_config(tree))
+
+    def test_student_overlap_is_reported_without_error(self, built):
+        overlap = built[1]["stats"]["student_overlap"]
+        assert overlap["overall"]["n_multi_split"] >= 1
+        assert set(overlap["overall"]) == {"n_multi_split", "train-val", "train-test", "val-test"}
+        assert set(overlap["by_letter"]) == {"A", "B"}
+
+    def test_every_split_has_both_langs_and_sources(self, built):
+        counts = built[1]["stats"]["counts"]
+        for split in SPLITS:
+            assert set(counts[split]) == {"human", "ai"}
+            langs = {lang for by_lang in counts[split].values() for lang in by_lang}
+            assert langs == {"c", "cpp"}
+
+    def test_validate_rejects_a_block_spanning_splits(self, built):
+        manifest = json.loads(json.dumps(built[1]))
+        entry = next(e for e in manifest["entries"] if e["block"] == "A/Z1")
+        entry["split"] = next(s for s in SPLITS if s != entry["split"])
+        with pytest.raises(ValueError, match="block"):
+            validate(manifest)
+
+    def test_negative_near_dups_are_listed_in_gt_stats(self, built):
+        ids = built[0].ids
+        neg = built[1]["stats"]["gt"]["negative_near_dup"]
+        assert [ids["near_a"], ids["near_b"]] in neg["pairs"]
+        assert sum(neg["by_split"].values()) == len(neg["pairs"])
+
+    def test_dup_group_size_distribution(self, built):
+        sizes = built[1]["stats"]["dedup"]["size_distribution"]
+        assert sizes["6"] == 1  # the cross-block exact group
+        assert built[1]["groups"]["dup"]
+        cross = [g for g in built[1]["groups"]["dup"].values() if g["cross_block"]]
+        assert any(g["kind"] == "exact" and len(g["blocks"]) == 6 for g in cross)
+
+# --- CLI (scripts/build_split.py) --------------------------------------------------------------
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "scripts" / "build_split.py"
+
+
+def _cli(tree, out, *extra):
+    cmd = [
+        sys.executable, str(SCRIPT), "--seed", "7", "--repo-root", str(tree.repo_root),
+        "--raw-root", str(tree.raw_root), "--ai-root", str(tree.ai_root),
+        "--gt-static", str(tree.gt_static), "--gt-ambiguous", str(tree.gt_dynamic),
+        "--out", str(out), *extra,
+    ]
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=str(out.parent.parent))
+
+
+class TestCli:
+    def test_cli_writes_the_same_manifest_as_the_library(self, tmp_path):
+        tree = make_tree(tmp_path / "corpus")
+        out = tmp_path / "out" / "split.json"
+        proc = _cli(tree, out)
+        assert proc.returncode == 0, proc.stderr
+        assert out.read_bytes() == dumps_manifest(build_split(_config(tree))).encode("utf-8")
+        for stage in ("scan", "read_normalize", "dedup", "assign", "total"):
+            assert stage in proc.stdout
+        assert hashlib.sha256(out.read_bytes()).hexdigest() in proc.stdout
+
+    def test_cli_reports_builder_errors_with_non_zero_exit(self, tmp_path):
+        tree = make_tree(tmp_path / "corpus", n_blocks=3, planted=False)
+        out = tmp_path / "out" / "split.json"
+        proc = _cli(tree, out)
+        assert proc.returncode != 0
+        assert "2-block minimum" in proc.stderr
+        assert not out.exists()
