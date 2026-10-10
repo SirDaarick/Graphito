@@ -2,6 +2,12 @@
 """
 prepare_dataset.py — Construye el dataset etiquetado para CharCNN.
 
+Deprecated: replaced by the `split_v1` manifest (`data/splits/split_v1.json.gz`, built by
+`models.evaluation.splits` and read through `models.evaluation.manifest`). The CharCNN v2
+trainer (`python -m models.char_cnn.v2.train`) never reads this module's output
+(`models/char_cnn/dataset_manifest.json`); both files are kept only until the legacy tests
+migrate. Importing this module emits a `DeprecationWarning`.
+
 Etiquetas:
   0 = humano   (data/raw/src/)
   1 = sintético (data/output/)
@@ -13,11 +19,19 @@ cantidad de muestras humanas y sintéticas para condiciones justas.
 import argparse
 import json
 import random
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
 from models.char_cnn.config import CharCNNConfig
+
+warnings.warn(
+    "models.char_cnn.prepare_dataset is deprecated: CharCNN training uses the split_v1 manifest "
+    "(models.evaluation.manifest); dataset_manifest.json is legacy",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def collect_human_files(raw_dir: Path) -> list[Path]:
