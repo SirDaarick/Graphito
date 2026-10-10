@@ -1,0 +1,189 @@
+"""Run reporting: run directories, config/metrics JSON, curve CSVs, headless plots, report.md."""
+
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from models.evaluation import calibration as C
+from models.evaluation import provenance as P
+from models.evaluation import report as R
+
+ROOT = Path(__file__).resolve().parent.parent
+PNGS = ("roc.png", "pr.png", "confusion.png", "reliability.png")
+NOW = datetime(2026, 10, 10, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def _scores(n=400, seed=0, all_negative=False):
+    rng = np.random.default_rng(seed)
+    y = np.zeros(n, dtype=int) if all_negative else rng.integers(0, 2, n)
+    p = np.clip(rng.beta(2, 5, n) + 0.35 * y, 0, 1)
+    return y, p
+
+
+@pytest.fixture
+def manifest(tmp_path):
+    path = tmp_path / "split_v1.json"
+    path.write_bytes(b'{"schema": "graphito.split/v1"}\n')
+    return path
+
+
+@pytest.fixture
+def calibration(tmp_path, manifest):
+    y, p = _scores(300, seed=1)
+    data = C.ScoredSet([f"id{i}" for i in range(y.size)], p, y, split="val", manifest_sha256=P.file_sha256(manifest))
+    artifact, _ = C.build_calibration(data, channel="channel_b", score_name="ai_prob", seed=3)
+    path = tmp_path / "calibration_channel_b.json"
+    C.save_calibration(artifact, path)
+    return C.load_calibration(path)
+
+
+def _run(tmp_path, manifest, calibration=None, *, y=None, p=None, now=NOW, **metric_kwargs):
+    if y is None:
+        y, p = _scores()
+    points = R.operating_points_from_calibration(calibration) if calibration else {}
+    ctx = R.RunContext.create(
+        "channel_b", seed=7, split="test", mode="calibrated-frozen" if calibration else "uncalibrated",
+        manifest_path=manifest, calibration_path=calibration.path if calibration else None,
+        thresholds={k: v["threshold"] for k, v in points.items()}, root=tmp_path / "runs", now=now,
+        argv=["benchmark_suite.py", "--seed", "7"],
+    )
+    metrics = R.compute_metrics(
+        y, p, channel="channel_b", split="test", mode=ctx.config["mode"], operating_points=points,
+        n_boot=50, seed=7, **metric_kwargs,
+    )
+    ctx.write(y, p, metrics, manifest_stats={"student_overlap": {"train-test": 12}})
+    return ctx
+
+
+def test_run_dir_has_every_artifact_and_provenance(tmp_path, manifest, calibration):
+    pytest.importorskip("matplotlib")
+    ctx = _run(tmp_path, manifest, calibration, groups={"lang": np.array(["c", "cpp"] * 200)})
+    assert ctx.path.parent == tmp_path / "runs" / "channel_b"
+    assert re.fullmatch(r"\d{8}-\d{6}", ctx.path.name)
+    for name in ("config.json", "metrics.json", "report.md", "roc.csv", "pr.csv", "reliability.csv", *PNGS):
+        assert (ctx.path / name).is_file(), name
+    config = json.loads((ctx.path / "config.json").read_text(encoding="utf-8"))
+    assert config["seed"] == 7 and config["split"] == "test" and config["channel"] == "channel_b"
+    assert config["manifest_sha256"] == P.file_sha256(manifest)
+    assert config["calibration_sha256"] == calibration.sha256
+    assert config["git_sha"] and "dirty" in config
+    assert config["versions"]["numpy"] and config["versions"]["scikit-learn"]
+    assert config["argv"] == ["benchmark_suite.py", "--seed", "7"]
+    assert set(config["thresholds"]) == {"fpr_0.05", "fpr_0.01"}
+
+    metrics = json.loads((ctx.path / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["schema"] == "graphito.metrics/v1" and metrics["artifacts_missing"] == []
+    auc = metrics["threshold_free"]["roc_auc"]
+    assert auc["value"] is not None and len(auc["ci95"]) == 2 and auc["view"] == "observed"
+    assert auc["n"] == 400 and auc["n_pos"] + auc["n_neg"] == 400
+    point = metrics["operating_points"]["fpr_0.05"]
+    assert point["source"].startswith("calibration") and point["threshold"] == calibration.threshold()["threshold"]
+    assert {"observed", "balanced"} <= set(point) and "natural" not in point
+    assert point["observed"]["recall"]["view"] == "observed" and "ci95" in point["observed"]["recall"]
+    assert metrics["per_group"]["lang"]["roc_auc"]["c"]["n"] == 200
+    assert metrics["bootstrap"]["n_boot"] == 50 and metrics["bootstrap"]["unit"] == "sample"
+    assert (ctx.path / "roc.csv").read_text(encoding="utf-8").splitlines()[0] == "threshold,fpr,tpr"
+
+
+def test_operating_points_put_the_calibration_primary_first(calibration):
+    points = R.operating_points_from_calibration(calibration)
+    assert list(points)[0] == calibration.artifact["primary"] == "fpr_0.05"
+    assert points["fpr_0.05"]["primary"] and not points["fpr_0.01"]["primary"]
+
+
+def test_natural_view_only_when_configured(tmp_path, manifest, calibration):
+    ctx = _run(tmp_path, manifest, calibration, natural_prevalence=0.1)
+    metrics = json.loads((ctx.path / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["views"] == ["observed", "balanced", "natural"]
+    assert metrics["operating_points"]["fpr_0.05"]["natural"]["precision"]["view"] == "natural"
+
+
+def test_report_md_states_split_hash_thresholds_support_and_overlap(tmp_path, manifest, calibration):
+    ctx = _run(tmp_path, manifest, calibration)
+    text = (ctx.path / "report.md").read_text(encoding="utf-8")
+    assert "test" in text and P.file_sha256(manifest) in text
+    assert "fpr_0.05" in text and "fpr_0.01" in text
+    assert f"{calibration.threshold()['threshold']:.4f}" in text
+    assert calibration.sha256 in text  # threshold source
+    assert calibration.threshold("fpr_0.01")["low_support"]  # 300 val samples < 1000 negatives
+    assert "low_support" in text
+    assert "Student overlap" in text and "train-test" in text
+
+
+def test_no_git_gives_unknown_and_run_succeeds(tmp_path, manifest, monkeypatch):
+    monkeypatch.setattr(P, "GIT", "git-executable-that-does-not-exist")
+    ctx = _run(tmp_path, manifest)
+    config = json.loads((ctx.path / "config.json").read_text(encoding="utf-8"))
+    assert config["git_sha"] == "unknown" and config["dirty"] == "unknown"
+    assert (ctx.path / "metrics.json").is_file()
+
+
+def test_single_class_omits_roc_png_and_explains(tmp_path, manifest):
+    y, p = _scores(all_negative=True)
+    ctx = _run(tmp_path, manifest, y=y, p=p)
+    assert not (ctx.path / "roc.png").exists() and not (ctx.path / "pr.png").exists()
+    metrics = json.loads((ctx.path / "metrics.json").read_text(encoding="utf-8"))
+    auc = metrics["threshold_free"]["roc_auc"]
+    assert auc["value"] is None and auc["reason"] == "single_class" and auc["ci95"] is None
+    missing = {m["file"]: m["reason"] for m in metrics["artifacts_missing"]}
+    assert missing["roc.png"] in ("single_class", "matplotlib_unavailable")
+    text = (ctx.path / "report.md").read_text(encoding="utf-8")
+    assert re.search(r"roc\.png.*(single_class|matplotlib_unavailable)", text)
+
+
+def test_uncalibrated_run_has_no_operating_points(tmp_path, manifest):
+    ctx = _run(tmp_path, manifest)
+    metrics = json.loads((ctx.path / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["operating_points"] == {} and metrics["mode"] == "uncalibrated"
+    assert not (ctx.path / "confusion.png").exists()
+
+
+def test_runs_in_the_same_second_get_distinct_dirs(tmp_path, manifest):
+    first = R.RunContext.create("channel_b", seed=1, split="test", manifest_path=manifest, root=tmp_path, now=NOW)
+    second = R.RunContext.create("channel_b", seed=1, split="test", manifest_path=manifest, root=tmp_path, now=NOW)
+    assert first.path != second.path and first.path.is_dir() and second.path.is_dir()
+    assert second.path.name == first.path.name + "-1"
+
+
+def test_missing_matplotlib_records_artifacts_missing(tmp_path, manifest, calibration, monkeypatch):
+    monkeypatch.setitem(sys.modules, "matplotlib", None)
+    ctx = _run(tmp_path, manifest, calibration)
+    metrics = json.loads((ctx.path / "metrics.json").read_text(encoding="utf-8"))
+    missing = {m["file"]: m["reason"] for m in metrics["artifacts_missing"]}
+    assert missing == {name: "matplotlib_unavailable" for name in PNGS}
+    assert not any((ctx.path / name).exists() for name in PNGS)
+    assert (ctx.path / "roc.csv").is_file() and (ctx.path / "report.md").is_file()
+
+
+def test_grouped_bootstrap_and_non_probability_scores(tmp_path, manifest):
+    y, p = _scores()
+    units = np.arange(y.size) // 4
+    metrics = R.compute_metrics(
+        y, p * 3 - 1, channel="channel_a", split="test", mode="uncalibrated", n_boot=30, seed=0,
+        bootstrap_groups=units, bootstrap_unit="atomic_unit",
+    )
+    assert metrics["bootstrap"]["unit"] == "atomic_unit" and metrics["bootstrap"]["n_units"] == 100
+    assert metrics["threshold_free"]["ece"]["value"] is None
+    assert metrics["threshold_free"]["ece"]["reason"] == "scores_not_probabilities"
+
+
+def test_run_requires_a_manifest_hash(tmp_path):
+    with pytest.raises(ValueError, match="manifest"):
+        R.RunContext.create("channel_b", seed=1, split="test", root=tmp_path)
+
+
+def test_package_imports_without_torch_or_matplotlib():
+    code = (
+        "import sys; sys.modules['torch'] = None; sys.modules['matplotlib'] = None\n"
+        "import models.evaluation as ev\n"
+        "from models.evaluation import metrics, calibration, report, provenance\n"
+        "assert ev.RunContext is report.RunContext\n"
+    )
+    done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr

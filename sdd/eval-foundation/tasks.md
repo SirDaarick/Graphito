@@ -99,8 +99,9 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU9: Reporting (depends on WU7; WU8 for the calibration hash)
 
-- [ ] 9.1 RED `tests/test_eval_report.py`: run dir has `config.json`, `metrics.json`, `report.md`, `roc/pr/reliability` CSVs and four PNGs; `config.json` has seed, `manifest_sha256`, `git_sha`, versions, argv; no git gives `"unknown"` and the run succeeds; single class gives no `roc.png`, reason in `report.md`, null AUC with reason; two runs in the same second give distinct dirs; missing matplotlib records `artifacts_missing` (`importorskip` for the PNG tests); `report.md` has split, hash, thresholds, `low_support`, student-overlap caveat. [ER1.1-1.6]
-- [ ] 9.2 GREEN `models/evaluation/report.py` (`RunContext.create`, writers, lazy Agg plots, `report.md` template). Check: 9.1 passes headless.
+- [x] 9.1 RED `tests/test_eval_report.py`: run dir has `config.json`, `metrics.json`, `report.md`, `roc/pr/reliability` CSVs and four PNGs; `config.json` has seed, `manifest_sha256`, `git_sha`, versions, argv; no git gives `"unknown"` and the run succeeds; single class gives no `roc.png`, reason in `report.md`, null AUC with reason; two runs in the same second give distinct dirs; missing matplotlib records `artifacts_missing` (`importorskip` for the PNG tests); `report.md` has split, hash, thresholds, `low_support`, student-overlap caveat. [ER1.1-1.6]
+- [x] 9.2 GREEN `models/evaluation/report.py` (`RunContext.create`, writers, lazy Agg plots, `report.md` template). Check: 9.1 passes headless.
+- Evidence 9.1-9.2: RED observed (`ImportError: cannot import name 'report' from 'models.evaluation'`) -> GREEN 12/12 in tests/test_eval_report.py (headless Agg canvas, no pyplot). Run dirs follow the spec (`runs/<channel>/<ts>[-N]/`, created atomically with `mkdir`); provenance lives in `config.json`; `RunContext.create` refuses a run without a manifest sha256 (DS4.1); the package exports calibration/report entry points and still imports with torch and matplotlib blocked.
 
 ## WU10: Golden set from split (depends on WU1, WU5; independent of WU9)
 
