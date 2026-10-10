@@ -1,0 +1,387 @@
+"""CharCNN v2 trainer: AUC selection, seeded end-to-end run, leak guard and determinism.
+
+End-to-end runs use the synthetic `eval_factory` corpus in a temporary directory, a tiny model
+(window 256, embedding 8, 4 filters per kernel, fc 16), 2 epochs and CPU only. Every run writes
+under a temporary runs root, never under the repository.
+"""
+
+import csv
+import hashlib
+import json
+import os
+import sys
+import types
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+torch = pytest.importorskip("torch")
+
+from eval_factory import make_tree
+from models.char_cnn.v2 import data as data_mod
+from models.char_cnn.v2 import train as train_mod
+from models.char_cnn.v2.config import CharCNNV2Config
+from models.char_cnn.v2.data import EncodedSet
+from models.char_cnn.v2.preprocess import preprocess_v2
+from models.evaluation.manifest import Sample, load_manifest
+from models.evaluation.splits import SplitConfig, build_split, write_manifest
+
+ROOT = Path(__file__).resolve().parent.parent
+REAL_CHECKPOINT = ROOT / "models" / "char_cnn" / "best_model.pth"
+
+TINY = dict(
+    embedding_dim=8,
+    conv_kernel_sizes=(3, 5, 7, 9),
+    conv_filters=(4, 4, 4, 4),
+    fc_units=16,
+    dropout=0.1,
+    window=256,
+    stride=128,
+    max_windows=4,
+)
+HISTORY_COLUMNS = ["epoch", "train_loss", "val_roc_auc", "val_pr_auc", "lr", "n_epoch_samples", "seconds"]
+
+
+def _sha256(path: Path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+
+
+def _models_mtimes() -> dict:
+    """mtime of every file under the repo's `models/` (bytecode caches excluded)."""
+    out = {}
+    for dirpath, dirnames, filenames in os.walk(ROOT / "models"):
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+        for name in filenames:
+            path = Path(dirpath) / name
+            out[path] = path.stat().st_mtime_ns
+    return out
+
+
+@pytest.fixture(scope="module", autouse=True)
+def restore_torch_determinism():
+    """The trainer switches torch to deterministic kernels; restore the process state afterwards."""
+    previous = (
+        torch.are_deterministic_algorithms_enabled(),
+        torch.is_deterministic_algorithms_warn_only_enabled(),
+        torch.backends.cudnn.deterministic,
+        torch.backends.cudnn.benchmark,
+    )
+    yield
+    torch.use_deterministic_algorithms(previous[0], warn_only=previous[1])
+    torch.backends.cudnn.deterministic, torch.backends.cudnn.benchmark = previous[2], previous[3]
+
+
+@pytest.fixture(scope="module")
+def corpus(tmp_path_factory):
+    tree = make_tree(tmp_path_factory.mktemp("corpus"))
+    config = SplitConfig(
+        seed=7,
+        repo_root=tree.repo_root,
+        raw_root=tree.raw_root,
+        ai_root=tree.ai_root,
+        gt_static=tree.gt_static,
+        gt_ambiguous=(tree.gt_dynamic,),
+    )
+    path = write_manifest(build_split(config), tree.repo_root / "data" / "splits" / "split_v1.json")
+    model_config = tree.repo_root / "tiny_model.json"
+    model_config.write_text(json.dumps(TINY), encoding="utf-8")
+    return tree, path, model_config
+
+
+def _argv(corpus, runs_root: Path, *extra: str) -> list:
+    tree, manifest_path, model_config = corpus
+    return [
+        "--manifest", str(manifest_path),
+        "--root", str(tree.repo_root),
+        "--runs-root", str(runs_root),
+        "--seed", "1",
+        "--epochs", "2",
+        "--batch-size", "8",
+        "--device", "cpu",
+        "--model-config", str(model_config),
+        *extra,
+    ]
+
+
+def _single_run_dir(runs_root: Path) -> Path:
+    assert [p.name for p in runs_root.iterdir()] == ["char_cnn"]
+    runs = list((runs_root / "char_cnn").iterdir())
+    assert len(runs) == 1 and runs[0].is_dir()
+    return runs[0]
+
+
+def _history(run_dir: Path) -> list:
+    with open(run_dir / "history.csv", encoding="utf-8", newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+@pytest.fixture(scope="module")
+def traced_run(corpus, tmp_path_factory):
+    """One end-to-end run with spies on seeding, data loading, model building, collation and promote."""
+    runs_root = tmp_path_factory.mktemp("runs")
+    events, forward_calls, collated, windows, promote_calls = [], [], [], [], []
+    real_before = _sha256(REAL_CHECKPOINT)
+    mtimes_before = _models_mtimes()
+
+    def seed_spy(seed, deterministic_torch=False):
+        events.append(("seed", seed, deterministic_torch))
+        return original["seed_everything"](seed, deterministic_torch=deterministic_torch)
+
+    def load_views_spy(*args, **kwargs):
+        events.append(("load_views",))
+        return original["load_views"](*args, **kwargs)
+
+    def build_model_spy(*args, **kwargs):
+        events.append(("build_model",))
+        model = original["build_model"](*args, **kwargs)
+        model.register_forward_pre_hook(
+            lambda module, inputs: forward_calls.append((module.training, inputs[0].detach().cpu().clone()))
+        )
+        return model
+
+    def collate_spy(*args, **kwargs):
+        out = original["collate"](*args, **kwargs)
+        collated.append(out[0].clone())
+        return out
+
+    def epoch_batches_spy(*args, **kwargs):
+        windows.append(kwargs.get("window"))
+        return original["epoch_batches"](*args, **kwargs)
+
+    promote = types.ModuleType("models.char_cnn.v2.promote")
+    promote.main = lambda *a, **k: promote_calls.append((a, k))
+    promote.promote = promote.main
+
+    original = {
+        name: getattr(train_mod, name)
+        for name in ("seed_everything", "load_views", "build_model", "collate", "epoch_batches")
+    }
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(train_mod, "seed_everything", seed_spy)
+        mp.setattr(train_mod, "load_views", load_views_spy)
+        mp.setattr(train_mod, "build_model", build_model_spy)
+        mp.setattr(train_mod, "collate", collate_spy)
+        mp.setattr(train_mod, "epoch_batches", epoch_batches_spy)
+        mp.setitem(sys.modules, "models.char_cnn.v2.promote", promote)
+        code = train_mod.main(_argv(corpus, runs_root))
+    return {
+        "code": code,
+        "runs_root": runs_root,
+        "run_dir": _single_run_dir(runs_root),
+        "events": events,
+        "forward_calls": forward_calls,
+        "collated": collated,
+        "windows": windows,
+        "promote_calls": promote_calls,
+        "real_before": real_before,
+        "real_after": _sha256(REAL_CHECKPOINT),
+        "mtimes_before": mtimes_before,
+        "mtimes_after": _models_mtimes(),
+    }
+
+
+# --- 5.1 selection -----------------------------------------------------------------------------
+
+
+def _sample(sample_id: str, source: str, split: str) -> Sample:
+    return Sample(
+        id=sample_id, course="A2016", block="A/Z1", assignment="A/Z1/Z1", student=None, lang="c",
+        source=source, model=None, profile=None, sha256="0", norm_hash="0", n_tokens=10,
+        dup_group=None, dup_rep=None, cluster_id=None, gt_status=None, split=split,
+        excluded=False, flags=(),
+    )
+
+
+def _encoded(split: str, n_ai: int, n_human: int) -> EncodedSet:
+    rng = np.random.RandomState(0 if split == "train" else 1)
+    samples = [_sample(f"{split}/ai{i}.c", "ai", split) for i in range(n_ai)]
+    samples += [_sample(f"{split}/h{i}.c", "human", split) for i in range(n_human)]
+    arrays = [rng.randint(2, 98, size=40 + 5 * i).astype(np.uint8) for i in range(len(samples))]
+    return EncodedSet.build(samples, arrays)
+
+
+def _fit_with_stub(tmp_path, monkeypatch, sequence, **option_overrides):
+    stub = iter(sequence)
+    monkeypatch.setattr(train_mod, "val_metrics", lambda *a, **k: next(stub))
+    options = train_mod.TrainOptions(
+        **{"epochs": len(sequence), "batch_size": 4, "early_stop": 100, "seed": 3, **option_overrides}
+    )
+    model = train_mod.build_model(CharCNNV2Config(**TINY), torch.device("cpu"), seed=3)
+    return train_mod.fit(
+        model, _encoded("train", 4, 6), _encoded("val", 3, 3), options, torch.device("cpu"), tmp_path
+    )
+
+
+class TestSelection:
+    def test_selection_tuple_prefers_auc_then_pr_then_earlier_epoch(self):
+        sel = train_mod.Selection()
+        assert sel.update(0, 0.80, 0.7) is True
+        assert sel.update(1, 0.90, 0.6) is True
+        assert sel.update(2, 0.90, 0.8) is True
+        assert sel.update(3, 0.90, 0.8) is False  # exact tie keeps the earlier epoch
+        assert (sel.best_epoch, sel.best_roc_auc, sel.best_pr_auc, sel.stale) == (2, 0.90, 0.8, 1)
+
+    def test_null_auc_is_never_selected(self):
+        sel = train_mod.Selection()
+        assert sel.update(0, None, None) is False
+        assert sel.best_epoch is None
+        assert sel.update(1, 0.55, None) is True
+        assert sel.update(2, None, 0.99) is False
+        assert sel.best_epoch == 1 and sel.stale == 1
+
+    def test_fit_selects_epoch_2_from_stubbed_val_metrics(self, tmp_path, monkeypatch):
+        result = _fit_with_stub(tmp_path, monkeypatch, [(0.80, 0.7), (0.90, 0.6), (0.90, 0.8)])
+        assert result.best_epoch == 2
+        ckpt = torch.load(tmp_path / "best.pth", weights_only=True)
+        assert (ckpt["config"]["epoch"], ckpt["config"]["val_roc_auc"], ckpt["config"]["val_pr_auc"]) == (2, 0.90, 0.8)
+        assert [int(r["epoch"]) for r in _history(tmp_path)] == [0, 1, 2]
+
+    def test_fit_ties_keep_the_earlier_epoch(self, tmp_path, monkeypatch):
+        assert _fit_with_stub(tmp_path, monkeypatch, [(0.9, 0.7), (0.9, 0.7)]).best_epoch == 0
+
+    def test_fit_skips_null_auc_epochs(self, tmp_path, monkeypatch):
+        result = _fit_with_stub(tmp_path, monkeypatch, [(None, None), (0.6, 0.5), (None, None)])
+        assert result.best_epoch == 1
+
+    def test_fit_without_any_defined_auc_raises_and_saves_nothing(self, tmp_path, monkeypatch):
+        with pytest.raises(RuntimeError, match="ROC-AUC"):
+            _fit_with_stub(tmp_path, monkeypatch, [(None, None), (None, None)])
+        assert not (tmp_path / "best.pth").exists()
+
+    def test_early_stop_counts_epochs_without_improvement(self, tmp_path, monkeypatch):
+        result = _fit_with_stub(
+            tmp_path, monkeypatch, [(0.9, 0.5), (0.8, 0.5), (0.85, 0.5), (0.95, 0.5)], early_stop=2
+        )
+        assert (result.best_epoch, result.epochs_run, result.stopped_early) == (0, 3, True)
+
+    def test_scheduler_reduces_lr_on_val_auc_plateau(self, tmp_path, monkeypatch):
+        result = _fit_with_stub(
+            tmp_path, monkeypatch, [(0.9, 0.5), (0.8, 0.5), (0.8, 0.5)], lr_patience=0, lr_factor=0.5
+        )
+        lrs = [float(r["lr"]) for r in result.history]
+        assert lrs == pytest.approx([1e-3, 1e-3, 5e-4])  # mode="max": a lower AUC is a plateau
+
+
+# --- 5.2 end-to-end run --------------------------------------------------------------------------
+
+
+class TestRun:
+    def test_exit_code_and_run_layout(self, traced_run):
+        assert traced_run["code"] == 0
+        run_dir = traced_run["run_dir"]
+        assert run_dir.parent == traced_run["runs_root"] / "char_cnn"
+        for name in ("config.json", "best.pth", "history.csv", "leak_guard.json"):
+            assert (run_dir / name).is_file(), name
+
+    def test_seed_runs_before_data_and_model(self, traced_run):
+        events = traced_run["events"]
+        assert events[0] == ("seed", 1, True)
+        names = [e[0] for e in events]
+        assert names.index("seed") < names.index("load_views") < names.index("build_model")
+
+    def test_no_forward_before_the_first_real_batch(self, traced_run):
+        calls, collated = traced_run["forward_calls"], traced_run["collated"]
+        assert calls and collated
+        training, first_input = calls[0]
+        assert training is True
+        assert torch.equal(first_input, collated[0])
+
+    def test_crops_use_the_run_config_window(self, traced_run):
+        assert traced_run["windows"] == [TINY["window"]] * 2
+
+    def test_config_json_records_provenance(self, corpus, traced_run):
+        _, manifest_path, _ = corpus
+        doc = json.loads((traced_run["run_dir"] / "config.json").read_text(encoding="utf-8"))
+        assert doc["channel"] == "char_cnn" and doc["seed"] == 1
+        assert doc["manifest_sha256"] == load_manifest(manifest_path).sha256
+        assert "git_sha" in doc and "dirty" in doc
+        cfg = doc["config"]
+        assert (cfg["arch_version"], cfg["preproc_version"]) == (2, 2)
+        assert cfg["alphabet"] == CharCNNV2Config().to_dict()["alphabet"]
+        assert cfg["conv_kernel_sizes"] == list(TINY["conv_kernel_sizes"])
+        assert cfg["conv_filters"] == list(TINY["conv_filters"])
+        assert cfg["dropout"] == TINY["dropout"]
+        hp = cfg["hyperparams"]
+        assert (hp["epochs"], hp["lr"], hp["seed"], hp["batch_size"]) == (2, 1e-3, 1, 8)
+        assert cfg["device"] == "cpu"
+        assert doc["sampling"]["ratio"] == "1:1"
+        assert doc["sampling"]["human_shortfall"] == 0
+        assert doc["selection"]["epoch"] in (0, 1)
+        assert doc["leak_guard"]["passed"] is True
+
+    def test_best_checkpoint_is_weights_only_and_self_describing(self, corpus, traced_run):
+        from models.char_cnn.v2.checkpoint import CHECKPOINT_FORMAT, load_v2_model
+
+        _, manifest_path, _ = corpus
+        ckpt = torch.load(traced_run["run_dir"] / "best.pth", weights_only=True)
+        assert ckpt["format"] == CHECKPOINT_FORMAT
+        config = ckpt["config"]
+        assert CharCNNV2Config.from_dict(config) == CharCNNV2Config(**TINY)
+        assert config["manifest_sha256"] == load_manifest(manifest_path).sha256
+        assert config["seed"] == 1 and config["device"] == "cpu"
+        assert config["run_id"] == f"char_cnn/{traced_run['run_dir'].name}"
+        assert config["epoch"] in (0, 1) and 0.0 <= config["val_roc_auc"] <= 1.0
+        assert config["hyperparams"]["epochs"] == 2
+        load_v2_model(ckpt, "cpu")
+
+    def test_history_has_one_row_per_epoch(self, traced_run):
+        rows = _history(traced_run["run_dir"])
+        assert list(rows[0]) == HISTORY_COLUMNS
+        assert [int(r["epoch"]) for r in rows] == [0, 1]
+        assert all(int(r["n_epoch_samples"]) > 0 for r in rows)
+
+    def test_writes_only_under_the_runs_root_and_never_promotes(self, traced_run):
+        assert traced_run["promote_calls"] == []
+        assert traced_run["real_after"] == traced_run["real_before"]  # NF3 (None when absent)
+        assert traced_run["mtimes_after"] == traced_run["mtimes_before"]
+        _single_run_dir(traced_run["runs_root"])
+
+
+# --- 5.3 leak guard ------------------------------------------------------------------------------
+
+
+class TestLeakGuard:
+    def test_clean_corpus_passes_with_zero_shares(self, traced_run):
+        doc = json.loads((traced_run["run_dir"] / "leak_guard.json").read_text(encoding="utf-8"))
+        assert doc["passed"] is True
+        assert doc["shares"] and set(doc["shares"].values()) == {0.0}
+        assert doc["n_texts"]["human"] > 0
+
+    def test_leaking_preprocessing_aborts_before_any_checkpoint(self, corpus, tmp_path, monkeypatch):
+        monkeypatch.setattr(data_mod, "preprocess_v2", lambda text: preprocess_v2(text) + "\nZadaca 4")
+        runs_root = tmp_path / "runs"
+        assert train_mod.main(_argv(corpus, runs_root)) == 2
+        run_dir = _single_run_dir(runs_root)
+        doc = json.loads((run_dir / "leak_guard.json").read_text(encoding="utf-8"))
+        assert doc["passed"] is False
+        assert doc["shares"]["course_marker"] == 1.0
+        assert doc["offending_ids"]["course_marker"]
+        assert not list(runs_root.rglob("*.pth"))
+        assert not (run_dir / "history.csv").exists()
+
+
+# --- 5.4 determinism -----------------------------------------------------------------------------
+
+
+class TestDeterminism:
+    def test_two_cpu_runs_are_identical(self, corpus, traced_run, tmp_path):
+        runs_root = tmp_path / "runs"
+        assert train_mod.main(_argv(corpus, runs_root)) == 0
+        first, second = traced_run["run_dir"], _single_run_dir(runs_root)
+
+        def strip_seconds(rows):
+            return [{k: v for k, v in row.items() if k != "seconds"} for row in rows]
+
+        assert strip_seconds(_history(first)) == strip_seconds(_history(second))
+        a = torch.load(first / "best.pth", weights_only=True)
+        b = torch.load(second / "best.pth", weights_only=True)
+        assert a["config"]["epoch"] == b["config"]["epoch"]
+        assert a["model_state_dict"].keys() == b["model_state_dict"].keys()
+        for key in a["model_state_dict"]:
+            assert torch.equal(a["model_state_dict"][key], b["model_state_dict"][key]), key
+
+    def test_real_checkpoint_is_untouched(self, traced_run):
+        if traced_run["real_before"] is None:
+            pytest.skip("models/char_cnn/best_model.pth is absent")
+        assert traced_run["real_after"] == traced_run["real_before"]
