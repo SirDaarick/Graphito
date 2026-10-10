@@ -1,0 +1,4 @@
+-r backend/requirements.txt
+scikit-learn
+aiosqlite
+pytest-asyncio
