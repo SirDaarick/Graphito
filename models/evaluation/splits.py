@@ -38,22 +38,22 @@ from .dedup import (
     token_ids,
 )
 from .ground_truth import CLUSTER_ID_RULE, LABEL_RULE, HumanFile, parse_ground_truth, resolve_clusters
+from .manifest import (  # schema constants live with the loader; re-exported here
+    ENTRY_KEYS,  # noqa: F401
+    HELD_OUT_ORDER,  # pin target preference: test > val > train
+    SCHEMA,
+    SPLITS,
+    STRATA,
+    check_invariants,
+    validate_schema,
+)
 from .normalize import effective_length, norm_hash, shingle_tokens
 from .seed import stable_rng
 
 ROOT = Path(__file__).resolve().parents[2]
-SCHEMA = "graphito.split/v1"
 BUILDER_VERSION = "1.0"
-SPLITS = ("train", "val", "test")
-HELD_OUT_ORDER = ("test", "val", "train")  # pin target preference
-STRATA = ("lang", "source")
 _PARALLEL_MIN = 2000  # below this many files a process pool costs more than it saves
 
-ENTRY_KEYS = (
-    "id", "course", "block", "assignment", "student", "lang", "source", "model", "profile",
-    "sha256", "norm_hash", "n_tokens", "dup_group", "dup_rep", "cluster_id", "gt_status",
-    "split", "excluded", "flags",
-)
 EXTENSIONS = {".c": "c", ".cpp": "cpp"}
 COPY_SUFFIX_RE = re.compile(r"\s\(\d+\)")  # same rule as data/golden_set/build_corpus.py
 STUDENT_RE = re.compile(r"^student\d+$")
@@ -492,33 +492,13 @@ def _assign_blocks(
 
 def validate(manifest: Dict) -> None:
     """Raise ValueError unless blocks, included dup groups and clusters each sit in one split
-    and every split covers every lang/source present among included entries."""
-    if manifest.get("schema") != SCHEMA:
-        raise ValueError(f"unknown manifest schema {manifest.get('schema')!r}")
-    owner: Dict[Tuple[str, str], str] = {}
-    present: Set[Tuple[str, str]] = set()
-    have: Dict[str, Set[Tuple[str, str]]] = {s: set() for s in SPLITS}
-    for e in manifest["entries"]:
-        lacking = [k for k in ENTRY_KEYS if k not in e]
-        if lacking:
-            raise ValueError(f"entry {e.get('id')} lacks keys {lacking}")
-        if e["split"] not in SPLITS:
-            raise ValueError(f"entry {e['id']} has invalid split {e['split']!r}")
-        keys = [("block", e["block"])]
-        if e["cluster_id"] is not None:
-            keys.append(("cluster", e["cluster_id"]))
-        if not e["excluded"]:
-            if e["dup_group"] is not None:
-                keys.append(("dup group", e["dup_group"]))
-            for kind in STRATA:
-                present.add((kind, e[kind]))
-                have[e["split"]].add((kind, e[kind]))
-        for key in keys:
-            if owner.setdefault(key, e["split"]) != e["split"]:
-                raise ValueError(f"{key[0]} {key[1]} spans splits {owner[key]} and {e['split']}")
-    for split in HELD_OUT_ORDER:
-        for kind, value in sorted(present - have[split]):
-            raise ValueError(f"split '{split}' lacks stratum {kind}={value}")
+    and every split covers every lang/source present among included entries.
+
+    Same checks as the loader (`manifest.validate_schema` + `manifest.check_invariants`);
+    `ManifestError` is a ValueError.
+    """
+    validate_schema(manifest)
+    check_invariants(manifest["entries"])
 
 
 # --- manifest sections --------------------------------------------------------------------------

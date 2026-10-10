@@ -77,8 +77,9 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU5: Loader (depends on WU4)
 
-- [ ] 5.1 RED `tests/test_eval_manifest.py`: `load_split("val")` returns only val and no `broken`; `include_broken=True` returns them; filters lang/source/course; schema validation rejects bad files; sha256 computed; `expected_sha256` mismatch and edited-file hash errors raise; Channel A negatives never include B2017 `unlabeled`; `plagiarism_pairs`, `clusters`, `check_invariants`. [DS3.6, DS4.1, DS4.2]
-- [ ] 5.2 GREEN `models/evaluation/manifest.py` (stdlib + numpy only for `PairSet`). API: `load_manifest(path, expected_sha256)` -> `SplitManifest`; `load_split(split, *, path=DEFAULT, expected_sha256=None, lang, source, course, include_broken=False)` -> `list[Sample]` (spec scenario form). Extend `models/evaluation/__init__.py` exports. Check: 5.1 passes.
+- [x] 5.1 RED `tests/test_eval_manifest.py`: `load_split("val")` returns only val and no `broken`; `include_broken=True` returns them; filters lang/source/course; schema validation rejects bad files; sha256 computed; `expected_sha256` mismatch and edited-file hash errors raise; Channel A negatives never include B2017 `unlabeled`; `plagiarism_pairs`, `clusters`, `check_invariants`. [DS3.6, DS4.1, DS4.2]
+- [x] 5.2 GREEN `models/evaluation/manifest.py` (stdlib + numpy only for `PairSet`). API: `load_manifest(path, expected_sha256)` -> `SplitManifest`; `load_split(split, *, path=DEFAULT, expected_sha256=None, lang, source, course, include_broken=False)` -> `list[Sample]` (spec scenario form). Extend `models/evaluation/__init__.py` exports. Check: 5.1 passes.
+- Evidence 5.1-5.2: RED observed (`ModuleNotFoundError: models.evaluation.manifest`); GREEN 21/21 in tests/test_eval_manifest.py. Schema constants and `check_invariants` moved into `manifest.py` (stdlib + numpy); `splits.validate` delegates to them. Loader drops all `excluded` entries by default (broken back with `include_broken`, `cross_split_dup` only via `SplitManifest.samples(include_excluded=True)`); `channel_a_negatives` returns only `gt_status == negative`. Full suite: 215 passed, 1 skipped, 1 known failure (tests/test_calibration_experiment.py).
 
 ## WU7: Metrics (independent; may start any time after WU1)
 
