@@ -171,6 +171,8 @@ python scripts/benchmark_suite.py --manifest data/golden_set/manifest.json \
 
 The benchmark modes are `calibrated-fit-in-run`, `calibrated-frozen` and `uncalibrated` (threshold-free metrics only). Thresholds always come from `calibration_<channel>.json` files fitted on val; there are no numeric defaults. See `data/golden_set/README.md`.
 
+- Fused (provisional, production fusion is SDD-4): runs on submissions scored by both channels (the config records `dropped_without_reference`). ROC/PR-AUC rank by the max of the calibrated channel scores; operating points are the confusion of the OR decision (calibrated A >= t_A OR calibrated B >= t_B).
+- A run is staged under `runs/.staging/` and moved to `runs/benchmark/<ts>/` only when complete (`summary.json` has `"status": "complete"`); a failure leaves no run behind. Input errors (non-test golden sample, missing source hash, split manifest hash mismatch, missing calibration) print `ERROR: ...` and exit 2.
 - Outputs go to `runs/benchmark/<ts>/` (one subdir per channel), which is gitignored. Commit only selected artifacts, explicitly: `git add -f runs/benchmark/<ts>/channel_a/<ts>/metrics.json runs/benchmark/<ts>/channel_a/<ts>/report.md runs/benchmark/<ts>/calibration_channel_a.json`.
 - **Legacy results:** the root `benchmark_*results.json` and `benchmark_charcnn_*.json` files predate the split manifest (the old golden set reused 1825/2621 CharCNN train/val samples and used hardcoded thresholds). They are kept for history but are NOT comparable with new runs, which carry the split manifest sha256.
 

@@ -3,6 +3,7 @@
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -142,6 +143,25 @@ class TestBuildCorpus:
         with pytest.raises(SystemExit):
             corpus_builder.main(["--split-manifest", str(split_path), "--split", "train", "--out", str(tmp_path / "y")])
 
+    def test_entry_id_escaping_the_repo_root_is_refused(self, tmp_path, monkeypatch):
+        repo = tmp_path / "repo"
+        (repo / "data" / "raw").mkdir(parents=True)
+        (repo / "data" / "raw" / "h.c").write_text("int h;\n", encoding="utf-8")
+        (tmp_path / "outside.c").write_text("int secret;\n", encoding="utf-8")
+
+        def sample(id_, source, gt_status):
+            return SimpleNamespace(
+                id=id_, split="test", assignment="A2016/Z1/Z1", source=source, lang="c", model=None,
+                profile=None, dup_group=None, cluster_id=None, gt_status=gt_status,
+            )
+
+        samples = [sample("data/raw/h.c", "human", "negative"), sample("../outside.c", "ai", "n/a")]
+        fake = SimpleNamespace(samples=lambda split: samples, path=tmp_path / "split.json", sha256="f" * 64)
+        monkeypatch.setattr(corpus_builder, "load_manifest", lambda path, sha=None: fake)
+        with pytest.raises(ValueError, match=r"\.\./outside\.c"):
+            corpus_builder.build_corpus(tmp_path / "split.json", "test", tmp_path / "out", repo_root=repo)
+        assert not list((tmp_path / "out").rglob("outside.c"))
+
     def test_val_corpus_goes_to_corpus_val_by_default(self):
         assert corpus_builder.default_out("test").name == "corpus"
         assert corpus_builder.default_out("val").name == "corpus_val"
@@ -217,6 +237,16 @@ class TestBuildManifest:
         assert [s["split"] for s in m["samples"]] == ["test"]
         assert m["source_manifest_sha256"] is None
         assert manifest_builder.main([str(corpus), "--out", str(tmp_path / "m.json")]) != 0
+
+    def test_synthetic_corpus_dedups_identical_files_by_content(self, tmp_path):
+        corpus = tmp_path / "corpus"
+        for rel, text in (("P/copy/a.c", "int a;\n"), ("P/copy/b.c", "int a;\n"), ("P/ai/c.c", "int c;\n"),
+                          ("Q/original/d.c", "int a;\n")):
+            (corpus / rel).parent.mkdir(parents=True, exist_ok=True)
+            (corpus / rel).write_bytes(text.encode("utf-8"))
+        m = manifest_builder.build_manifest(corpus, synthetic=True)
+        assert [s["path"] for s in m["samples"]] == ["P/copy/a.c", "P/ai/c.c"]
+        assert m["duplicates_removed"] == ["P/copy/b.c", "Q/original/d.c"]
 
     def test_tiny_fixture_dedups_by_dup_group(self):
         m = manifest_builder.build_manifest(FIXTURE)

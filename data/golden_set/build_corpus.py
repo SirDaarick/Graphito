@@ -70,6 +70,17 @@ def _display_path(path: Path) -> str:
         return Path(path).name
 
 
+def source_path(repo_root: Path, entry_id: str) -> Path:
+    """The resolved source file of a manifest id; ids escaping `repo_root` (e.g. `../x.c`) raise."""
+    base = Path(repo_root).resolve()
+    path = (base / entry_id).resolve()
+    try:
+        path.relative_to(base)
+    except ValueError:
+        raise ValueError(f"manifest entry {entry_id} resolves outside the repo root {base}") from None
+    return path
+
+
 def _record(sample, cls: str) -> Dict:
     return {
         "id": sample.id,
@@ -141,9 +152,10 @@ def build_corpus(
                 rel = f"{problem_id}/{cls}/{Path(s.id).name}"
                 if rel in files:
                     raise ValueError(f"two entries map to {rel}: {files[rel]['id']} and {s.id}")
+                src = source_path(repo_root, s.id)
                 dest = out / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(repo_root / s.id, dest)
+                shutil.copyfile(src, dest)
                 files[rel] = _record(s, cls)
             totals[cls] += len(chosen[cls])
         totals["problems"] += 1

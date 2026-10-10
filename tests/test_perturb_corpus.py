@@ -118,6 +118,34 @@ def test_problems_from_split_lists_only_that_split(golden):
         perturb.problems_from_split(split_path, "train")
 
 
+def test_problem_subset_recomputes_totals_and_writes_provenance_atomically(golden, tmp_path, monkeypatch):
+    _, _, corpus = golden
+    source = json.loads((corpus / "provenance.json").read_text(encoding="utf-8"))
+    problems = sorted({rel.split("/", 1)[0] for rel in source["files"]})
+    assert len(problems) > 1, "precondition: the subset must drop at least one problem"
+    keep = {problems[0]}
+    writes = []
+    real_write = perturb.atomic_write_bytes
+
+    def spy(path, data):
+        writes.append(Path(path).name)
+        return real_write(path, data)
+
+    monkeypatch.setattr(perturb, "atomic_write_bytes", spy)
+    out = tmp_path / "subset"
+    perturb.build_perturbed(corpus, out, "none", only_problems=keep)
+
+    assert writes == ["provenance.json"]
+    prov = json.loads((out / "provenance.json").read_text(encoding="utf-8"))
+    assert prov["files"] and {rel.split("/", 1)[0] for rel in prov["files"]} == keep
+    classes = [meta["class"] for meta in prov["files"].values()]
+    totals = prov["totals"]
+    assert totals["problems"] == 1
+    for cls in ("reference", "original", "copy", "ai"):
+        assert totals[cls] == classes.count(cls)
+    assert totals != source["totals"]
+
+
 def test_perturbs_the_rebuilt_golden_set_without_train_or_val(golden, tmp_path):
     split_path, manifest, corpus = golden
     out = tmp_path / "strip"

@@ -205,8 +205,8 @@ def test_fit_in_run_fits_on_val_only_and_freezes_before_test(env, tmp_path, monk
     real = suite.score_manifest
 
     async def spy(golden, root, engine):
-        top = sorted((tmp_path / "runs" / "benchmark").glob("*"))
-        frozen = sorted(p.name for t in top for p in t.glob("calibration_*.json"))
+        # the run is still staged while scoring, so look anywhere under the runs root
+        frozen = sorted(p.name for p in (tmp_path / "runs").rglob("calibration_*.json"))
         calls.append(({s["split"] for s in golden["samples"]}, frozen))
         return await real(golden, root, engine)
 
@@ -282,12 +282,216 @@ def test_fused_decision_is_or_of_channel_decisions():
     assert score.tolist() == [0.5, 0.7, 0.2, 0.9]
 
 
+# --- fused metrics on the OR decision (R3-001, R2 alignment) -----------------------------------
+
+
+class _IdentityCalibration:
+    """Stand-in for a `LoadedCalibration` whose calibrated score is the raw score."""
+
+    def __init__(self, channel, threshold, path: Path):
+        path.write_text("{}\n", encoding="utf-8")
+        self.path, self.sha256 = path, file_sha256(path)
+        self.artifact = {
+            "channel": channel, "primary": "fpr_0.05",
+            "thresholds": {"fpr_0.05": {
+                "threshold": threshold, "target_fpr": 0.05, "low_support": False, "unachievable": False,
+                "reason": None, "achieved_fpr": 0.0, "tpr": 1.0, "n_neg": 50, "n_pos": 50, "min_negatives": 20,
+            }},
+        }
+
+    def apply(self, raw):
+        return np.asarray(raw, dtype=np.float64)
+
+
+def _row(i, sim, ai_prob, copy, ai):
+    return {
+        "id": f"A2016_Z1_Z1/x/s{i}.c", "split_id": f"s{i}", "split": "test", "problem_id": "A2016_Z1_Z1",
+        "lang": "c", "model": None, "dup_group": None, "cluster_id": None,
+        "label_copy": copy, "label_ai": ai, "sim": sim, "ai_prob": ai_prob,
+    }
+
+
+# calibrated A, calibrated B, label_copy, label_ai; t_A = t_B = 0.5
+HAND_BUILT = [
+    _row(0, 0.6, 0.1, True, False),    # A fires          -> TP
+    _row(1, 0.2, 0.7, False, True),    # B fires          -> TP
+    _row(2, 0.7, 0.2, False, False),   # A fires          -> FP
+    _row(3, 0.1, 0.3, False, False),   # neither          -> TN
+    _row(4, 0.3, 0.4, True, False),    # neither          -> FN
+    _row(5, 0.2, 0.1, False, False),   # neither          -> TN
+    _row(6, None, 0.9, False, True),   # no reference: channel B only, never fused
+]
+
+
+def _hand_built_run(env, tmp_path, monkeypatch):
+    async def fake_scores(golden, root, engine):
+        return [dict(r) for r in HAND_BUILT]
+
+    cals = {
+        "channel_a": _IdentityCalibration("channel_a", 0.5, tmp_path / "cal_a.json"),
+        "channel_b": _IdentityCalibration("channel_b", 0.5, tmp_path / "cal_b.json"),
+    }
+    monkeypatch.setattr(suite, "score_manifest", fake_scores)
+    monkeypatch.setattr(suite, "resolve_calibrations", lambda paths, sha: cals)
+    golden = _json(env["test"])
+    runs = tmp_path / "runs"
+    suite.run_suite(
+        golden=golden, root=Path(golden["root"]), split_manifest_path=env["split"],
+        engine=None, engine_name="stub", mode="calibrated-frozen", seed=1, n_boot=20, runs_root=runs,
+    )
+    return _channel_dirs(runs)
+
+
+def test_fused_threshold_metrics_are_the_or_decision_confusion(env, tmp_path, monkeypatch):
+    fused = [r for r in HAND_BUILT if r["sim"] is not None]
+    a = np.array([r["sim"] for r in fused])
+    b = np.array([r["ai_prob"] for r in fused])
+    y = np.array([r["label_copy"] or r["label_ai"] for r in fused])
+    decision = (a >= 0.5) | (b >= 0.5)
+    assert ((np.maximum(a, b) >= 1) != decision).any(), "precondition: max >= 1 differs from the OR decision"
+
+    _, dirs = _hand_built_run(env, tmp_path, monkeypatch)
+    point = _json(dirs["fused"] / "metrics.json")["operating_points"]["or_fpr_0.05"]
+    obs = point["observed"]
+    tp, fp = int((decision & y).sum()), int((decision & ~y).sum())
+    fn, tn = int((~decision & y).sum()), int((~decision & ~y).sum())
+    assert (obs["tp"], obs["fp"], obs["fn"], obs["tn"]) == (tp, fp, fn, tn) == (2, 1, 1, 2)
+    assert obs["precision"]["value"] == pytest.approx(tp / (tp + fp))
+    assert obs["recall"]["value"] == pytest.approx(tp / (tp + fn))
+    assert obs["fpr"]["value"] == pytest.approx(fp / (fp + tn))
+    assert point["channel_thresholds"] == {"channel_a": 0.5, "channel_b": 0.5}
+
+
+def test_fused_rows_are_the_rows_scored_by_both_channels(env, tmp_path, monkeypatch):
+    _, dirs = _hand_built_run(env, tmp_path, monkeypatch)
+    config = _json(dirs["fused"] / "config.json")["config"]
+    assert config["dropped_without_reference"] == 1
+    assert _json(dirs["fused"] / "metrics.json")["n"] == 6
+    assert _json(dirs["channel_b"] / "metrics.json")["n"] == 7
+    assert "OR" in config["operating_points"] and "max" in config["threshold_free_score"]
+
+
+# --- run lifecycle (R4 orphan run dir / R3-003) -----------------------------------------------
+
+
+STUB_ENGINE = type(suite.make_engine("stub"))
+
+
+class _FailingEngine:
+    """The stub engine, raising on the n-th AI probability (i.e. mid-scoring)."""
+
+    def __init__(self, fail_at: int):
+        self.inner, self.calls, self.fail_at = STUB_ENGINE(), 0, fail_at
+
+    async def extract_semantic_embedding(self, code, lang):
+        return await self.inner.extract_semantic_embedding(code, lang=lang)
+
+    async def predict_synthetic_prob(self, code):
+        self.calls += 1
+        if self.calls >= self.fail_at:
+            raise RuntimeError("engine crashed mid-scoring")
+        return await self.inner.predict_synthetic_prob(code)
+
+
+def _no_run_left(runs: Path):
+    bench = runs / "benchmark"
+    assert not bench.exists() or not any(bench.iterdir()), list(bench.iterdir())
+    assert not list(runs.rglob("config.json")), "a run directory survived the failure"
+    assert not list(runs.rglob("calibration_*.json"))
+
+
+def test_failure_mid_scoring_leaves_no_run_dir(env, tmp_path, monkeypatch):
+    n_val = sum(1 for s in _json(env["val"])["samples"] if s["role"] == "submission")
+    monkeypatch.setattr(suite, "make_engine", lambda name: _FailingEngine(n_val + 2))  # in the test set
+    runs = tmp_path / "runs"
+    with pytest.raises(RuntimeError, match="mid-scoring"):
+        suite.main(_args(env, runs, "--calibrate", "--val-manifest", str(env["val"])))
+    _no_run_left(runs)
+
+
+def test_failure_while_fitting_calibration_leaves_no_run_dir(env, tmp_path, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("fit failed")
+
+    monkeypatch.setattr(suite, "build_calibration", boom)
+    runs = tmp_path / "runs"
+    with pytest.raises(RuntimeError, match="fit failed"):
+        suite.main(_args(env, runs, "--calibrate", "--val-manifest", str(env["val"])))
+    _no_run_left(runs)
+
+
+def test_published_run_records_final_paths_and_complete_status(env, tmp_path):
+    runs = tmp_path / "runs"
+    assert suite.main(_args(env, runs, "--calibrate", "--val-manifest", str(env["val"]))) == 0
+    top, dirs = _channel_dirs(runs)
+    assert not (runs / suite.STAGING).exists()
+    summary = _json(top / "summary.json")
+    assert summary["status"] == "complete" and summary["run_dir"] == top.as_posix()
+    assert summary["channels"]["fused"]["run_dir"] == dirs["fused"].as_posix()
+    config_a = _json(dirs["channel_a"] / "config.json")
+    assert config_a["calibration_path"] == (top / "calibration_channel_a.json").as_posix()
+    assert config_a["calibration_sha256"] == file_sha256(top / "calibration_channel_a.json")
+    fused_cal = _json(dirs["fused"] / "config.json")["config"]["calibrations"]["channel_b"]
+    assert fused_cal["path"] == (top / "calibration_channel_b.json").as_posix()
+
+
+# --- CLI errors (R3-002) and config keys (R2) -------------------------------------------------
+
+
+def _bad_golden(env, tmp_path, **changes):
+    golden = _json(env["test"])
+    golden.update(changes)
+    path = tmp_path / "golden.json"
+    path.write_text(json.dumps(golden), encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("case", ["val_as_test", "no_source_sha", "hash_mismatch"])
+def test_cli_turns_input_errors_into_exit_2(env, tmp_path, capsys, case):
+    if case == "val_as_test":
+        manifest = env["val"]
+    elif case == "no_source_sha":
+        manifest = _bad_golden(env, tmp_path, source_manifest_sha256=None)
+    else:
+        manifest = _bad_golden(env, tmp_path, source_manifest_sha256="e" * 64)
+    runs = tmp_path / "runs"
+    args = _args(env, runs, "--mode", "uncalibrated")
+    args[args.index("--manifest") + 1] = str(manifest)
+    assert suite.main(args) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("ERROR: ") and "Traceback" not in err
+    assert not (runs / "benchmark").exists()
+
+
+def test_config_records_golden_and_split_manifest_paths(env, tmp_path):
+    runs = tmp_path / "runs"
+    assert suite.main(_args(env, runs, "--mode", "uncalibrated")) == 0
+    top, _ = _channel_dirs(runs)
+    config = _json(top / "config.json")["config"]
+    assert config["golden_manifest"] == Path(env["test"]).as_posix()
+    assert config["split_manifest"] == Path(env["split"]).as_posix()
+
+
 # --- BS2: no threshold constants --------------------------------------------------------------
+
+# A numeric literal bound to a threshold-like name, or a score compared against a float literal.
+THRESHOLD_LITERAL = re.compile(
+    r"(?i)\b(?:\w*(?:threshold|thresh|cutoff)\w*|t|t_\w+)\s*(?::\s*\w+\s*)?=\s*-?\d*\.?\d+(?![\w.])"
+    r"|[<>]=?\s*-?\d*\.\d+"
+)
+
+
+def test_threshold_literal_pattern_is_narrow():
+    for bad in ("THRESHOLD_AI = 0.20", "threshold=0.5", "t_sem: float = 0.85", "s >= 0.7"):
+        assert THRESHOLD_LITERAL.search(bad), bad
+    for ok in ("return 0.0", "x = float(a @ b / denom) if denom else 0.0", "DECISION_TRUE = 1"):
+        assert not THRESHOLD_LITERAL.search(ok), ok
 
 
 def test_no_numeric_threshold_literal_in_the_suite():
     source = SUITE_PATH.read_text(encoding="utf-8")
-    assert not re.findall(r"(?<![\w.:])\d*\.\d+", source), "float literals (threshold defaults) remain"
+    assert not THRESHOLD_LITERAL.findall(source), "threshold literals (numeric defaults) remain"
+    assert "float(0)" not in source, "write 0.0, not a literal workaround"
     for name in ("DEFAULT_THRESHOLDS_SEM", "THRESHOLD_AI", "threshold_ai", "settings",
                  "calibrate_semantic_similarity"):
         assert name not in source

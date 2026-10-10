@@ -9,6 +9,10 @@ report.md, provenance in config.json):
     runs/benchmark/<ts>/config.json, summary.json, [calibration_<channel>.json]
     runs/benchmark/<ts>/{channel_a,channel_b,fused}/<ts>/{config,metrics}.json, report.md, ...
 
+A run is written under runs/.staging/<random>/ and renamed into runs/benchmark/ only when it
+completes (summary.json carries status "complete"); a failure while scoring or fitting removes
+the staged run, so runs/benchmark/ never holds a partial run.
+
 Samples (BS1): every golden sample must be tagged `test` AND its split id must be among the
 `load_split("test")` entries of the split manifest whose sha256 the golden manifest records;
 anything else raises naming the id.
@@ -17,8 +21,11 @@ Scores:
     channel_a : raw cosine similarity of the engine embeddings to the best reference of the same
                 problem (in-memory top-1), label = label_copy. Not the backend sigmoid.
     channel_b : ai_prob, label = label_ai.
-    fused     : label = copy OR ai, score = max of the calibrated channel scores. Provisional
-                decision = OR of the calibrated channel decisions (production fusion: SDD-4).
+    fused     : label = copy OR ai, on the submissions scored by BOTH channels (those with a
+                reference). Threshold-free metrics rank by max of the calibrated channel scores;
+                operating points are the confusion of the provisional OR decision
+                (calibrated A >= t_A OR calibrated B >= t_B), computed on that 0/1 decision
+                vector, never by thresholding the max score (production fusion: SDD-4).
 
 Modes (thresholds always come from calibration files, never from constants):
     calibrated-fit-in-run : score the VAL golden set (--val-manifest), fit one calibration per
@@ -44,7 +51,9 @@ Usage:
 import argparse
 import asyncio
 import json
+import shutil
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
@@ -56,7 +65,6 @@ for p in (str(ROOT), str(ROOT / "backend")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from models.evaluation import metrics as M  # noqa: E402
 from models.evaluation.calibration import (  # noqa: E402
     ScoredSet,
     build_calibration,
@@ -77,7 +85,10 @@ MODES = ("calibrated-fit-in-run", "calibrated-frozen", "uncalibrated")
 DEFAULT_METHODS = {"channel_a": "isotonic", "channel_b": "platt"}
 SCORE_NAMES = {"channel_a": "raw_cosine", "channel_b": "ai_prob"}
 LABELS = {"channel_a": "label_copy", "channel_b": "label_ai"}
-DECISION_TRUE = 1  # fused operating points threshold the 0/1 OR decision at "true"
+# Fused operating points are evaluated on the 0/1 OR decision vector, where "positive" means
+# decision >= DECISION_TRUE, i.e. the decision is True. It is not a score threshold.
+DECISION_TRUE = 1
+STAGING = ".staging"  # in-progress runs live under <runs root>/.staging/ until they complete
 CALIBRATION_STEP = (
     "run the calibration step first: python scripts/benchmark_suite.py --mode calibrated-fit-in-run "
     "--manifest <test golden manifest> --val-manifest <val golden manifest> (it writes "
@@ -95,7 +106,7 @@ def cosine(a: Sequence[float], b: Sequence[float]) -> float:
     """Raw cosine similarity in [-1, 1] (0 for a zero vector); no clipping, no calibration."""
     a, b = np.asarray(a, dtype=np.float64), np.asarray(b, dtype=np.float64)
     denom = np.linalg.norm(a) * np.linalg.norm(b)
-    return float(a @ b / denom) if denom else float(0)
+    return float(a @ b / denom) if denom else 0.0
 
 
 def make_engine(name: str):
@@ -247,16 +258,15 @@ def _groups(rows: List[Dict]) -> Dict[str, List]:
     }
 
 
-def _evaluate(ctx: RunContext, rows, y, s, *, mode, seed, n_boot, points, manifest) -> Dict:
-    metrics = compute_metrics(
-        y, s, channel=ctx.channel, split="test", mode=mode, seed=seed, operating_points=points,
+def _channel_metrics(rows, y, s, *, channel, mode, seed, n_boot, points) -> Dict:
+    return compute_metrics(
+        y, s, channel=channel, split="test", mode=mode, seed=seed, operating_points=points,
         groups=_groups(rows), bootstrap_groups=atomic_units(rows), bootstrap_unit="atomic", n_boot=n_boot,
     )
-    return ctx.write(y, s, metrics, manifest_stats=manifest.stats)
 
 
-def _fused_points(y, cal_a, cal_b, calibrations, *, seed, n_boot, rows) -> Dict[str, Dict]:
-    """OR-decision operating points, one per FPR key both calibrations share."""
+def _fused_specs(calibrations) -> Dict[str, Dict]:
+    """OR-decision operating points (unevaluated), one per FPR key both calibrations share."""
     a_art, b_art = calibrations["channel_a"].artifact, calibrations["channel_b"].artifact
     points = {}
     primary = a_art["primary"]
@@ -264,29 +274,76 @@ def _fused_points(y, cal_a, cal_b, calibrations, *, seed, n_boot, rows) -> Dict[
         if key not in b_art["thresholds"]:
             continue
         ta, tb = a_art["thresholds"][key], b_art["thresholds"][key]
-        point = {
+        unachievable = ta["threshold"] is None or tb["threshold"] is None
+        points[f"or_{key}"] = {
             "rule": "or",
             "primary": key == primary,
-            "source": "provisional OR of calibrated channel decisions (production fusion: SDD-4)",
+            "source": "OR of calibrated channel decisions (A >= t_A OR B >= t_B), evaluated on that 0/1 "
+                      "decision; provisional (production fusion: SDD-4)",
             "target_fpr": ta["target_fpr"],
             "channel_thresholds": {"channel_a": ta["threshold"], "channel_b": tb["threshold"]},
             "low_support": bool(ta["low_support"] or tb["low_support"]),
-            "unachievable": ta["threshold"] is None or tb["threshold"] is None,
+            "unachievable": unachievable,
             "reason": ta["reason"] or tb["reason"],
-            "threshold": None,
+            "threshold": None if unachievable else DECISION_TRUE,
         }
-        name = f"or_{key}"
-        if point["unachievable"]:
-            points[name] = point
-            continue
-        _, decision = fuse(cal_a, cal_b, ta["threshold"], tb["threshold"])
-        point["threshold"] = DECISION_TRUE
-        on_decision = compute_metrics(
-            y, decision.astype(np.float64), channel=FUSED, split="test", mode="decision", seed=seed,
-            operating_points={name: point}, bootstrap_groups=atomic_units(rows), n_boot=n_boot,
-        )
-        points[name] = on_decision["operating_points"][name]
     return points
+
+
+def fused_metrics(rows, y, cal_a, cal_b, calibrations, *, mode, seed, n_boot) -> Dict:
+    """The fused `graphito.metrics/v1` document.
+
+    Threshold-free metrics (ROC/PR-AUC, ECE) rank by max(calibrated A, calibrated B). Every
+    operating point is the confusion of the OR decision `(A >= t_A) | (B >= t_B)`: it is
+    computed on that 0/1 decision vector, because thresholding the max score at one value
+    would not reproduce two per-channel thresholds."""
+    score = np.maximum(np.asarray(cal_a, dtype=np.float64), np.asarray(cal_b, dtype=np.float64))
+    specs = _fused_specs(calibrations)
+    # unachievable points carry no threshold, so compute_metrics only copies them
+    unevaluated = {k: p for k, p in specs.items() if p["threshold"] is None}
+    metrics = _channel_metrics(rows, y, score, channel=FUSED, mode=mode, seed=seed, n_boot=n_boot,
+                               points=unevaluated)
+    for name, point in specs.items():
+        if point["threshold"] is None:
+            continue
+        t = point["channel_thresholds"]
+        _, decision = fuse(cal_a, cal_b, t["channel_a"], t["channel_b"])
+        on_decision = compute_metrics(
+            y, decision.astype(np.float64), channel=FUSED, split="test", mode=mode, seed=seed,
+            operating_points={name: point}, bootstrap_groups=atomic_units(rows), bootstrap_unit="atomic",
+            n_boot=n_boot,
+        )
+        metrics["operating_points"][name] = on_decision["operating_points"][name]
+        metrics["warnings"] += [w for w in on_decision["warnings"] if f"operating point {name} " in w]
+    metrics["operating_points"] = {k: metrics["operating_points"][k] for k in specs}  # primary first
+    return metrics
+
+
+# --------------------------------------------------------------------------- run lifecycle
+def _publish(staged: Path, dest_root: Path) -> Path:
+    """Move a finished staged run to `dest_root/<ts>[-N]` and return its final path.
+
+    Paths recorded inside the run (summary, configs) are rebased onto the final directory
+    BEFORE the rename, so the rename is the last step. Calibration files record no run path
+    and stay byte-identical (their sha256 is pinned in the channel configs)."""
+    dest_root.mkdir(parents=True, exist_ok=True)
+    final, suffix = dest_root / staged.name, 0
+    while final.exists():
+        suffix += 1
+        final = dest_root / f"{staged.name}-{suffix}"
+    old, new = staged.as_posix(), final.as_posix()
+    for path in staged.rglob("*"):
+        if path.suffix in (".json", ".md") and not path.name.startswith("calibration_"):
+            text = path.read_text(encoding="utf-8")
+            if old in text:
+                path.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+    if final.name != staged.name:
+        config = json.loads((staged / "config.json").read_text(encoding="utf-8"))
+        config["run_id"] = f"{dest_root.name}/{final.name}"
+        text = json.dumps(config, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+        (staged / "config.json").write_text(text, encoding="utf-8", newline="\n")
+    staged.rename(final)
+    return final
 
 
 def run_suite(
@@ -305,6 +362,7 @@ def run_suite(
     calibration_paths: Optional[Mapping[str, Optional[Path]]] = None,
     methods: Optional[Mapping[str, str]] = None,
     argv: Optional[Sequence[str]] = None,
+    golden_manifest_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     if mode not in MODES:
         raise BenchmarkError(f"unknown mode {mode!r} (want one of {MODES})")
@@ -326,26 +384,42 @@ def run_suite(
     shared = {
         "engine": engine_name,
         "synthetic": synthetic,
-        "golden_manifest": golden.get("source_manifest_path"),
+        "golden_manifest": Path(golden_manifest_path).as_posix() if golden_manifest_path else None,
+        "split_manifest": Path(split_manifest_path).as_posix(),
         "golden_root": Path(root).as_posix(),
         "methods": methods if mode == "calibrated-fit-in-run" else None,
         "n_boot": n_boot,
     }
-    top = RunContext.create(
-        "benchmark", seed=seed, split="test", mode=mode, manifest_path=split_manifest_path,
-        manifest_sha256=sha, config=shared, argv=argv, root=runs_root, now=now,
-    )
+    staging = Path(runs_root) / STAGING / uuid.uuid4().hex
+    try:
+        top = RunContext.create(
+            "benchmark", seed=seed, split="test", mode=mode, manifest_path=split_manifest_path,
+            manifest_sha256=sha, config=shared, argv=argv, root=staging, now=now,
+        )
+        if mode == "calibrated-fit-in-run":
+            val_rows = asyncio.run(score_manifest(val_golden, val_root, engine))
+            calibrations = fit_calibrations(val_rows, manifest, split_manifest_path, top.path, methods, seed)
+        rows = asyncio.run(score_manifest(golden, root, engine))
+        _evaluate_run(top, rows, calibrations, shared, manifest, sha=sha, split_manifest_path=split_manifest_path,
+                      mode=mode, seed=seed, n_boot=n_boot, argv=argv, now=now, synthetic=synthetic)
+        final = _publish(top.path, Path(runs_root) / "benchmark")
+    finally:
+        # on success only the emptied staging parents remain; on failure the partial run goes
+        shutil.rmtree(staging, ignore_errors=True)
+        try:
+            staging.parent.rmdir()  # only when no other run is staged
+        except OSError:
+            pass
+    return json.loads((final / "summary.json").read_text(encoding="utf-8"))
 
-    if mode == "calibrated-fit-in-run":
-        val_rows = asyncio.run(score_manifest(val_golden, val_root, engine))
-        calibrations = fit_calibrations(val_rows, manifest, split_manifest_path, top.path, methods, seed)
-    rows = asyncio.run(score_manifest(golden, root, engine))
 
+def _evaluate_run(top: RunContext, rows, calibrations, shared, manifest, *, sha, split_manifest_path, mode,
+                  seed, n_boot, argv, now, synthetic) -> None:
+    """Write one run per channel (and the fused run when calibrated) plus summary.json into `top`."""
     summary: Dict[str, Any] = {
         "mode": mode, "manifest_sha256": sha, "run_dir": top.path.as_posix(), "synthetic": synthetic,
         "channels": {}, "skipped": {},
     }
-    calibrated: Dict[str, np.ndarray] = {}
     for channel in CHANNELS:
         ch_rows = _channel_rows(rows, channel)
         y, raw = _labels(ch_rows, LABELS[channel]), _raw_scores(ch_rows, channel)
@@ -360,35 +434,39 @@ def run_suite(
                     "dropped_without_reference": len(rows) - len(ch_rows)},
             argv=argv, root=top.path, now=now,
         )
-        metrics = _evaluate(ctx, ch_rows, y, s, mode=mode, seed=seed, n_boot=n_boot, points=points, manifest=manifest)
-        summary["channels"][channel] = _summary(ctx, metrics)
-        if cal:
-            calibrated[channel] = cal.apply(_raw_scores(_channel_rows(rows, "channel_a"), channel))
+        metrics = _channel_metrics(ch_rows, y, s, channel=channel, mode=mode, seed=seed, n_boot=n_boot, points=points)
+        summary["channels"][channel] = _summary(ctx, ctx.write(y, s, metrics, manifest_stats=manifest.stats))
 
     if not calibrations:
         summary["skipped"][FUSED] = "uncalibrated mode: the fused decision needs calibrated channel thresholds"
     else:
-        fused_rows = _channel_rows(rows, "channel_a")
+        # The fused decision needs both channel scores, so it runs on the rows scored by BOTH
+        # channels: channel A drops submissions of problems without a reference (sim is None),
+        # channel B scores every row. Both calibrated arrays below are aligned on these rows.
+        fused_rows = [r for r in rows if r["sim"] is not None]
         y = np.array([int(r["label_copy"] or r["label_ai"]) for r in fused_rows], dtype=np.int64)
-        s = np.maximum(calibrated["channel_a"], calibrated["channel_b"])  # fused ranking score
-        points = _fused_points(y, calibrated["channel_a"], calibrated["channel_b"], calibrations,
-                               seed=seed, n_boot=n_boot, rows=fused_rows)
+        cal_a = calibrations["channel_a"].apply(_raw_scores(fused_rows, "channel_a"))
+        cal_b = calibrations["channel_b"].apply(_raw_scores(fused_rows, "channel_b"))
+        metrics = fused_metrics(fused_rows, y, cal_a, cal_b, calibrations, mode=mode, seed=seed, n_boot=n_boot)
         ctx = RunContext.create(
             FUSED, seed=seed, split="test", mode=mode, manifest_path=split_manifest_path, manifest_sha256=sha,
             config={**shared, "score": "max(calibrated channel_a, calibrated channel_b)", "label": "copy OR ai",
+                    "threshold_free_score": "max(calibrated channel_a, calibrated channel_b): ROC-AUC, PR-AUC, ECE",
+                    "operating_points": "confusion of the OR decision (calibrated A >= t_A OR calibrated B >= t_B) "
+                                        "on its 0/1 vector; threshold = DECISION_TRUE marks the decision True",
                     "decision": "OR of calibrated channel decisions (provisional; production fusion: SDD-4)",
+                    "dropped_without_reference": len(rows) - len(fused_rows),
                     "calibrations": {c: {"path": cal.path.as_posix(), "sha256": cal.sha256}
                                      for c, cal in calibrations.items()},
-                    "channel_thresholds": {k: p["channel_thresholds"] for k, p in points.items()}},
+                    "channel_thresholds": {k: p["channel_thresholds"] for k, p in metrics["operating_points"].items()}},
             argv=argv, root=top.path, now=now,
         )
-        metrics = _evaluate(ctx, fused_rows, y, s, mode=mode, seed=seed, n_boot=n_boot, points=points,
-                            manifest=manifest)
-        summary["channels"][FUSED] = _summary(ctx, metrics)
+        score = np.maximum(cal_a, cal_b)
+        summary["channels"][FUSED] = _summary(ctx, ctx.write(y, score, metrics, manifest_stats=manifest.stats))
 
+    summary["status"] = "complete"
     text = json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
     (top.path / "summary.json").write_text(text, encoding="utf-8", newline="\n")
-    return summary
 
 
 def _summary(ctx: RunContext, metrics: Mapping) -> Dict[str, Any]:
@@ -488,8 +566,11 @@ def main(argv=None) -> int:
             },
             methods={"channel_a": args.method_a, "channel_b": args.method_b},
             argv=sys.argv if argv is None else ["scripts/benchmark_suite.py", *argv],
+            golden_manifest_path=args.manifest,
         )
-    except BenchmarkError as exc:
+    except (BenchmarkError, ValueError) as exc:
+        # usage and input errors: missing calibration, a non-test golden sample, a golden manifest
+        # without source hash, a split manifest hash mismatch (ManifestError is a ValueError)
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     print_table(summary)

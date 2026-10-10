@@ -56,7 +56,9 @@ python data/golden_set/build_manifest.py data/golden_set/corpus_val --out data/g
 entry raises naming its id, and members of one `dup_group` are deduplicated (the first path in
 sorted order is kept). The output has no wall-clock field, so rebuilding gives byte-identical
 manifests. A corpus without provenance (a hand-written fixture) needs `--synthetic` and is
-tagged `test`.
+tagged `test`; there, byte-identical files are deduplicated by content sha256 instead (the
+first path in scan order is kept). `build_corpus.py` refuses manifest ids that resolve outside
+`--repo-root`.
 
 ## Perturbed corpora (robustness check)
 
@@ -66,7 +68,9 @@ python data/golden_set/perturb_corpus.py --transform strip-comments \
 ```
 
 The transform is applied to every class, `provenance.json` is copied, and `--split-manifest`
-restricts the output to problems of that split (test or val; never train).
+restricts the output to problems of that split (test or val; never train). With that filter the
+copied provenance keeps only the selected problems' files and recounts `problems` and the
+per-class totals from them.
 
 ## Run the benchmark
 

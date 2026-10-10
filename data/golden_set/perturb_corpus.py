@@ -35,6 +35,7 @@ if str(ROOT) not in sys.path:
 
 from models.evaluation.manifest import load_manifest  # noqa: E402
 from models.evaluation.normalize import strip_comments  # noqa: E402,F401  (re-exported)
+from models.evaluation.provenance import atomic_write_bytes  # noqa: E402
 
 CLASSES = ("reference", "original", "copy", "ai")
 EXTENSIONS = {".c", ".cpp"}
@@ -110,18 +111,25 @@ def build_perturbed(src: Path, out: Path, transform: str, only_problems: Optiona
 
 
 def copy_provenance(src: Path, out: Path, only_problems: Optional[Set[str]] = None) -> None:
-    """Copy `provenance.json`, keeping only the files of the selected problems."""
+    """Copy `provenance.json`, keeping only the files of the selected problems.
+
+    With a problem filter, the per-class and `problems` totals are recounted from the kept
+    files; the `skipped_*` counters describe the source corpus build and are kept as is."""
     path = src / PROVENANCE_FILE
     if not path.is_file():
         return
-    out.mkdir(parents=True, exist_ok=True)
     if only_problems is None:
-        shutil.copyfile(path, out / PROVENANCE_FILE)
+        atomic_write_bytes(out / PROVENANCE_FILE, path.read_bytes())
         return
     doc = json.loads(path.read_text(encoding="utf-8"))
     doc["files"] = {rel: meta for rel, meta in doc["files"].items() if rel.split("/", 1)[0] in only_problems}
+    totals = dict(doc.get("totals") or {})
+    totals["problems"] = len({rel.split("/", 1)[0] for rel in doc["files"]})
+    for cls in CLASSES:
+        totals[cls] = sum(1 for meta in doc["files"].values() if meta.get("class") == cls)
+    doc["totals"] = totals
     text = json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
-    (out / PROVENANCE_FILE).write_bytes(text.encode("utf-8"))
+    atomic_write_bytes(out / PROVENANCE_FILE, text.encode("utf-8"))
 
 
 def main(argv=None) -> int:

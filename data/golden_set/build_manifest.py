@@ -16,7 +16,8 @@ Split and metadata come from `provenance.json` (split id, split, model, profile,
 cluster, gt_status), so the golden set follows the split manifest instead of hashing its own
 split. Every corpus file must be listed there, and a `train` entry raises naming its id. Members
 of one dup group are deduplicated (the first path in sorted order is kept). A corpus without
-provenance (e.g. a hand-written fixture) needs `--synthetic`; its samples are tagged `test`.
+provenance (e.g. a hand-written fixture) needs `--synthetic`; its samples are tagged `test` and
+byte-identical files are deduplicated by content sha256 (first path in scan order kept).
 
 The output is deterministic (no wall clock, sorted keys, LF), so rebuilding from the same
 corpus gives byte-identical manifests that carry `source_manifest_sha256`.
@@ -26,6 +27,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import sys
 from collections import Counter
@@ -58,6 +60,11 @@ def load_provenance(root: Path) -> Optional[Dict[str, Any]]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _content_group(path: Path) -> str:
+    """Dedup key of a synthetic corpus file: the sha256 of its bytes."""
+    return "sha256:" + hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
 def build_manifest(root: Path, synthetic: bool = False) -> Dict[str, Any]:
     """Scan `root` and return the manifest dict (deterministic given the inputs)."""
     root = Path(root)
@@ -86,7 +93,9 @@ def build_manifest(root: Path, synthetic: bool = False) -> Dict[str, Any]:
                 split = meta.get("split", "test")
                 if split == "train":
                     raise ValueError(f"golden sample {rel} comes from train entry {meta.get('id')}")
-                group = meta.get("dup_group")
+                # provenance corpora dedup by the split manifest's dup_group; a synthetic corpus
+                # has no provenance, so byte-identical files share a content-hash group instead
+                group = meta.get("dup_group") if provenance is not None else _content_group(f)
                 if group is not None:
                     if group in seen_groups:
                         duplicates.append(rel)
