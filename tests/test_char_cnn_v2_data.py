@@ -245,7 +245,7 @@ class TestEpochs:
         b = epoch_batches(train, epoch=0, seed=3, batch_size=2, window=WINDOW)
         crops_a = {train.ids[i]: arr for batch in a.batches for i, arr in zip(batch.indices, batch.arrays)}
         crops_b = {train.ids[i]: arr for batch in b.batches for i, arr in zip(batch.indices, batch.arrays)}
-        assert len(crops_a["ai00.c"]) == 4096
+        assert len(crops_a["ai00.c"]) == WINDOW
         assert len(crops_a["h00.c"]) == 100
         np.testing.assert_array_equal(crops_a["ai00.c"], crops_b["ai00.c"])
         long = np.arange(9000) % 90 + 2
@@ -254,7 +254,7 @@ class TestEpochs:
         for epoch in range(6):
             plan = epoch_batches(train, epoch=epoch, seed=3, batch_size=2, window=WINDOW)
             crop = next(arr for batch in plan.batches for i, arr in zip(batch.indices, batch.arrays) if i == 0)
-            assert len(crop) == 4096
+            assert len(crop) == WINDOW
             starts.add(int(crop[0]))
         assert len(starts) > 1
 

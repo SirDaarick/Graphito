@@ -13,12 +13,18 @@ from models.char_cnn.preprocess import MIN_NON_WS_CHARS
 PREPROC_VERSION = 2
 ARCH_VERSION = 2
 
-# LF plus printable ASCII 0x20-0x7E. PAD=0, UNK=1, ALPHABET[i] -> i + 2.
+# LF plus printable ASCII 0x20-0x7E. PAD=0, UNK=1, ALPHABET[i] -> i + ALPHABET_OFFSET.
 ALPHABET = "\n" + "".join(chr(c) for c in range(0x20, 0x7F))
 PAD_IDX = 0
 UNK_IDX = 1
-VOCAB_SIZE = len(ALPHABET) + 2
+ALPHABET_OFFSET = 2  # indices reserved before the alphabet: PAD and UNK
+VOCAB_SIZE = len(ALPHABET) + ALPHABET_OFFSET
 NORM = "layernorm_channels"
+
+
+def char_index(ch: str) -> int:
+    """Encoded index of an `ALPHABET` character (`ValueError` for anything else)."""
+    return ALPHABET.index(ch) + ALPHABET_OFFSET
 
 # Fixed by the preprocessing/architecture version: written by `to_dict`, checked by `from_dict`.
 _FIXED_FIELDS: dict[str, Any] = {

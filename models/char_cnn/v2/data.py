@@ -13,12 +13,12 @@ length bucketing, so an epoch depends only on `(seed, epoch)` (no DataLoader wor
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
 
-from models.char_cnn.v2.config import PAD_IDX
+from models.char_cnn.v2.config import PAD_IDX, UNK_IDX
 from models.char_cnn.v2.preprocess import encode, preprocess_v2
 from models.char_cnn.v2.scoring import random_crop
 from models.evaluation.manifest import ROOT, Sample, SplitManifest
@@ -26,13 +26,18 @@ from models.evaluation.seed import stable_rng
 
 __all__ = [
     "VIEWS",
+    "TRAINABLE_VIEWS",
     "EncodedSet",
     "Batch",
     "EpochPlan",
     "label_of",
+    "read_source",
     "view_samples",
     "load_encoded",
     "load_views",
+    "limit_per_class",
+    "data_summary",
+    "check_trainable",
     "epoch_batches",
     "collate",
 ]
@@ -45,6 +50,9 @@ VIEWS: Dict[str, Tuple[str, bool]] = {
     "test": ("test", True),
     "test_all": ("test", False),
 }
+# Views that must hold both classes: training needs AI and human files, and model selection plus
+# calibration need a defined val ROC-AUC.
+TRAINABLE_VIEWS = ("train", "val")
 
 OnText = Callable[[Sample, str, str], None]
 
@@ -112,9 +120,10 @@ def _check_membership(manifest: SplitManifest, samples: Sequence[Sample]) -> Non
         raise ValueError(f"{len(moved)} samples disagree with the manifest split (first: {moved[:3]})")
 
 
-def _read_text(path: Path) -> str:
-    # Same decoding as inference (`read_text(errors="replace")`); U+FFFD is dropped by preprocess.
-    return path.read_bytes().decode("utf-8", errors="replace")
+def read_source(path: Path) -> str:
+    """Raw file text: UTF-8 with `errors="replace"`, line endings untouched (U+FFFD is dropped by
+    `preprocess_v2`)."""
+    return Path(path).read_bytes().decode("utf-8", errors="replace")
 
 
 def load_encoded(
@@ -139,7 +148,7 @@ def load_encoded(
         )
     arrays = []
     for sample in samples:
-        raw = _read_text(root / sample.id)
+        raw = read_source(root / sample.id)
         normalized = preprocess_v2(raw)
         if on_text is not None:
             on_text(sample, raw, normalized)
@@ -170,6 +179,45 @@ def load_views(
     return {
         view: EncodedSet.build(samples, [by_id[s.id] for s in samples]) for view, samples in selected.items()
     }
+
+
+def limit_per_class(view: EncodedSet, per_class: int) -> EncodedSet:
+    """Debug subset: the first `per_class` samples of each class, in view order."""
+    if per_class < 1:
+        raise ValueError(f"per_class must be >= 1 (got {per_class})")
+    seen = {0: 0, 1: 0}
+    keep = []
+    for i, label in enumerate(view.y.tolist()):
+        if seen[label] < per_class:
+            seen[label] += 1
+            keep.append(i)
+    return EncodedSet.build([view.samples[i] for i in keep], [view.arrays[i] for i in keep])
+
+
+def data_summary(views: Mapping[str, EncodedSet]) -> Dict[str, Dict[str, int]]:
+    """Per-view counts; an empty normalized text is encoded as `[UNK]` (see `encode`)."""
+    return {
+        name: {
+            "n": len(view),
+            "n_ai": int(view.y.sum()),
+            "n_human": int(len(view) - view.y.sum()),
+            "n_empty_after_normalize": sum(1 for a in view.arrays if len(a) == 1 and int(a[0]) == UNK_IDX),
+        }
+        for name, view in views.items()
+    }
+
+
+def check_trainable(views: Mapping[str, EncodedSet]) -> None:
+    """Raise `ValueError` unless every `TRAINABLE_VIEWS` view holds both classes."""
+    for name in TRAINABLE_VIEWS:
+        view = views[name]
+        n_ai = int(view.y.sum())
+        n_human = len(view) - n_ai
+        if n_ai == 0 or n_human == 0:
+            raise ValueError(
+                f"the {name} view needs both classes (n_ai={n_ai}, n_human={n_human}); "
+                "check the manifest or --limit-per-class"
+            )
 
 
 @dataclass(frozen=True)

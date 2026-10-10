@@ -14,27 +14,35 @@
 5. write `scores_val.csv`, `scores_test.csv` and `shortcuts.json`, and extend `report.md`.
 
 Every file is scored; abstention (`effective_length < min_non_ws_chars`) is only counted.
+
+`python -m models.char_cnn.v2.evaluate --run-dir <run>` re-runs steps 2-5 from an existing run's
+`best.pth` without retraining (same manifest, data root, seed and `--limit-per-class` as the
+run). It refuses a run that already has calibration or metrics unless `--force` is given.
 """
 
+import argparse
 import csv
 import io
 import json
+import logging
+import sys
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import numpy as np
 import torch
 import torch.nn as nn
 
 from models.char_cnn.v2.checkpoint import load_checkpoint, load_v2_model
-from models.char_cnn.v2.config import ALPHABET, UNK_IDX
-from models.char_cnn.v2.data import EncodedSet
+from models.char_cnn.v2.config import UNK_IDX, char_index
+from models.char_cnn.v2.data import EncodedSet, data_summary, limit_per_class, load_views, view_samples
 from models.char_cnn.v2.scoring import score_arrays
-from models.char_cnn.v2.shortcuts import LENGTH_BUCKETS, length_bucket, render_markdown
+from models.char_cnn.v2.shortcuts import LENGTH_BUCKETS, ShortcutAudit, length_bucket, render_markdown
 from models.evaluation import metrics as M
 from models.evaluation.calibration import ScoredSet, build_calibration, load_calibration, save_calibration
-from models.evaluation.manifest import SplitManifest
+from models.evaluation.manifest import Sample, SplitManifest, load_manifest
 from models.evaluation.provenance import atomic_write_bytes
 from models.evaluation.report import RunContext, compute_metrics, operating_points_from_calibration
 
@@ -44,26 +52,53 @@ __all__ = [
     "LOW_SUPPORT_MIN",
     "GROUP_KEYS",
     "GENERATOR_KEYS",
+    "SHORTCUT_VIEWS",
+    "STATUS_RUNNING",
+    "STATUS_COMPLETE",
+    "STATUS_FAILED",
+    "REFUSED_EXIT",
+    "RUN_FAILED_EXIT",
     "EvaluationResult",
+    "resolve_device",
+    "write_json",
+    "describe_error",
+    "set_run_status",
     "score_split",
+    "group_labels",
+    "expected_groups",
+    "expected_generators",
+    "load_run_views",
     "complete_per_group",
     "per_generator",
     "abstention_counts",
     "update_run_config",
     "evaluate_run",
+    "reevaluate",
+    "main",
 ]
+
+logger = logging.getLogger(__name__)
 
 CHANNEL = "char_cnn"
 SCORE_NAME = "p_synthetic_raw"
 LOW_SUPPORT_MIN = 30  # positives (and, per group, negatives) below this are flagged
 GROUP_KEYS = ("lang", "course", "length_bucket")
 GENERATOR_KEYS = ("model", "profile")
+SHORTCUT_VIEWS = ("train", "test")  # representatives audited for residual shortcuts
 TEST_VIEWS = {
     "test": ("representatives", "headline: test representatives (one file per dup group)"),
     "test_all": ("all_files", "secondary: all non-broken test files (CI95 by dup_group)"),
 }
-_SPACE_IDX = ALPHABET.index(" ") + 2
-_NEWLINE_IDX = ALPHABET.index("\n") + 2
+# Run status recorded in `config.json` (`status`, plus `failure` = {stage, reason} when failed).
+STATUS_RUNNING = "running"
+STATUS_COMPLETE = "complete"
+STATUS_FAILED = "failed"
+REFUSED_EXIT = 1  # nothing was written
+RUN_FAILED_EXIT = 3  # the run directory is marked failed
+# Files whose presence means a run was already evaluated (re-evaluation needs --force).
+EVALUATION_ARTIFACTS = ("calibration.json", "metrics.json")
+_SPACE_IDX = char_index(" ")
+_NEWLINE_IDX = char_index("\n")
 
 
 def _key(value: Any) -> str:
@@ -71,12 +106,68 @@ def _key(value: Any) -> str:
     return "<none>" if value is None else str(value)
 
 
+def resolve_device(name: Optional[str]) -> torch.device:
+    """The requested device, else CUDA when available, else CPU."""
+    return torch.device(name or ("cuda" if torch.cuda.is_available() else "cpu"))
+
+
+def write_json(path: Path, doc: Mapping[str, Any]) -> None:
+    """Atomic, sorted, NaN-free UTF-8 JSON (the run directory's JSON writer)."""
+    text = json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False)
+    atomic_write_bytes(path, (text + "\n").encode("utf-8"))
+
+
+def describe_error(exc: BaseException) -> str:
+    """One-line `Type: message` for `config.json` and the `ERROR:` line."""
+    message = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
+
+
+def set_run_status(
+    run_dir: Path, status: str, *, stage: Optional[str] = None, reason: Optional[str] = None
+) -> Dict[str, Any]:
+    """Record the run status in `config.json`, re-read from disk so no earlier update is lost."""
+    path = Path(run_dir) / "config.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["status"] = status
+    doc["failure"] = {"stage": stage, "reason": reason} if status == STATUS_FAILED else None
+    write_json(path, doc)
+    return doc
+
+
 def score_split(
     model: nn.Module, encoded: EncodedSet, device: "str | torch.device", batch_size: int, *, name: str
 ) -> np.ndarray:
-    """Raw windowed p(synthetic) of every sample of one split (`name` labels the pass)."""
+    """Raw windowed p(synthetic) of every sample of one split (`name` labels the pass in the log)."""
+    logger.info("scoring %s: %d files", name, len(encoded))
     p_synth, _, _ = score_arrays(model, encoded.arrays, device, batch_size)
     return np.asarray(p_synth, dtype=np.float64)
+
+
+def group_labels(encoded: EncodedSet) -> Dict[str, List[str]]:
+    """Per-sample labels of every `GROUP_KEYS` breakdown (length buckets on normalized length)."""
+    labels = {
+        "lang": [s.lang for s in encoded.samples],
+        "course": [s.course for s in encoded.samples],
+        "length_bucket": [length_bucket(int(n)) for n in encoded.lengths],
+    }
+    return {key: labels[key] for key in GROUP_KEYS}
+
+
+def expected_groups(population: Sequence[Sample]) -> Dict[str, List[str]]:
+    """Every group a `GROUP_KEYS` breakdown should list, so absent groups report `n=0`."""
+    expected = {
+        "lang": sorted({s.lang for s in population}),
+        "course": sorted({s.course for s in population}),
+        "length_bucket": list(LENGTH_BUCKETS),
+    }
+    return {key: expected[key] for key in GROUP_KEYS}
+
+
+def expected_generators(population: Sequence[Sample]) -> Dict[str, List[str]]:
+    """Every generator group (model/profile of the AI files) a per-generator table should list."""
+    ai = [s for s in population if s.source == "ai"]
+    return {key: sorted({_key(getattr(s, key)) for s in ai}) for key in GENERATOR_KEYS}
 
 
 def complete_per_group(per_group: Mapping[str, Mapping], expected: Mapping[str, Iterable[Any]]) -> Dict:
@@ -108,7 +199,8 @@ def per_generator(
 
     Humans have no model/profile, so a plain per-group AUC would be single-class; here each group
     is (its AI files) + (every human file). Recall is the share of the group's AI files at or
-    above each operating point. `low_support` when the group has fewer than 30 AI files.
+    above each operating point. `low_support` when the group has fewer than `LOW_SUPPORT_MIN`
+    AI files. AI files without a model/profile form the `<none>` group.
     """
     y = np.asarray(y)
     scores = np.asarray(scores, dtype=np.float64)
@@ -181,15 +273,10 @@ def _write_csv(path: Path, header: Sequence[str], rows: Iterable[Sequence[Any]])
     atomic_write_bytes(path, out.getvalue().encode("utf-8"))
 
 
-def _write_json(path: Path, doc: Mapping[str, Any]) -> None:
-    text = json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False)
-    atomic_write_bytes(path, (text + "\n").encode("utf-8"))
-
-
 def update_run_config(ctx: RunContext, **fields: Any) -> RunContext:
     """Rewrite the run's `config.json` with extra top-level fields (provenance completion, D12)."""
     doc = {**ctx.config, **fields}
-    _write_json(ctx.path / "config.json", doc)
+    write_json(ctx.path / "config.json", doc)
     return replace(ctx, config=doc)
 
 
@@ -317,13 +404,8 @@ def evaluate_run(
     )
 
     population = manifest.samples()  # non-broken, non-excluded entries of every split
-    expected_groups = {
-        "lang": sorted({s.lang for s in population}),
-        "course": sorted({s.course for s in population}),
-        "length_bucket": list(LENGTH_BUCKETS),
-    }
-    ai_population = [s for s in population if s.source == "ai"]
-    expected_generators = {key: sorted({_key(getattr(s, key)) for s in ai_population}) for key in GENERATOR_KEYS}
+    groups_expected = expected_groups(population)
+    generators_expected = expected_generators(population)
     n_abstained = {
         name: abstention_counts(views[name], min_non_ws) for name in ("val", "test", "test_all")
     }
@@ -341,17 +423,13 @@ def evaluate_run(
             mode=mode,
             seed=seed,
             operating_points=points,
-            groups={
-                "lang": [s.lang for s in view.samples],
-                "course": [s.course for s in view.samples],
-                "length_bucket": [length_bucket(int(n)) for n in view.lengths],
-            },
+            groups=group_labels(view),
             bootstrap_groups=[s.dup_group or s.id for s in view.samples],
             bootstrap_unit="dup_group",
             n_boot=n_boot,
         )
-        metrics["per_group"] = complete_per_group(metrics["per_group"], expected_groups)
-        metrics["per_generator"] = per_generator(view.samples, view.y, calibrated, points, expected_generators)
+        metrics["per_group"] = complete_per_group(metrics["per_group"], groups_expected)
+        metrics["per_generator"] = per_generator(view.samples, view.y, calibrated, points, generators_expected)
         metrics["test_view"] = {"name": name, "label": label}
         metrics["n_abstained"] = {**n_abstained, "min_non_ws_chars": min_non_ws}
         metrics["selected_epoch"] = checkpoint["config"].get("epoch")
@@ -369,7 +447,7 @@ def evaluate_run(
         )
 
     if shortcuts is not None:
-        _write_json(run_dir / "shortcuts.json", shortcuts)
+        write_json(run_dir / "shortcuts.json", shortcuts)
         _append_report(run_dir / "report.md", [render_markdown(shortcuts)])
 
     return EvaluationResult(
@@ -379,3 +457,128 @@ def evaluate_run(
         headline=written["test"],
         secondary=written["test_all"],
     )
+
+
+# --- re-evaluation of an existing run (CLI) -------------------------------------------------------
+
+
+def _read_json(path: Path) -> Dict[str, Any]:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def load_run_views(
+    manifest: SplitManifest, root: "str | Path", limit: Optional[int] = None
+) -> "tuple[Dict[str, EncodedSet], ShortcutAudit]":
+    """Encode every view as the trainer did (one pass, shortcut audit fed in it), then apply the
+    run's debug `--limit-per-class` when it had one."""
+    audit = ShortcutAudit({view: [s.id for s in view_samples(manifest, view)] for view in SHORTCUT_VIEWS})
+    views = load_views(manifest, root=root, on_text=audit)
+    if limit is not None:
+        views = {name: limit_per_class(view, limit) for name, view in views.items()}
+    return views, audit
+
+
+def reevaluate(
+    run_dir: Path,
+    manifest: SplitManifest,
+    views: Mapping[str, EncodedSet],
+    audit: ShortcutAudit,
+    device: "str | torch.device",
+    *,
+    n_boot: Optional[int] = None,
+    batch_size: Optional[int] = None,
+) -> EvaluationResult:
+    """Re-run `evaluate_run` on a finished run's `best.pth` with the run's own seed and settings.
+
+    The run is marked `running` first; the caller marks it `complete` or `failed`.
+    """
+    doc = _read_json(Path(run_dir) / "config.json")
+    hyperparams = doc.get("config", {}).get("hyperparams", {})
+    ctx = RunContext(path=Path(run_dir), channel=doc["channel"], config=doc)
+    ctx = update_run_config(
+        ctx,
+        status=STATUS_RUNNING,
+        failure=None,
+        last_evaluation={"by": "models.char_cnn.v2.evaluate", "at": datetime.now(timezone.utc).isoformat()},
+    )
+    return evaluate_run(
+        ctx,
+        manifest,
+        views,
+        device,
+        seed=doc["seed"],
+        n_boot=n_boot or hyperparams.get("n_boot", 1000),
+        batch_size=batch_size or hyperparams.get("eval_batch_size", 32),
+        shortcuts=audit.to_dict(),
+        data_summary=data_summary(views),
+    )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="python -m models.char_cnn.v2.evaluate",
+        description="Re-run val calibration and the single test evaluation from an existing run's best.pth.",
+    )
+    p.add_argument("--run-dir", type=Path, required=True, help="run directory holding config.json and best.pth")
+    p.add_argument("--force", action="store_true", help="recompute even if calibration/metrics already exist")
+    p.add_argument("--device", default=None, help="torch device (default: cuda if available, else cpu)")
+    p.add_argument("--manifest", type=Path, default=None, help="manifest path (default: the run's; sha256 must match)")
+    p.add_argument("--root", type=Path, default=None, help="corpus root (default: the run's data_root)")
+    p.add_argument("--n-boot", type=int, default=None, help="bootstrap resamples (default: the run's)")
+    p.add_argument("--batch-size", type=int, default=None, help="windows per scoring batch (default: the run's)")
+    return p
+
+
+def _refuse(message: str) -> int:
+    print(f"REFUSED: {message}", file=sys.stderr)
+    return REFUSED_EXIT
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Exit 0 when evaluated, `REFUSED_EXIT` when nothing was written, `RUN_FAILED_EXIT` on failure."""
+    parser = build_parser()
+    args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
+    for name in ("n_boot", "batch_size"):
+        value = getattr(args, name)
+        if value is not None and value < 1:
+            parser.error(f"--{name.replace('_', '-')} must be >= 1 (got {value})")
+    run_dir = Path(args.run_dir)
+    for required in ("config.json", "best.pth"):
+        if not (run_dir / required).is_file():
+            return _refuse(f"{run_dir / required} does not exist; nothing to evaluate")
+    existing = [name for name in EVALUATION_ARTIFACTS if (run_dir / name).exists()]
+    if existing and not args.force:
+        return _refuse(f"{run_dir} already has {existing}; pass --force to recompute them")
+    doc = _read_json(run_dir / "config.json")
+    try:
+        manifest = load_manifest(args.manifest or doc["manifest_path"], doc["manifest_sha256"])
+    except (OSError, ValueError, KeyError) as exc:
+        return _refuse(f"cannot load the run's manifest: {describe_error(exc)}")
+
+    run_config = doc.get("config", {})
+    root = args.root or run_config.get("data_root")
+    if root is None:
+        return _refuse("the run records no data_root; pass --root")
+    try:
+        views, audit = load_run_views(manifest, root, run_config.get("hyperparams", {}).get("limit_per_class"))
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: cannot load the run's data: {describe_error(exc)} (run left unchanged)", file=sys.stderr)
+        return RUN_FAILED_EXIT
+
+    try:
+        reevaluate(
+            run_dir, manifest, views, audit, resolve_device(args.device), n_boot=args.n_boot,
+            batch_size=args.batch_size,
+        )
+    except Exception as exc:  # recorded in config.json; the run's outputs may be partial
+        reason = describe_error(exc)
+        set_run_status(run_dir, STATUS_FAILED, stage="evaluate", reason=reason)
+        print(f"ERROR: evaluation failed: {reason}; {run_dir / 'config.json'} marked failed", file=sys.stderr)
+        return RUN_FAILED_EXIT
+    set_run_status(run_dir, STATUS_COMPLETE)
+    print(f"evaluated: {run_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

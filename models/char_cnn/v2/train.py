@@ -10,7 +10,12 @@ val ROC-AUC (ties: val PR-AUC, then the earlier epoch), saving `best.pth` on eve
 
 The trainer writes only inside its run directory. It never writes `models/char_cnn/best_model.pth`
 (or anything under `models/`) and never promotes a checkpoint; promotion is a separate CLI.
-A leak-guard failure writes `leak_guard.json` and exits with code 2 before any checkpoint exists.
+
+Exit codes: 0 complete; 2 on a leak-guard failure (`leak_guard.json` written, no checkpoint);
+3 when the run fails after its directory exists (data, training or evaluation error, e.g. no epoch
+with a defined val ROC-AUC). `config.json` records `status` (`running` -> `complete` | `failed`)
+and, when failed, `failure: {stage, reason}`. Invalid options are rejected (argparse, exit 2)
+before anything is written.
 """
 
 import argparse
@@ -30,8 +35,30 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from models.char_cnn.v2.checkpoint import make_checkpoint
 from models.char_cnn.v2.config import CharCNNV2Config
-from models.char_cnn.v2.data import EncodedSet, collate, epoch_batches, label_of, load_views, view_samples
-from models.char_cnn.v2.evaluate import evaluate_run, update_run_config
+from models.char_cnn.v2.data import (
+    EncodedSet,
+    check_trainable,
+    collate,
+    data_summary,
+    epoch_batches,
+    label_of,
+    limit_per_class,
+    load_views,
+    view_samples,
+)
+from models.char_cnn.v2.evaluate import (
+    RUN_FAILED_EXIT,
+    SHORTCUT_VIEWS,
+    STATUS_COMPLETE,
+    STATUS_FAILED,
+    STATUS_RUNNING,
+    describe_error,
+    evaluate_run,
+    resolve_device,
+    set_run_status,
+    update_run_config,
+    write_json,
+)
 from models.char_cnn.v2.model import CharCNNV2
 from models.char_cnn.v2.preprocess import LeakGuardError, leak_guard
 from models.char_cnn.v2.scoring import score_arrays
@@ -45,6 +72,7 @@ from models.evaluation.seed import seed_everything
 __all__ = [
     "CHANNEL",
     "LEAK_GUARD_EXIT",
+    "RUN_FAILED_EXIT",
     "TrainOptions",
     "Selection",
     "FitResult",
@@ -60,15 +88,31 @@ LEAK_GUARD_EXIT = 2
 LEAK_GUARD_SCHEMA = "graphito.charcnn_leak_guard/v1"
 LEAK_GUARD_THRESHOLD = 0.001
 GUARD_VIEWS = ("train", "val", "test")  # representatives of every split
-SHORTCUT_VIEWS = ("train", "test")  # representatives audited for residual shortcuts
 HISTORY_COLUMNS = ("epoch", "train_loss", "val_roc_auc", "val_pr_auc", "lr", "n_epoch_samples", "seconds")
 
 OnText = Callable[[Sample, str, str], None]
 
+# (field, CLI flag, minimum, minimum inclusive) for the numeric options; `limit_per_class` may be None.
+_OPTION_BOUNDS = (
+    ("epochs", "--epochs", 1, True),
+    ("batch_size", "--batch-size", 1, True),
+    ("eval_batch_size", "--eval-batch-size", 1, True),
+    ("early_stop", "--early-stop", 1, True),
+    ("lr_patience", "--lr-patience", 0, True),
+    ("n_boot", "--n-boot", 1, True),
+    ("limit_per_class", "--limit-per-class", 1, True),
+    ("lr", "--lr", 0.0, False),
+    ("weight_decay", "--weight-decay", 0.0, True),
+)
+
 
 @dataclass(frozen=True)
 class TrainOptions:
-    """Run inputs and hyperparameters (defaults: the legacy CLI and `CharCNNConfig` values)."""
+    """Run inputs and hyperparameters (defaults: the legacy CLI and `CharCNNConfig` values).
+
+    Construction validates every number (`ValueError` naming the field and its CLI flag), so an
+    invalid run is refused before its directory is created.
+    """
 
     manifest: Path = DEFAULT_MANIFEST
     expected_sha256: Optional[str] = None
@@ -86,6 +130,18 @@ class TrainOptions:
     eval_batch_size: int = 32
     n_boot: int = 1000
     limit_per_class: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        for name, flag, minimum, inclusive in _OPTION_BOUNDS:
+            value = getattr(self, name)
+            if value is None and name == "limit_per_class":
+                continue
+            ok = math.isfinite(value) and (value >= minimum if inclusive else value > minimum)
+            if not ok:
+                bound = f">= {minimum}" if inclusive else f"> {minimum}"
+                raise ValueError(f"{name} ({flag}) must be a finite number {bound} (got {value!r})")
+        if not (math.isfinite(self.lr_factor) and 0.0 < self.lr_factor < 1.0):
+            raise ValueError(f"lr_factor (--lr-factor) must be in (0, 1) (got {self.lr_factor!r})")
 
     def hyperparams(self) -> Dict[str, Any]:
         keys = (
@@ -117,7 +173,7 @@ class Selection:
 
     @staticmethod
     def _key(roc_auc: float, pr_auc: Optional[float]) -> Tuple[float, float]:
-        return roc_auc, pr_auc if _finite(pr_auc) else -math.inf
+        return roc_auc, (pr_auc if _finite(pr_auc) else -math.inf)
 
     def update(self, epoch: int, roc_auc: Optional[float], pr_auc: Optional[float]) -> bool:
         """Record one epoch; True when it becomes the selected one."""
@@ -146,11 +202,6 @@ class FitResult:
 # --- model, scoring, checkpoints -----------------------------------------------------------------
 
 
-def resolve_device(name: Optional[str]) -> torch.device:
-    """The requested device, else CUDA when available, else CPU."""
-    return torch.device(name or ("cuda" if torch.cuda.is_available() else "cpu"))
-
-
 def build_model(config: CharCNNV2Config, device: torch.device, seed: int) -> CharCNNV2:
     """Seeded model construction; no forward pass of any kind happens here."""
     torch.manual_seed(seed)
@@ -163,11 +214,6 @@ def val_metrics(
     """(ROC-AUC, PR-AUC) of the raw windowed scores on the val representatives."""
     p_synth, _, _ = score_arrays(model, val.arrays, device, batch_size)
     return M.roc_auc(val.y, p_synth), M.average_precision(val.y, p_synth)
-
-
-def _write_json(path: Path, doc: Mapping[str, Any]) -> None:
-    text = json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False)
-    atomic_write_bytes(path, (text + "\n").encode("utf-8"))
 
 
 def _write_history(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
@@ -183,7 +229,6 @@ def save_checkpoint(model: CharCNNV2, path: Path, **metadata: Any) -> None:
     buffer = io.BytesIO()
     torch.save(make_checkpoint(model, **metadata), buffer)
     atomic_write_bytes(path, buffer.getvalue())
-
 
 
 # --- training loop -------------------------------------------------------------------------------
@@ -319,29 +364,6 @@ def _fan_out(*callbacks: OnText) -> OnText:
     return on_text
 
 
-def _limit(view: EncodedSet, per_class: int) -> EncodedSet:
-    """Debug subset: the first `per_class` samples of each class, in view order."""
-    seen = {0: 0, 1: 0}
-    keep = []
-    for i, label in enumerate(view.y.tolist()):
-        if seen[label] < per_class:
-            seen[label] += 1
-            keep.append(i)
-    return EncodedSet.build([view.samples[i] for i in keep], [view.arrays[i] for i in keep])
-
-
-def data_summary(views: Mapping[str, EncodedSet]) -> Dict[str, Dict[str, int]]:
-    return {
-        name: {
-            "n": len(view),
-            "n_ai": int(view.y.sum()),
-            "n_human": int(len(view) - view.y.sum()),
-            "n_empty_after_normalize": sum(1 for a in view.arrays if len(a) == 1 and int(a[0]) == 1),
-        }
-        for name, view in views.items()
-    }
-
-
 # --- run -----------------------------------------------------------------------------------------
 
 
@@ -352,12 +374,24 @@ class RunResult:
     fit: Optional[FitResult] = None
 
 
+class _Stage:
+    """The step a run is in, recorded as `failure.stage` when the run fails."""
+
+    def __init__(self) -> None:
+        self.name = "load_data"
+
+
 def run(
     options: TrainOptions,
     model_config: Optional[CharCNNV2Config] = None,
     argv: Optional[Sequence[str]] = None,
 ) -> RunResult:
-    """Execute one run (steps 1-7); returns exit code 0, or 2 on a leak-guard failure."""
+    """Execute one run (steps 1-7).
+
+    Returns exit code 0, `LEAK_GUARD_EXIT` on a leak-guard failure or `RUN_FAILED_EXIT` when any
+    step after the run directory exists raises; in both failure cases `config.json` is marked
+    `failed` with the stage and reason, and an `ERROR:` line goes to stderr.
+    """
     model_config = model_config or CharCNNV2Config()
     seed_everything(options.seed, deterministic_torch=True)
     device = resolve_device(options.device)
@@ -379,27 +413,50 @@ def run(
         argv=argv,
         root=options.runs_root,
     )
+    ctx = update_run_config(ctx, status=STATUS_RUNNING, failure=None)
+    stage = _Stage()
+    try:
+        return _execute(ctx, manifest, options, model_config, device, stage)
+    except Exception as exc:  # recorded in config.json instead of leaving a silent half-written run
+        reason = describe_error(exc)
+        set_run_status(ctx.path, STATUS_FAILED, stage=stage.name, reason=reason)
+        print(f"ERROR: run failed during {stage.name}: {reason}; see {ctx.path / 'config.json'}", file=sys.stderr)
+        return RunResult(RUN_FAILED_EXIT, ctx.path)
 
+
+def _execute(
+    ctx: RunContext,
+    manifest,
+    options: TrainOptions,
+    model_config: CharCNNV2Config,
+    device: torch.device,
+    stage: _Stage,
+) -> RunResult:
+    """Steps 4-7 inside an existing run directory (`run` handles failures)."""
     guard_ids = {s.id for view in GUARD_VIEWS for s in view_samples(manifest, view)}
     guard = GuardCollector(guard_ids)
     audit = ShortcutAudit({view: [s.id for s in view_samples(manifest, view)] for view in SHORTCUT_VIEWS})
     views = load_views(manifest, root=options.root, on_text=_fan_out(guard, audit))
     guard_doc = guard.check()
-    _write_json(ctx.path / "leak_guard.json", guard_doc)
+    write_json(ctx.path / "leak_guard.json", guard_doc)
     ctx = update_run_config(
         ctx,
         leak_guard={"path": "leak_guard.json", "passed": guard_doc["passed"], "shares": guard_doc["shares"]},
     )
     if not guard_doc["passed"]:
         over = {k: v for k, v in guard_doc["shares"].items() if v > guard_doc["threshold"]}
-        print(f"leak guard failed: {over}; see {ctx.path / 'leak_guard.json'}", file=sys.stderr)
+        reason = f"leak patterns above {guard_doc['threshold']} of human representatives: {over}"
+        set_run_status(ctx.path, STATUS_FAILED, stage="leak_guard", reason=reason)
+        print(f"ERROR: leak guard failed: {over}; see {ctx.path / 'leak_guard.json'}", file=sys.stderr)
         return RunResult(LEAK_GUARD_EXIT, ctx.path)
 
     if options.limit_per_class is not None:
-        views = {name: _limit(view, options.limit_per_class) for name, view in views.items()}
+        views = {name: limit_per_class(view, options.limit_per_class) for name, view in views.items()}
     summary = data_summary(views)
     ctx = update_run_config(ctx, data_summary=summary)
+    check_trainable(views)
 
+    stage.name = "fit"
     model = build_model(model_config, device, options.seed)
     metadata = {
         "seed": options.seed,
@@ -426,6 +483,8 @@ def run(
             "checkpoint": "best.pth",
         },
     )
+
+    stage.name = "evaluate"
     evaluate_run(
         ctx,
         manifest,
@@ -437,6 +496,7 @@ def run(
         shortcuts=audit.to_dict(),
         data_summary=summary,
     )
+    set_run_status(ctx.path, STATUS_COMPLETE)
     return RunResult(0, ctx.path, result)
 
 
@@ -504,12 +564,14 @@ def options_from_args(args: argparse.Namespace) -> TrainOptions:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    args = build_parser().parse_args(argv)
-    result = run(
-        options_from_args(args),
-        load_model_config(args.model_config),
-        argv=["-m", "models.char_cnn.v2.train", *argv],
-    )
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:  # validated before anything is written (argparse error, exit 2)
+        options = options_from_args(args)
+        model_config = load_model_config(args.model_config)
+    except (OSError, ValueError, TypeError) as exc:
+        parser.error(str(exc))
+    result = run(options, model_config, argv=["-m", "models.char_cnn.v2.train", *argv])
     if result.exit_code == 0:
         print(f"run directory: {result.run_dir}")
     return result.exit_code

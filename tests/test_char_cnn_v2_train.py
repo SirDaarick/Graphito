@@ -383,6 +383,8 @@ class TestLeakGuard:
         assert doc["offending_ids"]["course_marker"]
         assert not list(runs_root.rglob("*.pth"))
         assert not (run_dir / "history.csv").exists()
+        config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+        assert config["status"] == "failed" and config["failure"]["stage"] == "leak_guard"
 
 
 # --- 6.1 / 6.3 evaluation ------------------------------------------------------------------------
@@ -566,3 +568,216 @@ class TestDeterminism:
         if traced_run["real_before"] is None:
             pytest.skip("models/char_cnn/best_model.pth is absent")
         assert traced_run["real_after"] == traced_run["real_before"]
+
+
+# --- PR3 review follow-ups: option validation ----------------------------------------------------
+
+
+class TestOptionValidation:
+    @pytest.mark.parametrize(
+        "field, value",
+        [
+            ("epochs", 0), ("early_stop", 0), ("lr", 0.0), ("lr", -1e-3), ("lr", float("nan")),
+            ("batch_size", 0), ("eval_batch_size", 0), ("n_boot", 0), ("limit_per_class", 0),
+            ("lr_patience", -1), ("lr_factor", 0.0), ("lr_factor", 1.0), ("weight_decay", -1e-4),
+        ],
+    )
+    def test_invalid_options_raise_value_error_naming_the_field(self, field, value):
+        with pytest.raises(ValueError, match=field):
+            train_mod.TrainOptions(**{field: value})
+
+    def test_defaults_and_boundaries_are_valid(self):
+        train_mod.TrainOptions()
+        train_mod.TrainOptions(
+            epochs=1, early_stop=1, lr_patience=0, lr_factor=0.99, limit_per_class=1, n_boot=1, weight_decay=0.0
+        )
+
+    @pytest.mark.parametrize(
+        "flag, value",
+        [
+            ("--epochs", "0"), ("--early-stop", "0"), ("--lr", "0"), ("--batch-size", "0"),
+            ("--eval-batch-size", "0"), ("--n-boot", "0"), ("--limit-per-class", "0"),
+            ("--lr-patience", "-1"), ("--lr-factor", "1"),
+        ],
+    )
+    def test_cli_rejects_invalid_numbers_before_writing(self, corpus, tmp_path, capsys, flag, value):
+        runs_root = tmp_path / "runs"
+        with pytest.raises(SystemExit) as exc:
+            train_mod.main(_argv(corpus, runs_root, flag, value))
+        assert exc.value.code == 2
+        err = capsys.readouterr().err
+        assert "error:" in err and flag in err
+        assert not runs_root.exists()
+
+
+# --- PR3 review follow-ups: run status and failure exit code -------------------------------------
+
+
+class TestRunStatus:
+    def test_successful_run_is_marked_complete(self, traced_run):
+        doc = _json(traced_run["run_dir"] / "config.json")
+        assert doc["status"] == "complete"
+        assert doc.get("failure") is None
+
+    def test_no_defined_val_auc_exits_3_and_marks_the_run_failed(self, corpus, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(train_mod, "val_metrics", lambda *a, **k: (None, None))
+        runs_root = tmp_path / "runs"
+        assert train_mod.main(_argv(corpus, runs_root)) == train_mod.RUN_FAILED_EXIT == 3
+        err = capsys.readouterr().err
+        assert err.startswith("ERROR:") and "ROC-AUC" in err
+        run_dir = _single_run_dir(runs_root)
+        doc = _json(run_dir / "config.json")
+        assert doc["status"] == "failed"
+        assert doc["failure"]["stage"] == "fit" and "ROC-AUC" in doc["failure"]["reason"]
+        assert not (run_dir / "best.pth").exists() and not (run_dir / "metrics.json").exists()
+
+    def test_evaluation_failure_exits_3_and_marks_the_run_failed(self, corpus, tmp_path, monkeypatch, capsys):
+        def boom(*args, **kwargs):
+            raise ValueError("calibration exploded")
+
+        monkeypatch.setattr(train_mod, "evaluate_run", boom)
+        runs_root = tmp_path / "runs"
+        assert train_mod.main(_argv(corpus, runs_root)) == 3
+        assert capsys.readouterr().err.startswith("ERROR:")
+        run_dir = _single_run_dir(runs_root)
+        doc = _json(run_dir / "config.json")
+        assert doc["status"] == "failed" and doc["failure"]["stage"] == "evaluate"
+        assert "calibration exploded" in doc["failure"]["reason"]
+        assert (run_dir / "best.pth").is_file()
+
+    def test_single_class_val_fails_cleanly_before_training(self, corpus, tmp_path, monkeypatch, capsys):
+        def humans_only_val(*args, **kwargs):
+            views = original(*args, **kwargs)
+            val = views["val"]
+            keep = [i for i, label in enumerate(val.y.tolist()) if label == 0]
+            views["val"] = EncodedSet.build([val.samples[i] for i in keep], [val.arrays[i] for i in keep])
+            return views
+
+        original = train_mod.load_views
+        monkeypatch.setattr(train_mod, "load_views", humans_only_val)
+        runs_root = tmp_path / "runs"
+        assert train_mod.main(_argv(corpus, runs_root)) == 3
+        assert "val" in capsys.readouterr().err
+        run_dir = _single_run_dir(runs_root)
+        doc = _json(run_dir / "config.json")
+        assert doc["status"] == "failed" and doc["failure"]["stage"] == "load_data"
+        assert not (run_dir / "best.pth").exists()
+
+    @pytest.mark.parametrize("limit", [1, 2])
+    def test_limit_per_class_runs_with_both_classes_per_view(self, corpus, tmp_path, limit):
+        runs_root = tmp_path / "runs"
+        assert train_mod.main(_argv(corpus, runs_root, "--limit-per-class", str(limit))) == 0
+        doc = _json(_single_run_dir(runs_root) / "config.json")
+        assert doc["status"] == "complete"
+        for name, entry in doc["data_summary"].items():
+            assert entry["n_ai"] <= limit and entry["n_human"] <= limit, name
+        assert doc["config"]["hyperparams"]["limit_per_class"] == limit
+
+
+# --- PR3 review follow-ups: re-evaluating an existing run ----------------------------------------
+
+
+EVAL_OUTPUTS = (
+    "calibration.json", "metrics.json", "report.md", "shortcuts.json", "scores_val.csv", "scores_test.csv",
+)
+
+
+def _copy_run(traced_run, tmp_path: Path, *, strip_outputs: bool) -> Path:
+    import shutil
+
+    run_dir = tmp_path / "run"
+    shutil.copytree(traced_run["run_dir"], run_dir)
+    if strip_outputs:
+        for name in EVAL_OUTPUTS:
+            (run_dir / name).unlink()
+        shutil.rmtree(run_dir / "test_all")
+        for name in ("roc.csv", "pr.csv", "reliability.csv"):
+            (run_dir / name).unlink(missing_ok=True)
+    return run_dir
+
+
+class TestReevaluate:
+    def test_rebuilds_calibration_and_metrics_from_best_pth(self, traced_run, tmp_path):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=True)
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == 0
+        for name in CT53_ARTIFACTS:
+            assert (run_dir / name).is_file(), name
+        original = traced_run["run_dir"]
+        for name in ("metrics.json", "test_all/metrics.json", "calibration.json", "shortcuts.json"):
+            assert _json(run_dir / name) == _json(original / name), name
+        doc = _json(run_dir / "config.json")
+        assert doc["status"] == "complete"
+        assert doc["calibration_sha256"] == hashlib.sha256((run_dir / "calibration.json").read_bytes()).hexdigest()
+
+    def test_refuses_existing_outputs_without_force(self, traced_run, tmp_path, capsys):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=False)
+        before = {name: (run_dir / name).read_bytes() for name in ("calibration.json", "metrics.json", "config.json")}
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == eval_mod.REFUSED_EXIT == 1
+        assert "--force" in capsys.readouterr().err
+        assert {name: (run_dir / name).read_bytes() for name in before} == before
+
+    def test_force_recomputes_existing_outputs(self, traced_run, tmp_path):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=False)
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu", "--force"]) == 0
+        assert _json(run_dir / "metrics.json") == _json(traced_run["run_dir"] / "metrics.json")
+
+    def test_refuses_a_run_without_checkpoint(self, traced_run, tmp_path, capsys):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=True)
+        (run_dir / "best.pth").unlink()
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == 1
+        assert "best.pth" in capsys.readouterr().err
+
+
+# --- PR3 review follow-ups: shared constants and helpers -----------------------------------------
+
+
+class TestSharedHelpers:
+    def test_char_index_matches_encode(self):
+        from models.char_cnn.v2.config import char_index
+        from models.char_cnn.v2.preprocess import encode
+
+        for ch in (" ", "\n", "a", "~", "{"):
+            assert char_index(ch) == int(encode(ch)[0]), repr(ch)
+
+    def test_empty_after_normalize_is_counted_with_unk(self):
+        from models.char_cnn.v2.config import UNK_IDX
+        from models.char_cnn.v2.data import data_summary
+
+        samples = [_sample("x/a.c", "ai", "val"), _sample("x/b.c", "human", "val")]
+        arrays = [np.array([UNK_IDX], dtype=np.uint8), np.array([UNK_IDX, 40], dtype=np.uint8)]
+        summary = data_summary({"val": EncodedSet.build(samples, arrays)})
+        assert summary["val"] == {"n": 2, "n_ai": 1, "n_human": 1, "n_empty_after_normalize": 1}
+
+    def test_group_labels_follow_group_keys(self):
+        encoded = _encoded("test", 2, 2)
+        labels = eval_mod.group_labels(encoded)
+        assert tuple(labels) == eval_mod.GROUP_KEYS
+        assert all(len(values) == len(encoded) for values in labels.values())
+
+    def test_one_json_writer_is_shared(self):
+        assert not hasattr(train_mod, "_write_json") and not hasattr(eval_mod, "_write_json")
+        assert train_mod.write_json is eval_mod.write_json
+
+
+class TestPerGeneratorNoneGroup:
+    def test_ai_files_without_model_or_profile_form_the_none_group(self):
+        from dataclasses import replace
+
+        samples = [
+            replace(_sample("t/k.c", "ai", "test"), model="kimi", profile="aplicado"),
+            _sample("t/u1.c", "ai", "test"),
+            _sample("t/u2.c", "ai", "test"),
+            _sample("t/h1.c", "human", "test"),
+            _sample("t/h2.c", "human", "test"),
+        ]
+        y = np.array([1, 1, 1, 0, 0])
+        scores = np.array([0.9, 0.8, 0.15, 0.2, 0.1])
+        points = {"fpr_0.05": {"threshold": 0.5}}
+        out = eval_mod.per_generator(samples, y, scores, points, {"model": ["kimi"], "profile": ["aplicado"]})
+        for key, known in (("model", "kimi"), ("profile", "aplicado")):
+            none = out[key]["<none>"]
+            assert (none["n_pos"], none["n_neg"]) == (2, 2), key
+            assert none["roc_auc"] == pytest.approx(0.75)
+            assert none["recall"]["fpr_0.05"] == pytest.approx(0.5)
+            assert none["low_support"] is True
+            assert out[key][known]["n_pos"] == 1

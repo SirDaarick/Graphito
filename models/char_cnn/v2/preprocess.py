@@ -12,7 +12,7 @@ from typing import Iterable
 
 import numpy as np
 
-from models.char_cnn.v2.config import ALPHABET, PREPROC_VERSION, UNK_IDX
+from models.char_cnn.v2.config import ALPHABET, PREPROC_VERSION, UNK_IDX, char_index
 from models.evaluation.normalize import strip_comments
 
 __all__ = [
@@ -79,8 +79,8 @@ _FOLD_TABLE = _build_fold_table()
 _KEEP = frozenset(ALPHABET) | {"\t"}
 
 _LUT = np.full(256, UNK_IDX, dtype=np.uint8)
-for _i, _ch in enumerate(ALPHABET):
-    _LUT[ord(_ch)] = _i + 2
+for _ch in ALPHABET:
+    _LUT[ord(_ch)] = char_index(_ch)
 
 LEAK_PATTERNS: dict[str, str] = {
     # Anything outside LF + printable ASCII: non-ASCII, CR, C0 controls, DEL and tabs.
