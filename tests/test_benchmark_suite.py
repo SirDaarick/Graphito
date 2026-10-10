@@ -43,41 +43,14 @@ def test_single_class_auc_is_none_and_does_not_crash():
     assert m["fpr"] is None  # no negatives
 
 
-# ---------------------------------------------------------------- builder
-def test_builder_is_deterministic_with_seed():
-    a = builder.build_manifest(FIXTURE, seed=42, test_ratio=0.3)
-    b = builder.build_manifest(FIXTURE, seed=42, test_ratio=0.3)
-    assert a == b
-
-
-def test_no_problem_in_two_splits():
-    m = builder.build_manifest(FIXTURE, seed=42, test_ratio=0.5)
-    splits = {}
-    for s in m["samples"]:
-        splits.setdefault(s["problem_id"], set()).add(s["split"])
-    assert splits  # fixture is not empty
-    assert all(len(v) == 1 for v in splits.values())
-
-
-def test_dedup_by_sha256():
-    m = builder.build_manifest(FIXTURE, seed=42)
-    hashes = [s["sha256"] for s in m["samples"]]
-    assert len(hashes) == len(set(hashes))
-    assert "p01_sum/copy/c1_dup.c" in m["duplicates_removed"]
-
-
-def test_builder_labels_and_warnings():
-    m = builder.build_manifest(FIXTURE, seed=42)
-    assert m["counts"]["by_label"]["ai"] == 4
-    assert m["counts"]["by_label"]["reference"] == 4
-    assert m["warnings"], "fixture has < 6 LLM files per problem, a warning is expected"
+# Golden-set builder tests live in tests/test_golden_set_split.py.
 
 
 # ---------------------------------------------------------------- end to end (stub)
 def test_stub_run_emits_schema_for_both_thresholds():
     from app.infrastructure.inference.stub_engine import StubInferenceEngine
 
-    manifest = builder.build_manifest(FIXTURE, seed=42, test_ratio=0.5)
+    manifest = builder.build_manifest(FIXTURE)
     manifest["synthetic"] = True
     result = suite.run_suite(manifest, FIXTURE, StubInferenceEngine(), "stub", manifest_label="fixture")
 

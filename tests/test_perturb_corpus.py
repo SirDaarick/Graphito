@@ -4,6 +4,12 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
+from eval_factory import make_tree
+from models.evaluation.manifest import load_manifest
+from models.evaluation.splits import SplitConfig, build_split, write_manifest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -15,6 +21,7 @@ def _load(name: str, path: Path):
 
 
 perturb = _load("perturb_corpus", ROOT / "data" / "golden_set" / "perturb_corpus.py")
+corpus_builder = _load("build_corpus", ROOT / "data" / "golden_set" / "build_corpus.py")
 
 
 def test_strip_removes_line_and_block_comments():
@@ -79,9 +86,48 @@ def test_line_endings_are_preserved_byte_for_byte(tmp_path):
         assert (out / transform / "P" / "ai" / "crlf.c").read_bytes() == b"int a;\r\nint b;\r\n"
 
 
-def test_problems_from_manifest_converts_slashes_and_filters_split(tmp_path):
-    manifest = tmp_path / "m.json"
-    manifest.write_text(
-        json.dumps({"subproblems": {"train": ["A2016/Z1/Z1"], "test": ["B2017/Z6/Z4"]}}), encoding="utf-8"
+def test_strip_comments_is_the_evaluation_package_function():
+    from models.evaluation.normalize import strip_comments
+
+    assert perturb.strip_comments is strip_comments
+    assert not hasattr(perturb, "problems_from_manifest")
+
+
+@pytest.fixture(scope="module")
+def golden(tmp_path_factory):
+    """A split manifest from the synthetic factory tree and the test golden set rebuilt from it."""
+    base = tmp_path_factory.mktemp("perturb")
+    tree = make_tree(base / "repo")
+    config = SplitConfig(
+        seed=7, repo_root=tree.repo_root, raw_root=tree.raw_root, ai_root=tree.ai_root,
+        gt_static=tree.gt_static, gt_ambiguous=(tree.gt_dynamic,),
     )
-    assert perturb.problems_from_manifest(manifest, "test") == {"B2017_Z6_Z4"}
+    split_path = write_manifest(build_split(config), base / "split.json")
+    corpus = base / "corpus"
+    corpus_builder.build_corpus(split_path, "test", corpus, repo_root=tree.repo_root)
+    return split_path, load_manifest(split_path), corpus
+
+
+def test_problems_from_split_lists_only_that_split(golden):
+    split_path, manifest, _ = golden
+    test = perturb.problems_from_split(split_path, "test")
+    assert test == {s.assignment.replace("/", "_") for s in manifest.samples("test")}
+    others = {s.assignment.replace("/", "_") for s in manifest.samples() if s.split != "test"}
+    assert test and test.isdisjoint(others)
+    with pytest.raises(ValueError, match="train"):
+        perturb.problems_from_split(split_path, "train")
+
+
+def test_perturbs_the_rebuilt_golden_set_without_train_or_val(golden, tmp_path):
+    split_path, manifest, corpus = golden
+    out = tmp_path / "strip"
+    code = perturb.main([
+        "--src", str(corpus), "--transform", "strip-comments", "--out", str(out),
+        "--split-manifest", str(split_path), "--split", "test",
+    ])
+    assert code == 0
+    prov = json.loads((out / "provenance.json").read_text(encoding="utf-8"))
+    assert prov == json.loads((corpus / "provenance.json").read_text(encoding="utf-8"))
+    written = sorted(p.relative_to(out).as_posix() for p in out.rglob("*.c*"))
+    assert written and written == sorted(prov["files"])
+    assert {manifest.split_of(f["id"]) for f in prov["files"].values()} == {"test"}

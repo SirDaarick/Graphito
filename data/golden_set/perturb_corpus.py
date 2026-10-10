@@ -10,12 +10,13 @@ Transforms:
     strip-comments : remove // and /* */ comments (string/char-literal aware, no dependencies)
     clang-format   : run `clang-format -style=Google` (needs the binary, e.g. `pip install clang-format`)
 
-`--only-problems-from <dataset_manifest.json> --split test` restricts the output to the
-subproblems a CharCNN never saw in training, removing file-level leakage from the measurement.
+The source is a golden set rebuilt by build_corpus.py from the split manifest; its
+`provenance.json` is copied next to the output. `--split-manifest <split_v1.json> --split test`
+further restricts the output to problems (assignments) of that split; train is refused.
 
 Usage:
     python data/golden_set/perturb_corpus.py --transform strip-comments \\
-        --only-problems-from models/char_cnn/dataset_manifest.json --split test \\
+        --split-manifest data/splits/split_v1.json --split test \\
         --out data/golden_set/corpus_strip-comments
 """
 
@@ -25,45 +26,20 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Callable, Dict, Optional, Set
+from typing import Callable, Optional, Set
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from models.evaluation.manifest import load_manifest  # noqa: E402
+from models.evaluation.normalize import strip_comments  # noqa: E402,F401  (re-exported)
+
 CLASSES = ("reference", "original", "copy", "ai")
 EXTENSIONS = {".c", ".cpp"}
-
-
-def strip_comments(code: str) -> str:
-    """Remove C/C++ comments, keeping string/char literals and the original line count."""
-    out = []
-    i, n = 0, len(code)
-    while i < n:
-        ch = code[i]
-        nxt = code[i + 1] if i + 1 < n else ""
-        if ch in ('"', "'"):
-            quote = ch
-            out.append(ch)
-            i += 1
-            while i < n:
-                c = code[i]
-                out.append(c)
-                i += 1
-                if c == "\\" and i < n:
-                    out.append(code[i])
-                    i += 1
-                elif c == quote or c == "\n":
-                    break
-        elif ch == "/" and nxt == "/":
-            while i < n and code[i] != "\n":
-                i += 1
-        elif ch == "/" and nxt == "*":
-            end = code.find("*/", i + 2)
-            end = n if end == -1 else end + 2
-            out.append(" " + "\n" * code.count("\n", i, end))
-            i = end
-        else:
-            out.append(ch)
-            i += 1
-    return "".join(out)
+PERTURB_SPLITS = ("test", "val")
+PROVENANCE_FILE = "provenance.json"
 
 
 def _clang_format_binary() -> str:
@@ -93,9 +69,11 @@ def make_clang_format() -> Callable[[str, str], str]:
     return run
 
 
-def problems_from_manifest(manifest: Path, split: str) -> Set[str]:
-    data = json.loads(Path(manifest).read_text(encoding="utf-8"))
-    return {p.replace("/", "_") for p in data["subproblems"][split]}
+def problems_from_split(split_manifest: Path, split: str) -> Set[str]:
+    """Problem ids (assignment with "/" -> "_") of the included entries of one split."""
+    if split not in PERTURB_SPLITS:
+        raise ValueError(f"perturbation runs on {PERTURB_SPLITS} only, never {split!r} (train is refused)")
+    return {s.assignment.replace("/", "_") for s in load_manifest(split_manifest).samples(split)}
 
 
 def build_perturbed(src: Path, out: Path, transform: str, only_problems: Optional[Set[str]] = None) -> int:
@@ -127,7 +105,23 @@ def build_perturbed(src: Path, out: Path, transform: str, only_problems: Optiona
                 with open(dest / f.name, "w", encoding="utf-8", newline="") as fh:
                     fh.write(apply(code, f.name))
                 count += 1
+    copy_provenance(Path(src), Path(out), only_problems)
     return count
+
+
+def copy_provenance(src: Path, out: Path, only_problems: Optional[Set[str]] = None) -> None:
+    """Copy `provenance.json`, keeping only the files of the selected problems."""
+    path = src / PROVENANCE_FILE
+    if not path.is_file():
+        return
+    out.mkdir(parents=True, exist_ok=True)
+    if only_problems is None:
+        shutil.copyfile(path, out / PROVENANCE_FILE)
+        return
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["files"] = {rel: meta for rel, meta in doc["files"].items() if rel.split("/", 1)[0] in only_problems}
+    text = json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+    (out / PROVENANCE_FILE).write_bytes(text.encode("utf-8"))
 
 
 def main(argv=None) -> int:
@@ -135,8 +129,9 @@ def main(argv=None) -> int:
     parser.add_argument("--src", type=Path, default=HERE / "corpus")
     parser.add_argument("--transform", choices=["none", "strip-comments", "clang-format"], required=True)
     parser.add_argument("--out", type=Path, default=None, help="Default: data/golden_set/corpus_<transform>")
-    parser.add_argument("--only-problems-from", type=Path, default=None, help="CharCNN dataset_manifest.json")
-    parser.add_argument("--split", choices=["train", "val", "test"], default="test")
+    parser.add_argument("--split-manifest", type=Path, default=None,
+                        help="Split manifest (data/splits/split_v1.json): keep only problems of --split")
+    parser.add_argument("--split", choices=PERTURB_SPLITS, default="test")
     parser.add_argument("--force", action="store_true", help="Delete --out first if it exists")
     args = parser.parse_args(argv)
 
@@ -147,7 +142,7 @@ def main(argv=None) -> int:
             return 1
         shutil.rmtree(out)
 
-    only = problems_from_manifest(args.only_problems_from, args.split) if args.only_problems_from else None
+    only = problems_from_split(args.split_manifest, args.split) if args.split_manifest else None
     n = build_perturbed(args.src, out, args.transform, only)
     print(f"Wrote {n} files to {out}" + (f" ({len(only)} problems, split={args.split})" if only else ""))
     return 0

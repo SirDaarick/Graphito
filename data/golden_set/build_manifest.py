@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Build a golden-set manifest from a corpus directory.
+"""Build a golden-set manifest from a corpus directory written by build_corpus.py.
 
 Expected layout (one root, passed on the command line; nothing is hardcoded):
 
     <root>/<problem_id>/<class>/*.c|*.cpp      with class in: reference | original | copy | ai
+    <root>/provenance.json                     written by build_corpus.py
 
 Class -> labels:
     reference : role=reference,  label_copy=False, label_ai=False
@@ -11,22 +12,32 @@ Class -> labels:
     copy      : role=submission, label_copy=True,  label_ai=False   (plagiarised human work)
     ai        : role=submission, label_copy=False, label_ai=True    (LLM-generated)
 
-The dev/test split is by problem_id (sha256(seed:problem_id) against --test-ratio), so a
-problem never spans two splits. Files with identical content (sha256) are deduplicated; the
-first path in sorted order is kept.
+Split and metadata come from `provenance.json` (split id, split, model, profile, dup_group,
+cluster, gt_status), so the golden set follows the split manifest instead of hashing its own
+split. Every corpus file must be listed there, and a `train` entry raises naming its id. Members
+of one dup group are deduplicated (the first path in sorted order is kept). A corpus without
+provenance (e.g. a hand-written fixture) needs `--synthetic`; its samples are tagged `test`.
+
+The output is deterministic (no wall clock, sorted keys, LF), so rebuilding from the same
+corpus gives byte-identical manifests that carry `source_manifest_sha256`.
 
 Usage:
-    python data/golden_set/build_manifest.py <root> --seed 42 --test-ratio 0.3 --out manifest.json
+    python data/golden_set/build_manifest.py data/golden_set/corpus --out data/golden_set/manifest.json
 """
 
 import argparse
-import hashlib
 import json
 import sys
 from collections import Counter
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from models.evaluation.provenance import atomic_write_bytes  # noqa: E402
 
 CLASSES = {
     "reference": {"role": "reference", "label_copy": False, "label_ai": False},
@@ -36,28 +47,30 @@ CLASSES = {
 }
 EXTENSIONS = {".c": "c", ".cpp": "cpp"}
 MIN_LLM_FILES_PER_PROBLEM = 6
+PROVENANCE_FILE = "provenance.json"
+META_KEYS = ("source", "model", "profile", "dup_group", "cluster_id", "gt_status", "assignment")
 
 
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+def load_provenance(root: Path) -> Optional[Dict[str, Any]]:
+    path = Path(root) / PROVENANCE_FILE
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def assign_split(problem_id: str, seed: int, test_ratio: float) -> str:
-    digest = hashlib.sha256(f"{seed}:{problem_id}".encode("utf-8")).hexdigest()
-    fraction = int(digest[:8], 16) / 0x100000000
-    return "test" if fraction < test_ratio else "dev"
-
-
-def build_manifest(root: Path, seed: int = 42, test_ratio: float = 0.3) -> Dict[str, Any]:
+def build_manifest(root: Path, synthetic: bool = False) -> Dict[str, Any]:
     """Scan `root` and return the manifest dict (deterministic given the inputs)."""
     root = Path(root)
-    samples: List[Dict[str, Any]] = []
-    seen_hashes: Dict[str, str] = {}
-    duplicates: List[str] = []
+    provenance = load_provenance(root)
+    if provenance is None and not synthetic:
+        raise ValueError(f"{root} has no {PROVENANCE_FILE}; rebuild it with build_corpus.py or pass --synthetic")
+    files: Dict[str, Dict] = (provenance or {}).get("files", {})
 
+    samples: List[Dict[str, Any]] = []
+    seen_groups: Dict[str, str] = {}
+    duplicates: List[str] = []
     for problem_dir in sorted(p for p in root.iterdir() if p.is_dir()):
         problem_id = problem_dir.name
-        split = assign_split(problem_id, seed, test_ratio)
         for class_name, attrs in CLASSES.items():
             class_dir = problem_dir / class_name
             if not class_dir.is_dir():
@@ -66,12 +79,19 @@ def build_manifest(root: Path, seed: int = 42, test_ratio: float = 0.3) -> Dict[
                 lang = EXTENSIONS.get(f.suffix.lower())
                 if not f.is_file() or lang is None:
                     continue
-                digest = sha256_bytes(f.read_bytes())
                 rel = f.relative_to(root).as_posix()
-                if digest in seen_hashes:
-                    duplicates.append(rel)
-                    continue
-                seen_hashes[digest] = rel
+                if provenance is not None and rel not in files:
+                    raise ValueError(f"corpus file {rel} is not listed in {PROVENANCE_FILE}")
+                meta = files.get(rel, {})
+                split = meta.get("split", "test")
+                if split == "train":
+                    raise ValueError(f"golden sample {rel} comes from train entry {meta.get('id')}")
+                group = meta.get("dup_group")
+                if group is not None:
+                    if group in seen_groups:
+                        duplicates.append(rel)
+                        continue
+                    seen_groups[group] = rel
                 samples.append(
                     {
                         "id": rel,
@@ -82,28 +102,30 @@ def build_manifest(root: Path, seed: int = 42, test_ratio: float = 0.3) -> Dict[
                         "label_copy": attrs["label_copy"],
                         "label_ai": attrs["label_ai"],
                         "split": split,
-                        "sha256": digest,
+                        "split_id": meta.get("id"),
+                        **{k: meta.get(k) for k in META_KEYS},
                     }
                 )
 
-    # No problem may appear in two splits.
-    problem_splits: Dict[str, set] = {}
-    for s in samples:
-        problem_splits.setdefault(s["problem_id"], set()).add(s["split"])
-    leaking = {p: sorted(v) for p, v in problem_splits.items() if len(v) > 1}
-    assert not leaking, f"problems appear in more than one split: {leaking}"
+    missing = sorted(set(files) - {s["path"] for s in samples} - set(duplicates))
+    if missing:
+        raise ValueError(f"{PROVENANCE_FILE} lists files absent from the corpus: {missing[:5]}")
 
+    problems = sorted({s["problem_id"] for s in samples})
     llm_per_problem = Counter(s["problem_id"] for s in samples if s["label_ai"])
     warnings = [
         f"problem '{p}' has {llm_per_problem.get(p, 0)} LLM files (< {MIN_LLM_FILES_PER_PROBLEM})"
-        for p in sorted(problem_splits)
+        for p in problems
         if llm_per_problem.get(p, 0) < MIN_LLM_FILES_PER_PROBLEM
     ]
 
     return {
-        "version": 1,
-        "seed": seed,
-        "test_ratio": test_ratio,
+        "version": 2,
+        "synthetic": bool(synthetic) or bool((provenance or {}).get("synthetic", False)),
+        "source_split": (provenance or {}).get("split", "test"),
+        "source_manifest_sha256": (provenance or {}).get("source_manifest_sha256"),
+        "source_manifest_path": (provenance or {}).get("source_manifest_path"),
+        "selection_seed": (provenance or {}).get("seed"),
         "samples": samples,
         "duplicates_removed": duplicates,
         "counts": {
@@ -115,8 +137,8 @@ def build_manifest(root: Path, seed: int = 42, test_ratio: float = 0.3) -> Dict[
                 ),
                 "reference": sum(1 for s in samples if s["role"] == "reference"),
             },
-            "by_split": dict(Counter(s["split"] for s in samples)),
-            "by_problem": dict(Counter(s["problem_id"] for s in samples)),
+            "by_split": dict(sorted(Counter(s["split"] for s in samples).items())),
+            "by_problem": dict(sorted(Counter(s["problem_id"] for s in samples).items())),
         },
         "warnings": warnings,
     }
@@ -125,25 +147,26 @@ def build_manifest(root: Path, seed: int = 42, test_ratio: float = 0.3) -> Dict[
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("root", type=Path, help="Corpus root: <root>/<problem_id>/<class>/*.c|cpp")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--test-ratio", type=float, default=0.3)
     parser.add_argument("--out", type=Path, default=Path("data/golden_set/manifest.json"))
-    parser.add_argument("--synthetic", action="store_true", help="Mark the manifest as synthetic (not real data).")
+    parser.add_argument("--synthetic", action="store_true",
+                        help="Allow a corpus without provenance.json (synthetic data, tagged split=test)")
     args = parser.parse_args(argv)
 
-    manifest = build_manifest(args.root, seed=args.seed, test_ratio=args.test_ratio)
-    manifest["root"] = str(args.root)
-    manifest["synthetic"] = bool(args.synthetic)
-    manifest["created_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        manifest = build_manifest(args.root, synthetic=args.synthetic)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    manifest["root"] = args.root.as_posix()
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    text = json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    atomic_write_bytes(args.out, text.encode("utf-8"))
 
     print(f"Manifest: {args.out}  ({len(manifest['samples'])} samples, "
           f"{len(manifest['duplicates_removed'])} duplicates removed)")
     print(f"By label: {manifest['counts']['by_label']}")
     print(f"By split: {manifest['counts']['by_split']}")
-    print(f"By problem: {manifest['counts']['by_problem']}")
+    print(f"Source split manifest sha256: {manifest['source_manifest_sha256']}")
     for w in manifest["warnings"]:
         print(f"WARNING: {w}", file=sys.stderr)
     return 0
