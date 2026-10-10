@@ -17,7 +17,9 @@ cluster, gt_status), so the golden set follows the split manifest instead of has
 split. Every corpus file must be listed there, and a `train` entry raises naming its id. Members
 of one dup group are deduplicated (the first path in sorted order is kept). A corpus without
 provenance (e.g. a hand-written fixture) needs `--synthetic`; its samples are tagged `test` and
-byte-identical files are deduplicated by content sha256 (first path in scan order kept).
+byte-identical files of the same problem AND class are deduplicated by content sha256 (first
+path in scan order kept); identical files in different problems or classes (an exact copy of its
+original) are all kept.
 
 The output is deterministic (no wall clock, sorted keys, LF), so rebuilding from the same
 corpus gives byte-identical manifests that carry `source_manifest_sha256`.
@@ -94,8 +96,13 @@ def build_manifest(root: Path, synthetic: bool = False) -> Dict[str, Any]:
                 if split == "train":
                     raise ValueError(f"golden sample {rel} comes from train entry {meta.get('id')}")
                 # provenance corpora dedup by the split manifest's dup_group; a synthetic corpus
-                # has no provenance, so byte-identical files share a content-hash group instead
-                group = meta.get("dup_group") if provenance is not None else _content_group(f)
+                # has no provenance, so byte-identical files share a content-hash group instead,
+                # scoped to one problem and class: an exact copy byte-identical to its original
+                # or reference is a labelled positive, and other problems are independent
+                if provenance is not None:
+                    group = meta.get("dup_group")
+                else:
+                    group = f"{problem_id}/{class_name}/{_content_group(f)}"
                 if group is not None:
                     if group in seen_groups:
                         duplicates.append(rel)

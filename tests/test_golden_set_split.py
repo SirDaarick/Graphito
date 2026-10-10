@@ -238,15 +238,36 @@ class TestBuildManifest:
         assert m["source_manifest_sha256"] is None
         assert manifest_builder.main([str(corpus), "--out", str(tmp_path / "m.json")]) != 0
 
-    def test_synthetic_corpus_dedups_identical_files_by_content(self, tmp_path):
-        corpus = tmp_path / "corpus"
-        for rel, text in (("P/copy/a.c", "int a;\n"), ("P/copy/b.c", "int a;\n"), ("P/ai/c.c", "int c;\n"),
-                          ("Q/original/d.c", "int a;\n")):
-            (corpus / rel).parent.mkdir(parents=True, exist_ok=True)
-            (corpus / rel).write_bytes(text.encode("utf-8"))
+    @staticmethod
+    def _synthetic_corpus(root, files):
+        for rel, text in files:
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_bytes(text.encode("utf-8"))
+        return root
+
+    def test_synthetic_corpus_dedups_identical_files_within_problem_and_class(self, tmp_path):
+        corpus = self._synthetic_corpus(tmp_path / "corpus", (
+            ("P/copy/a.c", "int a;\n"), ("P/copy/b.c", "int a;\n"), ("P/ai/c.c", "int c;\n"),
+            ("Q/original/d.c", "int a;\n"),
+        ))
         m = manifest_builder.build_manifest(corpus, synthetic=True)
-        assert [s["path"] for s in m["samples"]] == ["P/copy/a.c", "P/ai/c.c"]
-        assert m["duplicates_removed"] == ["P/copy/b.c", "Q/original/d.c"]
+        # only P/copy/b.c collapses onto P/copy/a.c; Q is another problem, so d.c is kept
+        assert [s["path"] for s in m["samples"]] == ["P/copy/a.c", "P/ai/c.c", "Q/original/d.c"]
+        assert m["duplicates_removed"] == ["P/copy/b.c"]
+
+    def test_synthetic_exact_copy_of_its_original_is_a_kept_positive(self, tmp_path):
+        """A byte-identical copy of an original (or reference) in the same problem is the
+        textbook plagiarism positive: content dedup must never drop it across classes."""
+        corpus = self._synthetic_corpus(tmp_path / "corpus", (
+            ("P/reference/r.c", "int s(int a){return a;}\n"), ("P/original/o.c", "int s(int a){return a;}\n"),
+            ("P/copy/k.c", "int s(int a){return a;}\n"),
+        ))
+        m = manifest_builder.build_manifest(corpus, synthetic=True)
+        by_path = {s["path"]: s for s in m["samples"]}
+        assert sorted(by_path) == ["P/copy/k.c", "P/original/o.c", "P/reference/r.c"]
+        assert by_path["P/copy/k.c"]["label_copy"] is True
+        assert by_path["P/original/o.c"]["label_copy"] is False
+        assert m["duplicates_removed"] == []
 
     def test_tiny_fixture_dedups_by_dup_group(self):
         m = manifest_builder.build_manifest(FIXTURE)

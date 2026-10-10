@@ -5,9 +5,11 @@ golden manifests) with the STUB engine: no real data, models or network. Stub nu
 evidence about the real models.
 """
 
+import ast
 import importlib.util
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -154,7 +156,7 @@ def test_calibration_of_another_split_manifest_is_refused(env, tmp_path, capsys)
 
 def test_val_golden_set_passed_as_test_raises_naming_the_id(env, tmp_path):
     golden = _json(env["val"])
-    with pytest.raises(ValueError) as info:
+    with pytest.raises(suite.BenchmarkError) as info:
         suite.run_suite(
             golden=golden, root=Path(golden["root"]), split_manifest_path=env["split"],
             engine=suite.make_engine("stub"), engine_name="stub", mode="uncalibrated",
@@ -167,14 +169,14 @@ def test_non_test_split_id_behind_a_test_tag_raises_naming_it(env, tmp_path):
     golden, val = _json(env["test"]), _json(env["val"])
     leaked = val["samples"][0]["split_id"]
     golden["samples"][0]["split_id"] = leaked  # tagged "test" but the split manifest says val
-    with pytest.raises(ValueError, match=re.escape(leaked)):
+    with pytest.raises(suite.BenchmarkError, match=re.escape(leaked)):
         suite.require_split(golden["samples"], "test", env["split"], golden["source_manifest_sha256"])
 
 
 def test_golden_manifest_without_source_hash_is_refused(env, tmp_path):
     golden = _json(env["test"])
     golden["source_manifest_sha256"] = None
-    with pytest.raises(ValueError, match="source_manifest_sha256"):
+    with pytest.raises(suite.BenchmarkError, match="source_manifest_sha256"):
         suite.run_suite(
             golden=golden, root=Path(golden["root"]), split_manifest_path=env["split"],
             engine=suite.make_engine("stub"), engine_name="stub", mode="uncalibrated",
@@ -435,6 +437,88 @@ def test_published_run_records_final_paths_and_complete_status(env, tmp_path):
     assert fused_cal["path"] == (top / "calibration_channel_b.json").as_posix()
 
 
+STAMP = "20260102-030405"
+
+
+class _FixedNow(datetime):
+    """Every run started in the same second, so they all want the same `<ts>` directory."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+
+
+def _assert_published_at(top: Path):
+    """The run at `top` records `top` (never the staging dir) as its location and run id."""
+    summary = _json(top / "summary.json")
+    assert summary["status"] == "complete" and summary["run_dir"] == top.as_posix()
+    assert _json(top / "config.json")["run_id"] == f"{top.parent.name}/{top.name}"
+    for channel in CHANNELS:
+        run_dir = Path(summary["channels"][channel]["run_dir"])
+        assert run_dir.parent.parent == top and run_dir.is_dir()
+    for path in top.rglob("*"):
+        if path.suffix in (".json", ".md"):
+            assert suite.STAGING not in path.read_text(encoding="utf-8"), path
+
+
+def test_runs_with_the_same_timestamp_publish_to_distinct_dirs(env, tmp_path, monkeypatch):
+    monkeypatch.setattr(suite, "datetime", _FixedNow)
+    runs = tmp_path / "runs"
+    for _ in range(2):
+        assert suite.main(_args(env, runs, "--mode", "uncalibrated")) == 0
+    tops = sorted((runs / "benchmark").iterdir())
+    assert [t.name for t in tops] == [STAMP, f"{STAMP}-1"]
+    for top in tops:
+        _assert_published_at(top)
+
+
+def test_publish_retries_when_a_concurrent_run_takes_the_name(env, tmp_path, monkeypatch):
+    """Another run publishes `<ts>` between our existence check and our rename."""
+    monkeypatch.setattr(suite, "datetime", _FixedNow)
+    runs = tmp_path / "runs"
+    bench, real_rename, racer = runs / "benchmark", Path.rename, []
+
+    def racing_rename(self, target):
+        target = Path(target)
+        if target.parent == bench and not racer:
+            target.mkdir()
+            (target / "summary.json").write_text("{}\n", encoding="utf-8")  # the racer's run
+            racer.append(target)
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", racing_rename)
+    assert suite.main(_args(env, runs, "--mode", "uncalibrated")) == 0
+    assert sorted(t.name for t in bench.iterdir()) == [STAMP, f"{STAMP}-1"]
+    assert _json(bench / STAMP / "summary.json") == {}, "the racer's run is untouched"
+    _assert_published_at(bench / f"{STAMP}-1")
+    assert not (runs / suite.STAGING).exists()
+
+
+@pytest.mark.parametrize("error", [PermissionError(13, "denied"), FileExistsError(17, "taken")],
+                         ids=["permission", "always_taken"])
+def test_publish_failure_keeps_the_completed_staged_run(env, tmp_path, monkeypatch, error):
+    runs = tmp_path / "runs"
+    bench, real_rename = runs / "benchmark", Path.rename
+
+    def failing_rename(self, target):
+        if Path(target).parent == bench:
+            raise error
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", failing_rename)
+    with pytest.raises(suite.PublishError) as info:
+        suite.main(_args(env, runs, "--mode", "uncalibrated"))
+    staged = sorted((runs / suite.STAGING).rglob("summary.json"))
+    assert len(staged) == 1, "the completed run must survive a failed publish"
+    top = staged[0].parent
+    assert top.as_posix() in str(info.value)
+    # the kept run records its staged location, not a destination it never reached
+    summary = _json(staged[0])
+    assert summary["status"] == "complete" and summary["run_dir"] == top.as_posix()
+    assert _json(top / "config.json")["run_id"] == f"benchmark/{top.name}"
+    assert not bench.exists() or not any(bench.iterdir())
+
+
 # --- CLI errors (R3-002) and config keys (R2) -------------------------------------------------
 
 
@@ -446,12 +530,19 @@ def _bad_golden(env, tmp_path, **changes):
     return path
 
 
-@pytest.mark.parametrize("case", ["val_as_test", "no_source_sha", "hash_mismatch"])
+@pytest.mark.parametrize("case", ["val_as_test", "no_source_sha", "hash_mismatch", "not_json", "split_id_leak"])
 def test_cli_turns_input_errors_into_exit_2(env, tmp_path, capsys, case):
     if case == "val_as_test":
         manifest = env["val"]
     elif case == "no_source_sha":
         manifest = _bad_golden(env, tmp_path, source_manifest_sha256=None)
+    elif case == "not_json":
+        manifest = tmp_path / "golden.json"
+        manifest.write_text("{not json", encoding="utf-8")
+    elif case == "split_id_leak":
+        golden = _json(env["test"])
+        golden["samples"][0]["split_id"] = _json(env["val"])["samples"][0]["split_id"]
+        manifest = _bad_golden(env, tmp_path, samples=golden["samples"])
     else:
         manifest = _bad_golden(env, tmp_path, source_manifest_sha256="e" * 64)
     runs = tmp_path / "runs"
@@ -461,6 +552,29 @@ def test_cli_turns_input_errors_into_exit_2(env, tmp_path, capsys, case):
     err = capsys.readouterr().err
     assert err.startswith("ERROR: ") and "Traceback" not in err
     assert not (runs / "benchmark").exists()
+
+
+def test_cli_turns_a_malformed_calibration_into_exit_2(env, tmp_path, capsys):
+    (tmp_path / "calibration_channel_a.json").write_text("{not json", encoding="utf-8")
+    (tmp_path / "calibration_channel_b.json").write_text("{not json", encoding="utf-8")
+    runs = tmp_path / "runs"
+    assert suite.main(_args(env, runs, "--mode", "calibrated-frozen", "--calibration-dir", str(tmp_path))) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("ERROR: ") and "calibration_channel_a.json" in err
+    assert not (runs / "benchmark").exists()
+
+
+@pytest.mark.parametrize("target", ["score_manifest", "build_calibration", "compute_metrics"])
+def test_internal_value_error_is_not_reported_as_an_input_error(env, tmp_path, monkeypatch, target):
+    """A ValueError raised while scoring, fitting or computing metrics is a bug, not bad input:
+    it must propagate with its traceback instead of becoming `ERROR:` + exit 2."""
+    def boom(*args, **kwargs):
+        raise ValueError(f"internal bug in {target}")
+
+    monkeypatch.setattr(suite, target, boom)
+    with pytest.raises(ValueError, match=f"internal bug in {target}"):
+        suite.main(_args(env, tmp_path / "runs", "--calibrate", "--val-manifest", str(env["val"])))
+    _no_run_left(tmp_path / "runs")
 
 
 def test_config_records_golden_and_split_manifest_paths(env, tmp_path):
@@ -474,24 +588,36 @@ def test_config_records_golden_and_split_manifest_paths(env, tmp_path):
 
 # --- BS2: no threshold constants --------------------------------------------------------------
 
-# A numeric literal bound to a threshold-like name, or a score compared against a float literal.
-THRESHOLD_LITERAL = re.compile(
-    r"(?i)\b(?:\w*(?:threshold|thresh|cutoff)\w*|t|t_\w+)\s*(?::\s*\w+\s*)?=\s*-?\d*\.?\d+(?![\w.])"
-    r"|[<>]=?\s*-?\d*\.\d+"
-)
+ALLOWED_FLOATS = (0.0, 1.0)
 
 
-def test_threshold_literal_pattern_is_narrow():
-    for bad in ("THRESHOLD_AI = 0.20", "threshold=0.5", "t_sem: float = 0.85", "s >= 0.7"):
-        assert THRESHOLD_LITERAL.search(bad), bad
-    for ok in ("return 0.0", "x = float(a @ b / denom) if denom else 0.0", "DECISION_TRUE = 1"):
-        assert not THRESHOLD_LITERAL.search(ok), ok
+def _threshold_literals(source: str):
+    """(line, value) of every float literal other than 0.0/1.0 anywhere in `source` (assignments,
+    defaults, dict values, call arguments, comparisons; a leading minus is a separate node), plus
+    every `float(<constant>)` call, which would smuggle a literal past the check."""
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant) and type(node.value) is float and node.value not in ALLOWED_FLOATS:
+            found.append((node.lineno, node.value))
+        elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "float"
+              and node.args and isinstance(node.args[0], ast.Constant)):
+            found.append((node.lineno, f"float({node.args[0].value!r})"))
+    return found
+
+
+def test_threshold_literal_guard_catches_every_float_position():
+    for bad in ("THRESHOLD_AI = 0.20", "f(threshold=0.5)", "def f(t: float = 0.85):\n    pass",
+                "ok = s >= 0.7", "D = {'t': 0.3}", "x = -0.25", "y = 5e-2", "z = float('0.5')",
+                "w = float(0)", "f(0.95)"):
+        assert _threshold_literals(bad), bad
+    for ok in ("x = 0.0", "y = -1.0", "z = a if d else 0.0", "DECISION_TRUE = 1", "s = 'fpr_0.05'",
+               "t = f'{v:.3f}'", "u = float(a @ b / d)"):
+        assert not _threshold_literals(ok), ok
 
 
 def test_no_numeric_threshold_literal_in_the_suite():
     source = SUITE_PATH.read_text(encoding="utf-8")
-    assert not THRESHOLD_LITERAL.findall(source), "threshold literals (numeric defaults) remain"
-    assert "float(0)" not in source, "write 0.0, not a literal workaround"
+    assert not _threshold_literals(source), "float literals other than 0.0/1.0 remain in the suite"
     for name in ("DEFAULT_THRESHOLDS_SEM", "THRESHOLD_AI", "threshold_ai", "settings",
                  "calibrate_semantic_similarity"):
         assert name not in source

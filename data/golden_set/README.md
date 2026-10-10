@@ -56,8 +56,10 @@ python data/golden_set/build_manifest.py data/golden_set/corpus_val --out data/g
 entry raises naming its id, and members of one `dup_group` are deduplicated (the first path in
 sorted order is kept). The output has no wall-clock field, so rebuilding gives byte-identical
 manifests. A corpus without provenance (a hand-written fixture) needs `--synthetic` and is
-tagged `test`; there, byte-identical files are deduplicated by content sha256 instead (the
-first path in scan order is kept). `build_corpus.py` refuses manifest ids that resolve outside
+tagged `test`; there, byte-identical files of the same problem and class are deduplicated by
+content sha256 instead (the first path in scan order is kept). Identical files in different
+problems or classes are all kept: an exact copy of its original is a labelled positive.
+`build_corpus.py` refuses manifest ids that resolve outside
 `--repo-root`.
 
 ## Perturbed corpora (robustness check)

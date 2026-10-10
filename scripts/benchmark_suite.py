@@ -11,7 +11,9 @@ report.md, provenance in config.json):
 
 A run is written under runs/.staging/<random>/ and renamed into runs/benchmark/ only when it
 completes (summary.json carries status "complete"); a failure while scoring or fitting removes
-the staged run, so runs/benchmark/ never holds a partial run.
+the staged run, so runs/benchmark/ never holds a partial run. Runs started in the same second
+publish as <ts>, <ts>-1, ...; a completed run that cannot be published stays staged (PublishError
+names it). Only input errors exit 2 with `ERROR:`; anything else raises with its traceback.
 
 Samples (BS1): every golden sample must be tagged `test` AND its split id must be among the
 `load_split("test")` entries of the split manifest whose sha256 the golden manifest records;
@@ -50,6 +52,7 @@ Usage:
 
 import argparse
 import asyncio
+import errno
 import json
 import shutil
 import sys
@@ -66,13 +69,14 @@ for p in (str(ROOT), str(ROOT / "backend")):
         sys.path.insert(0, p)
 
 from models.evaluation.calibration import (  # noqa: E402
+    CalibrationError,
     ScoredSet,
     build_calibration,
     load_calibration,
     save_calibration,
 )
 from models.evaluation.dedup import UnionFind  # noqa: E402
-from models.evaluation.manifest import DEFAULT_MANIFEST, load_manifest, load_split  # noqa: E402
+from models.evaluation.manifest import DEFAULT_MANIFEST, ManifestError, load_manifest, load_split  # noqa: E402
 from models.evaluation.report import (  # noqa: E402
     RunContext,
     compute_metrics,
@@ -89,6 +93,7 @@ LABELS = {"channel_a": "label_copy", "channel_b": "label_ai"}
 # decision >= DECISION_TRUE, i.e. the decision is True. It is not a score threshold.
 DECISION_TRUE = 1
 STAGING = ".staging"  # in-progress runs live under <runs root>/.staging/ until they complete
+PUBLISH_ATTEMPTS = 100  # <ts>, <ts>-1, ... names tried before a completed run stays staged
 CALIBRATION_STEP = (
     "run the calibration step first: python scripts/benchmark_suite.py --mode calibrated-fit-in-run "
     "--manifest <test golden manifest> --val-manifest <val golden manifest> (it writes "
@@ -98,7 +103,16 @@ CALIBRATION_STEP = (
 
 
 class BenchmarkError(Exception):
-    """An actionable usage error (missing calibration, missing val manifest, hash mismatch)."""
+    """An actionable input error: missing or malformed calibration, missing val manifest, a golden
+    manifest that is unreadable, lacks its source hash or holds a sample outside the split.
+
+    `main()` reports only these (and `ManifestError`) as `ERROR:` + exit 2; any other exception,
+    including a ValueError raised while scoring, calibrating or computing metrics, is a bug and
+    propagates with its traceback."""
+
+
+class PublishError(RuntimeError):
+    """A completed run could not be moved out of staging; the staged run is kept at the named path."""
 
 
 # --------------------------------------------------------------------------- scoring
@@ -162,14 +176,14 @@ def require_split(samples: Sequence[Mapping], split: str, split_manifest_path: P
     """Raise naming the first sample that is not an included `split` entry of the manifest."""
     for s in samples:
         if s.get("split") != split:
-            raise ValueError(
+            raise BenchmarkError(
                 f"golden sample {s['id']} (split id {s.get('split_id')}) is {s.get('split')!r}; "
                 f"this step accepts {split!r} only"
             )
     allowed = {e.id for e in load_split(split, path=split_manifest_path, expected_sha256=sha256)}
     for s in samples:
         if s.get("split_id") not in allowed:
-            raise ValueError(
+            raise BenchmarkError(
                 f"golden sample {s['id']} has split id {s.get('split_id')}, which is not an included "
                 f"{split!r} entry of {split_manifest_path}"
             )
@@ -178,7 +192,7 @@ def require_split(samples: Sequence[Mapping], split: str, split_manifest_path: P
 def _source_sha(golden: Mapping, which: str) -> str:
     sha = golden.get("source_manifest_sha256")
     if not sha:
-        raise ValueError(
+        raise BenchmarkError(
             f"{which} golden manifest has no source_manifest_sha256; rebuild it with "
             "data/golden_set/build_corpus.py and build_manifest.py from the split manifest"
         )
@@ -194,7 +208,10 @@ def resolve_calibrations(paths: Mapping[str, Optional[Path]], manifest_sha256: s
         if path is None or not Path(path).is_file():
             shown = path if path is not None else f"calibration_{channel}.json (no path given)"
             raise BenchmarkError(f"missing calibration for {channel}: {shown}; {CALIBRATION_STEP}")
-        cal = load_calibration(path)
+        try:
+            cal = load_calibration(path)
+        except CalibrationError as exc:
+            raise BenchmarkError(f"{path} is not a valid calibration file ({exc}); {CALIBRATION_STEP}") from exc
         if cal.artifact["channel"] != channel:
             raise BenchmarkError(f"{path} is a calibration for {cal.artifact['channel']}, not {channel}")
         if cal.artifact["manifest"]["sha256"] != manifest_sha256:
@@ -320,30 +337,60 @@ def fused_metrics(rows, y, cal_a, cal_b, calibrations, *, mode, seed, n_boot) ->
 
 
 # --------------------------------------------------------------------------- run lifecycle
+def _is_name_taken(exc: OSError) -> bool:
+    """True when a rename failed because the destination directory already exists."""
+    return isinstance(exc, FileExistsError) or exc.errno in (errno.EEXIST, errno.ENOTEMPTY)
+
+
+def _write_run_paths(staged: Path, originals: Mapping[Path, str], final: Path, run_id: Optional[str]) -> None:
+    """Rewrite the original texts with the staged path rebased onto `final` (and the top run id
+    when given); always from the originals, so retrying another name never rebases twice."""
+    old, new = staged.as_posix(), final.as_posix()
+    for path, text in originals.items():
+        if path == staged / "config.json" and run_id is not None:
+            config = json.loads(text.replace(old, new))
+            config["run_id"] = run_id
+            text = json.dumps(config, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+            path.write_text(text, encoding="utf-8", newline="\n")
+        else:
+            path.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+
+
 def _publish(staged: Path, dest_root: Path) -> Path:
     """Move a finished staged run to `dest_root/<ts>[-N]` and return its final path.
 
-    Paths recorded inside the run (summary, configs) are rebased onto the final directory
-    BEFORE the rename, so the rename is the last step. Calibration files record no run path
-    and stay byte-identical (their sha256 is pinned in the channel configs)."""
+    Paths recorded inside the run (summary, configs) are rebased onto the candidate directory
+    BEFORE each rename, so the rename is the last step. The rename itself claims the name: when
+    another run takes `<ts>` first (between any check and our rename), the next suffix is tried,
+    up to PUBLISH_ATTEMPTS names. On failure the recorded paths are restored and the staged run
+    is kept (a completed run is never deleted) and `PublishError` names it. Calibration files
+    record no run path and stay byte-identical (their sha256 is pinned in the channel configs)."""
     dest_root.mkdir(parents=True, exist_ok=True)
-    final, suffix = dest_root / staged.name, 0
-    while final.exists():
-        suffix += 1
-        final = dest_root / f"{staged.name}-{suffix}"
-    old, new = staged.as_posix(), final.as_posix()
-    for path in staged.rglob("*"):
-        if path.suffix in (".json", ".md") and not path.name.startswith("calibration_"):
-            text = path.read_text(encoding="utf-8")
-            if old in text:
-                path.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
-    if final.name != staged.name:
-        config = json.loads((staged / "config.json").read_text(encoding="utf-8"))
-        config["run_id"] = f"{dest_root.name}/{final.name}"
-        text = json.dumps(config, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
-        (staged / "config.json").write_text(text, encoding="utf-8", newline="\n")
-    staged.rename(final)
-    return final
+    originals = {
+        path: path.read_text(encoding="utf-8")
+        for path in sorted(staged.rglob("*"))
+        if path.suffix in (".json", ".md") and not path.name.startswith("calibration_")
+    }
+    last_error: Optional[OSError] = None
+    for suffix in range(PUBLISH_ATTEMPTS):
+        final = dest_root / (staged.name if suffix == 0 else f"{staged.name}-{suffix}")
+        if final.exists():
+            continue
+        run_id = None if suffix == 0 else f"{dest_root.name}/{final.name}"
+        _write_run_paths(staged, originals, final, run_id)
+        try:
+            staged.rename(final)
+            return final
+        except OSError as exc:
+            last_error = exc
+            if not _is_name_taken(exc):
+                break
+    for path, text in originals.items():  # the kept run records where it actually is
+        path.write_text(text, encoding="utf-8", newline="\n")
+    raise PublishError(
+        f"could not publish the completed run into {dest_root} ({last_error or 'every name was taken'}); "
+        f"it is kept at {staged.as_posix()}"
+    ) from last_error
 
 
 def run_suite(
@@ -402,15 +449,21 @@ def run_suite(
         rows = asyncio.run(score_manifest(golden, root, engine))
         _evaluate_run(top, rows, calibrations, shared, manifest, sha=sha, split_manifest_path=split_manifest_path,
                       mode=mode, seed=seed, n_boot=n_boot, argv=argv, now=now, synthetic=synthetic)
-        final = _publish(top.path, Path(runs_root) / "benchmark")
-    finally:
-        # on success only the emptied staging parents remain; on failure the partial run goes
-        shutil.rmtree(staging, ignore_errors=True)
-        try:
-            staging.parent.rmdir()  # only when no other run is staged
-        except OSError:
-            pass
+    except BaseException:
+        _discard_staging(staging)  # a failure while scoring or fitting: the partial run goes
+        raise
+    # a completed run is never deleted: if publishing fails, PublishError names the kept run
+    final = _publish(top.path, Path(runs_root) / "benchmark")
+    _discard_staging(staging)  # only the emptied staging parents remain
     return json.loads((final / "summary.json").read_text(encoding="utf-8"))
+
+
+def _discard_staging(staging: Path) -> None:
+    shutil.rmtree(staging, ignore_errors=True)
+    try:
+        staging.parent.rmdir()  # only when no other run is staged
+    except OSError:
+        pass
 
 
 def _evaluate_run(top: RunContext, rows, calibrations, shared, manifest, *, sha, split_manifest_path, mode,
@@ -506,7 +559,10 @@ def print_table(summary: Mapping[str, Any]) -> None:
 
 
 def _read_golden(path: Path) -> Dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BenchmarkError(f"cannot read golden manifest {path}: {exc}") from exc
 
 
 def main(argv=None) -> int:
@@ -568,9 +624,11 @@ def main(argv=None) -> int:
             argv=sys.argv if argv is None else ["scripts/benchmark_suite.py", *argv],
             golden_manifest_path=args.manifest,
         )
-    except (BenchmarkError, ValueError) as exc:
-        # usage and input errors: missing calibration, a non-test golden sample, a golden manifest
-        # without source hash, a split manifest hash mismatch (ManifestError is a ValueError)
+    except (BenchmarkError, ManifestError) as exc:
+        # input errors only: missing/malformed calibration or golden manifest, a sample outside the
+        # test split, a missing source hash, a split manifest hash mismatch (ManifestHashError).
+        # Any other exception (a ValueError while scoring or computing metrics) is a bug: let it
+        # propagate with its traceback.
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     print_table(summary)
