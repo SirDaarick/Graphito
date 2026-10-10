@@ -3,9 +3,10 @@
 Order (design "Training"): (1) `seed_everything(seed, deterministic_torch=True)`, (2) load the
 split manifest, (3) create the run directory `<runs-root>/char_cnn/<ts>/` (`RunContext`), (4) read,
 normalize and encode train/val/test once, running the leak guard on the normalized human
-representatives of every split, (5) build the model (seeded, no dummy forward pass), (6) train
-with the 1:1 epoch sampler and select the checkpoint by val ROC-AUC (ties: val PR-AUC, then the
-earlier epoch), saving `best.pth` on every improvement.
+representatives of every split and the shortcut audit in the same pass, (5) build the model
+(seeded, no dummy forward pass), (6) train with the 1:1 epoch sampler and select the checkpoint by
+val ROC-AUC (ties: val PR-AUC, then the earlier epoch), saving `best.pth` on every improvement,
+(7) `evaluate_run`: val-only calibration, then the test split scored once (`v2/evaluate.py`).
 
 The trainer writes only inside its run directory. It never writes `models/char_cnn/best_model.pth`
 (or anything under `models/`) and never promotes a checkpoint; promotion is a separate CLI.
@@ -19,7 +20,7 @@ import json
 import math
 import sys
 import time
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
@@ -30,9 +31,11 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from models.char_cnn.v2.checkpoint import make_checkpoint
 from models.char_cnn.v2.config import CharCNNV2Config
 from models.char_cnn.v2.data import EncodedSet, collate, epoch_batches, label_of, load_views, view_samples
+from models.char_cnn.v2.evaluate import evaluate_run, update_run_config
 from models.char_cnn.v2.model import CharCNNV2
 from models.char_cnn.v2.preprocess import LeakGuardError, leak_guard
 from models.char_cnn.v2.scoring import score_arrays
+from models.char_cnn.v2.shortcuts import ShortcutAudit
 from models.evaluation import metrics as M
 from models.evaluation.manifest import DEFAULT_MANIFEST, ROOT, Sample, load_manifest
 from models.evaluation.provenance import atomic_write_bytes
@@ -57,6 +60,7 @@ LEAK_GUARD_EXIT = 2
 LEAK_GUARD_SCHEMA = "graphito.charcnn_leak_guard/v1"
 LEAK_GUARD_THRESHOLD = 0.001
 GUARD_VIEWS = ("train", "val", "test")  # representatives of every split
+SHORTCUT_VIEWS = ("train", "test")  # representatives audited for residual shortcuts
 HISTORY_COLUMNS = ("epoch", "train_loss", "val_roc_auc", "val_pr_auc", "lr", "n_epoch_samples", "seconds")
 
 OnText = Callable[[Sample, str, str], None]
@@ -80,12 +84,13 @@ class TrainOptions:
     lr_patience: int = 3
     lr_factor: float = 0.5
     eval_batch_size: int = 32
+    n_boot: int = 1000
     limit_per_class: Optional[int] = None
 
     def hyperparams(self) -> Dict[str, Any]:
         keys = (
             "seed", "epochs", "batch_size", "lr", "weight_decay", "early_stop", "lr_patience",
-            "lr_factor", "eval_batch_size", "limit_per_class",
+            "lr_factor", "eval_batch_size", "n_boot", "limit_per_class",
         )
         return {key: getattr(self, key) for key in keys}
 
@@ -179,12 +184,6 @@ def save_checkpoint(model: CharCNNV2, path: Path, **metadata: Any) -> None:
     torch.save(make_checkpoint(model, **metadata), buffer)
     atomic_write_bytes(path, buffer.getvalue())
 
-
-def update_run_config(ctx: RunContext, **fields_: Any) -> RunContext:
-    """Rewrite the run's `config.json` with extra top-level fields (provenance completion, D12)."""
-    doc = {**ctx.config, **fields_}
-    _write_json(ctx.path / "config.json", doc)
-    return replace(ctx, config=doc)
 
 
 # --- training loop -------------------------------------------------------------------------------
@@ -358,7 +357,7 @@ def run(
     model_config: Optional[CharCNNV2Config] = None,
     argv: Optional[Sequence[str]] = None,
 ) -> RunResult:
-    """Execute one training run (steps 1-6); returns exit code 0, or 2 on a leak-guard failure."""
+    """Execute one run (steps 1-7); returns exit code 0, or 2 on a leak-guard failure."""
     model_config = model_config or CharCNNV2Config()
     seed_everything(options.seed, deterministic_torch=True)
     device = resolve_device(options.device)
@@ -383,7 +382,8 @@ def run(
 
     guard_ids = {s.id for view in GUARD_VIEWS for s in view_samples(manifest, view)}
     guard = GuardCollector(guard_ids)
-    views = load_views(manifest, root=options.root, on_text=_fan_out(guard))
+    audit = ShortcutAudit({view: [s.id for s in view_samples(manifest, view)] for view in SHORTCUT_VIEWS})
+    views = load_views(manifest, root=options.root, on_text=_fan_out(guard, audit))
     guard_doc = guard.check()
     _write_json(ctx.path / "leak_guard.json", guard_doc)
     ctx = update_run_config(
@@ -397,7 +397,8 @@ def run(
 
     if options.limit_per_class is not None:
         views = {name: _limit(view, options.limit_per_class) for name, view in views.items()}
-    ctx = update_run_config(ctx, data_summary=data_summary(views))
+    summary = data_summary(views)
+    ctx = update_run_config(ctx, data_summary=summary)
 
     model = build_model(model_config, device, options.seed)
     metadata = {
@@ -424,6 +425,17 @@ def run(
             "stopped_early": result.stopped_early,
             "checkpoint": "best.pth",
         },
+    )
+    evaluate_run(
+        ctx,
+        manifest,
+        views,
+        device,
+        seed=options.seed,
+        n_boot=options.n_boot,
+        batch_size=options.eval_batch_size,
+        shortcuts=audit.to_dict(),
+        data_summary=summary,
     )
     return RunResult(0, ctx.path, result)
 
@@ -463,6 +475,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lr-patience", type=int, default=d.lr_patience)
     p.add_argument("--lr-factor", type=float, default=d.lr_factor)
     p.add_argument("--eval-batch-size", type=int, default=d.eval_batch_size, help="windows per scoring batch")
+    p.add_argument("--n-boot", type=int, default=d.n_boot, help="bootstrap resamples for the CI95")
     p.add_argument("--limit-per-class", type=int, default=None, help="debug only: first N per class per view")
     p.add_argument("--model-config", type=Path, default=None, help="JSON object of CharCNNV2Config overrides")
     return p
@@ -484,6 +497,7 @@ def options_from_args(args: argparse.Namespace) -> TrainOptions:
         lr_patience=args.lr_patience,
         lr_factor=args.lr_factor,
         eval_batch_size=args.eval_batch_size,
+        n_boot=args.n_boot,
         limit_per_class=args.limit_per_class,
     )
 

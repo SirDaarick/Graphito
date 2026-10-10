@@ -20,6 +20,7 @@ torch = pytest.importorskip("torch")
 
 from eval_factory import make_tree
 from models.char_cnn.v2 import data as data_mod
+from models.char_cnn.v2 import evaluate as eval_mod
 from models.char_cnn.v2 import train as train_mod
 from models.char_cnn.v2.config import CharCNNV2Config
 from models.char_cnn.v2.data import EncodedSet
@@ -100,6 +101,7 @@ def _argv(corpus, runs_root: Path, *extra: str) -> list:
         "--batch-size", "8",
         "--device", "cpu",
         "--model-config", str(model_config),
+        "--n-boot", "40",
         *extra,
     ]
 
@@ -153,19 +155,41 @@ def traced_run(corpus, tmp_path_factory):
     promote.main = lambda *a, **k: promote_calls.append((a, k))
     promote.promote = promote.main
 
+    evaluate_calls, calibration_inputs, scored = [], [], []
+
+    def evaluate_run_spy(ctx, *args, **kwargs):
+        evaluate_calls.append(ctx.path)
+        return original["evaluate_run"](ctx, *args, **kwargs)
+
+    def build_calibration_spy(data, **kwargs):
+        calibration_inputs.append((list(data.ids), list(data.entry_splits or ())))
+        return original_eval["build_calibration"](data, **kwargs)
+
+    def score_split_spy(model, encoded, device, batch_size, *, name):
+        run_dir = evaluate_calls[-1]
+        scored.append((name, list(encoded.ids), (run_dir / "calibration.json").exists()))
+        return original_eval["score_split"](model, encoded, device, batch_size, name=name)
+
     original = {
         name: getattr(train_mod, name)
-        for name in ("seed_everything", "load_views", "build_model", "collate", "epoch_batches")
+        for name in ("seed_everything", "load_views", "build_model", "collate", "epoch_batches", "evaluate_run")
     }
+    original_eval = {name: getattr(eval_mod, name) for name in ("build_calibration", "score_split")}
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(train_mod, "seed_everything", seed_spy)
         mp.setattr(train_mod, "load_views", load_views_spy)
         mp.setattr(train_mod, "build_model", build_model_spy)
         mp.setattr(train_mod, "collate", collate_spy)
         mp.setattr(train_mod, "epoch_batches", epoch_batches_spy)
+        mp.setattr(train_mod, "evaluate_run", evaluate_run_spy)
+        mp.setattr(eval_mod, "build_calibration", build_calibration_spy)
+        mp.setattr(eval_mod, "score_split", score_split_spy)
         mp.setitem(sys.modules, "models.char_cnn.v2.promote", promote)
         code = train_mod.main(_argv(corpus, runs_root))
     return {
+        "evaluate_calls": evaluate_calls,
+        "calibration_inputs": calibration_inputs,
+        "scored": scored,
         "code": code,
         "runs_root": runs_root,
         "run_dir": _single_run_dir(runs_root),
@@ -361,6 +385,161 @@ class TestLeakGuard:
         assert not (run_dir / "history.csv").exists()
 
 
+# --- 6.1 / 6.3 evaluation ------------------------------------------------------------------------
+
+
+def _json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _csv(path: Path) -> list:
+    with open(path, encoding="utf-8", newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+CT53_ARTIFACTS = (
+    "config.json", "best.pth", "history.csv", "leak_guard.json", "calibration.json", "metrics.json",
+    "report.md", "shortcuts.json", "scores_val.csv", "scores_test.csv", "test_all/metrics.json",
+    "test_all/report.md",
+)
+
+
+class TestEvaluate:
+    def test_main_invokes_evaluate_run_once(self, traced_run):
+        assert traced_run["evaluate_calls"] == [traced_run["run_dir"]]
+
+    def test_run_has_every_artifact(self, traced_run):
+        run_dir = traced_run["run_dir"]
+        for name in CT53_ARTIFACTS:
+            assert (run_dir / name).is_file(), name
+        report = (run_dir / "report.md").read_text(encoding="utf-8")
+        for section in ("## Test view", "## Per generator", "## Abstention", "## Shortcut audit"):
+            assert section in report, section
+
+    def test_calibration_is_fitted_on_val_ids_only(self, corpus, traced_run):
+        manifest = load_manifest(corpus[1])
+        val_ids = {s.id for s in manifest.samples("val", representatives_only=True)}
+        assert len(traced_run["calibration_inputs"]) == 1
+        ids, splits = traced_run["calibration_inputs"][0]
+        assert set(ids) == val_ids and set(splits) == {"val"}
+        cal = _json(traced_run["run_dir"] / "calibration.json")
+        assert cal["fit_set"]["split"] == "val" and cal["fit_set"]["n"] == len(val_ids)
+        assert cal["method"] == "platt" and cal["channel"] == "char_cnn"
+
+    def test_test_is_scored_once_after_calibration(self, corpus, traced_run):
+        manifest = load_manifest(corpus[1])
+        assert [name for name, _, _ in traced_run["scored"]] == ["val", "test"]
+        (_, _, cal_before_val), (_, test_ids, cal_before_test) = traced_run["scored"]
+        assert cal_before_val is False and cal_before_test is True
+        assert set(test_ids) == {s.id for s in manifest.samples("test")}
+
+    def test_headline_and_secondary_views(self, corpus, traced_run):
+        manifest = load_manifest(corpus[1])
+        run_dir = traced_run["run_dir"]
+        headline, secondary = _json(run_dir / "metrics.json"), _json(run_dir / "test_all" / "metrics.json")
+        n_reps = len(manifest.samples("test", representatives_only=True))
+        n_all = len(manifest.samples("test"))
+        assert n_reps < n_all
+        assert (headline["n"], secondary["n"]) == (n_reps, n_all)
+        assert headline["test_view"]["name"] == "test" and "representatives" in headline["test_view"]["label"]
+        assert secondary["test_view"]["name"] == "test_all" and "all" in secondary["test_view"]["label"]
+        assert headline["mode"] == "representatives" and secondary["mode"] == "all_files"
+        assert "## Test view" in (run_dir / "test_all" / "report.md").read_text(encoding="utf-8")
+
+    def test_ci_is_bootstrapped_by_dup_group(self, corpus, traced_run):
+        manifest = load_manifest(corpus[1])
+        secondary = _json(traced_run["run_dir"] / "test_all" / "metrics.json")
+        units = {s.dup_group or s.id for s in manifest.samples("test")}
+        assert secondary["bootstrap"]["unit"] == "dup_group"
+        assert secondary["bootstrap"]["n_units"] == len(units) < secondary["n"]
+        assert secondary["threshold_free"]["roc_auc"]["ci95"] is not None
+
+    def test_operating_points_come_from_val_calibration(self, traced_run):
+        run_dir = traced_run["run_dir"]
+        headline = _json(run_dir / "metrics.json")
+        sha = hashlib.sha256((run_dir / "calibration.json").read_bytes()).hexdigest()
+        assert headline["operating_points"]
+        assert {p["source"] for p in headline["operating_points"].values()} == {f"calibration:{sha}"}
+        config = _json(run_dir / "config.json")
+        assert config["calibration_sha256"] == sha
+        assert config["threshold_source"] == f"calibration:{sha}"
+        assert config["calibration_path"].endswith("calibration.json")
+
+    def test_per_group_breakdowns(self, traced_run):
+        per_group = _json(traced_run["run_dir"] / "metrics.json")["per_group"]
+        assert set(per_group) == {"lang", "course", "length_bucket"}
+        for name, table in per_group.items():
+            for entry in table["roc_auc"].values():
+                assert isinstance(entry["low_support"], bool), name
+        buckets = per_group["length_bucket"]["roc_auc"]
+        assert set(buckets) == {"<512", "512-1023", "1024-2047", "2048-4095", ">=4096"}
+        assert buckets[">=4096"] == {"n": 0, "n_pos": 0, "value": None, "reason": "empty", "low_support": True}
+        assert set(per_group["course"]["roc_auc"]) == {"A2016", "A2017", "B2016", "B2017"}
+
+    def test_per_generator_compares_each_group_with_all_humans(self, corpus, traced_run):
+        manifest = load_manifest(corpus[1])
+        test = manifest.samples("test", representatives_only=True)
+        n_human = sum(s.source == "human" for s in test)
+        metrics = _json(traced_run["run_dir"] / "metrics.json")
+        per_gen = metrics["per_generator"]
+        assert set(per_gen) >= {"model", "profile"}
+        for key in ("model", "profile"):
+            for group, entry in per_gen[key].items():
+                expected_pos = sum(s.source == "ai" and str(getattr(s, key)) == group for s in test)
+                assert (entry["n_pos"], entry["n_neg"]) == (expected_pos, n_human), (key, group)
+                assert entry["low_support"] is (entry["n_pos"] < 30)
+                assert set(entry["recall"]) == set(metrics["operating_points"])
+        assert {"kimi", "deepseek-chat"} <= set(per_gen["model"])
+
+    def test_n_abstained_is_reported_per_split_and_class(self, traced_run):
+        n_abstained = _json(traced_run["run_dir"] / "metrics.json")["n_abstained"]
+        for split in ("val", "test", "test_all"):
+            entry = n_abstained[split]
+            assert {"human", "ai", "total"} <= set(entry)
+            assert entry["total"] == entry["human"] + entry["ai"]
+
+    def test_score_csvs(self, corpus, traced_run):
+        manifest = load_manifest(corpus[1])
+        run_dir = traced_run["run_dir"]
+        val_rows = _csv(run_dir / "scores_val.csv")
+        assert list(val_rows[0]) == ["id", "y", "raw", "calibrated"]
+        assert [r["id"] for r in val_rows] == [s.id for s in manifest.samples("val", representatives_only=True)]
+        test_rows = _csv(run_dir / "scores_test.csv")
+        assert list(test_rows[0]) == ["id", "y", "raw", "calibrated", "representative"]
+        assert {r["id"] for r in test_rows} == {s.id for s in manifest.samples("test")}
+        reps = {s.id for s in manifest.samples("test", representatives_only=True)}
+        assert {r["id"] for r in test_rows if r["representative"] == "1"} == reps
+        assert all(0.0 <= float(r["calibrated"]) <= 1.0 for r in val_rows + test_rows)
+
+    def test_shortcuts_cover_train_and_test_representatives(self, corpus, traced_run):
+        manifest = load_manifest(corpus[1])
+        doc = _json(traced_run["run_dir"] / "shortcuts.json")
+        for split in ("train", "test"):
+            reps = manifest.samples(split, representatives_only=True)
+            assert doc["sets"][split]["human"]["n"] == sum(s.source == "human" for s in reps)
+            assert doc["sets"][split]["ai"]["n"] == sum(s.source == "ai" for s in reps)
+
+
+class TestPerGroupSupport:
+    def test_small_group_is_low_support_and_absent_group_is_empty(self):
+        from models.evaluation.report import compute_metrics
+
+        y = np.array([0, 1] * 35 + [0, 1])
+        s = np.linspace(0.0, 1.0, y.size)
+        groups = np.array(["big"] * 70 + ["tiny"] * 2, dtype=object)
+        metrics = compute_metrics(
+            y, s, channel="char_cnn", split="test", mode="representatives", seed=0,
+            groups={"g": groups}, n_boot=10,
+        )
+        table = eval_mod.complete_per_group(metrics["per_group"], {"g": ["big", "tiny", "absent"]})["g"]
+        for metric in ("roc_auc", "pr_auc"):
+            assert table[metric]["big"]["low_support"] is False
+            assert table[metric]["tiny"]["n"] == 2 and table[metric]["tiny"]["low_support"] is True
+            assert table[metric]["absent"] == {
+                "n": 0, "n_pos": 0, "value": None, "reason": "empty", "low_support": True
+            }
+
+
 # --- 5.4 determinism -----------------------------------------------------------------------------
 
 
@@ -380,6 +559,8 @@ class TestDeterminism:
         assert a["model_state_dict"].keys() == b["model_state_dict"].keys()
         for key in a["model_state_dict"]:
             assert torch.equal(a["model_state_dict"][key], b["model_state_dict"][key]), key
+        for name in ("metrics.json", "test_all/metrics.json", "calibration.json", "shortcuts.json"):
+            assert _json(first / name) == _json(second / name), name
 
     def test_real_checkpoint_is_untouched(self, traced_run):
         if traced_run["real_before"] is None:
