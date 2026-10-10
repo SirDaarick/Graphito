@@ -93,8 +93,9 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU8: Calibration (depends on WU5, WU7)
 
-- [ ] 8.1 RED `tests/test_eval_calibration.py`: `fit` raises `ValueError` on any non-val entry and writes no artifact; Platt/temperature/isotonic preserve ranking (AUC unchanged); temperature recovers a known T; `select_threshold` lowest t with FPR <= 5% (Uniform(0,0.6)/(0.4,1) case), `low_support`, `unachievable`; round trip `transform` within 1e-9; unknown schema version or missing key rejected; deterministic write; frozen apply to test changes no parameter. [EM3.1-3.7]
-- [ ] 8.2 GREEN `models/evaluation/calibration.py` (`ScoredSet`, `fit`, calibrators, `select_threshold`, `save/load_calibration`; thresholds in calibrated space) and `models/evaluation/provenance.py` (git sha + dirty with `unknown` fallback, file sha256; shared with WU9). Check: 8.1 passes.
+- [x] 8.1 RED `tests/test_eval_calibration.py`: `fit` raises `ValueError` on any non-val entry and writes no artifact; Platt/temperature/isotonic preserve ranking (AUC unchanged); temperature recovers a known T; `select_threshold` lowest t with FPR <= 5% (Uniform(0,0.6)/(0.4,1) case), `low_support`, `unachievable`; round trip `transform` within 1e-9; unknown schema version or missing key rejected; deterministic write; frozen apply to test changes no parameter. [EM3.1-3.7]
+- [x] 8.2 GREEN `models/evaluation/calibration.py` (`ScoredSet`, `fit`, calibrators, `select_threshold`, `save/load_calibration`; thresholds in calibrated space) and `models/evaluation/provenance.py` (git sha + dirty with `unknown` fallback, file sha256; shared with WU9). Check: 8.1 passes.
+- Evidence 8.1-8.2: RED observed (`ImportError` collecting tests/test_eval_calibration.py: no `calibration`/`provenance` modules) -> GREEN 25/25. Isotonic preserves ranking weakly (plateaus may tie; never invert), so the AUC-unchanged check applies to temperature/Platt; default `min_negatives = ceil(10 / target)` (design rule `n_neg * target < 10`), overridable. Temperature/Platt require scores in [0, 1].
 
 ## WU9: Reporting (depends on WU7; WU8 for the calibration hash)
 
