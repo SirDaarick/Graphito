@@ -84,11 +84,12 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU7: Metrics (independent; may start any time after WU1)
 
-- [ ] 7.1 RED `tests/test_eval_metrics.py` known values: ROC-AUC 1.0 / 0.0 / 0.5 (all ties) / 0.875; sklearn oracle on tie-heavy random data (`roc_auc`, `average_precision`); `single_class` returns `None` plus reason, no exception; n=20000 random AUC within 0.02 of 0.5. [EM1.2, EM1.3]
-- [ ] 7.2 RED threshold metrics: precision null without predicted positives, recall null without positives, FPR still defined; `observed` and `balanced` always, `natural` only when configured (labelled); per-group with empty group gives `n=0` and null. [EM1.1, EM1.4-1.6]
-- [ ] 7.3 RED retrieval and calibration error: AP@R = 1/2 for `[rel,non,rel,non]`, 1.0 for `[rel,rel,non,non]`, R=0 queries excluded and counted; ECE 0 (8/10 at 0.8) and 0.3 (5/10), bin count recorded. [EM1.1]
-- [ ] 7.4 RED bootstrap: seed-reproducible; point estimate in `[lo, hi]`; global RNG state unchanged; 2 positives in 100 gives `skipped_resamples` and valid or null CI; grouped (atomic unit/block) resampling. [EM2.1-2.3]
-- [ ] 7.5 GREEN `models/evaluation/metrics.py` (rank-based AUC with midranks, curves, AP, `threshold_metrics`, `map_at_r`, `ece`/`reliability_bins`, `bootstrap_ci`, `per_group`, `prevalence_weights`). Check: 7.1-7.4 pass.
+- [x] 7.1 RED `tests/test_eval_metrics.py` known values: ROC-AUC 1.0 / 0.0 / 0.5 (all ties) / 0.875; sklearn oracle on tie-heavy random data (`roc_auc`, `average_precision`); `single_class` returns `None` plus reason, no exception; n=20000 random AUC within 0.02 of 0.5. [EM1.2, EM1.3]
+- [x] 7.2 RED threshold metrics: precision null without predicted positives, recall null without positives, FPR still defined; `observed` and `balanced` always, `natural` only when configured (labelled); per-group with empty group gives `n=0` and null. [EM1.1, EM1.4-1.6]
+- [x] 7.3 RED retrieval and calibration error: AP@R = 1/2 for `[rel,non,rel,non]`, 1.0 for `[rel,rel,non,non]`, R=0 queries excluded and counted; ECE 0 (8/10 at 0.8) and 0.3 (5/10), bin count recorded. [EM1.1]
+- [x] 7.4 RED bootstrap: seed-reproducible; point estimate in `[lo, hi]`; global RNG state unchanged; 2 positives in 100 gives `skipped_resamples` and valid or null CI; grouped (atomic unit/block) resampling. [EM2.1-2.3]
+- [x] 7.5 GREEN `models/evaluation/metrics.py` (rank-based AUC with midranks, curves, AP, `threshold_metrics`, `map_at_r`, `ece`/`reliability_bins`, `bootstrap_ci`, `per_group`, `prevalence_weights`). Check: 7.1-7.4 pass.
+- Evidence 7.1-7.5: RED observed (`ImportError: cannot import name 'metrics' from 'models.evaluation'`) -> GREEN 34/34 in tests/test_eval_metrics.py (sklearn oracle for AUC, weighted AUC, AP and ROC points; brute-force MAP@R oracle).
 
 ## WU8: Calibration (depends on WU5, WU7)
 
