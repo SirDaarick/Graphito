@@ -21,6 +21,8 @@ data/raw/*
 data/raw.zip
 data/processed/*
 data/output/
+data/golden_set/corpus/
+data/golden_set/corpus_*/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 chroma_data/

@@ -4,6 +4,7 @@ import torch
 from models.char_cnn.inference import CharCNNInference
 from models.graphcodebert.inference import GraphCodeBERTInference
 from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
+from app.config import settings
 from app.infrastructure.inference.stub_engine import StubInferenceEngine
 
 # ==============================================================================
@@ -256,8 +257,8 @@ def run_benchmarks():
         decision = stub.compute_decision(
             semantic_similarity=calib_sem,
             synthetic_prob=ai_prob,
-            threshold_sem=0.75,
-            threshold_ai=0.70,
+            threshold_sem=settings.THRESHOLD_SEM,  # canonical 0.85 (was a local 0.75)
+            threshold_ai=settings.THRESHOLD_AI,
         )
 
         results.append({

@@ -1,0 +1,104 @@
+{
+  "engine": "real",
+  "manifest": "data\\golden_set\\manifest_clang-format.json",
+  "synthetic": false,
+  "threshold_ai": 0.7,
+  "runs": [
+    {
+      "threshold_sem": 0.85,
+      "split": "all",
+      "n": 417,
+      "channel_a": {
+        "auc": 0.5994,
+        "f1": 0.3483,
+        "fpr": 0.6372,
+        "tp": 62,
+        "fp": 216,
+        "tn": 123,
+        "fn": 16
+      },
+      "channel_b": {
+        "auc": 0.9775,
+        "f1": 0.7526,
+        "fpr": 0.7273,
+        "tp": 219,
+        "fp": 144,
+        "tn": 54,
+        "fn": 0
+      },
+      "fused": {
+        "auc": 0.8408,
+        "f1": 0.8462,
+        "fpr": 0.9,
+        "tp": 297,
+        "fp": 108,
+        "tn": 12,
+        "fn": 0
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "dev",
+      "n": 213,
+      "channel_a": {
+        "auc": 0.6675,
+        "f1": 0.4153,
+        "fpr": 0.6047,
+        "tp": 38,
+        "fp": 104,
+        "tn": 68,
+        "fn": 3
+      },
+      "channel_b": {
+        "auc": 0.9702,
+        "f1": 0.7351,
+        "fpr": 0.7843,
+        "tp": 111,
+        "fp": 80,
+        "tn": 22,
+        "fn": 0
+      },
+      "fused": {
+        "auc": 0.8286,
+        "f1": 0.8444,
+        "fpr": 0.918,
+        "tp": 152,
+        "fp": 56,
+        "tn": 5,
+        "fn": 0
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "test",
+      "n": 204,
+      "channel_a": {
+        "auc": 0.5136,
+        "f1": 0.2775,
+        "fpr": 0.6707,
+        "tp": 24,
+        "fp": 112,
+        "tn": 55,
+        "fn": 13
+      },
+      "channel_b": {
+        "auc": 0.9849,
+        "f1": 0.7714,
+        "fpr": 0.6667,
+        "tp": 108,
+        "fp": 64,
+        "tn": 32,
+        "fn": 0
+      },
+      "fused": {
+        "auc": 0.8545,
+        "f1": 0.848,
+        "fpr": 0.8814,
+        "tp": 145,
+        "fp": 52,
+        "tn": 7,
+        "fn": 0
+      }
+    }
+  ]
+}

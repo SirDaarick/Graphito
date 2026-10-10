@@ -4,17 +4,17 @@
     "titulo": "Alumno IA (Gemini / ChatGPT puro)",
     "descripcion": "Generado íntegramente por LLM con comentarios explicativos, estilo canónico en inglés y nombrado descriptivo.",
     "raw_sem": 0.8917,
-    "calib_sem": 0.5666,
+    "calib_sem": 0.751,
     "ai_prob": 0.9954,
     "hum_prob": 0.0046,
     "char_pred": "sintético",
-    "dictamen": "SOSPECHA_IA",
-    "discrepancia": 0.564,
+    "dictamen": "DISCREPANCIA_DUAL",
+    "discrepancia": 0.7475,
     "indicadores": [
       {
-        "tipo_alerta": "PATRON_SINTETICO",
-        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.5%).",
-        "severidad": "MEDIA"
+        "tipo_alerta": "DISCREPANCIA_ESTILOMETRICA",
+        "descripcion": "Bandera dual: Alta coincidencia funcional (75.1%) y patrón estilométrico consistente con modelos generativos (99.5%). Sugiere revisión pericial del docente.",
+        "severidad": "ALTA"
       }
     ]
   },
@@ -23,17 +23,17 @@
     "titulo": "Alumno Aplicado (Humano limpio)",
     "descripcion": "Estudiante responsable que resuelve el problema con funciones, nombres en español y formato estándar de laboratorio.",
     "raw_sem": 0.9147,
-    "calib_sem": 0.6589,
+    "calib_sem": 0.848,
     "ai_prob": 0.9961,
     "hum_prob": 0.0039,
     "char_pred": "sintético",
-    "dictamen": "SOSPECHA_IA",
-    "discrepancia": 0.6563,
+    "dictamen": "DISCREPANCIA_DUAL",
+    "discrepancia": 0.8447,
     "indicadores": [
       {
-        "tipo_alerta": "PATRON_SINTETICO",
-        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.6%).",
-        "severidad": "MEDIA"
+        "tipo_alerta": "DISCREPANCIA_ESTILOMETRICA",
+        "descripcion": "Bandera dual: Alta coincidencia funcional (84.8%) y patrón estilométrico consistente con modelos generativos (99.6%). Sugiere revisión pericial del docente.",
+        "severidad": "ALTA"
       }
     ]
   },
@@ -42,16 +42,16 @@
     "titulo": "Alumno con Malas Prácticas (Espagueti / Desorden)",
     "descripcion": "Todo en el main, variables de una letra (i, j, b, c), indentación inconsistente y sin funciones separadas.",
     "raw_sem": 0.8867,
-    "calib_sem": 0.5467,
+    "calib_sem": 0.7262,
     "ai_prob": 0.6897,
     "hum_prob": 0.3103,
     "char_pred": "sintético",
-    "dictamen": "INTEGRO",
-    "discrepancia": 0.377,
+    "dictamen": "SIN_ALERTAS",
+    "discrepancia": 0.5008,
     "indicadores": [
       {
         "tipo_alerta": "CONFORMIDAD_BASE",
-        "descripcion": "No se detectaron discrepancias críticas de integridad académica.",
+        "descripcion": "Conformidad base: No se detectaron indicadores críticos de coincidencia ni patrones atípicos.",
         "severidad": "BAJA"
       }
     ]
@@ -61,17 +61,17 @@
     "titulo": "Alumno que 'lo intentó pero no le salió'",
     "descripcion": "Lógica incompleta o errónea: cuenta divisores de forma deficiente, condición rota (deja pasar pares o no valida 1), imprime basura pero tiene la estructura del intento.",
     "raw_sem": 0.8981,
-    "calib_sem": 0.5924,
+    "calib_sem": 0.7811,
     "ai_prob": 0.9956,
     "hum_prob": 0.0044,
     "char_pred": "sintético",
-    "dictamen": "SOSPECHA_IA",
-    "discrepancia": 0.5898,
+    "dictamen": "DISCREPANCIA_DUAL",
+    "discrepancia": 0.7777,
     "indicadores": [
       {
-        "tipo_alerta": "PATRON_SINTETICO",
-        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.6%).",
-        "severidad": "MEDIA"
+        "tipo_alerta": "DISCREPANCIA_ESTILOMETRICA",
+        "descripcion": "Bandera dual: Alta coincidencia funcional (78.1%) y patrón estilométrico consistente con modelos generativos (99.6%). Sugiere revisión pericial del docente.",
+        "severidad": "ALTA"
       }
     ]
   },
@@ -80,17 +80,17 @@
     "titulo": "El Tramposo Astuto (IA parafraseada a mano)",
     "descripcion": "Tomó la salida de ChatGPT, tradujo nombres a español, borró comentarios de Doxygen y alteró operadores para intentar engañar al detector.",
     "raw_sem": 0.9167,
-    "calib_sem": 0.6669,
+    "calib_sem": 0.8549,
     "ai_prob": 0.9981,
     "hum_prob": 0.0019,
     "char_pred": "sintético",
-    "dictamen": "SOSPECHA_IA",
-    "discrepancia": 0.6656,
+    "dictamen": "DISCREPANCIA_DUAL",
+    "discrepancia": 0.8533,
     "indicadores": [
       {
-        "tipo_alerta": "PATRON_SINTETICO",
-        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (99.8%).",
-        "severidad": "MEDIA"
+        "tipo_alerta": "DISCREPANCIA_ESTILOMETRICA",
+        "descripcion": "Bandera dual: Alta coincidencia funcional (85.5%) y patrón estilométrico consistente con modelos generativos (99.8%). Sugiere revisión pericial del docente.",
+        "severidad": "ALTA"
       }
     ]
   },
@@ -99,17 +99,17 @@
     "titulo": "El Confundido (Entregó otra práctica completamente diferente)",
     "descripcion": "Entregó el algoritmo de Ordenamiento Burbuja de un arreglo, no tiene nada que ver con números primos.",
     "raw_sem": 0.8983,
-    "calib_sem": 0.5934,
+    "calib_sem": 0.7822,
     "ai_prob": 0.9995,
     "hum_prob": 0.0005,
     "char_pred": "sintético",
-    "dictamen": "SOSPECHA_IA",
-    "discrepancia": 0.5931,
+    "dictamen": "DISCREPANCIA_DUAL",
+    "discrepancia": 0.7818,
     "indicadores": [
       {
-        "tipo_alerta": "PATRON_SINTETICO",
-        "descripcion": "Estilometría con alta probabilidad de redacción por LLM (100.0%).",
-        "severidad": "MEDIA"
+        "tipo_alerta": "DISCREPANCIA_ESTILOMETRICA",
+        "descripcion": "Bandera dual: Alta coincidencia funcional (78.2%) y patrón estilométrico consistente con modelos generativos (100.0%). Sugiere revisión pericial del docente.",
+        "severidad": "ALTA"
       }
     ]
   }

@@ -1,0 +1,104 @@
+{
+  "engine": "real",
+  "manifest": "data\\golden_set\\manifest_none.json",
+  "synthetic": false,
+  "threshold_ai": 0.7,
+  "runs": [
+    {
+      "threshold_sem": 0.85,
+      "split": "all",
+      "n": 419,
+      "channel_a": {
+        "auc": 0.5937,
+        "f1": 0.3401,
+        "fpr": 0.6158,
+        "tp": 59,
+        "fp": 210,
+        "tn": 131,
+        "fn": 19
+      },
+      "channel_b": {
+        "auc": 0.9959,
+        "f1": 0.8866,
+        "fpr": 0.0,
+        "tp": 176,
+        "fp": 0,
+        "tn": 198,
+        "fn": 45
+      },
+      "fused": {
+        "auc": 0.5853,
+        "f1": 0.7743,
+        "fpr": 0.7667,
+        "tp": 247,
+        "fp": 92,
+        "tn": 28,
+        "fn": 52
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "dev",
+      "n": 215,
+      "channel_a": {
+        "auc": 0.6586,
+        "f1": 0.4066,
+        "fpr": 0.5977,
+        "tp": 37,
+        "fp": 104,
+        "tn": 70,
+        "fn": 4
+      },
+      "channel_b": {
+        "auc": 0.9961,
+        "f1": 0.8922,
+        "fpr": 0.0,
+        "tp": 91,
+        "fp": 0,
+        "tn": 102,
+        "fn": 22
+      },
+      "fused": {
+        "auc": 0.5758,
+        "f1": 0.7965,
+        "fpr": 0.8197,
+        "tp": 135,
+        "fp": 50,
+        "tn": 11,
+        "fn": 19
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "test",
+      "n": 204,
+      "channel_a": {
+        "auc": 0.5061,
+        "f1": 0.2667,
+        "fpr": 0.6347,
+        "tp": 22,
+        "fp": 106,
+        "tn": 61,
+        "fn": 15
+      },
+      "channel_b": {
+        "auc": 0.996,
+        "f1": 0.8808,
+        "fpr": 0.0,
+        "tp": 85,
+        "fp": 0,
+        "tn": 96,
+        "fn": 23
+      },
+      "fused": {
+        "auc": 0.5948,
+        "f1": 0.7492,
+        "fpr": 0.7119,
+        "tp": 112,
+        "fp": 42,
+        "tn": 17,
+        "fn": 33
+      }
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "engine": "real",
+  "manifest": "data\\golden_set\\manifest_clang-format.json",
+  "synthetic": false,
+  "threshold_ai": 0.7,
+  "runs": [
+    {
+      "threshold_sem": 0.85,
+      "split": "all",
+      "n": 417,
+      "channel_a": {
+        "auc": 0.5994,
+        "f1": 0.3483,
+        "fpr": 0.6372,
+        "tp": 62,
+        "fp": 216,
+        "tn": 123,
+        "fn": 16
+      },
+      "channel_b": {
+        "auc": 0.9958,
+        "f1": 0.8855,
+        "fpr": 0.0,
+        "tp": 174,
+        "fp": 0,
+        "tn": 198,
+        "fn": 45
+      },
+      "fused": {
+        "auc": 0.5767,
+        "f1": 0.768,
+        "fpr": 0.8,
+        "tp": 245,
+        "fp": 96,
+        "tn": 24,
+        "fn": 52
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "dev",
+      "n": 213,
+      "channel_a": {
+        "auc": 0.6675,
+        "f1": 0.4153,
+        "fpr": 0.6047,
+        "tp": 38,
+        "fp": 104,
+        "tn": 68,
+        "fn": 3
+      },
+      "channel_b": {
+        "auc": 0.996,
+        "f1": 0.89,
+        "fpr": 0.0,
+        "tp": 89,
+        "fp": 0,
+        "tn": 102,
+        "fn": 22
+      },
+      "fused": {
+        "auc": 0.5511,
+        "f1": 0.7857,
+        "fpr": 0.8525,
+        "tp": 132,
+        "fp": 52,
+        "tn": 9,
+        "fn": 20
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "test",
+      "n": 204,
+      "channel_a": {
+        "auc": 0.5136,
+        "f1": 0.2775,
+        "fpr": 0.6707,
+        "tp": 24,
+        "fp": 112,
+        "tn": 55,
+        "fn": 13
+      },
+      "channel_b": {
+        "auc": 0.9961,
+        "f1": 0.8808,
+        "fpr": 0.0,
+        "tp": 85,
+        "fp": 0,
+        "tn": 96,
+        "fn": 23
+      },
+      "fused": {
+        "auc": 0.6004,
+        "f1": 0.7483,
+        "fpr": 0.7458,
+        "tp": 113,
+        "fp": 44,
+        "tn": 15,
+        "fn": 32
+      }
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "engine": "real",
+  "manifest": "data\\golden_set\\manifest_strip-comments.json",
+  "synthetic": false,
+  "threshold_ai": 0.7,
+  "runs": [
+    {
+      "threshold_sem": 0.85,
+      "split": "all",
+      "n": 419,
+      "channel_a": {
+        "auc": 0.6004,
+        "f1": 0.3526,
+        "fpr": 0.6481,
+        "tp": 64,
+        "fp": 221,
+        "tn": 120,
+        "fn": 14
+      },
+      "channel_b": {
+        "auc": 0.9999,
+        "f1": 0.9933,
+        "fpr": 0.0152,
+        "tp": 221,
+        "fp": 3,
+        "tn": 195,
+        "fn": 0
+      },
+      "fused": {
+        "auc": 0.8113,
+        "f1": 0.8432,
+        "fpr": 0.7667,
+        "tp": 285,
+        "fp": 92,
+        "tn": 28,
+        "fn": 14
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "dev",
+      "n": 215,
+      "channel_a": {
+        "auc": 0.6765,
+        "f1": 0.4021,
+        "fpr": 0.6322,
+        "tp": 38,
+        "fp": 110,
+        "tn": 64,
+        "fn": 3
+      },
+      "channel_b": {
+        "auc": 0.9997,
+        "f1": 0.9869,
+        "fpr": 0.0294,
+        "tp": 113,
+        "fp": 3,
+        "tn": 99,
+        "fn": 0
+      },
+      "fused": {
+        "auc": 0.8131,
+        "f1": 0.8555,
+        "fpr": 0.7869,
+        "tp": 151,
+        "fp": 48,
+        "tn": 13,
+        "fn": 3
+      }
+    },
+    {
+      "threshold_sem": 0.85,
+      "split": "test",
+      "n": 204,
+      "channel_a": {
+        "auc": 0.5049,
+        "f1": 0.2989,
+        "fpr": 0.6647,
+        "tp": 26,
+        "fp": 111,
+        "tn": 56,
+        "fn": 11
+      },
+      "channel_b": {
+        "auc": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "tp": 108,
+        "fp": 0,
+        "tn": 96,
+        "fn": 0
+      },
+      "fused": {
+        "auc": 0.8077,
+        "f1": 0.8297,
+        "fpr": 0.7458,
+        "tp": 134,
+        "fp": 44,
+        "tn": 15,
+        "fn": 11
+      }
+    }
+  ]
+}
