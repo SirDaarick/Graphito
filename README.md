@@ -153,6 +153,27 @@ Tests that need model weights or cached HuggingFace files are skipped automatica
 
 `backend/app/config.py` is the single source: `THRESHOLD_SEM=0.85` (calibrated semantic similarity) and `THRESHOLD_AI=0.20` (AI probability; tuned for the format-invariant CharCNN). Override them with the environment variables of the same name (e.g. in `.env`); a request to `/analysis/run` may still override them per call. The sigmoid `baseline` of `calibrate_semantic_similarity` is a separate calibration parameter, not a decision threshold.
 
+### Offline evaluation (split, golden set, benchmark)
+
+Every reported metric comes from one shared split manifest and a run directory that records its sha256:
+
+```bash
+python scripts/build_split.py                                   # -> data/splits/split_v1.json
+python data/golden_set/build_corpus.py --split test --force     # -> data/golden_set/corpus
+python data/golden_set/build_corpus.py --split val --force      # -> data/golden_set/corpus_val (calibration only)
+python data/golden_set/build_manifest.py data/golden_set/corpus --out data/golden_set/manifest.json
+python data/golden_set/build_manifest.py data/golden_set/corpus_val --out data/golden_set/manifest_val.json
+python scripts/benchmark_suite.py --manifest data/golden_set/manifest.json \
+    --calibrate --val-manifest data/golden_set/manifest_val.json   # fit on val, freeze, score test
+python scripts/benchmark_suite.py --manifest data/golden_set/manifest.json \
+    --mode calibrated-frozen --calibration-dir runs/benchmark/<ts> # reuse frozen calibrations
+```
+
+The benchmark modes are `calibrated-fit-in-run`, `calibrated-frozen` and `uncalibrated` (threshold-free metrics only). Thresholds always come from `calibration_<channel>.json` files fitted on val; there are no numeric defaults. See `data/golden_set/README.md`.
+
+- Outputs go to `runs/benchmark/<ts>/` (one subdir per channel), which is gitignored. Commit only selected artifacts, explicitly: `git add -f runs/benchmark/<ts>/channel_a/<ts>/metrics.json runs/benchmark/<ts>/channel_a/<ts>/report.md runs/benchmark/<ts>/calibration_channel_a.json`.
+- **Legacy results:** the root `benchmark_*results.json` and `benchmark_charcnn_*.json` files predate the split manifest (the old golden set reused 1825/2621 CharCNN train/val samples and used hardcoded thresholds). They are kept for history but are NOT comparable with new runs, which carry the split manifest sha256.
+
 ### Migration note: 768-dim semantic vectors (Chroma v2 collection)
 
 Previously the reference index stored a 769-dim vector (768 semantic + `ai_prob`). The stylometry component leaked into the semantic similarity, so the index now stores and queries only the 768-dim semantic embedding, in a new collection `codigos_referencia_v2`. The legacy `codigos_referencia` collection is left untouched.
