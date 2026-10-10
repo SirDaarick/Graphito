@@ -1,9 +1,10 @@
 from fastapi import APIRouter
-from app.presentation.api.v1.endpoints import auth, problems, analysis, comments
+from app.presentation.api.v1.endpoints import auth, problems, analysis, comments, groups
 
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
 api_router.include_router(problems.router, prefix="/problems", tags=["Problemas y Entregas"])
+api_router.include_router(groups.router, prefix="/groups", tags=["Cursos y Grupos Académicos"])
 api_router.include_router(analysis.router, prefix="/analysis", tags=["Análisis Bimodal e Integridad"])
 api_router.include_router(comments.router, prefix="/reports", tags=["Comentarios de Revisión"])

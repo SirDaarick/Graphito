@@ -22,10 +22,18 @@ from app.domain.ports.vector_store_port import VectorStorePort
 
 # Mock Vector Store en memoria para tests aislados
 class InMemoryVectorStore(VectorStorePort):
+    EXPECTED_DIM = 768
+
     def __init__(self):
         self.store = {}
+        self.last_upsert_embedding = None
+        self.last_query_embedding = None
 
     async def upsert_reference(self, reference_id: str, embedding: list, metadata: dict, document=None):
+        self.last_upsert_embedding = list(embedding)
+        assert len(embedding) == self.EXPECTED_DIM, (
+            f"vector store received a {len(embedding)}-dim embedding, expected {self.EXPECTED_DIM}"
+        )
         self.store[reference_id] = {
             "embedding": embedding,
             "metadata": metadata,
@@ -34,6 +42,10 @@ class InMemoryVectorStore(VectorStorePort):
         return True
 
     async def query_nearest(self, embedding: list, problema_id: int, top_k: int = 1):
+        self.last_query_embedding = list(embedding)
+        assert len(embedding) == self.EXPECTED_DIM, (
+            f"vector store queried with a {len(embedding)}-dim embedding, expected {self.EXPECTED_DIM}"
+        )
         results = []
         for ref_id, data in self.store.items():
             if data["metadata"].get("problema_id") == problema_id:
@@ -61,8 +73,17 @@ test_vector_store = InMemoryVectorStore()
 test_inference_engine = StubInferenceEngine()
 
 
+@pytest.fixture
+def vector_store() -> InMemoryVectorStore:
+    """The shared in-memory store injected into the app by the `client` fixture."""
+    test_vector_store.store.clear()
+    test_vector_store.last_upsert_embedding = None
+    test_vector_store.last_query_embedding = None
+    return test_vector_store
+
+
 @pytest_asyncio.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def db_session()-> AsyncGenerator[AsyncSession, None]:
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

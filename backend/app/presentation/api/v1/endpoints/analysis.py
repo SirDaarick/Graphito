@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Query, status
+import uuid
+from typing import List, Optional
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
@@ -10,11 +12,19 @@ from app.infrastructure.inference import get_inference_engine
 from app.infrastructure.vector_store import get_vector_store
 from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
 from app.application.services.pdf_service import PdfReportService
+from app.application.services.batch_analysis_service import BatchAnalysisService
+from app.application.services.xai_service import XAIService
 from app.presentation.api.v1.deps import get_current_docente
 from app.presentation.schemas.analysis import (
     AnalysisRunRequest,
     ReporteAnalisisResponse,
     ReportCodeComparisonResponse,
+    IndicadorResponse,
+)
+from app.presentation.schemas.batch import (
+    BatchUploadResponse,
+    BatchStatusResponse,
+    VerdictUpdateRequest,
 )
 
 router = APIRouter()
@@ -64,7 +74,7 @@ async def download_report_pdf(
     report = await orchestrator.get_report_model(report_id)
 
     student_author = report.entrega.autor if report.entrega else None
-    student_code = report.entrega.codigo_fuente if report.entrega else None
+    student_code = report.entrega.contenido if report.entrega else None
     problem_title = report.entrega.problema.titulo if (report.entrega and report.entrega.problema) else None
     language = report.entrega.lenguaje if report.entrega else None
     comments = list(report.comentarios) if hasattr(report, "comentarios") and report.comentarios else []
@@ -131,6 +141,20 @@ async def get_report_code(
             reference_author = canonical_ref.autor
             reference_code = canonical_ref.contenido
 
+    # Extraer indicadores de explicabilidad y métricas de complejidad de código (XAI)
+    indicadores_resp = [
+        IndicadorResponse(
+            id=i.id,
+            tipo_alerta=i.tipo_alerta,
+            descripcion=i.descripcion,
+            severidad=i.severidad,
+            numero_linea=i.numero_linea,
+            categoria=i.categoria,
+        )
+        for i in report.indicadores
+    ]
+    metricas = XAIService.compute_code_metrics(student_code)
+
     return ReportCodeComparisonResponse(
         reporte_id=report.id,
         student_author=student_author,
@@ -139,4 +163,96 @@ async def get_report_code(
         reference_code=reference_code,
         language=language,
         problem_title=problem_title,
+        indicadores=indicadores_resp,
+        metricas_codigo=metricas,
     )
+
+
+@router.post("/batch", response_model=BatchUploadResponse, status_code=status.HTTP_202_ACCEPTED)
+async def upload_batch_submissions(
+    problema_id: int = Form(...),
+    grupo_id: Optional[int] = Form(None),
+    files: List[UploadFile] = File(...),
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+    inference: InferencePort = Depends(get_inference_engine),
+    vector_store: VectorStorePort = Depends(get_vector_store),
+):
+    """
+    Carga masiva de entregas de estudiantes (archivos múltiples o carpetas completas).
+    Encola la inferencia bimodal en segundo plano evitando timeouts HTTP (Patrón 202 Accepted).
+    """
+    files_data = []
+    for f in files:
+        if not f.filename.lower().endswith((".c", ".cpp", ".cc", ".h")):
+            continue
+        raw_bytes = await f.read()
+        content = raw_bytes.decode("utf-8", errors="ignore")
+        # Extraer nombre preliminar del archivo si no viene en metadatos
+        clean_name = f.filename.rsplit(".", 1)[0]
+        # Si tiene patrón boleta_nombre_apellido, aislar nombres
+        tokens = [t for t in clean_name.replace("-", "_").split("_") if not t.isdigit()]
+        author = " ".join(tokens) if tokens else clean_name
+
+        files_data.append((f.filename, content, author))
+
+    batch_service = BatchAnalysisService(db, inference, vector_store)
+    batch_id = await batch_service.create_batch(
+        docente_id=current_user.id,
+        problema_id=problema_id,
+        grupo_id=grupo_id,
+        files_data=files_data,
+    )
+
+    # Lanzar worker en segundo plano
+    batch_service.dispatch_batch_worker(
+        batch_id=batch_id,
+        problema_id=problema_id,
+        inference=inference,
+        vector_store=vector_store,
+    )
+
+    return BatchUploadResponse(
+        batch_id=batch_id,
+        problema_id=problema_id,
+        total_archivos=len(files_data),
+        mensaje="Lote de entregas recibido y encolado para análisis asíncrono.",
+    )
+
+
+@router.get("/batch/{batch_id}/status", response_model=BatchStatusResponse)
+async def get_batch_status(
+    batch_id: uuid.UUID,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+    inference: InferencePort = Depends(get_inference_engine),
+    vector_store: VectorStorePort = Depends(get_vector_store),
+):
+    """
+    Consulta en tiempo real el progreso de procesamiento del lote para actualización reactiva en la UI.
+    """
+    batch_service = BatchAnalysisService(db, inference, vector_store)
+    return await batch_service.get_batch_status(current_user.id, batch_id)
+
+
+@router.patch("/reports/{report_id}/verdict", response_model=ReporteAnalisisResponse)
+async def update_report_verdict(
+    report_id: int,
+    request: VerdictUpdateRequest,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+    inference: InferencePort = Depends(get_inference_engine),
+    vector_store: VectorStorePort = Depends(get_vector_store),
+):
+    """
+    Persiste en base de datos la decisión humana final del docente (Human-in-the-Loop)
+    para active learning y seguimiento de integridad académica institucional.
+    """
+    orchestrator = AnalysisOrchestrator(db, inference, vector_store)
+    return await orchestrator.update_verdict(
+        docente_id=current_user.id,
+        report_id=report_id,
+        verdict=request.decision_docente,
+        notas=request.notas_docente,
+    )
+

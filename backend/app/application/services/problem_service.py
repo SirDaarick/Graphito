@@ -67,8 +67,8 @@ class ProblemService:
         await self.db.commit()
         await self.db.refresh(codigo)
 
-        # 2. Extraer vector híbrido (769 dimensiones)
-        vector_769 = await self.inference.generate_hybrid_embedding(contenido, lang=lenguaje)
+        # 2. Extraer vector semántico (768 dimensiones; sin componente estilométrica)
+        semantic_vector = await self.inference.extract_semantic_embedding(contenido, lang=lenguaje)
 
         # 3. Indexar en ChromaDB
         metadata = {
@@ -79,7 +79,7 @@ class ProblemService:
         }
         await self.vector_store.upsert_reference(
             reference_id=str(codigo.id),
-            embedding=vector_769,
+            embedding=semantic_vector,
             metadata=metadata,
             document=contenido,
         )
@@ -94,6 +94,7 @@ class ProblemService:
 
         codigo = CodigoFuente(
             problema_id=data.problema_id,
+            grupo_id=data.grupo_id,
             tipo=TipoCodigoEnum.ENTREGA_ALUMNO,
             autor=data.autor,
             contenido=data.contenido,

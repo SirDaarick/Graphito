@@ -3,8 +3,6 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
 from app.config import settings
 from app.infrastructure.database.models import Docente
 from app.core.security import get_password_hash, verify_password, create_access_token
@@ -55,6 +53,16 @@ class AuthService:
         return result.scalar_one_or_none()
 
     async def login_with_google(self, token: str) -> TokenResponse:
+        # Lazy import: the app must start (and tests must collect) without google-auth.
+        try:
+            from google.oauth2 import id_token
+            from google.auth.transport import requests as google_requests
+        except ImportError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="El inicio de sesión con Google no está disponible (falta la dependencia google-auth).",
+            )
+
         try:
             audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
             id_info = id_token.verify_oauth2_token(

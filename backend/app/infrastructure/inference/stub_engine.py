@@ -47,8 +47,9 @@ class StubInferenceEngine(InferencePort):
         self,
         semantic_similarity: float,
         synthetic_prob: float,
-        threshold_sem: float = 0.85,
-        threshold_ai: float = 0.70,
+        *,
+        threshold_sem: float,
+        threshold_ai: float,
     ) -> Dict[str, Any]:
         """
         Cálculo del dictamen de integridad docente e indicadores de discrepancia.

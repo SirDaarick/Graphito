@@ -28,9 +28,17 @@ class RealBimodalInferenceEngine(InferencePort):
 
     def _init_models(self):
         try:
+            from pathlib import Path
+            from models.graphcodebert.config import GraphCodeBERTConfig
             from models.graphcodebert.inference import GraphCodeBERTInference
-            self.gcb_engine = GraphCodeBERTInference()
-            logger.info("GraphCodeBERT engine inicializado exitosamente.")
+
+            lora_candidate = Path(project_root) / "models/graphcodebert/adaptador-lora-20k/adaptador-lora-20k/final"
+            adapter_path = lora_candidate if lora_candidate.exists() else None
+            gcb_config = GraphCodeBERTConfig(adapter_path=adapter_path)
+            self.gcb_engine = GraphCodeBERTInference(config=gcb_config)
+
+            status_lora = "con adaptador LoRA (20k)" if getattr(self.gcb_engine, "is_lora_loaded", False) else "base (sin LoRA)"
+            logger.info(f"GraphCodeBERT engine inicializado exitosamente [{status_lora}].")
         except Exception as e:
             logger.warning(f"No se pudo cargar GraphCodeBERT: {e}. Se usará fallback simulado.")
 
@@ -84,9 +92,13 @@ class RealBimodalInferenceEngine(InferencePort):
         self,
         semantic_similarity: float,
         synthetic_prob: float,
-        threshold_sem: float = 0.85,
-        threshold_ai: float = 0.70,
+        *,
+        threshold_sem: float,
+        threshold_ai: float,
     ) -> Dict[str, Any]:
         return self.stub_fallback.compute_decision(
-            semantic_similarity, synthetic_prob, threshold_sem, threshold_ai
+            semantic_similarity,
+            synthetic_prob,
+            threshold_sem=threshold_sem,
+            threshold_ai=threshold_ai,
         )

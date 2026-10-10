@@ -10,6 +10,7 @@ from sqlalchemy import (
     Text,
     Enum,
     Uuid,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from app.infrastructure.database.session import Base
@@ -32,6 +33,13 @@ class DictamenEnum(str, enum.Enum):
     PLAGIO_PROBABLE = "REVISION_SEMANTICA"
 
 
+class DecisionDocenteEnum(str, enum.Enum):
+    PENDIENTE = "PENDIENTE"
+    APROBADO = "APROBADO"
+    RECHAZADO = "RECHAZADO"
+    EN_DUDA = "EN_DUDA"
+
+
 class EstadoAnalisisEnum(str, enum.Enum):
     PENDIENTE = "PENDIENTE"
     PROCESANDO = "PROCESANDO"
@@ -50,6 +58,37 @@ class Docente(Base):
 
     problemas = relationship("Problema", back_populates="docente", cascade="all, delete-orphan")
     comentarios = relationship("ComentarioRevision", back_populates="docente", cascade="all, delete-orphan")
+    grupos = relationship("Grupo", back_populates="docente", cascade="all, delete-orphan")
+
+
+class Grupo(Base):
+    __tablename__ = "grupos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    docente_id = Column(Integer, ForeignKey("docentes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nombre = Column(String(150), nullable=False)
+    codigo_grupo = Column(String(50), nullable=False)
+    periodo = Column(String(50), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    docente = relationship("Docente", back_populates="grupos")
+    asignaciones = relationship("GrupoProblema", back_populates="grupo", cascade="all, delete-orphan")
+    entregas = relationship("CodigoFuente", back_populates="grupo")
+
+
+class GrupoProblema(Base):
+    __tablename__ = "grupo_problemas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    grupo_id = Column(Integer, ForeignKey("grupos.id", ondelete="CASCADE"), nullable=False, index=True)
+    problema_id = Column(Integer, ForeignKey("problemas.id", ondelete="CASCADE"), nullable=False, index=True)
+    fecha_limite = Column(DateTime(timezone=True), nullable=True)
+    activo = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    grupo = relationship("Grupo", back_populates="asignaciones")
+    problema = relationship("Problema")
 
 
 class Problema(Base):
@@ -66,11 +105,31 @@ class Problema(Base):
     codigos = relationship("CodigoFuente", back_populates="problema", cascade="all, delete-orphan")
 
 
+class LoteAnalisis(Base):
+    __tablename__ = "lotes_analisis"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    problema_id = Column(Integer, ForeignKey("problemas.id", ondelete="CASCADE"), nullable=False, index=True)
+    docente_id = Column(Integer, ForeignKey("docentes.id", ondelete="CASCADE"), nullable=False, index=True)
+    grupo_id = Column(Integer, ForeignKey("grupos.id", ondelete="SET NULL"), nullable=True, index=True)
+    total_archivos = Column(Integer, default=0, nullable=False)
+    procesados = Column(Integer, default=0, nullable=False)
+    errores = Column(Integer, default=0, nullable=False)
+    estado = Column(String(50), default="PENDIENTE", nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    problema = relationship("Problema")
+    docente = relationship("Docente")
+    grupo = relationship("Grupo")
+    reportes = relationship("ReporteAnalisis", back_populates="lote")
+
+
 class CodigoFuente(Base):
     __tablename__ = "codigos_fuente"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     problema_id = Column(Integer, ForeignKey("problemas.id", ondelete="CASCADE"), nullable=False)
+    grupo_id = Column(Integer, ForeignKey("grupos.id", ondelete="SET NULL"), nullable=True, index=True)
     tipo = Column(Enum(TipoCodigoEnum), nullable=False, default=TipoCodigoEnum.ENTREGA_ALUMNO)
     autor = Column(String(255), nullable=False)
     contenido = Column(Text, nullable=False)
@@ -78,6 +137,7 @@ class CodigoFuente(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     problema = relationship("Problema", back_populates="codigos")
+    grupo = relationship("Grupo", back_populates="entregas")
     reportes_entrega = relationship(
         "ReporteAnalisis",
         foreign_keys="ReporteAnalisis.entrega_id",
@@ -97,16 +157,21 @@ class ReporteAnalisis(Base):
     id = Column(Integer, primary_key=True, index=True)
     entrega_id = Column(Uuid(as_uuid=True), ForeignKey("codigos_fuente.id", ondelete="CASCADE"), nullable=False)
     referencia_id = Column(Uuid(as_uuid=True), ForeignKey("codigos_fuente.id", ondelete="SET NULL"), nullable=True)
+    lote_id = Column(Uuid(as_uuid=True), ForeignKey("lotes_analisis.id", ondelete="SET NULL"), nullable=True, index=True)
     similitud_semantica = Column(Float, nullable=False, default=0.0)
     probabilidad_ia = Column(Float, nullable=False, default=0.0)
     discrepancia_score = Column(Float, nullable=False, default=0.0)
     dictamen = Column(Enum(DictamenEnum), nullable=False, default=DictamenEnum.SIN_ALERTAS)
     estado = Column(Enum(EstadoAnalisisEnum), nullable=False, default=EstadoAnalisisEnum.COMPLETADO)
+    decision_docente = Column(Enum(DecisionDocenteEnum), nullable=False, default=DecisionDocenteEnum.PENDIENTE, index=True)
+    fecha_decision = Column(DateTime(timezone=True), nullable=True)
+    notas_docente = Column(Text, nullable=True)
     error_mensaje = Column(Text, nullable=True)
     fecha_analisis = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     entrega = relationship("CodigoFuente", foreign_keys=[entrega_id], back_populates="reportes_entrega")
     referencia = relationship("CodigoFuente", foreign_keys=[referencia_id], back_populates="reportes_referencia")
+    lote = relationship("LoteAnalisis", back_populates="reportes")
     indicadores = relationship("IndicadorIntegridad", back_populates="reporte", cascade="all, delete-orphan")
     comentarios = relationship("ComentarioRevision", back_populates="reporte", cascade="all, delete-orphan")
 
@@ -119,6 +184,8 @@ class IndicadorIntegridad(Base):
     tipo_alerta = Column(String(100), nullable=False)
     descripcion = Column(Text, nullable=False)
     severidad = Column(String(50), default="MEDIA", nullable=False)
+    numero_linea = Column(Integer, nullable=True)
+    categoria = Column(String(50), default="GENERAL", nullable=False)
 
     reporte = relationship("ReporteAnalisis", back_populates="indicadores")
 

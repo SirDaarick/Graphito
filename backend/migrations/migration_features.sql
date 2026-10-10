@@ -51,10 +51,12 @@ CREATE TABLE IF NOT EXISTS lotes_analisis (
     procesados INTEGER NOT NULL DEFAULT 0,
     errores INTEGER NOT NULL DEFAULT 0,
     estado VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE',
+    grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS ix_lotes_docente_id ON lotes_analisis(docente_id);
 CREATE INDEX IF NOT EXISTS ix_lotes_problema_id ON lotes_analisis(problema_id);
+CREATE INDEX IF NOT EXISTS ix_lotes_grupo_id ON lotes_analisis(grupo_id);
 
 ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS lote_id UUID REFERENCES lotes_analisis(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS ix_reportes_lote_id ON reportes_analisis(lote_id);

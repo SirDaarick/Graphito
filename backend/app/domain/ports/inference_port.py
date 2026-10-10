@@ -17,7 +17,11 @@ class InferencePort(ABC):
 
     @abstractmethod
     async def generate_hybrid_embedding(self, code: str, lang: str = "c") -> List[float]:
-        """Genera el embedding híbrido unificado de 769 dimensiones (768 semánticas + 1 estilométrica)."""
+        """DEPRECATED: hybrid 769-dim embedding (768 semantic + 1 stylometric).
+
+        Do not use for indexing or querying the vector store: the stylometry channel
+        must not leak into semantic similarity. Use `extract_semantic_embedding` (768 dims).
+        """
         pass
 
     @abstractmethod
@@ -25,8 +29,9 @@ class InferencePort(ABC):
         self,
         semantic_similarity: float,
         synthetic_prob: float,
-        threshold_sem: float = 0.85,
-        threshold_ai: float = 0.70,
+        *,
+        threshold_sem: float,
+        threshold_ai: float,
     ) -> Dict[str, Any]:
         """Calcula discrepancia, dictamen e indicadores de integridad."""
         pass

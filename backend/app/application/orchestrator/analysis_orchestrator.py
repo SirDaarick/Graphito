@@ -1,5 +1,7 @@
 import uuid
+import math
 import asyncio
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -14,9 +16,11 @@ from app.infrastructure.database.models import (
     TipoCodigoEnum,
     DictamenEnum,
     EstadoAnalisisEnum,
+    DecisionDocenteEnum,
 )
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
+from app.application.services.xai_service import XAIService
 from app.presentation.schemas.analysis import (
     AnalysisRunRequest,
     ReporteAnalisisResponse,
@@ -41,15 +45,34 @@ class AnalysisOrchestrator:
         self.vector_store = vector_store
 
     @staticmethod
-    def calibrate_semantic_similarity(raw_sim: float, baseline: float = 0.75) -> float:
+    def calibrate_semantic_similarity(
+        raw_sim: float,
+        baseline: float = 0.85,
+        k: float = 24.0,
+    ) -> float:
         """
-        Calibra la similitud coseno cruda de GraphCodeBERT para corregir la anisotropía,
-        donde programas no relacionados en C presentan un piso de ~0.70-0.75.
-        Mapea el rango [baseline, 1.0] -> [0.0, 1.0].
+        Calibra la similitud coseno cruda de GraphCodeBERT mediante una transformación
+        logística sigmoidal continua, mitigando la anisotropía del espacio latente
+        (donde programas disímiles en C/C++ exhiben un piso de similitud de ~0.70-0.75).
+
+        NOTE: `baseline` is the sigmoid midpoint of this calibration. It is NOT the decision
+        threshold (`settings.THRESHOLD_SEM`), which is applied afterwards in compute_decision.
+
+        A diferencia de un umbral truncado discontinuo (cliff-edge), esta función C^inf
+        proporciona una transición monótona creciente estrictamente normalizada en [0.0, 1.0]:
+            f(s) = (g(s) - g(0)) / (g(1) - g(0)), donde g(s) = 1 / (1 + exp(-k*(s - baseline)))
         """
-        if raw_sim <= baseline:
+        if raw_sim <= 0.0:
             return 0.0
-        calibrated = (raw_sim - baseline) / (1.0 - baseline)
+        if raw_sim >= 1.0:
+            return 1.0
+
+        def _g(v: float) -> float:
+            return 1.0 / (1.0 + math.exp(-k * (v - baseline)))
+
+        g0 = _g(0.0)
+        g1 = _g(1.0)
+        calibrated = (_g(raw_sim) - g0) / (g1 - g0)
         return max(0.0, min(1.0, round(calibrated, 4)))
 
     async def execute_analysis(
@@ -76,7 +99,6 @@ class AnalysisOrchestrator:
         prob_task = self.inference.predict_synthetic_prob(entrega.contenido)
         
         semantic_vector, ai_prob = await asyncio.gather(semantic_task, prob_task)
-        hybrid_vector = semantic_vector + [ai_prob]
 
         # S6: Búsqueda Vectorial de la Referencia más Cercana
         target_ref_id: Optional[uuid.UUID] = None
@@ -102,7 +124,7 @@ class AnalysisOrchestrator:
         else:
             # Consulta por vecinos más cercanos en ChromaDB para el problema
             matches = await self.vector_store.query_nearest(
-                embedding=hybrid_vector,
+                embedding=semantic_vector,  # 768-dim semantic only (no ai_prob)
                 problema_id=entrega.problema_id,
                 top_k=1,
             )
@@ -138,12 +160,33 @@ class AnalysisOrchestrator:
         self.db.add(reporte)
         await self.db.flush()
 
+        # Inyectar indicadores básicos
         for ind in decision["indicadores"]:
             indicador_obj = IndicadorIntegridad(
                 reporte_id=reporte.id,
                 tipo_alerta=ind["tipo_alerta"],
                 descripcion=ind["descripcion"],
                 severidad=ind["severidad"],
+                numero_linea=None,
+                categoria="GENERAL",
+            )
+            self.db.add(indicador_obj)
+
+        # Inyectar explicaciones XAI línea por línea
+        xai_explanations = XAIService.extract_explanations(
+            code=entrega.contenido,
+            language=entrega.lenguaje,
+            semantic_sim=semantic_sim,
+            ai_prob=ai_prob,
+        )
+        for exp in xai_explanations:
+            indicador_obj = IndicadorIntegridad(
+                reporte_id=reporte.id,
+                tipo_alerta=exp["tipo_alerta"],
+                descripcion=exp["descripcion"],
+                severidad=exp["severidad"],
+                numero_linea=exp["numero_linea"],
+                categoria=exp["categoria"],
             )
             self.db.add(indicador_obj)
 
@@ -161,11 +204,15 @@ class AnalysisOrchestrator:
             id=saved_report.id,
             entrega_id=saved_report.entrega_id,
             referencia_id=saved_report.referencia_id,
+            lote_id=saved_report.lote_id,
             similitud_semantica=saved_report.similitud_semantica,
             probabilidad_ia=saved_report.probabilidad_ia,
             discrepancia_score=saved_report.discrepancia_score,
             dictamen=saved_report.dictamen,
             estado=saved_report.estado,
+            decision_docente=saved_report.decision_docente,
+            fecha_decision=saved_report.fecha_decision,
+            notas_docente=saved_report.notas_docente,
             error_mensaje=saved_report.error_mensaje,
             fecha_analisis=saved_report.fecha_analisis,
             indicadores=[
@@ -174,6 +221,8 @@ class AnalysisOrchestrator:
                     tipo_alerta=i.tipo_alerta,
                     descripcion=i.descripcion,
                     severidad=i.severidad,
+                    numero_linea=i.numero_linea,
+                    categoria=i.categoria,
                 )
                 for i in saved_report.indicadores
             ],
@@ -258,7 +307,6 @@ class AnalysisOrchestrator:
                 )
                 prob_task = self.inference.predict_synthetic_prob(entrega.contenido)
                 semantic_vector, ai_prob = await asyncio.gather(semantic_task, prob_task)
-                hybrid_vector = semantic_vector + [ai_prob]
 
                 target_ref_id = referencia_id
                 semantic_sim = 0.0
@@ -278,7 +326,7 @@ class AnalysisOrchestrator:
                         semantic_sim = max(0.0, min(1.0, dot / (norm_a * norm_b)))
                 else:
                     matches = await self.vector_store.query_nearest(
-                        embedding=hybrid_vector,
+                        embedding=semantic_vector,  # 768-dim semantic only (no ai_prob)
                         problema_id=entrega.problema_id,
                         top_k=1,
                     )
@@ -313,6 +361,26 @@ class AnalysisOrchestrator:
                         tipo_alerta=ind["tipo_alerta"],
                         descripcion=ind["descripcion"],
                         severidad=ind["severidad"],
+                        numero_linea=None,
+                        categoria="GENERAL",
+                    )
+                    session.add(indicador_obj)
+
+                # Inyectar explicaciones XAI línea por línea
+                xai_explanations = XAIService.extract_explanations(
+                    code=entrega.contenido,
+                    language=entrega.lenguaje,
+                    semantic_sim=semantic_sim,
+                    ai_prob=ai_prob,
+                )
+                for exp in xai_explanations:
+                    indicador_obj = IndicadorIntegridad(
+                        reporte_id=reporte.id,
+                        tipo_alerta=exp["tipo_alerta"],
+                        descripcion=exp["descripcion"],
+                        severidad=exp["severidad"],
+                        numero_linea=exp["numero_linea"],
+                        categoria=exp["categoria"],
                     )
                     session.add(indicador_obj)
 
@@ -342,6 +410,39 @@ class AnalysisOrchestrator:
                 detail="Reporte de análisis no encontrado.",
             )
         return ReporteAnalisisResponse.model_validate(report)
+
+    async def update_verdict(
+        self,
+        docente_id: int,
+        report_id: int,
+        verdict: DecisionDocenteEnum,
+        notas: Optional[str] = None,
+    ) -> ReporteAnalisisResponse:
+        """
+        Registra la decisión humana final del docente (Human-in-the-Loop)
+        para active learning y seguimiento pedagógico institucional.
+        """
+        report = await self.get_report_model(report_id)
+        # Validar que el reporte pertenezca al docente que creó el problema
+        if (
+            report.entrega
+            and report.entrega.problema
+            and report.entrega.problema.docente_id != docente_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permiso para emitir dictamen sobre esta entrega.",
+            )
+
+        report.decision_docente = verdict
+        report.fecha_decision = datetime.now(timezone.utc)
+        if notas is not None:
+            report.notas_docente = notas
+
+        await self.db.commit()
+        await self.db.refresh(report)
+
+        return await self.get_report(report_id)
 
     async def get_report_model(self, report_id: int) -> ReporteAnalisis:
         res = await self.db.execute(

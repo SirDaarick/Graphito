@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     INFERENCE_MODE: str = "STUB"
     DEMO_MODE: bool = False
 
+    # Decision thresholds (single source of truth; override via env THRESHOLD_SEM / THRESHOLD_AI).
+    # NOTE: distinct from the `baseline` of calibrate_semantic_similarity (sigmoid midpoint).
+    THRESHOLD_SEM: float = 0.85
+    # 0.20 is tuned for the format-invariant ("canonical") CharCNN, whose probabilities are lower
+    # than the legacy model's; chosen on dev and confirmed on test (recall 0.94, FPR 0.01).
+    THRESHOLD_AI: float = 0.20
+
     # Security
     JWT_SECRET: str = "supersecretjwtkey_change_in_production_123456789"
     JWT_ALGORITHM: str = "HS256"

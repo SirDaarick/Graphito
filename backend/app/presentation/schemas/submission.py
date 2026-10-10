@@ -8,6 +8,7 @@ from app.presentation.schemas.analysis import ReporteAnalisisResponse
 
 class CodigoFuenteCreate(BaseModel):
     problema_id: int
+    grupo_id: Optional[int] = None
     autor: str
     contenido: str
     tipo: TipoCodigoEnum = TipoCodigoEnum.ENTREGA_ALUMNO
@@ -19,9 +20,11 @@ class CodigoFuenteResponse(BaseModel):
 
     id: uuid.UUID
     problema_id: int
+    grupo_id: Optional[int] = None
     tipo: TipoCodigoEnum
     autor: str
     contenido: str
     lenguaje: str
     created_at: datetime
     reporte: Optional[ReporteAnalisisResponse] = None
+
