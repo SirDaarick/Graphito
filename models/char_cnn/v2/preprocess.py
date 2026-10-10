@@ -46,11 +46,18 @@ _INVISIBLE = dict.fromkeys(map(ord, "​‌‍⁠﻿�"))
 _LITERAL = re.compile(r"\x22(?:\\.|[^\x22\\\n])*\x22|\x27(?:\\.|[^\x27\\\n])*\x27")
 _SPACE_RUN = re.compile(r" {2,}")
 
-# C++14 digit separators (1'000) would open a char literal in `strip_comments` and hide a
-# trailing `//` comment. They are swapped for NUL (removed in step 1, so it cannot occur in
-# the text at that point) while comments, markers and whitespace are processed.
-_DIGIT_SEPARATOR_RE = re.compile(r"(?<=\d)'(?=\d)")
+# C++14 digit separators (1'000, 0xDEAD'BEEF, 0b1010'1010) would open a char literal in
+# `strip_comments` and hide a trailing `//` comment. A numeric literal token starts with a digit
+# that does not continue an identifier (so `u8'a'` and `v1` are left alone); inside it, an
+# apostrophe between two alphanumeric characters is a separator. Separators are swapped for NUL
+# (removed in step 1, so it cannot occur in the text at that point) while comments, markers and
+# whitespace are processed.
+_NUMERIC_TOKEN_RE = re.compile(r"(?<![\w.])\.?\d(?:[\w.]|(?<=[0-9A-Za-z])'(?=[0-9A-Za-z]))*")
 _SEPARATOR_PLACEHOLDER = "\x00"
+
+
+def _shield_digit_separators(text: str) -> str:
+    return _NUMERIC_TOKEN_RE.sub(lambda m: m.group(0).replace("'", _SEPARATOR_PLACEHOLDER), text)
 
 
 def _build_fold_table() -> dict[int, str]:
@@ -139,7 +146,7 @@ def canonical_whitespace(text: str) -> str:
 def preprocess_v2(text: str) -> str:
     """Normalize source text symmetrically for both classes (pure and idempotent)."""
     text = fold_unicode(clean_controls(text))
-    text = _DIGIT_SEPARATOR_RE.sub(_SEPARATOR_PLACEHOLDER, text)
+    text = _shield_digit_separators(text)
     text = canonical_whitespace(strip_course_markers(strip_comments(text)))
     return text.replace(_SEPARATOR_PLACEHOLDER, "'")
 

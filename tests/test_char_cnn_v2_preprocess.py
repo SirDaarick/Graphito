@@ -87,6 +87,13 @@ class TestConfig:
         with pytest.raises(ValueError, match=key):
             CharCNNV2Config.from_dict(d)
 
+    @pytest.mark.parametrize("key", ["arch_version", "preproc_version", "alphabet"])
+    def test_from_dict_requires_version_and_alphabet_fields(self, key):
+        d = CharCNNV2Config().to_dict()
+        del d[key]
+        with pytest.raises(ValueError, match=key):
+            CharCNNV2Config.from_dict(d)
+
     @pytest.mark.parametrize(
         "kwargs",
         [
@@ -95,6 +102,7 @@ class TestConfig:
             {"window": 0},
             {"stride": 0},
             {"max_windows": 0},
+            {"window": 8, "stride": 9},
         ],
     )
     def test_invalid_values_raise(self, kwargs):
@@ -150,6 +158,17 @@ class TestSteps:
             ("int x = 1'000; // c", "int x = 1'000;"),
             ("char c = '\"'; int y; // c", "char c = '\"'; int y;"),
             ('puts("http://a"); /* b */', 'puts("http://a");'),
+            # Digit separators inside hex/binary/suffixed literals (token starts with a digit).
+            ("x = 0xDEAD'BEEF; // c", "x = 0xDEAD'BEEF;"),
+            ("x = 0b1010'1010; // c", "x = 0b1010'1010;"),
+            ("x = 1'000'000ull; // c", "x = 1'000'000ull;"),
+            ("x = 0x1'Fu + 0XaB'cD; // c", "x = 0x1'Fu + 0XaB'cD;"),
+            # Real char literals are untouched.
+            ("c = 'a'; // c", "c = 'a';"),
+            ("c = '\\''; // c", "c = '\\'';"),
+            ("x = 'b'; // c", "x = 'b';"),
+            ("c = '1'; d = '0'+n; // c", "c = '1'; d = '0'+n;"),
+            ("s = u8'a'; t = v1; // c", "s = u8'a'; t = v1;"),
         ],
     )
     def test_comments(self, src, expected):

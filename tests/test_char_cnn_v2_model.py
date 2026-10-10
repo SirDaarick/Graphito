@@ -1,5 +1,8 @@
 """Unit tests for the CharCNN v2 model and windowed scoring (tiny CPU models, synthetic inputs)."""
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pytest
 import torch
@@ -8,6 +11,9 @@ import torch.nn as nn
 from models.char_cnn.v2.config import PAD_IDX, VOCAB_SIZE, CharCNNV2Config
 from models.char_cnn.v2.model import CharCNNV2, masked_pool
 from models.char_cnn.v2.scoring import predict_one, random_crop, score_arrays, window_starts
+
+# Key names and shapes of the legacy v1 `CharCNN` (default `CharCNNConfig`, vocab 123).
+V1_SHAPES = Path(__file__).resolve().parent / "fixtures" / "charcnn_v1_state_dict_shapes.json"
 
 TINY = CharCNNV2Config(
     embedding_dim=8, conv_kernel_sizes=(3, 5), conv_filters=(4, 6), fc_units=16, dropout=0.4
@@ -107,18 +113,26 @@ class TestModel:
         x = _seq(64).unsqueeze(0)
         torch.testing.assert_close(target.eval()(x), source(x), atol=1e-6, rtol=0)
 
-    def test_v1_model_still_loads_v1_state_dict(self, tmp_path, monkeypatch):
+    def test_v1_model_matches_frozen_state_dict_fixture(self, tmp_path, monkeypatch):
         # The legacy config creates weights/ and logs/ relative to cwd; keep that out of the repo.
         monkeypatch.chdir(tmp_path)
         from models.char_cnn.config import CharCNNConfig
         from models.char_cnn.model import CharCNN
+        from models.char_cnn.preprocess import CharPreprocessor
 
+        frozen = json.loads(V1_SHAPES.read_text(encoding="utf-8"))
         cfg = CharCNNConfig()
-        cfg.vocab_size = 123
-        torch.manual_seed(0)
-        state = CharCNN(cfg).state_dict()
-        CharCNN(cfg).load_state_dict(state, strict=True)
+        assert CharPreprocessor(cfg).vocab_size == frozen["vocab_size"]
+        cfg.vocab_size = frozen["vocab_size"]
+        model = CharCNN(cfg)
+        assert [[k, list(v.shape)] for k, v in model.state_dict().items()] == frozen["state_dict"]
 
+        # A state_dict built only from the frozen key names and shapes loads strictly.
+        state = {
+            key: torch.zeros(shape, dtype=torch.long if key.endswith("num_batches_tracked") else torch.float32)
+            for key, shape in frozen["state_dict"]
+        }
+        model.load_state_dict(state, strict=True)
 
 
 class _StubModel(nn.Module):

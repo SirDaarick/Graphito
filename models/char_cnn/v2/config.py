@@ -30,6 +30,8 @@ _FIXED_FIELDS: dict[str, Any] = {
     "vocab_size": VOCAB_SIZE,
     "norm": NORM,
 }
+# A payload without these cannot be proven to be a v2 config, so `from_dict` fails closed.
+_REQUIRED_FIELDS = ("arch_version", "preproc_version", "alphabet")
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,8 @@ class CharCNNV2Config:
         for name in ("embedding_dim", "fc_units", "num_classes", "window", "stride", "max_windows"):
             if getattr(self, name) < 1:
                 raise ValueError(f"{name} must be >= 1")
+        if self.stride > self.window:
+            raise ValueError("stride must be <= window (windows must cover the whole input)")
         if any(f < 1 for f in self.conv_filters):
             raise ValueError("conv_filters must be >= 1")
         if not 0.0 <= self.dropout < 1.0:
@@ -79,8 +83,12 @@ class CharCNNV2Config:
     def from_dict(cls, data: Mapping[str, Any]) -> "CharCNNV2Config":
         """Rebuild from a `to_dict` payload; unknown keys (run metadata) are ignored.
 
-        Raises `ValueError` when a fixed field present in `data` disagrees with this version.
+        Raises `ValueError` when a required field (`_REQUIRED_FIELDS`) is missing or when a fixed
+        field present in `data` disagrees with this version.
         """
+        missing = [key for key in _REQUIRED_FIELDS if key not in data]
+        if missing:
+            raise ValueError(f"v2 config lacks required fields {missing}")
         for key, expected in _FIXED_FIELDS.items():
             if key in data and data[key] != expected:
                 raise ValueError(f"incompatible {key}: {data[key]!r} (expected {expected!r})")
