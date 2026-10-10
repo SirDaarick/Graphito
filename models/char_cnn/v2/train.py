@@ -11,11 +11,13 @@ val ROC-AUC (ties: val PR-AUC, then the earlier epoch), saving `best.pth` on eve
 The trainer writes only inside its run directory. It never writes `models/char_cnn/best_model.pth`
 (or anything under `models/`) and never promotes a checkpoint; promotion is a separate CLI.
 
-Exit codes: 0 complete; 2 on a leak-guard failure (`leak_guard.json` written, no checkpoint);
-3 when the run fails after its directory exists (data, training or evaluation error, e.g. no epoch
-with a defined val ROC-AUC). `config.json` records `status` (`running` -> `complete` | `failed`)
-and, when failed, `failure: {stage, reason}`. Invalid options are rejected (argparse, exit 2)
-before anything is written.
+Exit codes (`v2/runs.py`): 0 complete; 2 on a leak-guard failure (`leak_guard.json` written, no
+checkpoint, run marked failed in stage `leak_guard`); 3 when the run is marked failed in any other
+stage after its directory exists (data, training or evaluation error, e.g. no epoch with a defined
+val ROC-AUC). `config.json` records `status` (`running` -> `complete` | `failed`), when failed
+`failure: {stage, reason}`, and `best_sha256` (the selected `best.pth`, which promote requires).
+An interrupt (`KeyboardInterrupt`) also marks the run failed with its stage, then propagates.
+Invalid options are rejected (argparse, exit 2) before anything is written.
 """
 
 import argparse
@@ -46,26 +48,28 @@ from models.char_cnn.v2.data import (
     load_views,
     view_samples,
 )
-from models.char_cnn.v2.evaluate import (
+from models.char_cnn.v2.evaluate import SHORTCUT_VIEWS, evaluate_run, update_run_config
+from models.char_cnn.v2.model import CharCNNV2
+from models.char_cnn.v2.preprocess import LeakGuardError, leak_guard
+from models.char_cnn.v2.runs import (
+    CHECKPOINT_NAME,
+    DEFAULT_EVAL_BATCH_SIZE,
+    DEFAULT_N_BOOT,
+    LEAK_GUARD_EXIT,
     RUN_FAILED_EXIT,
-    SHORTCUT_VIEWS,
     STATUS_COMPLETE,
     STATUS_FAILED,
     STATUS_RUNNING,
     describe_error,
-    evaluate_run,
     resolve_device,
     set_run_status,
-    update_run_config,
     write_json,
 )
-from models.char_cnn.v2.model import CharCNNV2
-from models.char_cnn.v2.preprocess import LeakGuardError, leak_guard
 from models.char_cnn.v2.scoring import score_arrays
 from models.char_cnn.v2.shortcuts import ShortcutAudit
 from models.evaluation import metrics as M
 from models.evaluation.manifest import DEFAULT_MANIFEST, ROOT, Sample, load_manifest
-from models.evaluation.provenance import atomic_write_bytes
+from models.evaluation.provenance import atomic_write_bytes, file_sha256
 from models.evaluation.report import RunContext
 from models.evaluation.seed import seed_everything
 
@@ -84,7 +88,6 @@ __all__ = [
 ]
 
 CHANNEL = "char_cnn"
-LEAK_GUARD_EXIT = 2
 LEAK_GUARD_SCHEMA = "graphito.charcnn_leak_guard/v1"
 LEAK_GUARD_THRESHOLD = 0.001
 GUARD_VIEWS = ("train", "val", "test")  # representatives of every split
@@ -127,8 +130,8 @@ class TrainOptions:
     early_stop: int = 7
     lr_patience: int = 3
     lr_factor: float = 0.5
-    eval_batch_size: int = 32
-    n_boot: int = 1000
+    eval_batch_size: int = DEFAULT_EVAL_BATCH_SIZE
+    n_boot: int = DEFAULT_N_BOOT
     limit_per_class: Optional[int] = None
 
     def __post_init__(self) -> None:
@@ -279,7 +282,7 @@ def fit(
         if selection.update(epoch, roc_auc, pr_auc):
             save_checkpoint(
                 model,
-                run_dir / "best.pth",
+                run_dir / CHECKPOINT_NAME,
                 **dict(checkpoint_metadata or {}),
                 epoch=epoch,
                 val_roc_auc=roc_auc,
@@ -390,7 +393,8 @@ def run(
 
     Returns exit code 0, `LEAK_GUARD_EXIT` on a leak-guard failure or `RUN_FAILED_EXIT` when any
     step after the run directory exists raises; in both failure cases `config.json` is marked
-    `failed` with the stage and reason, and an `ERROR:` line goes to stderr.
+    `failed` with the stage and reason, and an `ERROR:` line goes to stderr. A `BaseException`
+    that is not an `Exception` (e.g. `KeyboardInterrupt`) is recorded the same way, then re-raised.
     """
     model_config = model_config or CharCNNV2Config()
     seed_everything(options.seed, deterministic_torch=True)
@@ -417,10 +421,12 @@ def run(
     stage = _Stage()
     try:
         return _execute(ctx, manifest, options, model_config, device, stage)
-    except Exception as exc:  # recorded in config.json instead of leaving a silent half-written run
+    except BaseException as exc:  # recorded in config.json instead of leaving a silent half-written run
         reason = describe_error(exc)
         set_run_status(ctx.path, STATUS_FAILED, stage=stage.name, reason=reason)
         print(f"ERROR: run failed during {stage.name}: {reason}; see {ctx.path / 'config.json'}", file=sys.stderr)
+        if not isinstance(exc, Exception):  # KeyboardInterrupt / SystemExit: recorded, then propagated
+            raise
         return RunResult(RUN_FAILED_EXIT, ctx.path)
 
 
@@ -472,6 +478,7 @@ def _execute(
     result = fit(model, views["train"], views["val"], options, device, ctx.path, metadata)
     ctx = update_run_config(
         ctx,
+        best_sha256=file_sha256(ctx.path / CHECKPOINT_NAME),  # binds the run to its checkpoint (promote)
         sampling={"ratio": "1:1", **{k: v for k, v in result.sampling.items() if k != "epoch"}},
         selection={
             "rule": "max (val_roc_auc, val_pr_auc); ties -> earlier epoch; null AUC never selected",
@@ -480,7 +487,7 @@ def _execute(
             "val_pr_auc": result.best_val_pr_auc,
             "epochs_run": result.epochs_run,
             "stopped_early": result.stopped_early,
-            "checkpoint": "best.pth",
+            "checkpoint": CHECKPOINT_NAME,
         },
     )
 

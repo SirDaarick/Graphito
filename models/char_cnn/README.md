@@ -77,12 +77,26 @@ except `promote`.
 `--lr 1e-3`, `--weight-decay 1e-4`, `--early-stop 7`, `--lr-patience 3`, `--lr-factor 0.5`,
 `--eval-batch-size 32`, `--n-boot 1000`, `--limit-per-class N` (debug only, recorded),
 `--model-config <json>` (`CharCNNV2Config` overrides). Invalid numbers are rejected before
-anything is written. Exit codes: 0 complete, 2 leak guard failed, 3 run failed (for example no
-epoch with a defined val ROC-AUC); `config.json` records `status` and `failure`.
+anything is written. `config.json` records `status`, `failure` and `best_sha256` (the selected
+checkpoint); an interrupt also marks the run failed before propagating.
 
-**Evaluate** refuses a run that already has `calibration.json`/`metrics.json` unless `--force`
-(exit 1); it reuses the run's manifest, data root, seed, `--n-boot` and `--limit-per-class`
-(`--manifest`, `--root`, `--n-boot`, `--batch-size`, `--device` override them).
+Exit codes (shared by every v2 CLI, `models/char_cnn/v2/runs.py`):
+
+| Code | Meaning |
+|---|---|
+| 0 | success |
+| 1 | refused; nothing written (or the run left unchanged) |
+| 2 | train: leak guard failed (run marked failed); also argparse usage errors |
+| 3 | the run's `config.json` is marked `failed` (stage and reason recorded) |
+| 4 | a write failed part-way; the previous files and status were restored |
+
+**Evaluate** refuses (exit 1) a run whose status is not `complete` or `failed` during
+`evaluate` (a `running` run is never touched), a `best.pth` that differs from `best_sha256`, a
+run that already has `calibration.json`/`metrics.json` unless `--force`, and a run whose manifest
+or data cannot be loaded. It snapshots the run first: if the evaluation fails, the previous
+outputs are restored (a `complete` run stays complete, exit 4; a failed run stays failed, exit 3).
+It reuses the run's manifest, data root, seed, `--n-boot` and `--limit-per-class` (`--manifest`,
+`--root`, `--n-boot`, `--batch-size`, `--device` override them).
 
 **Baseline** flags: `--checkpoint`, `--manifest`, `--expected-sha256`, `--root`,
 `--runs-root runs`, `--device`, `--seed 42`, `--n-boot 1000`. It refuses non-legacy checkpoints,
@@ -90,11 +104,14 @@ hashes the checkpoint before and after (a change fails the run), and is never ca
 only operating point is `argmax_0.5` with `source: "manual"`. The legacy `CharCNNConfig` creates
 `models/char_cnn/{weights,logs}/` relative to the working directory (both gitignored).
 
-**Promote** requires a v2 checkpoint whose run is `complete` with `metrics.json` and
-`calibration.json`. It refuses when `git status --porcelain -- <target>` reports any change
-(modified, staged or untracked) or git fails, unless `--force`. It writes
-`best_model.provenance.json` next to the target (run id, source/target/previous/config/
-calibration sha256, headline AUCs, forced flag). `--dry-run` runs every check and writes nothing.
+**Promote** requires a v2 checkpoint that is its run's `best.pth`, matches the run's
+`best_sha256`, and whose run is `complete` with `metrics.json` and `calibration.json`. It refuses
+when `git status --porcelain --ignored -- <target>` reports any entry (modified, staged,
+untracked, or ignored unless tracked and identical to `HEAD`) or git fails, unless `--force`.
+The source bytes are read once and re-hashed before writing; the sidecar
+`best_model.provenance.json` (run id, source/target/previous/config/calibration sha256, headline
+AUCs, forced flag) is staged before the target is replaced, and a failed write restores the
+previous target and sidecar (exit 4). `--dry-run` runs every check and writes nothing.
 Promotion is a user decision; no other tool calls it.
 
 ## Run layout

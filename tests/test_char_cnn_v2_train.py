@@ -645,6 +645,22 @@ class TestRunStatus:
         assert "calibration exploded" in doc["failure"]["reason"]
         assert (run_dir / "best.pth").is_file()
 
+    def test_successful_run_records_the_best_checkpoint_hash(self, traced_run):
+        doc = _json(traced_run["run_dir"] / "config.json")
+        assert doc["best_sha256"] == _sha256(traced_run["run_dir"] / "best.pth")
+
+    def test_keyboard_interrupt_marks_the_run_failed_and_propagates(self, corpus, tmp_path, monkeypatch):
+        def interrupted(*args, **kwargs):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(train_mod, "fit", interrupted)
+        runs_root = tmp_path / "runs"
+        with pytest.raises(KeyboardInterrupt):
+            train_mod.main(_argv(corpus, runs_root))
+        doc = _json(_single_run_dir(runs_root) / "config.json")
+        assert doc["status"] == "failed"
+        assert doc["failure"]["stage"] == "fit" and "KeyboardInterrupt" in doc["failure"]["reason"]
+
     def test_single_class_val_fails_cleanly_before_training(self, corpus, tmp_path, monkeypatch, capsys):
         def humans_only_val(*args, **kwargs):
             views = original(*args, **kwargs)
@@ -727,6 +743,103 @@ class TestReevaluate:
         assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == 1
         assert "best.pth" in capsys.readouterr().err
 
+    # --- PR4 review follow-ups: run status gate and fail-safe re-evaluation -----------------------
+
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            {"status": "running", "failure": None},
+            {"status": "failed", "failure": {"stage": "fit", "reason": "x"}},
+            {"status": "failed", "failure": None},
+            {"status": None},
+        ],
+    )
+    def test_refuses_a_run_that_is_not_finished_even_with_force(self, traced_run, tmp_path, capsys, fields):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=False)
+        _update_config(run_dir, **fields)
+        before = _tree_bytes(run_dir)
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu", "--force"]) == eval_mod.REFUSED_EXIT
+        assert "status" in capsys.readouterr().err
+        assert _tree_bytes(run_dir) == before
+
+    def test_reevaluates_a_run_that_failed_during_evaluation(self, traced_run, tmp_path):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=True)
+        _update_config(run_dir, status="failed", failure={"stage": "evaluate", "reason": "boom"})
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == 0
+        doc = _json(run_dir / "config.json")
+        assert doc["status"] == "complete" and doc["failure"] is None
+
+    def test_refuses_a_checkpoint_that_differs_from_the_recorded_hash(self, traced_run, tmp_path, capsys):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=True)
+        _update_config(run_dir, best_sha256="0" * 64)
+        before = _tree_bytes(run_dir)
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == eval_mod.REFUSED_EXIT
+        assert "best_sha256" in capsys.readouterr().err
+        assert _tree_bytes(run_dir) == before
+
+    def test_data_load_failure_is_refused_and_leaves_the_run_unchanged(
+        self, traced_run, tmp_path, monkeypatch, capsys
+    ):
+        def unreadable(*args, **kwargs):
+            raise FileNotFoundError("corpus is gone")
+
+        monkeypatch.setattr(eval_mod, "load_run_views", unreadable)
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=True)
+        before = _tree_bytes(run_dir)
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == eval_mod.REFUSED_EXIT
+        assert "corpus is gone" in capsys.readouterr().err
+        assert _tree_bytes(run_dir) == before
+
+    def test_forced_failure_restores_the_previous_outputs_and_status(
+        self, traced_run, tmp_path, monkeypatch, capsys
+    ):
+        from models.char_cnn.v2 import runs
+
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=False)
+        before = _tree_bytes(run_dir)
+        _fail_test_scoring(monkeypatch)  # after calibration.json, config.json and scores_val.csv were rewritten
+        code = eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu", "--force"])
+        assert code == runs.PARTIAL_WRITE_EXIT == 4
+        err = capsys.readouterr().err
+        assert err.startswith("ERROR:") and "test scoring exploded" in err and "restored" in err
+        assert _tree_bytes(run_dir) == before
+        assert _json(run_dir / "config.json")["status"] == "complete"
+
+    def test_failure_of_a_failed_run_keeps_it_failed_without_partial_outputs(
+        self, traced_run, tmp_path, monkeypatch, capsys
+    ):
+        run_dir = _copy_run(traced_run, tmp_path, strip_outputs=True)
+        _update_config(run_dir, status="failed", failure={"stage": "evaluate", "reason": "earlier"})
+        before = set(_tree_bytes(run_dir))
+        _fail_test_scoring(monkeypatch)
+        assert eval_mod.main(["--run-dir", str(run_dir), "--device", "cpu"]) == eval_mod.RUN_FAILED_EXIT
+        assert capsys.readouterr().err.startswith("ERROR:")
+        assert set(_tree_bytes(run_dir)) == before  # calibration.json and scores_val.csv were removed
+        doc = _json(run_dir / "config.json")
+        assert doc["status"] == "failed" and doc["failure"]["stage"] == "evaluate"
+        assert "test scoring exploded" in doc["failure"]["reason"]
+
+
+def _update_config(run_dir: Path, **fields) -> None:
+    doc = _json(run_dir / "config.json")
+    doc.update(fields)
+    (run_dir / "config.json").write_text(json.dumps(doc), encoding="utf-8")
+
+
+def _tree_bytes(run_dir: Path) -> dict:
+    return {p.relative_to(run_dir).as_posix(): p.read_bytes() for p in run_dir.rglob("*") if p.is_file()}
+
+
+def _fail_test_scoring(monkeypatch) -> None:
+    original = eval_mod.score_split
+
+    def score_split(model, encoded, device, batch_size, *, name):
+        if name == "test":
+            raise RuntimeError("test scoring exploded")
+        return original(model, encoded, device, batch_size, name=name)
+
+    monkeypatch.setattr(eval_mod, "score_split", score_split)
+
 
 # --- PR3 review follow-ups: shared constants and helpers -----------------------------------------
 
@@ -757,6 +870,24 @@ class TestSharedHelpers:
     def test_one_json_writer_is_shared(self):
         assert not hasattr(train_mod, "_write_json") and not hasattr(eval_mod, "_write_json")
         assert train_mod.write_json is eval_mod.write_json
+
+    def test_exit_codes_status_and_helpers_live_in_runs(self):
+        from models.char_cnn.v2 import runs
+
+        codes = (runs.REFUSED_EXIT, runs.LEAK_GUARD_EXIT, runs.RUN_FAILED_EXIT, runs.PARTIAL_WRITE_EXIT)
+        assert codes == (1, 2, 3, 4)
+        assert (runs.STATUS_RUNNING, runs.STATUS_COMPLETE, runs.STATUS_FAILED) == ("running", "complete", "failed")
+        for name in ("write_json", "set_run_status", "describe_error", "resolve_device", "STATUS_COMPLETE",
+                     "REFUSED_EXIT", "RUN_FAILED_EXIT"):
+            assert getattr(eval_mod, name) is getattr(runs, name), name  # backward-compatible re-export
+        assert train_mod.LEAK_GUARD_EXIT is runs.LEAK_GUARD_EXIT
+        assert train_mod.RUN_FAILED_EXIT is runs.RUN_FAILED_EXIT
+
+    def test_evaluation_defaults_are_shared_with_train_options(self):
+        from models.char_cnn.v2 import runs
+
+        options = train_mod.TrainOptions()
+        assert (options.n_boot, options.eval_batch_size) == (runs.DEFAULT_N_BOOT, runs.DEFAULT_EVAL_BATCH_SIZE)
 
 
 class TestPerGeneratorNoneGroup:

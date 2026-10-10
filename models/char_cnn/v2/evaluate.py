@@ -17,7 +17,13 @@ Every file is scored; abstention (`effective_length < min_non_ws_chars`) is only
 
 `python -m models.char_cnn.v2.evaluate --run-dir <run>` re-runs steps 2-5 from an existing run's
 `best.pth` without retraining (same manifest, data root, seed and `--limit-per-class` as the
-run). It refuses a run that already has calibration or metrics unless `--force` is given.
+run). It refuses (exit 1, nothing written) a run whose status is not `complete` or `failed` during
+`evaluate` (a `running` run is never touched), a `best.pth` whose sha256 differs from the run's
+recorded `best_sha256`, a run that already has calibration or metrics unless `--force` is given,
+and a run whose manifest or data cannot be loaded. Every file of the run (except `best.pth`) is
+snapshotted first; when the evaluation then fails, the snapshot is restored, so no partial outputs
+are left: a `complete` run keeps its previous outputs and status (exit 4), a run that had failed
+during `evaluate` is marked failed again with the new reason (exit 3).
 """
 
 import argparse
@@ -38,12 +44,27 @@ import torch.nn as nn
 from models.char_cnn.v2.checkpoint import load_checkpoint, load_v2_model
 from models.char_cnn.v2.config import UNK_IDX, char_index
 from models.char_cnn.v2.data import EncodedSet, data_summary, limit_per_class, load_views, view_samples
+from models.char_cnn.v2.runs import (
+    CHECKPOINT_NAME,
+    DEFAULT_EVAL_BATCH_SIZE,
+    DEFAULT_N_BOOT,
+    PARTIAL_WRITE_EXIT,
+    REFUSED_EXIT,
+    RUN_FAILED_EXIT,
+    STATUS_COMPLETE,
+    STATUS_FAILED,
+    STATUS_RUNNING,
+    describe_error,
+    resolve_device,
+    set_run_status,
+    write_json,
+)
 from models.char_cnn.v2.scoring import score_arrays
 from models.char_cnn.v2.shortcuts import LENGTH_BUCKETS, ShortcutAudit, length_bucket, render_markdown
 from models.evaluation import metrics as M
 from models.evaluation.calibration import ScoredSet, build_calibration, load_calibration, save_calibration
 from models.evaluation.manifest import Sample, SplitManifest, load_manifest
-from models.evaluation.provenance import atomic_write_bytes
+from models.evaluation.provenance import atomic_write_bytes, file_sha256
 from models.evaluation.report import RunContext, compute_metrics, operating_points_from_calibration
 
 __all__ = [
@@ -58,6 +79,8 @@ __all__ = [
     "STATUS_FAILED",
     "REFUSED_EXIT",
     "RUN_FAILED_EXIT",
+    "PARTIAL_WRITE_EXIT",
+    "EVALUABLE_FAILURE_STAGE",
     "EvaluationResult",
     "resolve_device",
     "write_json",
@@ -92,14 +115,12 @@ TEST_VIEWS = {
     "test": ("representatives", "headline: test representatives (one file per dup group)"),
     "test_all": ("all_files", "secondary: all non-broken test files (CI95 by dup_group)"),
 }
-# Run status recorded in `config.json` (`status`, plus `failure` = {stage, reason} when failed).
-STATUS_RUNNING = "running"
-STATUS_COMPLETE = "complete"
-STATUS_FAILED = "failed"
-REFUSED_EXIT = 1  # nothing was written
-RUN_FAILED_EXIT = 3  # the run directory is marked failed
+# Status constants, exit codes and the JSON/status helpers live in `v2/runs.py`; they are
+# imported above and stay importable from this module.
 # Files whose presence means a run was already evaluated (re-evaluation needs --force).
 EVALUATION_ARTIFACTS = ("calibration.json", "metrics.json")
+# A failed run may be re-evaluated only when it failed in this stage (its checkpoint is final).
+EVALUABLE_FAILURE_STAGE = "evaluate"
 _SPACE_IDX = char_index(" ")
 _NEWLINE_IDX = char_index("\n")
 
@@ -107,35 +128,6 @@ _NEWLINE_IDX = char_index("\n")
 def _key(value: Any) -> str:
     # Same convention as `models.evaluation.report` group keys.
     return "<none>" if value is None else str(value)
-
-
-def resolve_device(name: Optional[str]) -> torch.device:
-    """The requested device, else CUDA when available, else CPU."""
-    return torch.device(name or ("cuda" if torch.cuda.is_available() else "cpu"))
-
-
-def write_json(path: Path, doc: Mapping[str, Any]) -> None:
-    """Atomic, sorted, NaN-free UTF-8 JSON (the run directory's JSON writer)."""
-    text = json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False)
-    atomic_write_bytes(path, (text + "\n").encode("utf-8"))
-
-
-def describe_error(exc: BaseException) -> str:
-    """One-line `Type: message` for `config.json` and the `ERROR:` line."""
-    message = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
-    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
-
-
-def set_run_status(
-    run_dir: Path, status: str, *, stage: Optional[str] = None, reason: Optional[str] = None
-) -> Dict[str, Any]:
-    """Record the run status in `config.json`, re-read from disk so no earlier update is lost."""
-    path = Path(run_dir) / "config.json"
-    doc = json.loads(path.read_text(encoding="utf-8"))
-    doc["status"] = status
-    doc["failure"] = {"stage": stage, "reason": reason} if status == STATUS_FAILED else None
-    write_json(path, doc)
-    return doc
 
 
 def score_split(
@@ -358,14 +350,14 @@ def evaluate_run(
     device: "str | torch.device",
     *,
     seed: int,
-    n_boot: int = 1000,
-    batch_size: int = 32,
+    n_boot: int = DEFAULT_N_BOOT,
+    batch_size: int = DEFAULT_EVAL_BATCH_SIZE,
     shortcuts: Optional[Mapping[str, Any]] = None,
     data_summary: Optional[Mapping[str, Any]] = None,
 ) -> EvaluationResult:
     """Calibrate on val, then score test once and write every report artifact (see module doc)."""
     run_dir = ctx.path
-    checkpoint = load_checkpoint(run_dir / "best.pth", map_location=device)
+    checkpoint = load_checkpoint(run_dir / CHECKPOINT_NAME, map_location=device)
     model = load_v2_model(checkpoint, device)
     min_non_ws = model.config.min_non_ws_chars
 
@@ -493,15 +485,18 @@ def reevaluate(
 ) -> EvaluationResult:
     """Re-run `evaluate_run` on a finished run's `best.pth` with the run's own seed and settings.
 
-    The run is marked `running` first; the caller marks it `complete` or `failed`.
+    The run is marked `running` first (and `best_sha256` recorded when the run had none); the
+    caller marks it `complete` or restores it on failure.
     """
-    doc = _read_json(Path(run_dir) / "config.json")
+    run_dir = Path(run_dir)
+    doc = _read_json(run_dir / "config.json")
     hyperparams = doc.get("config", {}).get("hyperparams", {})
-    ctx = RunContext(path=Path(run_dir), channel=doc["channel"], config=doc)
+    ctx = RunContext(path=run_dir, channel=doc["channel"], config=doc)
     ctx = update_run_config(
         ctx,
         status=STATUS_RUNNING,
         failure=None,
+        best_sha256=doc.get("best_sha256") or file_sha256(run_dir / CHECKPOINT_NAME),
         last_evaluation={"by": "models.char_cnn.v2.evaluate", "at": datetime.now(timezone.utc).isoformat()},
     )
     return evaluate_run(
@@ -510,8 +505,8 @@ def reevaluate(
         views,
         device,
         seed=doc["seed"],
-        n_boot=n_boot or hyperparams.get("n_boot", 1000),
-        batch_size=batch_size or hyperparams.get("eval_batch_size", 32),
+        n_boot=n_boot or hyperparams.get("n_boot", DEFAULT_N_BOOT),
+        batch_size=batch_size or hyperparams.get("eval_batch_size", DEFAULT_EVAL_BATCH_SIZE),
         shortcuts=audit.to_dict(),
         data_summary=data_summary(views),
     )
@@ -537,8 +532,56 @@ def _refuse(message: str) -> int:
     return REFUSED_EXIT
 
 
+def _status_refusal(doc: Mapping[str, Any]) -> Optional[str]:
+    """Why a run's status forbids re-evaluation, or None when it is `complete` or failed in `evaluate`."""
+    status = doc.get("status")
+    if status == STATUS_COMPLETE:
+        return None
+    stage = (doc.get("failure") or {}).get("stage")
+    if status == STATUS_FAILED and stage == EVALUABLE_FAILURE_STAGE:
+        return None
+    if status == STATUS_FAILED:
+        return (
+            f"the run has status {status!r} in stage {stage!r}, not {EVALUABLE_FAILURE_STAGE!r}; retrain instead"
+        )
+    return f"the run has status {status!r}; only a complete run or one that failed during evaluation can be re-evaluated"
+
+
+@dataclass(frozen=True)
+class _Snapshot:
+    """Every file of a run directory except `best.pth`, plus its directories, held in memory."""
+
+    files: Dict[Path, bytes]
+    dirs: frozenset
+
+    @classmethod
+    def take(cls, run_dir: Path) -> "_Snapshot":
+        files, dirs = {}, set()
+        for path in run_dir.rglob("*"):
+            rel = path.relative_to(run_dir)
+            if path.is_dir():
+                dirs.add(rel)
+            elif rel != Path(CHECKPOINT_NAME):
+                files[rel] = path.read_bytes()
+        return cls(files=files, dirs=frozenset(dirs))
+
+    def restore(self, run_dir: Path) -> None:
+        """Delete what the failed evaluation created and rewrite every file it changed."""
+        for path in sorted(run_dir.rglob("*"), reverse=True):  # children before their directory
+            rel = path.relative_to(run_dir)
+            if path.is_dir():
+                if rel not in self.dirs:
+                    path.rmdir()
+            elif rel != Path(CHECKPOINT_NAME) and rel not in self.files:
+                path.unlink()
+        for rel, data in self.files.items():
+            path = run_dir / rel
+            if not path.is_file() or path.read_bytes() != data:
+                atomic_write_bytes(path, data)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """Exit 0 when evaluated, `REFUSED_EXIT` when nothing was written, `RUN_FAILED_EXIT` on failure."""
+    """Exit 0 when evaluated, else `REFUSED_EXIT`, `PARTIAL_WRITE_EXIT` or `RUN_FAILED_EXIT` (module doc)."""
     parser = build_parser()
     args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
     for name in ("n_boot", "batch_size"):
@@ -546,13 +589,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if value is not None and value < 1:
             parser.error(f"--{name.replace('_', '-')} must be >= 1 (got {value})")
     run_dir = Path(args.run_dir)
-    for required in ("config.json", "best.pth"):
+    for required in ("config.json", CHECKPOINT_NAME):
         if not (run_dir / required).is_file():
             return _refuse(f"{run_dir / required} does not exist; nothing to evaluate")
+    try:
+        doc = _read_json(run_dir / "config.json")
+    except (OSError, ValueError) as exc:
+        return _refuse(f"cannot read {run_dir / 'config.json'}: {describe_error(exc)}")
+    refusal = _status_refusal(doc)
+    if refusal is not None:
+        return _refuse(f"{run_dir}: {refusal}")
+    recorded = doc.get("best_sha256")
+    if recorded and file_sha256(run_dir / CHECKPOINT_NAME) != recorded:
+        return _refuse(f"{run_dir / CHECKPOINT_NAME} does not match the run's recorded best_sha256 {recorded}")
     existing = [name for name in EVALUATION_ARTIFACTS if (run_dir / name).exists()]
     if existing and not args.force:
         return _refuse(f"{run_dir} already has {existing}; pass --force to recompute them")
-    doc = _read_json(run_dir / "config.json")
     try:
         manifest = load_manifest(args.manifest or doc["manifest_path"], doc["manifest_sha256"])
     except (OSError, ValueError, KeyError) as exc:
@@ -565,22 +617,44 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         views, audit = load_run_views(manifest, root, run_config.get("hyperparams", {}).get("limit_per_class"))
     except (OSError, ValueError) as exc:
-        print(f"ERROR: cannot load the run's data: {describe_error(exc)} (run left unchanged)", file=sys.stderr)
-        return RUN_FAILED_EXIT
+        return _refuse(f"cannot load the run's data: {describe_error(exc)} (run left unchanged)")
 
+    snapshot = _Snapshot.take(run_dir)
     try:
         reevaluate(
             run_dir, manifest, views, audit, resolve_device(args.device), n_boot=args.n_boot,
             batch_size=args.batch_size,
         )
-    except Exception as exc:  # recorded in config.json; the run's outputs may be partial
-        reason = describe_error(exc)
-        set_run_status(run_dir, STATUS_FAILED, stage="evaluate", reason=reason)
-        print(f"ERROR: evaluation failed: {reason}; {run_dir / 'config.json'} marked failed", file=sys.stderr)
-        return RUN_FAILED_EXIT
+    except BaseException as exc:  # restore the previous outputs instead of leaving partial ones
+        return _evaluation_failed(run_dir, doc, snapshot, exc)
     set_run_status(run_dir, STATUS_COMPLETE)
     print(f"evaluated: {run_dir}")
     return 0
+
+
+def _evaluation_failed(run_dir: Path, doc: Mapping[str, Any], snapshot: _Snapshot, exc: BaseException) -> int:
+    """Restore the run, then mark it failed unless it was `complete`; re-raises non-`Exception`s."""
+    reason = describe_error(exc)
+    try:
+        snapshot.restore(run_dir)
+    except Exception as restore_exc:  # outputs may be partial: say so in config.json
+        reason = f"{reason}; restoring the previous outputs failed: {describe_error(restore_exc)}"
+        set_run_status(run_dir, STATUS_FAILED, stage=EVALUABLE_FAILURE_STAGE, reason=reason)
+        print(f"ERROR: evaluation failed: {reason}; {run_dir / 'config.json'} marked failed", file=sys.stderr)
+        if not isinstance(exc, Exception):
+            raise exc
+        return RUN_FAILED_EXIT
+    if not isinstance(exc, Exception):  # KeyboardInterrupt and friends: restored, then propagated
+        raise exc
+    if doc.get("status") == STATUS_COMPLETE:
+        print(f"ERROR: evaluation failed: {reason}; previous outputs and status of {run_dir} restored", file=sys.stderr)
+        return PARTIAL_WRITE_EXIT
+    set_run_status(run_dir, STATUS_FAILED, stage=EVALUABLE_FAILURE_STAGE, reason=reason)
+    print(
+        f"ERROR: evaluation failed: {reason}; previous outputs restored, {run_dir / 'config.json'} marked failed",
+        file=sys.stderr,
+    )
+    return RUN_FAILED_EXIT
 
 
 if __name__ == "__main__":

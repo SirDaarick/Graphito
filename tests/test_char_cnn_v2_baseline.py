@@ -150,6 +150,15 @@ class TestBaselineRun:
         assert "not comparable" in report
 
 
+class TestBaselineExitCodes:
+    def test_exit_codes_and_defaults_come_from_the_shared_runs_module(self):
+        from models.char_cnn.v2 import runs
+
+        assert baseline_mod.REFUSED_EXIT is runs.REFUSED_EXIT
+        assert baseline_mod.RUN_FAILED_EXIT is runs.RUN_FAILED_EXIT
+        assert baseline_mod.build_parser().parse_args([]).n_boot == runs.DEFAULT_N_BOOT
+
+
 class TestBaselineRefusals:
     def test_v2_checkpoint_is_refused_before_writing(self, corpus, tmp_path, monkeypatch, capsys):
         tree, manifest_path = corpus

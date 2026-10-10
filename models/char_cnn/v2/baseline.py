@@ -16,9 +16,9 @@ operating point is `argmax_0.5` (`source: "manual"`). The checkpoint is read-onl
 is recorded before and after the run and a difference fails the run. Output goes to
 `<runs-root>/char_cnn_legacy/<ts>/`.
 
-Exit codes: 0 complete; 1 refused before anything was written (missing or non-legacy
-checkpoint, unloadable manifest); 3 when the run fails after its directory exists (status
-`failed` in `config.json`).
+Exit codes (`v2/runs.py`): 0 complete; 1 refused before anything was written (missing or
+non-legacy checkpoint, unloadable manifest); 3 when the run is marked failed after its directory
+exists (status `failed` in `config.json`).
 """
 
 import argparse
@@ -33,23 +33,27 @@ from models.char_cnn.inference import CharCNNInference
 from models.char_cnn.v2.checkpoint import LEGACY_VERSION
 from models.char_cnn.v2.data import EncodedSet, load_views
 from models.char_cnn.v2.evaluate import (
-    RUN_FAILED_EXIT,
-    STATUS_COMPLETE,
-    STATUS_FAILED,
-    STATUS_RUNNING,
     TEST_VIEWS,
     append_report,
     complete_per_group,
-    describe_error,
     expected_generators,
     expected_groups,
     group_labels,
     per_generator,
     render_generator_section,
-    resolve_device,
-    set_run_status,
     update_run_config,
     write_csv,
+)
+from models.char_cnn.v2.runs import (
+    DEFAULT_N_BOOT,
+    REFUSED_EXIT,
+    RUN_FAILED_EXIT,
+    STATUS_COMPLETE,
+    STATUS_FAILED,
+    STATUS_RUNNING,
+    describe_error,
+    resolve_device,
+    set_run_status,
 )
 from models.evaluation.manifest import DEFAULT_MANIFEST, ROOT, SplitManifest, load_manifest
 from models.evaluation.provenance import file_sha256
@@ -71,7 +75,6 @@ CHANNEL = "char_cnn_legacy"
 MODE = "legacy_contaminated"
 SCORE_NAME = "prob_sintetico"
 POINT_KEY = "argmax_0.5"
-REFUSED_EXIT = 1
 CONTAMINATION_NOTE = (
     "contaminated: the legacy checkpoint was trained on a split that overlaps split_v1 test, and its "
     "preprocessing (v1) differs from preprocess v2; these numbers are not comparable to a v2 run"
@@ -282,7 +285,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--runs-root", type=Path, default=ROOT / "runs", help="output goes to <runs-root>/char_cnn_legacy/")
     p.add_argument("--device", default=None, help="torch device (default: cuda if available, else cpu)")
     p.add_argument("--seed", type=int, default=42, help="bootstrap seed")
-    p.add_argument("--n-boot", type=_positive_int, default=1000, help="bootstrap resamples for the CI95")
+    p.add_argument("--n-boot", type=_positive_int, default=DEFAULT_N_BOOT, help="bootstrap resamples for the CI95")
     return p
 
 
