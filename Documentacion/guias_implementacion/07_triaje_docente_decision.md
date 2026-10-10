@@ -1,5 +1,8 @@
 # Guía de Implementación 07: Botones de Triaje Docente (Aceptar, Rechazar, En Duda)
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `backend/app/infrastructure/database/models.py` (`DecisionDocenteEnum`), `backend/app/presentation/api/v1/endpoints/analysis.py` (`/verdict`), `frontend/src/pages/SimilarityReportModal.tsx`
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 En sistemas éticos de Inteligencia Artificial para el ámbito educativo, existe un principio inviolable: **Human-in-the-Loop (El Humano Toma la Decisión Final)**.
 

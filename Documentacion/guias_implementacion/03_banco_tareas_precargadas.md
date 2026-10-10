@@ -1,5 +1,8 @@
 # Guía de Implementación 03: Banco de Tareas Precargadas (Plantillas Canónicas)
 
+> **Estado:** ⏳ **PENDIENTE DE IMPLEMENTACIÓN**  
+> **Objetivo:** Catálogo de plantillas canónicas (Criba de Eratóstenes, Quicksort, etc.) con clonación transaccional para resolver el síndrome del lienzo en blanco (*Cold Start*).
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 El mayor inhibidor de tracción en un producto B2B/Educativo es el **síndrome del lienzo en blanco (Cold Start Problem)**. Cuando un docente ingresa a Graphito por primera vez y ve una biblioteca vacía, la fricción de:
 1. Redactar el enunciado del problema,

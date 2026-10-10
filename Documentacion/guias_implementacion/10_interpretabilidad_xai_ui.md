@@ -1,5 +1,8 @@
 # Guía de Implementación 10: Interpretabilidad de Modelos en la UI (Explainable AI / XAI)
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `backend/app/application/services/xai_service.py`, `backend/app/presentation/api/v1/endpoints/analysis.py`, `frontend/src/components/xai/EvidenceDrawer.tsx`, `frontend/src/pages/SimilarityReportModal.tsx`
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 En la evaluación de integridad académica, **un porcentaje abstracto carece de validez pedagógica y jurídica**.
 

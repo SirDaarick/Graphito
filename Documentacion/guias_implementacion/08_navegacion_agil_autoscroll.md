@@ -1,5 +1,8 @@
 # Guía de Implementación 08: Navegación Ágil (Avance Automático & Atajos de Teclado)
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `frontend/src/pages/SimilarityReportModal.tsx` (Cola de revisión secuencial, navegación con índice `navigateTo`, animaciones GSAP y auto-avance tras veredicto)
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 En el diseño de interfaces de alta productividad (*High-Throughput Review Interfaces*), la **Ley de Fitts** y la **minimización de la carga cognitiva** son determinantes.
 

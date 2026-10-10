@@ -1,5 +1,8 @@
 # Guía de Implementación 04: Agrupación por Grupos / Cursos Académicos
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `backend/app/infrastructure/database/models.py` (`Grupo`, `GrupoProblema`), `backend/app/application/services/group_service.py`, `backend/app/presentation/api/v1/endpoints/groups.py`, `frontend/src/components/groups/CreateGroupModal.tsx`, `frontend/src/components/groups/GroupFilterDropdown.tsx`
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 En el diseño de software para educación, uno de los errores más comunes es acoplar la **especificación de una tarea (Problema)** a un **contexto temporal específico (Grupo/Semestre)**.
 

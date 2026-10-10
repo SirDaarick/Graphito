@@ -1,5 +1,8 @@
 # Guía de Implementación 05: Carga Masiva (Archivos Múltiples / Carpetas) y Pipeline en Background
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `backend/app/application/services/batch_analysis_service.py`, `backend/app/presentation/schemas/batch.py`, `frontend/src/components/batch/BulkUploadModal.tsx`, `frontend/src/lib/filename_parser.ts`
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 En una clase de programación típica, un profesor recibe entre **30 y 60 entregas** por práctica de laboratorio. Obligar al docente a cargar archivos uno a uno es inviable operativamente.
 

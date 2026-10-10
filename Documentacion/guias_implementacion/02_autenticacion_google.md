@@ -1,5 +1,8 @@
 # Guía de Implementación 02: Autenticación con Google (OAuth 2.0 / OIDC)
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `backend/app/presentation/api/v1/endpoints/auth.py`, `backend/app/application/services/auth_service.py`, `frontend/src/pages/Login.tsx`
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 La autenticación no debe acoplarse rígidamente a una única fuente de identidad. En Clean Architecture, la autenticación es un **mecanismo de entrada (Infrastructure / Presentation)** que resuelve una entidad de dominio: el `Docente`.
 

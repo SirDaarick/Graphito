@@ -1,18 +1,18 @@
 \chapter{Ingeniería de Datos}
 \label{cap:ingenieria_datos}
 
-En el desarrollo de sistemas de aprendizaje automático aplicados al análisis de código fuente, la calidad y el balance de los datos son determinantes. Si el conjunto de datos contiene sesgos o información inconsistente, los modelos aprenderán patrones erróneos que afectarán su desempeño en casos reales.
+En el desarrollo de sistemas de aprendizaje automático aplicados al análisis de código fuente, la calidad y el balance de los datos utilizados es fundamental. Los modelos prodrían aprender patrones erróneos que afectarán su desempeño en casos reales si el conjunto de datos contiene información inconsistente o sesgos.
 
-Siguiendo la metodología \textbf{Komorebi} para la gestión de proyectos de Inteligencia Artificial \cite{verges_como_2023}, las fases iniciales de \textbf{Adquisición de Datos} y \textbf{Preparación de Datos} establecen las bases del sistema \textbf{Graphito}. En este capítulo se documenta cómo se recolectó el código escrito por estudiantes, cómo se reconstruyeron los enunciados de las prácticas mediante ingeniería inversa con modelos de lenguaje, el método utilizado para generar código equivalente con inteligencia artificial y el proceso de preparación y normalización para alimentar los modelos predictivos.
+Siguiendo la metodología \textbf{Komorebi} para la gestión de proyectos de Inteligencia Artificial \cite{verges_como_2023}, las fases iniciales de \textbf{Adquisición de Datos} y \textbf{Preparación de Datos} establecen las bases del sistema \textbf{Graphito}. En este capítulo se documenta cómo se obtuvó el código escrito por estudiantes, cómo se reconstruyeron los enunciados de las prácticas mediante ingeniería inversa utilizando modelos de lenguaje, el método utilizado para generar código equivalente generado con inteligencia artificial y el proceso de preparación y normalización para entrenar el modelo predictivo.
 
 % ======================================================================
 \section{Adquisición de Datos}
 \label{sec:adquisicion_datos}
 % ======================================================================
 
-El objetivo de la adquisición de datos fue conformar un conjunto balanceado y representativo de programación en cursos universitarios iniciales. El problema exigía comparar dos grupos de código: programas escritos por estudiantes y programas generados por inteligencia artificial, asegurando que ambos resolvieran exactamente las mismas tareas algorítmicas y con el mismo contexto de lenguaje.
+El objetivo de la adquisición de datos fue conformar un conjunto balanceado y representativo de cursos introductorios de programación en univerdades. El problema requiere comparar dos grupos de código: programas escritos por estudiantes y programas generados por inteligencia artificial, asegurando que ambos resolvieran exactamente los mismos problemas algorítmicos y con el mismo contexto de lenguaje.
 
-En la Figura~\ref{fig:pipeline_adquisicion} se muestra el flujo general de adquisición e ingeniería inversa diseñado para construir este conjunto de datos.
+En la Figura~\ref{fig:pipeline_adquisicion} se muestra el flujo general de adquisición de datos e ingeniería inversa diseñado para construir este conjunto de datos.
 
 \begin{figure}[H]
     \centering
@@ -27,12 +27,12 @@ En la Figura~\ref{fig:pipeline_adquisicion} se muestra el flujo general de adqui
         \node[proc, below=of ieee] (extraer) {\textbf{Paso 1: Inferencia de Enunciados (\texttt{extraer\_enunciados.py})}\\Análisis cruzado de soluciones con modelos de lenguaje};
         \node[data, below=of extraer] (csv) {\textbf{Catálogo de Tareas (\texttt{enunciados\_srb.csv} / \texttt{enunciados.csv})}\\72 problemas algorítmicos documentados en serbocroata y español};
         \node[proc, below=of csv] (generar) {\textbf{Paso 2: Generación Sintética (\texttt{generar\_referencias.py})}\\Generación con LLMs usando 4 perfiles de estilo estudiantil};
-        \node[box, fill=green!12, below=of generar] (corpus) {\textbf{Corpus Consolidado de Graphito}\\20,000 códigos (50\,\% humano / 50\,\% IA) sobre los 72 problemas};
+        \node[box, fill=green!12, below=of generar] (Conjunto) {\textbf{Conjunto de datos de Graphito}\\20,000 códigos (50\,\% humano / 50\,\% IA) sobre los 72 problemas};
 
         \draw[arrow] (ieee.south) -- (extraer.north);
         \draw[arrow] (extraer.south) -- (csv.north);
         \draw[arrow] (csv.south) -- (generar.north);
-        \draw[arrow] (generar.south) -- (corpus.north);
+        \draw[arrow] (generar.south) -- (Conjunto.north);
     \end{tikzpicture}
     \caption{Flujo general de adquisición e ingeniería inversa de datos.}
     \label{fig:pipeline_adquisicion}
@@ -45,8 +45,8 @@ En la Figura~\ref{fig:pipeline_adquisicion} se muestra el flujo general de adqui
 Para que los datos fueran útiles en el contexto de las asignaciones de programación en la Escuela Superior de Cómputo (ESCOM-IPN), se definieron dos condiciones indispensables:
 
 \begin{enumerate}
-    \item \textbf{Autoría humana verificada (Pre-LLM):} 
-    Actualmente, recolectar código reciente de repositorios abiertos como GitHub implica dos riesgos metodológicos severos documentados en la literatura. Por un lado, Lopes et al. \cite{Lopes2017DejaVu} demostraron mediante el estudio DéjàVu que más del 70\,\% del código en GitHub corresponde a duplicados o variantes triviales de archivos existentes, lo que induce una alta contaminación del corpus (\textit{corpus contamination}). Por otro lado, como advierten Zhou et al. \cite{Zhou2023Contamination}, los modelos generativos contemporáneos han sido preentrenados sobre estos repositorios masivos, existiendo el peligro latente de contaminar los conjuntos evaluativos o de incluir código autocompletado por IA. Si un clasificador se entrena con código supuestamente humano que contiene trazas sintéticas, aprenderá fronteras de decisión difusas. Por ello, fue indispensable utilizar un conjunto de datos recolectado con anterioridad a la popularización masiva de los modelos de lenguaje a finales de 2022.
+    \item \textbf{Autoría humana verificada:} 
+    Actualmente, recolectar código reciente de repositorios abiertos como GitHub implica dos riesgos metodológicos severos documentados en la literatura. Por un lado, Lopes et al. \cite{Lopes2017DejaVu} demostraron mediante el estudio DéjàVu que más del 70\,\% del código en GitHub corresponde a duplicados o variantes triviales de archivos existentes, lo que introduce una alta contaminación al conjunto de datos. Por otro lado, como advierten Zhou et al. \cite{Zhou2023Contamination}, los modelos generativos contemporáneos han sido preentrenados sobre estos repositorios masivos, existiendo el peligro latente de contaminar los conjuntos evaluativos o de incluir código autocompletado por IA. Si un clasificador se entrena con código supuestamente humano que contiene trazas sintéticas, aprenderá fronteras de decisión difusas. Por ello, fue indispensable utilizar un conjunto de datos recolectado con anterioridad a la popularización masiva de los modelos de lenguaje a finales de 2022.
     
     \item \textbf{Nivel académico introductorio:} 
     Graphito apoya la revisión en materias como Fundamentos de Programación y Estructuras de Datos. Por lo tanto, no se requería código profesional con patrones de diseño avanzados o características complejas de C++ moderno, sino código típico de estudiantes: variables con nombres sencillos, estructuras de control básicas (\texttt{if}, \texttt{for}, \texttt{while}), funciones modulares, arreglos y punteros elementales, incluyendo los errores de formato comunes en principiantes.

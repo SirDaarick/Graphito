@@ -1,5 +1,9 @@
 # Guía de Implementación 09: Estrategia de Mejora de Modelos & Benchmark Riguroso
 
+> **Estado:** 🔄 **FASE 1 COMPLETADA / FASES 2-4 PLANIFICADAS Y DOCUMENTADAS**  
+> **Reporte Técnico Integral:** 👉 [REPORTE_MEJORA_MODELOS_ML.md](../REPORTE_MEJORA_MODELOS_ML.md)  
+> **Logros Fase 1:** Inferencia bimodal blindada, LoRA 20k fusionado en memoria, máscara float32 DFG, salvaguarda CharCNN ($<60$ caracteres), calibración logística sigmoidal suave ($x_0 = 0.85, k = 24.0$) y 47/47 pruebas unitarias aprobadas.
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 En Machine Learning y Deep Learning aplicado a código fuente (*Code Intelligence*), existe un principio inquebrantable:
 > **"No puedes mejorar lo que no puedes medir con precisión."**

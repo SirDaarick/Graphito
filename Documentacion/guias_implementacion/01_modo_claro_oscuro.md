@@ -1,5 +1,8 @@
 # Guía de Implementación 01: Modo Claro / Oscuro (Design Tokens & Ergonomía)
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `frontend/src/context/ThemeContext.tsx`, `frontend/src/index.css`, `frontend/src/components/layout/Header.tsx`
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 En una aplicación profesional, el cambio de tema **no se resuelve parchando clases condicionales `dark:` arbitrarias** en cada componente. Ese enfoque produce una deuda técnica insostenible, duplicación de código y un mantenimiento caótico.
 

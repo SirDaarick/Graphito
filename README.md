@@ -147,6 +147,31 @@ pytest tests/ backend/tests/ -v
 cd frontend && npm run build
 ```
 
+Tests that need model weights or cached HuggingFace files are skipped automatically when those are absent (`requires_charcnn_weights`, `requires_graphcodebert` markers). Dev-only extras (scikit-learn) are in `requirements-dev.txt`.
+
+### Decision thresholds
+
+`backend/app/config.py` is the single source: `THRESHOLD_SEM=0.85` (calibrated semantic similarity) and `THRESHOLD_AI=0.20` (AI probability; tuned for the format-invariant CharCNN). Override them with the environment variables of the same name (e.g. in `.env`); a request to `/analysis/run` may still override them per call. The sigmoid `baseline` of `calibrate_semantic_similarity` is a separate calibration parameter, not a decision threshold.
+
+### Migration note: 768-dim semantic vectors (Chroma v2 collection)
+
+Previously the reference index stored a 769-dim vector (768 semantic + `ai_prob`). The stylometry component leaked into the semantic similarity, so the index now stores and queries only the 768-dim semantic embedding, in a new collection `codigos_referencia_v2`. The legacy `codigos_referencia` collection is left untouched.
+
+1. Deploy the new backend. At startup it logs a warning if the legacy collection has data and v2 is empty.
+2. Migrate the existing references (exact, no models needed, idempotent):
+   `docker compose exec backend python reindex_chroma.py --mode slice`
+   If the legacy collection is missing or the model changed, rebuild from Postgres instead: `--mode reembed`.
+3. Optional cleanup once verified: add `--drop-legacy`.
+
+Rollback: revert the commit and delete `codigos_referencia_v2`; the legacy collection is still intact.
+
+---
+
+## 📖 Documentación Técnica y Auditoría de Modelos
+
+- 📄 **[Auditoría Técnica y Reporte de Mejora de Modelos ML (Fase 1)](Documentacion/REPORTE_MEJORA_MODELOS_ML.md)**: Diagnóstico empírico de patologías (train/serve skew, desconexión LoRA, anisotropía), remediaciones de inferencia, formulación matemática de calibración sigmoidal ($x_0 = 0.85, k = 24.0$) y validación experimental en casos reales de ESCOM IPN.
+- 📚 **[Guías de Implementación Arquitectónica](Documentacion/guias_implementacion/README.md)**: Especificaciones técnicas detalladas para los módulos y flujos del sistema.
+
 ---
 
 ## 👥 Autores y Dirección

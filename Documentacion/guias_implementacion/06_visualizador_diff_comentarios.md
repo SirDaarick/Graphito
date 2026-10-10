@@ -1,5 +1,8 @@
 # Guía de Implementación 06: Visualizador de Códigos Cara a Cara (Diff Viewer) y Anotaciones
 
+> **Estado:** ✅ **HECHA / IMPLEMENTADA**  
+> **Archivos clave:** `frontend/src/components/code/SideBySideDiffViewer.tsx`, `backend/app/infrastructure/database/models.py` (`ComentarioRevision`), `backend/app/presentation/api/v1/endpoints/analysis.py`
+
 ## 1. Fundamentos & Filosofía de Arquitectura
 Un Sistema de Apoyo a la Decisión Docente (DSS) no puede ser una **caja negra**. Decirle a un profesor que un código tiene *"88% de similitud semántica y 92% de probabilidad sintética"* sin permitirle confrontar el código del estudiante frente al código canónico de referencia imposibilita la labor docente.
 
