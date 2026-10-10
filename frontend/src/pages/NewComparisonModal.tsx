@@ -98,7 +98,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
             );
             // 2. Disparar análisis bimodal en segundo plano (asíncrono)
             setLoadingMessage("Iniciando inferencia bimodal en segundo plano...");
-            const initialReport = await api.analysis.run(submission.id, undefined, 0.85, 0.70, true);
+            const initialReport = await api.analysis.run(submission.id, undefined, 0.85, 0.20, true);
 
             let report = initialReport;
             if (initialReport.estado === "PROCESANDO") {

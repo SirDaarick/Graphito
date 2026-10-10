@@ -271,16 +271,21 @@ export const DEMO_REPORTS: Record<number, ReporteAnalisis> = {
         discrepancia_score: 0.80,
         dictamen: "PLAGIO_PROBABLE",
         estado: "COMPLETADO",
+        decision_docente: "PENDIENTE",
         indicadores: [
             {
                 tipo_alerta: "ISOMORFISMO_DFG",
-                descripcion: "El grafo de flujo de datos (DFG) es 96% idéntico al código canónico de la cátedra con renombrado sistemático de variables.",
+                descripcion: "Línea 87: El grafo de flujo de datos (DFG) es 96% idéntico al código canónico de la cátedra con renombrado sistemático de variables.",
                 severidad: "CRITICA",
+                numero_linea: 87,
+                categoria: "ISOMORFISMO_DFG",
             },
             {
                 tipo_alerta: "MUTACION_COSMETICA_AST",
-                descripcion: "Sustitución directa de identificadores ('dist' -> 'd_arr', 'sptSet' -> 'v_flag', 'minDistance' -> 'obtener_minimo') sin alterar topología ni orden de sentencias.",
+                descripcion: "Línea 98: Sustitución directa de identificadores ('dist' -> 'd_arr', 'sptSet' -> 'v_flag', 'minDistance' -> 'obtener_minimo') sin alterar topología ni orden de sentencias.",
                 severidad: "ALTA",
+                numero_linea: 98,
+                categoria: "ISOMORFISMO_DFG",
             },
         ],
     },
@@ -293,16 +298,21 @@ export const DEMO_REPORTS: Record<number, ReporteAnalisis> = {
         discrepancia_score: 0.25,
         dictamen: "SOSPECHA_IA",
         estado: "COMPLETADO",
+        decision_docente: "PENDIENTE",
         indicadores: [
             {
                 tipo_alerta: "PERPLEJIDAD_ESTILOMETRICA_BAJA",
-                descripcion: "La red neuronal convolucional a nivel de caracteres (CharCNN) detectó uniformidad atípica en espaciado, nombres autodocumentados y longitud de tokens.",
+                descripcion: "Línea 146: La red CharCNN detectó uniformidad atípica en espaciado, nombres autodocumentados y longitud de tokens.",
                 severidad: "ALTA",
+                numero_linea: 146,
+                categoria: "ESTILO_LLM",
             },
             {
                 tipo_alerta: "PATRON_COMENTARIOS_LLM",
-                descripcion: "Uso de directivas Doxygen completas y comentarios paso a paso ('Paso 1: Inicialización...', 'Paso 2: Bucle...') típicos de respuestas de ChatGPT o Claude.",
+                descripcion: "Línea 178: Uso de directivas Doxygen completas y comentarios paso a paso ('Paso 1: Inicialización...', 'Paso 2: Bucle...') típicos de respuestas de ChatGPT o Claude.",
                 severidad: "MEDIA",
+                numero_linea: 178,
+                categoria: "ESTILO_LLM",
             },
         ],
     },
@@ -457,3 +467,52 @@ export const DEMO_COMMENTS: Record<number, ComentarioRevision[]> = {
         },
     ],
 };
+
+export interface DemoGrupo {
+    id: number;
+    docente_id: number;
+    nombre: string;
+    codigo_grupo: string;
+    periodo: string;
+    descripcion?: string;
+    created_at: string;
+    total_problemas?: number;
+    total_entregas?: number;
+}
+
+export const DEMO_GRUPOS: DemoGrupo[] = [
+    {
+        id: 1,
+        docente_id: 1,
+        nombre: "Estructuras de Datos",
+        codigo_grupo: "2CM1",
+        periodo: "2026-B",
+        descripcion: "Grupo matutino. Punteros, memoria dinámica y grafos en C.",
+        created_at: "2026-08-20T08:00:00Z",
+        total_problemas: 2,
+        total_entregas: 3,
+    },
+    {
+        id: 2,
+        docente_id: 1,
+        nombre: "Programación Avanzada",
+        codigo_grupo: "3CV2",
+        periodo: "2026-B",
+        descripcion: "Grupo vespertino. Algoritmos avanzados de grafos y árboles balanceados.",
+        created_at: "2026-08-22T14:00:00Z",
+        total_problemas: 1,
+        total_entregas: 1,
+    },
+    {
+        id: 3,
+        docente_id: 1,
+        nombre: "Algoritmia y Complejidad",
+        codigo_grupo: "4CM1",
+        periodo: "2026-A",
+        descripcion: "Semestre anterior archivado. Análisis asintótico y árboles AVL.",
+        created_at: "2026-01-15T09:00:00Z",
+        total_problemas: 1,
+        total_entregas: 0,
+    },
+];
+

@@ -3,9 +3,10 @@ import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
-import { api } from "../lib/api";
+import { api, IndicadorIntegridad } from "../lib/api";
 import { saveVerdict } from "../lib/verdicts";
 import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
+import { EvidenceDrawer } from "../components/xai/EvidenceDrawer";
 
 // Helper hook for the typewriter effect (optimized for performance)
 function useTypewriter(text: string, speed: number = 15) {
@@ -36,6 +37,8 @@ export interface IndicadorItem {
     tipo_alerta: string;
     descripcion: string;
     severidad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | string;
+    numero_linea?: number | null;
+    categoria?: string;
 }
 
 export interface ComparisonData {
@@ -70,12 +73,21 @@ export function SimilarityReportModal({
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const [viewMode, setViewMode] = useState<"report" | "code_diff">("report");
     const [isUltraWide, setIsUltraWide] = useState(false);
+    const [highlightedLine, setHighlightedLine] = useState<number | null>(null);
     const [codeData, setCodeData] = useState<{
         reference_code: string;
         student_code: string;
         reference_author: string;
         student_author: string;
         language: string;
+        metricas_codigo?: {
+            total_lineas: number;
+            lineas_codigo: number;
+            lineas_comentarios: number;
+            densidad_comentarios: string;
+            complejidad_ciclomatica: number;
+        };
+        indicadores?: IndicadorIntegridad[];
     } | null>(null);
     const [isLoadingCode, setIsLoadingCode] = useState(false);
     const [comments, setComments] = useState<ComentarioRevisionItem[]>([]);
@@ -136,6 +148,12 @@ export function SimilarityReportModal({
 
         if (comparison?.id) {
             saveVerdict(comparison.id, isConforme ? "CONFORME" : "DUDA");
+            const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
+            if (!isNaN(repId)) {
+                api.analysis.updateVerdict(repId, isConforme ? "APROBADO" : "EN_DUDA").catch((err) => {
+                    console.warn("No se pudo persistir el veredicto en backend:", err);
+                });
+            }
         }
 
         setTriageToast({
@@ -161,15 +179,14 @@ export function SimilarityReportModal({
             const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
             if (!isNaN(repId)) {
                 api.comments.list(repId).then(setComments).catch(() => setComments([]));
-                if (viewMode === "code_diff") {
-                    fetchCode(repId);
-                }
+                fetchCode(repId);
             }
         } else {
             setViewMode("report");
             setCodeData(null);
+            setHighlightedLine(null);
         }
-    }, [isOpen, comparison?.id, viewMode]);
+    }, [isOpen, comparison?.id]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -221,6 +238,8 @@ export function SimilarityReportModal({
                 reference_author: data.reference_author || "Docente (Referencia)",
                 student_author: data.student_author || comparison?.title || "Estudiante",
                 language: data.language || "c",
+                metricas_codigo: data.metricas_codigo,
+                indicadores: data.indicadores,
             });
         } catch (err) {
             console.warn("No se pudo obtener el código desde la API, usando código de demostración:", err);
@@ -288,6 +307,29 @@ int main() {
                 reference_author: "Prof. Manuel Portillo (ESCOM)",
                 student_author: comparison?.title || "Estudiante Evaluado",
                 language: "c",
+                metricas_codigo: {
+                    total_lineas: 28,
+                    lineas_codigo: 21,
+                    lineas_comentarios: 1,
+                    densidad_comentarios: "4.8%",
+                    complejidad_ciclomatica: 3,
+                },
+                indicadores: [
+                    {
+                        tipo_alerta: "Patrón de Estructura Canónica",
+                        descripcion: "Bucle iterativo con cálculo de punto medio idéntico a la referencia.",
+                        severidad: "MEDIA",
+                        numero_linea: 7,
+                        categoria: "ISOMORFISMO_DFG",
+                    },
+                    {
+                        tipo_alerta: "Estilo Sintáctico Generativo",
+                        descripcion: "Nomenclatura y formateo afín a generadores LLM.",
+                        severidad: "BAJA",
+                        numero_linea: 4,
+                        categoria: "ESTILO_LLM",
+                    }
+                ],
             });
         } finally {
             setIsLoadingCode(false);
@@ -716,6 +758,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                                 onAddComment={handleAddComment}
                                                 onDeleteComment={handleDeleteComment}
                                                 isSubmittingComment={isSubmittingComment}
+                                                highlightedLine={highlightedLine}
                                             />
                                         </div>
                                     )}
@@ -899,6 +942,35 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                     </div>
 
                                 </div>
+                            </div>
+
+                            {/* Sección XAI: Desglose de Evidencias Técnicas */}
+                            <div className="mt-8">
+                                <EvidenceDrawer
+                                    semanticScore={semanticPct}
+                                    aiScore={aiPct}
+                                    discrepancyScore={comparison.discrepancia_score ?? Number((semanticPct * aiPct / 10000).toFixed(2))}
+                                    dictamen={dictamenRaw}
+                                    indicadores={(
+                                        (comparison.indicadores && comparison.indicadores.length > 0)
+                                            ? comparison.indicadores
+                                            : (codeData?.indicadores && codeData.indicadores.length > 0)
+                                            ? codeData.indicadores
+                                            : []
+                                    ).map((ind, idx) => ({
+                                        id: ind.id ?? idx + 1,
+                                        tipo_alerta: ind.tipo_alerta,
+                                        descripcion: ind.descripcion,
+                                        severidad: (ind.severidad as "BAJA" | "MEDIA" | "ALTA" | "CRITICA") || "MEDIA",
+                                        numero_linea: (ind as any).numero_linea ?? null,
+                                        categoria: (ind as any).categoria ?? "OBSERVACION",
+                                    }))}
+                                    codeMetrics={codeData?.metricas_codigo}
+                                    onNavigateToLine={(lineNumber) => {
+                                        setHighlightedLine(lineNumber);
+                                        setViewMode("code_diff");
+                                    }}
+                                />
                             </div>
                         </>
                     )}

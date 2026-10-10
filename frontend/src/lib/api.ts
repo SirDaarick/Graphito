@@ -9,6 +9,7 @@ import {
     DEMO_REPORTS,
     DEMO_CODE_COMPARISONS,
     DEMO_COMMENTS,
+    DEMO_GRUPOS,
 } from "./demoData";
 
 export const IS_DEMO_MODE: boolean =
@@ -83,9 +84,32 @@ export interface Problema {
     fecha_creacion: string;
 }
 
+export interface Grupo {
+    id: number;
+    docente_id: number;
+    nombre: string;
+    codigo_grupo: string;
+    periodo: string;
+    descripcion?: string;
+    created_at: string;
+    total_problemas?: number;
+    total_entregas?: number;
+}
+
+export interface GrupoProblema {
+    id: number;
+    grupo_id: number;
+    problema_id: number;
+    fecha_limite?: string;
+    activo: boolean;
+    created_at: string;
+    problema?: Problema;
+}
+
 export interface CodigoFuente {
     id: string;
     problema_id: number;
+    grupo_id?: number;
     tipo: "REFERENCIA" | "ENTREGA_ALUMNO";
     autor: string;
     contenido: string;
@@ -98,18 +122,24 @@ export interface IndicadorIntegridad {
     id?: number;
     tipo_alerta: string;
     descripcion: string;
-    severidad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+    severidad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | string;
+    numero_linea?: number | null;
+    categoria?: string;
 }
 
 export interface ReporteAnalisis {
     id: number;
     entrega_id: string;
     referencia_id?: string;
+    lote_id?: string;
     similitud_semantica: number;
     probabilidad_ia: number;
     discrepancia_score: number;
-    dictamen: "SIN_ALERTAS" | "REVISION_ESTILOMETRICA" | "REVISION_SEMANTICA" | "DISCREPANCIA_DUAL" | "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE";
+    dictamen: "SIN_ALERTAS" | "REVISION_ESTILOMETRICA" | "REVISION_SEMANTICA" | "DISCREPANCIA_DUAL" | "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE" | string;
     estado?: "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "ERROR";
+    decision_docente?: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "EN_DUDA";
+    fecha_decision?: string;
+    notas_docente?: string;
     error_mensaje?: string;
     indicadores: IndicadorIntegridad[];
 }
@@ -122,6 +152,32 @@ export interface ReportCodeComparison {
     reference_code: string;
     language: string;
     problem_title: string;
+    indicadores?: IndicadorIntegridad[];
+    metricas_codigo?: {
+        total_lineas: number;
+        lineas_codigo: number;
+        lineas_comentarios: number;
+        densidad_comentarios: string;
+        complejidad_ciclomatica: number;
+    };
+}
+
+export interface BatchUploadResponse {
+    batch_id: string;
+    problema_id: number;
+    total_archivos: number;
+    mensaje: string;
+}
+
+export interface BatchStatusResponse {
+    batch_id: string;
+    problema_id: number;
+    total_archivos: number;
+    procesados: number;
+    errores: number;
+    estado: string;
+    porcentaje: number;
+    reportes_completados: number[];
 }
 
 export interface ComentarioRevision {
@@ -136,6 +192,7 @@ export interface ComentarioRevision {
 
 // In-memory comments store for demo mode
 const demoCommentsStore: Record<number, ComentarioRevision[]> = JSON.parse(JSON.stringify(DEMO_COMMENTS));
+const demoGruposStore: Grupo[] = JSON.parse(JSON.stringify(DEMO_GRUPOS));
 
 export const api = {
     auth: {
@@ -250,7 +307,7 @@ export const api = {
             entregaId: string,
             referenciaId?: string,
             thresholdSem = 0.85,
-            thresholdAi = 0.70,
+            thresholdAi = 0.20,
             asyncMode = true
         ): Promise<ReporteAnalisis> {
             if (IS_DEMO_MODE) {
@@ -362,7 +419,164 @@ export const api = {
                 return DEMO_CODE_COMPARISONS[reportId] || DEMO_CODE_COMPARISONS[101];
             }
             return request<ReportCodeComparison>(`/analysis/reports/${reportId}/code`);
-        }
+        },
+        async uploadBatch(
+            problemaId: number,
+            files: File[],
+            grupoId?: number
+        ): Promise<BatchUploadResponse> {
+            if (IS_DEMO_MODE) {
+                return {
+                    batch_id: "demo-batch-" + Date.now(),
+                    problema_id: problemaId,
+                    total_archivos: files.length,
+                    mensaje: "Lote de entregas procesado exitosamente en Modo Demostración.",
+                };
+            }
+            const formData = new FormData();
+            formData.append("problema_id", String(problemaId));
+            if (grupoId) {
+                formData.append("grupo_id", String(grupoId));
+            }
+            files.forEach((file) => {
+                formData.append("files", file);
+            });
+
+            const token = getAuthToken();
+            const headers: Record<string, string> = {
+                "ngrok-skip-browser-warning": "true",
+            };
+            if (token) {
+                headers["Authorization"] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/analysis/batch`, {
+                method: "POST",
+                headers,
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new ApiError(response.status, errData.detail || "Error en la carga masiva.");
+            }
+            return response.json();
+        },
+        async getBatchStatus(batchId: string): Promise<BatchStatusResponse> {
+            if (IS_DEMO_MODE) {
+                return {
+                    batch_id: batchId,
+                    problema_id: 1,
+                    total_archivos: 5,
+                    procesados: 5,
+                    errores: 0,
+                    estado: "COMPLETADO",
+                    porcentaje: 100.0,
+                    reportes_completados: [101, 102, 103],
+                };
+            }
+            return request<BatchStatusResponse>(`/analysis/batch/${batchId}/status`);
+        },
+        async updateVerdict(
+            reportId: number,
+            verdict: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "EN_DUDA",
+            notas?: string
+        ): Promise<ReporteAnalisis> {
+            if (IS_DEMO_MODE) {
+                if (DEMO_REPORTS[reportId]) {
+                    DEMO_REPORTS[reportId].decision_docente = verdict;
+                    if (notas) DEMO_REPORTS[reportId].notas_docente = notas;
+                }
+                return DEMO_REPORTS[reportId] || DEMO_REPORTS[101];
+            }
+            return request<ReporteAnalisis>(`/analysis/reports/${reportId}/verdict`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    decision_docente: verdict,
+                    notas_docente: notas || null,
+                }),
+            });
+        },
+    },
+
+    groups: {
+        async list(): Promise<Grupo[]> {
+            if (IS_DEMO_MODE) {
+                return demoGruposStore;
+            }
+            return request<Grupo[]>("/groups/");
+        },
+        async create(data: {
+            nombre: string;
+            codigo_grupo: string;
+            periodo: string;
+            descripcion?: string;
+        }): Promise<Grupo> {
+            if (IS_DEMO_MODE) {
+                const nuevo: Grupo = {
+                    id: Date.now(),
+                    docente_id: 1,
+                    nombre: data.nombre,
+                    codigo_grupo: data.codigo_grupo,
+                    periodo: data.periodo,
+                    descripcion: data.descripcion,
+                    created_at: new Date().toISOString(),
+                    total_problemas: 0,
+                    total_entregas: 0,
+                };
+                demoGruposStore.unshift(nuevo);
+                return nuevo;
+            }
+            return request<Grupo>("/groups/", {
+                method: "POST",
+                body: JSON.stringify(data),
+            });
+        },
+        async get(groupId: number): Promise<Grupo> {
+            if (IS_DEMO_MODE) {
+                const g = demoGruposStore.find((x) => x.id === groupId);
+                if (!g) throw new ApiError(404, "Grupo no encontrado");
+                return g;
+            }
+            return request<Grupo>(`/groups/${groupId}`);
+        },
+        async assignProblem(
+            groupId: number,
+            problemaId: number,
+            fechaLimite?: string
+        ): Promise<GrupoProblema> {
+            if (IS_DEMO_MODE) {
+                const g = demoGruposStore.find((x) => x.id === groupId);
+                if (g) {
+                    g.total_problemas = (g.total_problemas || 0) + 1;
+                }
+                return {
+                    id: Date.now(),
+                    grupo_id: groupId,
+                    problema_id: problemaId,
+                    fecha_limite: fechaLimite,
+                    activo: true,
+                    created_at: new Date().toISOString(),
+                };
+            }
+            return request<GrupoProblema>(`/groups/${groupId}/assign`, {
+                method: "POST",
+                body: JSON.stringify({
+                    problema_id: problemaId,
+                    fecha_limite: fechaLimite || null,
+                }),
+            });
+        },
+        async delete(groupId: number): Promise<void> {
+            if (IS_DEMO_MODE) {
+                const idx = demoGruposStore.findIndex((g) => g.id === groupId);
+                if (idx >= 0) demoGruposStore.splice(idx, 1);
+                return;
+            }
+            return request<void>(`/groups/${groupId}`, {
+                method: "DELETE",
+            });
+        },
     },
 
     comments: {

@@ -39,6 +39,7 @@ interface SideBySideDiffViewerProps {
     onAddComment: (lineNum: number | null, text: string) => Promise<void>;
     onDeleteComment: (commentId: number) => Promise<void>;
     isSubmittingComment?: boolean;
+    highlightedLine?: number | null;
 }
 
 export function SideBySideDiffViewer({
@@ -52,6 +53,7 @@ export function SideBySideDiffViewer({
     onAddComment,
     onDeleteComment,
     isSubmittingComment = false,
+    highlightedLine = null,
 }: SideBySideDiffViewerProps) {
     // Sincronización de scroll
     const leftScrollRef = useRef<HTMLDivElement>(null);
@@ -106,6 +108,16 @@ export function SideBySideDiffViewer({
             isScrollingRef.current = null;
         }, 30);
     };
+
+    // Desplazamiento automático al inspeccionar línea desde XAI
+    useEffect(() => {
+        if (highlightedLine && rightScrollRef.current) {
+            const targetRow = rightScrollRef.current.querySelector<HTMLElement>(`[data-line="${highlightedLine}"]`);
+            if (targetRow) {
+                targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+    }, [highlightedLine]);
 
     const handleSaveLineComment = async (lineNum: number) => {
         if (!commentText.trim()) return;
@@ -301,14 +313,18 @@ export function SideBySideDiffViewer({
                                 const refLine = refLines[index] ?? "";
                                 const stuLine = stuLines[index] ?? "";
                                 const isDiff = refLine !== stuLine;
+                                const isHighlighted = highlightedLine === lineNum;
                                 const lineComments = commentsByLine.get(lineNum) || [];
                                 const isComposerActive = activeCommentLine === lineNum;
 
                                 return (
                                     <React.Fragment key={`stu-frag-${lineNum}`}>
                                         <tr
-                                            className={`group transition-colors ${
-                                                isDiff
+                                            data-line={lineNum}
+                                            className={`group transition-all duration-300 ${
+                                                isHighlighted
+                                                    ? "bg-cyan-500/25 shadow-[inset_0_0_12px_rgba(6,182,212,0.3)] border-l-4 border-cyan-400"
+                                                    : isDiff
                                                     ? "bg-fuchsia-950/20 hover:bg-fuchsia-950/30"
                                                     : "hover:bg-[#251d38]/50"
                                             }`}

@@ -15,6 +15,7 @@ export interface Comparison {
     dictamen?: string
     indicadores?: any[]
     veredicto?: VerdictType | null
+    grupo_id?: number
 }
 
 interface ReferenceCardProps {

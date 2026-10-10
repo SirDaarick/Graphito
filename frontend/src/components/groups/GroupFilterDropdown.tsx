@@ -1,0 +1,145 @@
+import { useState, useRef, useEffect } from "react";
+import { Users, ChevronDown, Check, Plus, FolderKanban } from "lucide-react";
+import { Grupo } from "../../lib/api";
+
+interface GroupFilterDropdownProps {
+    groups: Grupo[];
+    selectedGroupId: number | null; // null = Todos los grupos
+    onSelectGroup: (groupId: number | null) => void;
+    onCreateGroupClick: () => void;
+}
+
+export function GroupFilterDropdown({
+    groups,
+    selectedGroupId,
+    onSelectGroup,
+    onCreateGroupClick,
+}: GroupFilterDropdownProps) {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const selectedGroup = groups.find((g) => g.id === selectedGroupId);
+
+    // Cerrar al hacer click fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative inline-block text-left" ref={dropdownRef}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 border ${
+                    selectedGroupId !== null
+                        ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400 dark:text-cyan-300 shadow-sm shadow-cyan-500/10"
+                        : "bg-surface-elevated/80 border-line-subtle text-content-secondary hover:text-content-primary hover:border-line-strong"
+                }`}
+                title="Filtrar biblioteca por curso o grupo académico"
+            >
+                <Users size={15} className={selectedGroupId !== null ? "text-cyan-400" : "text-content-muted"} />
+                <span className="max-w-[160px] truncate">
+                    {selectedGroup ? (
+                        <>
+                            <span className="font-mono font-bold mr-1 text-cyan-400">[{selectedGroup.codigo_grupo}]</span>
+                            {selectedGroup.nombre}
+                        </>
+                    ) : (
+                        "Todos los cursos"
+                    )}
+                </span>
+                <ChevronDown size={14} className={`transition-transform duration-200 text-content-muted ${isOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-2xl bg-surface-elevated/95 backdrop-blur-xl border border-line-subtle shadow-2xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-content-muted flex items-center justify-between">
+                        <span>Filtrar por Curso</span>
+                        <FolderKanban size={12} />
+                    </div>
+
+                    {/* Opción global */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onSelectGroup(null);
+                            setIsOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                            selectedGroupId === null
+                                ? "bg-cyan-500/15 text-cyan-400 font-semibold"
+                                : "text-content-secondary hover:text-content-primary hover:bg-surface-elevated"
+                        }`}
+                    >
+                        <span>Vista Global (Todos los problemas)</span>
+                        {selectedGroupId === null && <Check size={14} className="text-cyan-400" />}
+                    </button>
+
+                    <div className="h-px bg-line-subtle my-1" />
+
+                    {/* Lista de grupos */}
+                    <div className="max-h-48 overflow-y-auto space-y-0.5 custom-scrollbar">
+                        {groups.length === 0 ? (
+                            <div className="px-3 py-3 text-center text-xs text-content-muted">
+                                No tienes grupos registrados.
+                            </div>
+                        ) : (
+                            groups.map((group) => {
+                                const isSelected = group.id === selectedGroupId;
+                                return (
+                                    <button
+                                        key={group.id}
+                                        type="button"
+                                        onClick={() => {
+                                            onSelectGroup(group.id);
+                                            setIsOpen(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left ${
+                                            isSelected
+                                                ? "bg-cyan-500/15 text-cyan-400 font-semibold"
+                                                : "text-content-secondary hover:text-content-primary hover:bg-surface-elevated"
+                                        }`}
+                                    >
+                                        <div className="truncate pr-2">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-mono font-bold text-[11px] text-cyan-400">
+                                                    [{group.codigo_grupo}]
+                                                </span>
+                                                <span className="truncate font-medium">{group.nombre}</span>
+                                            </div>
+                                            <span className="text-[10px] text-content-muted block mt-0.5">
+                                                Periodo: {group.periodo} • {group.total_entregas || 0} entregas
+                                            </span>
+                                        </div>
+                                        {isSelected && <Check size={14} className="text-cyan-400 shrink-0" />}
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    <div className="h-px bg-line-subtle my-1" />
+
+                    {/* Botón de crear nuevo grupo */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsOpen(false);
+                            onCreateGroupClick();
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                    >
+                        <Plus size={14} />
+                        <span>Crear nuevo curso o grupo</span>
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
