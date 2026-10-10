@@ -111,6 +111,12 @@ def test_manifest_edited_after_generation_fails_the_hash_check(corpus, tmp_path,
         (lambda d: d["entries"][0].update(split="dev"), "split"),
         (lambda d: d["entries"][0].update(source="robot"), "source"),
         (lambda d: d["entries"][0].update(flags="broken"), "flags"),
+        (lambda d: d["entries"].__setitem__(0, "oops"), "object"),
+        (lambda d: d["entries"].__setitem__(0, 42), "object"),
+        (lambda d: d["entries"].__setitem__(0, ["id", "split"]), "object"),
+        (lambda d: d["entries"][0].update(split=["train"]), "split"),
+        (lambda d: d["entries"][0].update(lang={"c": 1}), "lang"),
+        (lambda d: d["entries"][0].update(gt_status=[]), "gt_status"),
     ],
 )
 def test_schema_validation_rejects_bad_files(corpus, tmp_path, mutate, message):
@@ -149,8 +155,15 @@ def test_plagiarism_pairs_label_same_cluster_pairs(manifest):
             assert {sa.gt_status, sb.gt_status} <= {"positive", "negative"}
             assert y == int(sa.cluster_id is not None and sa.cluster_id == sb.cluster_id)
         assert not any(by_id[i].course == "B2017" for i in pairs.ids)
+        assert pairs.ambiguous.dtype == bool and len(pairs.ambiguous) == len(pairs.a)
+        assert not pairs.ambiguous.any()
     every = [manifest.plagiarism_pairs(s) for s in ("train", "val", "test")]
     assert sum(int(p.label.sum()) for p in every) >= 1
+
+
+def _id_pairs(pairs, mask=None):
+    keep = np.ones(len(pairs.a), dtype=bool) if mask is None else mask
+    return {(pairs.ids[a], pairs.ids[b]) for a, b in zip(pairs.a[keep], pairs.b[keep])}
 
 
 def test_plagiarism_pairs_include_ambiguous_on_request(manifest):
@@ -158,6 +171,47 @@ def test_plagiarism_pairs_include_ambiguous_on_request(manifest):
     base = manifest.plagiarism_pairs(split)
     wider = manifest.plagiarism_pairs(split, include_ambiguous=True)
     assert len(wider.a) > len(base.a)
+    by_id = {s.id: s for s in manifest.entries}
+    for a, b, y, amb in zip(wider.a, wider.b, wider.label, wider.ambiguous):
+        statuses = {by_id[wider.ids[a]].gt_status, by_id[wider.ids[b]].gt_status}
+        assert bool(amb) == ("ambiguous" in statuses)
+        assert y == -1 if amb else y in (0, 1)  # ambiguous pairs are never true negatives
+    assert wider.ambiguous.any()
+    assert _id_pairs(wider, ~wider.ambiguous) == _id_pairs(base)
+    assert np.array_equal(np.sort(wider.label[~wider.ambiguous]), np.sort(base.label))
+
+
+def test_representatives_only_keeps_one_included_member_per_group(corpus, manifest):
+    """The representative is chosen within the result set, so pinned groups whose global
+    `dup_rep` is excluded (or in another split) still keep one member."""
+    cross = {v for k, v in corpus[0].ids.items() if k.startswith("cross_exact_")}
+    covered, moved = set(), 0
+    for split in ("train", "val", "test"):
+        for include_excluded in (False, True):
+            full = manifest.samples(split, include_excluded=include_excluded)
+            reps = manifest.samples(split, include_excluded=include_excluded, representatives_only=True)
+            groups = {}
+            for s in full:
+                if s.dup_group is not None:
+                    groups.setdefault(s.dup_group, []).append(s.id)
+            kept = [s for s in reps if s.dup_group is not None]
+            assert sorted(s.dup_group for s in kept) == sorted(groups)  # exactly one per group
+            assert all(s.id == min(groups[s.dup_group]) for s in kept)
+            assert [s for s in reps if s.dup_group is None] == [s for s in full if s.dup_group is None]
+            moved += sum(s.id != s.dup_rep for s in kept)
+            if not include_excluded and cross & {s.id for s in full}:
+                covered.add(split)
+    assert covered  # the pinned cross-block exact group keeps a representative
+    assert moved  # at least one representative differs from the global `dup_rep`
+
+
+def test_representatives_only_respects_lang_and_source_filters(manifest):
+    for split in ("train", "val", "test"):
+        for lang, source in (("c", "human"), ("cpp", "ai")):
+            full = manifest.samples(split, lang=lang, source=source)
+            reps = manifest.samples(split, lang=lang, source=source, representatives_only=True)
+            groups = {s.dup_group for s in full if s.dup_group is not None}
+            assert sorted(s.dup_group for s in reps if s.dup_group is not None) == sorted(groups)
 
 
 def test_clusters_group_member_ids_per_split(manifest):
@@ -178,6 +232,17 @@ def test_check_invariants_passes_and_detects_tampering(corpus, tmp_path, manifes
     tampered = load_manifest(_rewrite(corpus[1], tmp_path, tamper))
     with pytest.raises(ManifestError, match="block B/Z1"):
         tampered.check_invariants()
+
+
+def test_check_invariants_names_the_first_missing_stratum(corpus, tmp_path):
+    def strip(data):  # test and val lose C++ and AI; train keeps both
+        for e in data["entries"]:
+            if e["split"] in ("test", "val"):
+                e.update(lang="c", source="human")
+
+    stripped = load_manifest(_rewrite(corpus[1], tmp_path, strip))
+    with pytest.raises(ManifestError, match=r"^split 'test' lacks stratum lang=cpp$"):
+        stripped.check_invariants()
 
 
 def test_samples_are_frozen_and_split_of_rejects_unknown_ids(manifest):

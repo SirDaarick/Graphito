@@ -1,6 +1,7 @@
 """Split builder: discovery, hygiene, dedup grouping, assignment and CLI on a synthetic tree."""
 
 import hashlib
+import inspect
 import json
 import subprocess
 import sys
@@ -11,6 +12,7 @@ import pytest
 from eval_factory import MODELS, PROFILES, make_tree
 from models.evaluation.splits import (
     ENTRY_KEYS,
+    MIN_EFFECTIVE_BYTES,
     SPLITS,
     SplitConfig,
     build_split,
@@ -150,6 +152,10 @@ class TestHygieneDedup:
         flags = entries[built[0].ids["copy_suffix"]]["flags"]
         assert {"broken", "copy_suffix", "no_student_id"} <= set(flags)
 
+    def test_min_effective_bytes_default_is_shared(self):
+        default = inspect.signature(hygiene_flags).parameters["min_effective_bytes"].default
+        assert default == SplitConfig().min_effective_bytes == MIN_EFFECTIVE_BYTES
+
     def test_hygiene_flags_unit(self):
         code = b"int main(void) { int a = 1, b = 2; return a + b * 3 - (a << 2) + (b >> 1); }"
         assert hygiene_flags("student1.c", code, "human", "student1") == []
@@ -244,6 +250,26 @@ class TestAssignment:
         assert list(json.loads(data)) == sorted(manifest)
         assert dumps_manifest(manifest) == data.decode("utf-8")
         assert tree.repo_root.as_posix() not in data.decode("utf-8")
+
+    def test_write_manifest_failure_leaves_previous_file_and_no_temp(self, built, tmp_path, monkeypatch):
+        path = tmp_path / "out" / "split.json"
+        path.parent.mkdir()
+        path.write_bytes(b"previous manifest\n")
+        real_write = Path.write_bytes
+
+        def torn_write(self, data):  # simulate a crash halfway through the write
+            real_write(self, data[: len(data) // 2])
+            raise OSError("disk full")
+
+        monkeypatch.setattr(Path, "write_bytes", torn_write)
+        with pytest.raises(OSError, match="disk full"):
+            write_manifest(built[1], path)
+        monkeypatch.undo()
+        assert path.read_bytes() == b"previous manifest\n"
+        assert [p.name for p in path.parent.iterdir()] == ["split.json"]
+        write_manifest(built[1], path)
+        assert path.read_bytes() == dumps_manifest(built[1]).encode("utf-8")
+        assert [p.name for p in path.parent.iterdir()] == ["split.json"]
 
     def test_one_split_per_block_dup_group_and_cluster(self, entries):
         assert all(e["split"] in SPLITS for e in entries.values())

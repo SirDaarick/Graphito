@@ -53,6 +53,7 @@ from .seed import stable_rng
 ROOT = Path(__file__).resolve().parents[2]
 BUILDER_VERSION = "1.0"
 _PARALLEL_MIN = 2000  # below this many files a process pool costs more than it saves
+MIN_EFFECTIVE_BYTES = 50  # hygiene: below this effective length a file is `too_short`
 
 EXTENSIONS = {".c": "c", ".cpp": "cpp"}
 COPY_SUFFIX_RE = re.compile(r"\s\(\d+\)")  # same rule as data/golden_set/build_corpus.py
@@ -74,7 +75,7 @@ class SplitConfig:
     val_fraction: float = 0.15
     min_blocks: int = 2
     max_attempts: int = 1000
-    min_effective_bytes: int = 50
+    min_effective_bytes: int = MIN_EFFECTIVE_BYTES
     threshold: float = 0.85
     sensitivity: Tuple[float, ...] = (0.80, 0.85, 0.90)
     shingle_k: int = SHINGLE_K
@@ -172,7 +173,11 @@ def _broken_reasons(
 
 
 def hygiene_flags(
-    filename: str, data: bytes, source: str, student: Optional[str], min_effective_bytes: int = 50
+    filename: str,
+    data: bytes,
+    source: str,
+    student: Optional[str],
+    min_effective_bytes: int = MIN_EFFECTIVE_BYTES,
 ) -> List[str]:
     """Sorted `broken` flag plus its sub-flags (`empty|too_short|no_student_id|copy_suffix`)."""
     return _broken_reasons(
@@ -690,10 +695,23 @@ def dumps_manifest(manifest: Dict) -> str:
 
 
 def write_manifest(manifest: Dict, path: "str | Path") -> Path:
-    """Write `dumps_manifest` output as UTF-8 bytes (no platform newline translation)."""
+    """Write `dumps_manifest` output as UTF-8 bytes (no platform newline translation).
+
+    Atomic: the bytes go to a sibling temp file that `os.replace` moves onto `path`, so a
+    failed write leaves any previous manifest intact; the temp file is removed on failure."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(dumps_manifest(manifest).encode("utf-8"))
+    data = dumps_manifest(manifest).encode("utf-8")
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
     return path
 
 

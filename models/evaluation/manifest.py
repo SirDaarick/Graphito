@@ -71,13 +71,19 @@ class Sample:
 
 @dataclass(frozen=True)
 class PairSet:
-    """Same-assignment human pairs; `a`/`b` index `ids` (a < b), label 1 = same GT cluster."""
+    """Same-assignment human pairs; `a`/`b` index `ids` (a < b).
+
+    `label`: 1 = same GT cluster, 0 = different clusters (a true negative pair), -1 = the pair
+    involves an `ambiguous` entry (only with `include_ambiguous=True`; never a negative).
+    `ambiguous` is the boolean mask of those pairs (all False by default).
+    """
 
     a: np.ndarray
     b: np.ndarray
     label: np.ndarray
     assignment: np.ndarray
     ids: List[str]
+    ambiguous: np.ndarray
 
 
 def validate_schema(data: Mapping) -> None:
@@ -91,13 +97,16 @@ def validate_schema(data: Mapping) -> None:
         raise ManifestError(f"manifest lacks top-level keys {missing}")
     if not isinstance(data["entries"], list):
         raise ManifestError("manifest entries must be a list")
-    for entry in data["entries"]:
+    for n, entry in enumerate(data["entries"]):
+        if not isinstance(entry, Mapping):
+            raise ManifestError(f"entry #{n} must be a JSON object, got {type(entry).__name__}")
         lacking = [k for k in ENTRY_KEYS if k not in entry]
         if lacking:
             raise ManifestError(f"entry {entry.get('id')} lacks keys {lacking}")
         for key, allowed in _ENUMS.items():
-            if entry[key] not in allowed:
-                raise ManifestError(f"entry {entry['id']} has invalid {key} {entry[key]!r}")
+            value = entry[key]
+            if not isinstance(value, (str, type(None))) or value not in allowed:
+                raise ManifestError(f"entry {entry['id']} has invalid {key} {value!r}")
         if not isinstance(entry["flags"], list) or not all(isinstance(f, str) for f in entry["flags"]):
             raise ManifestError(f"entry {entry['id']} has invalid flags {entry['flags']!r}")
         if not isinstance(entry["excluded"], bool):
@@ -123,9 +132,13 @@ def check_invariants(entries: Iterable[Mapping]) -> None:
         for key in keys:
             if owner.setdefault(key, e["split"]) != e["split"]:
                 raise ManifestError(f"{key[0]} {key[1]} spans splits {owner[key]} and {e['split']}")
-    for split in HELD_OUT_ORDER:
-        for kind, value in sorted(present - have[split]):
-            raise ManifestError(f"split '{split}' lacks stratum {kind}={value}")
+    gap = next(
+        ((split, min(present - have[split])) for split in HELD_OUT_ORDER if present - have[split]),
+        None,
+    )
+    if gap is not None:
+        split, (kind, value) = gap
+        raise ManifestError(f"split '{split}' lacks stratum {kind}={value}")
 
 
 @dataclass(frozen=True)
@@ -151,7 +164,11 @@ class SplitManifest:
         representatives_only: bool = False,
     ) -> List[Sample]:
         """Filtered entries. Broken entries need `include_broken`; other exclusions
-        (`cross_split_dup`) need `include_excluded`."""
+        (`cross_split_dup`) need `include_excluded`.
+
+        `representatives_only` keeps one member per dup group: the smallest id among the
+        group's members that pass every other filter. The manifest's global `dup_rep` is not
+        used, since it may sit in another split or be excluded as `cross_split_dup`."""
         if split is not None and split not in SPLITS:
             raise ValueError(f"unknown split {split!r} (want one of {SPLITS})")
         out = []
@@ -164,9 +181,13 @@ class SplitManifest:
                 continue
             if (source and s.source != source) or (course and s.course != course):
                 continue
-            if representatives_only and s.dup_rep not in (None, s.id):
-                continue
             out.append(s)
+        if representatives_only:
+            rep: Dict[str, str] = {}
+            for s in out:
+                if s.dup_group is not None and (s.dup_group not in rep or s.id < rep[s.dup_group]):
+                    rep[s.dup_group] = s.id
+            out = [s for s in out if s.dup_group is None or rep[s.dup_group] == s.id]
         return out
 
     def split_of(self, sample_id: str) -> str:
@@ -185,7 +206,12 @@ class SplitManifest:
         return [s for s in self.samples(split, source="human") if s.gt_status == "negative"]
 
     def plagiarism_pairs(self, split: str, include_ambiguous: bool = False) -> PairSet:
-        """All same-assignment pairs of labelled human entries of different students."""
+        """All same-assignment pairs of labelled human entries of different students.
+
+        By default only `positive`/`negative` entries pair, so labels are 1 or 0. With
+        `include_ambiguous=True` pairs involving an `ambiguous` entry are added with label -1
+        and `PairSet.ambiguous` True; they are never labelled 0 (not true negatives), so
+        callers must filter them (e.g. `label[~ambiguous]`) before binary metrics."""
         allowed = {"positive", "negative"} | ({"ambiguous"} if include_ambiguous else set())
         pool = sorted(
             (s for s in self.samples(split, source="human") if s.gt_status in allowed),
@@ -203,16 +229,24 @@ class SplitManifest:
             i, j = np.triu_indices(len(group), k=1)
             students = np.array([s.student for s in group], dtype=object)
             clusters = np.array([s.cluster_id or "" for s in group], dtype=object)
+            unsure = np.array([s.gt_status == "ambiguous" for s in group], dtype=bool)
             keep = students[i] != students[j]
             i, j = i[keep], j[keep]
             label = ((clusters[i] == clusters[j]) & (clusters[i] != "")).astype(np.int8)
-            parts.append((i + start, j + start, label, np.full(i.size, assignment, dtype=object)))
+            ambiguous = unsure[i] | unsure[j]
+            label[ambiguous] = -1
+            parts.append(
+                (i + start, j + start, label, np.full(i.size, assignment, dtype=object), ambiguous)
+            )
             start = stop
         if not parts:
             empty = np.empty(0, dtype=np.int64)
-            return PairSet(empty, empty, np.empty(0, dtype=np.int8), np.empty(0, dtype=object), ids)
-        a, b, label, assignment = (np.concatenate(cols) for cols in zip(*parts))
-        return PairSet(a.astype(np.int64), b.astype(np.int64), label, assignment, ids)
+            return PairSet(
+                empty, empty, np.empty(0, dtype=np.int8), np.empty(0, dtype=object), ids,
+                np.empty(0, dtype=bool),
+            )
+        a, b, label, assignment, ambiguous = (np.concatenate(cols) for cols in zip(*parts))
+        return PairSet(a.astype(np.int64), b.astype(np.int64), label, assignment, ids, ambiguous)
 
     def check_invariants(self) -> None:
         check_invariants(asdict(s) for s in self.entries)
