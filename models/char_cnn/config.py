@@ -25,6 +25,9 @@ class CharCNNConfig:
     # --- Preprocesamiento ---
     strip_comments: bool = True
     normalize_whitespace: bool = True
+    # "trim": strip trailing spaces / collapse blank lines (legacy, formatting still visible).
+    # "canonical": drop all layout whitespace outside literals so reformatting is invisible.
+    whitespace_mode: str = "trim"
 
     # --- Arquitectura Multi-Scale 1D CNN ---
     embedding_dim: int = 128

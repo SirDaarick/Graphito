@@ -5,11 +5,24 @@ from typing import Optional
 
 from models.char_cnn.config import CharCNNConfig
 
+# Minimum non-whitespace, non-comment characters for the CharCNN to be trusted.
+MIN_NON_WS_CHARS = 60
+
+WHITESPACE_MODES = ("trim", "canonical")
+
+# String/char literals on a single line; an unterminated quote is treated as plain code.
+_LITERAL = re.compile(r"\x22(?:\\.|[^\x22\\\n])*\x22|\x27(?:\\.|[^\x27\\\n])*\x27")
+_IDENT_CHAR = re.compile(r"[A-Za-z0-9_]")
+
 
 class CharPreprocessor:
 
     def __init__(self, config: Optional[CharCNNConfig] = None):
         self.config = config or CharCNNConfig()
+        if self.config.whitespace_mode not in WHITESPACE_MODES:
+            raise ValueError(
+                f"whitespace_mode must be one of {WHITESPACE_MODES}, got {self.config.whitespace_mode!r}"
+            )
         self._comment_pattern = re.compile(
             r"//.*?$|/\*.*?\*/|\x27(?:\\.|[^\x27\\])*\x27|\x22(?:\\.|[^\x22\\])*\x22",
             re.DOTALL | re.MULTILINE,
@@ -33,9 +46,46 @@ class CharPreprocessor:
             return s
         return self._comment_pattern.sub(replacer, code)
 
+    def effective_length(self, text: str) -> int:
+        """Non-whitespace characters left after stripping C/C++ comments.
+
+        Always strips comments (independent of `config.strip_comments`) and is used only
+        for the length guard; the text fed to the model is not modified.
+        Known limits: C++ raw strings, digit separators (1'000), `//` with `\\` continuation.
+        """
+        return len("".join(self.strip_c_comments(text).split()))
+
+    @staticmethod
+    def _drop_layout_whitespace(segment: str) -> str:
+        def repl(m: re.Match) -> str:
+            before = segment[m.start() - 1] if m.start() > 0 else ""
+            after = segment[m.end()] if m.end() < len(segment) else ""
+            # Keep one space only where removing it would fuse two identifiers/keywords.
+            if before and after and _IDENT_CHAR.match(before) and _IDENT_CHAR.match(after):
+                return " "
+            return ""
+
+        return re.sub(r"\s+", repl, segment)
+
+    def canonicalize_whitespace(self, text: str) -> str:
+        """Remove layout whitespace outside string/char literals so reformatting is invisible.
+
+        `int a` keeps its space (identifier boundary); everything else collapses, so a
+        clang-format'd program and its compact original canonicalize to the same string.
+        """
+        out, last = [], 0
+        for m in _LITERAL.finditer(text):
+            out.append(self._drop_layout_whitespace(text[last:m.start()]))
+            out.append(m.group(0))
+            last = m.end()
+        out.append(self._drop_layout_whitespace(text[last:]))
+        return "".join(out)
+
     def normalize(self, text: str) -> str:
         if self.config.strip_comments:
             text = self.strip_c_comments(text)
+        if self.config.whitespace_mode == "canonical":
+            return self.canonicalize_whitespace(text)
         if self.config.normalize_whitespace:
             # Collapse runs of blank lines and strip trailing spaces per line
             text = re.sub(r"[ \t]+$", "", text, flags=re.MULTILINE)

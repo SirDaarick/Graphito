@@ -15,7 +15,7 @@ import torch
 
 from models.char_cnn.config import CharCNNConfig
 from models.char_cnn.model import CharCNN
-from models.char_cnn.preprocess import CharPreprocessor
+from models.char_cnn.preprocess import CharPreprocessor, MIN_NON_WS_CHARS
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -44,6 +44,8 @@ class CharCNNInference:
             self.config.alphabet = ckpt_config["alphabet"]
         if ckpt_config.get("seq_length"):
             self.config.seq_length = ckpt_config["seq_length"]
+        # Checkpoints saved before this field existed were trained on legacy "trim" input.
+        self.config.whitespace_mode = ckpt_config.get("whitespace_mode", "trim")
 
         self.preprocessor = CharPreprocessor(self.config)
         self.config.vocab_size = self.preprocessor.vocab_size
@@ -80,6 +82,25 @@ class CharCNNInference:
         return res
 
     def predict_text(self, text: str, pad: bool = False) -> dict:
+        # Salvaguarda pericial de inferencia: fragmentos triviales (< MIN_NON_WS_CHARS caracteres
+        # no-espacio, sin contar comentarios) carecen de densidad estadística de n-gramas de
+        # autoría y degeneran a falso positivo. El modelo recibe el texto original (sin recortar).
+        non_ws_len = self.preprocessor.effective_length(text)
+        if non_ws_len < MIN_NON_WS_CHARS:
+            encoded = self.preprocessor.encode(text, pad=pad)
+            input_tensor = torch.tensor(encoded, dtype=torch.long).unsqueeze(0).to(self.device)
+            with torch.no_grad():
+                _, embedding = self.model(input_tensor, return_embedding=True)
+            return {
+                "prediction": "humano",
+                "class_id": 0,
+                "confidence": 0.95,
+                "prob_humano": 0.95,
+                "prob_sintetico": 0.05,
+                "ai_probability": 0.05,
+                "embedding": embedding.squeeze(0).cpu().tolist(),
+                "insufficient_length": True,
+            }
 
         encoded = self.preprocessor.encode(text, pad=pad)
         input_tensor = torch.tensor(encoded, dtype=torch.long).unsqueeze(0).to(self.device)
@@ -99,6 +120,7 @@ class CharCNNInference:
             "prob_sintetico": p_synth,
             "ai_probability": p_synth,
             "embedding": embedding.squeeze(0).cpu().tolist(),
+            "insufficient_length": False,
         }
 
 

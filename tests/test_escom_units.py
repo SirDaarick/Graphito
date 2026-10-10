@@ -7,6 +7,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
+import pytest
+
+pytest.importorskip("torch")
+pytest.importorskip("transformers")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -339,6 +343,7 @@ int contar_lineas(const char *nom_arch) {
 ]
 
 
+@pytest.mark.requires_graphcodebert
 def test_real_cases():
     print("=" * 70)
     print("EVALUACIÓN EN CASOS REALES: FUNDAMENTOS DE PROGRAMACIÓN (ESCOM IPN)")

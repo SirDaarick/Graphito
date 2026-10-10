@@ -8,6 +8,22 @@ from torch.utils.data import Dataset
 from models.char_cnn.preprocess import CharPreprocessor
 
 
+DEFAULT_DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+
+
+def rebase_path(file_path: str, data_root: Path = DEFAULT_DATA_ROOT) -> Path:
+    """Map a manifest path recorded on another machine onto the local `data/` folder.
+
+    Manifests store absolute paths (e.g. /home/user/.../data/raw/src/...). Anything after
+    `data/{raw,output}` is kept; paths without that anchor are returned unchanged.
+    """
+    parts = Path(str(file_path).replace("\\", "/")).parts
+    for i, part in enumerate(parts[:-1]):
+        if part == "data" and parts[i + 1] in ("raw", "output"):
+            return Path(data_root).joinpath(*parts[i + 1:])
+    return Path(file_path)
+
+
 class CharCNNDataset(Dataset):
 
     def __init__(
@@ -52,7 +68,21 @@ class CharCNNDataset(Dataset):
         preprocessor: CharPreprocessor,
         split: str = "train",
         cache_encoding: bool = True,
+        data_root: Path = DEFAULT_DATA_ROOT,
     ) -> "CharCNNDataset":
         with open(manifest_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return cls(data["splits"].get(split, []), preprocessor, cache_encoding)
+        samples = []
+        missing = []
+        for s in data["splits"].get(split, []):
+            path = Path(s["file_path"])
+            if not path.exists():
+                path = rebase_path(s["file_path"], data_root)
+            if not path.exists():
+                missing.append(s["file_path"])
+            samples.append({**s, "file_path": str(path)})
+        if missing:
+            raise FileNotFoundError(
+                f"{len(missing)}/{len(samples)} '{split}' files not found locally; first: {missing[0]}"
+            )
+        return cls(samples, preprocessor, cache_encoding)

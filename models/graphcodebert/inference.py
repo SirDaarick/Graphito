@@ -9,6 +9,19 @@ from models.graphcodebert.config import GraphCodeBERTConfig
 from models.graphcodebert.parser import DFGExtractor, DFGResult
 
 
+def lora_weights_applied(model: torch.nn.Module) -> bool:
+    """True only if the model has LoRA B matrices and at least one is non-zero.
+
+    LoRA initialises B to zero, so an all-zero B after loading an adapter means
+    the checkpoint weights never reached the model.
+    """
+    return any(
+        bool(param.detach().abs().sum() > 0)
+        for name, param in model.named_parameters()
+        if "lora_B" in name
+    )
+
+
 class GraphCodeBERTInference:
 
     def __init__(
@@ -22,24 +35,56 @@ class GraphCodeBERTInference:
         )
         self._dfg_extractor = DFGExtractor()
 
+        cache_dir_str = str(self.config.cache_dir) if self.config.cache_dir else None
         self.tokenizer = RobertaTokenizer.from_pretrained(
-            self.config.model_name, cache_dir=str(self.config.cache_dir)
+            self.config.model_name, cache_dir=cache_dir_str
         )
         base_encoder = RobertaModel.from_pretrained(
-            self.config.model_name, cache_dir=str(self.config.cache_dir)
+            self.config.model_name, cache_dir=cache_dir_str
         )
+        self.is_lora_loaded = False
+        self.encoder = base_encoder
         if self.config.adapter_path and Path(self.config.adapter_path).exists():
             try:
-                from peft import PeftModel
-                peft_model = PeftModel.from_pretrained(base_encoder, str(self.config.adapter_path))
-                self.encoder = peft_model.merge_and_unload()
-            except Exception:
-                self.encoder = base_encoder
-        else:
-            self.encoder = base_encoder
+                merged = self._load_merged_adapter(base_encoder, cache_dir_str)
+            except Exception as e:
+                import logging
+                logging.getLogger("graphcodebert").warning(f"No se pudo cargar LoRA adapter: {e}")
+                merged = None
+            if merged is not None:
+                self.encoder = merged
+                self.is_lora_loaded = True
+            else:
+                import logging
+                logging.getLogger("graphcodebert").warning(
+                    "LoRA adapter at %s loaded but none of its weights were applied "
+                    "(key names do not match the model); using base GraphCodeBERT.",
+                    self.config.adapter_path,
+                )
 
         self.encoder.to(self.device)
         self.encoder.eval()
+
+    def _load_merged_adapter(self, base_encoder: RobertaModel, cache_dir: Optional[str]):
+        """Return the encoder with the LoRA merged in, or None if no weight was applied.
+
+        The shipped adapter was trained on RobertaForMaskedLM, so its keys are prefixed
+        "roberta.*" and only match that wrapper. Try it first and keep just `.roberta`; fall
+        back to a bare RobertaModel for adapters trained directly on the encoder.
+        """
+        from peft import PeftModel
+        from transformers import RobertaForMaskedLM
+
+        adapter = str(self.config.adapter_path)
+        mlm = RobertaForMaskedLM.from_pretrained(self.config.model_name, cache_dir=cache_dir)
+        peft_mlm = PeftModel.from_pretrained(mlm, adapter)
+        if lora_weights_applied(peft_mlm):
+            return peft_mlm.merge_and_unload().roberta
+
+        peft_enc = PeftModel.from_pretrained(base_encoder, adapter)
+        if lora_weights_applied(peft_enc):
+            return peft_enc.merge_and_unload()
+        return None
 
     def predict(self, file_path: Path) -> dict:
         code_bytes = file_path.read_bytes()
@@ -138,10 +183,14 @@ class GraphCodeBERTInference:
         embeds = self.encoder.embeddings.LayerNorm(embeds)
         embeds = self.encoder.embeddings.dropout(embeds)
 
+        # Transformación a máscara aditiva de atención (0.0 para conectado, -10000.0 para bloqueado)
+        # Esto asegura que RobertaEncoder aplique softmax(attn + mask) anulando las posiciones sin aristas DFG.
+        extended_graph_mask = (1.0 - graph_mask_4d.to(dtype=embeds.dtype, device=self.device)) * -10000.0
+
         with torch.no_grad():
             encoder_out = self.encoder.encoder(
                 hidden_states=embeds,
-                attention_mask=graph_mask_4d.to(self.device),
+                attention_mask=extended_graph_mask,
             )
             cls_embedding = encoder_out.last_hidden_state[:, 0, :].squeeze(0)
 

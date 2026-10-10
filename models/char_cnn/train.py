@@ -109,6 +109,8 @@ def save_checkpoint(
             "config": {
                 "alphabet": config.alphabet,
                 "seq_length": config.seq_length,
+                "whitespace_mode": config.whitespace_mode,
+                "strip_comments": config.strip_comments,
                 "vocab_size": model.vocab_size,
                 "embedding_dim": config.embedding_dim,
                 "num_classes": config.num_classes,
@@ -268,11 +270,17 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--early-stop", type=int, default=7)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--whitespace-mode", choices=["trim", "canonical"], default="trim",
+                        help="canonical: input invariant to reformatting (clang-format, IDE auto-format)")
+    parser.add_argument("--best-model-path", type=Path, default=None,
+                        help="Where to write the best checkpoint (default: models/char_cnn/best_model.pth)")
     args = parser.parse_args()
 
-    config = CharCNNConfig()
+    config = CharCNNConfig(whitespace_mode=args.whitespace_mode)
     if args.manifest:
         config.manifest_path = args.manifest
+    if args.best_model_path:
+        config.best_model_path = args.best_model_path
     config.batch_size = args.batch_size
     config.epochs = args.epochs
     config.learning_rate = args.lr

@@ -3,14 +3,19 @@
 test_e2e_analysis.py - Prueba de integración End-to-End del pipeline bimodal con PostgreSQL y ChromaDB.
 Verifica:
   1. Persistencia relacional de Docente, Problema, Código Fuente.
-  2. Indexación vectorial en ChromaDB (769 dimensiones).
+  2. Indexación vectorial en ChromaDB (768 dimensiones, solo canal semántico).
   3. Ejecución del orquestador de análisis con inferencia real (GraphCodeBERT + MultiScaleCharCNN).
   4. Generación de ReporteAnalisis e Indicadores de Integridad según diseño de tesis.
 """
 
 import asyncio
 import uuid
+
+import pytest
 from sqlalchemy import select
+
+pytest.importorskip("torch")  # real engine needs torch; skip at collection instead of erroring
+
 from app.infrastructure.database.session import async_session_maker, engine, Base
 import app.infrastructure.database.models as db_models
 from app.infrastructure.database.models import (
@@ -23,13 +28,14 @@ from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestra
 from app.presentation.schemas.analysis import AnalysisRunRequest
 from app.config import settings
 
-# Configurar para usar servidor ChromaDB local
-settings.USE_CHROMA_SERVER = True
-settings.CHROMA_HOST = "localhost"
-settings.CHROMA_PORT = 8001
-
 
 async def run_e2e_test():
+    # Configurar para usar servidor ChromaDB local (inside the function so the
+    # mutation of the global settings does not leak into the pytest session).
+    settings.USE_CHROMA_SERVER = True
+    settings.CHROMA_HOST = "localhost"
+    settings.CHROMA_PORT = 8001
+
     print("=" * 60)
     print("INICIANDO PRUEBA END-TO-END DE PERSISTENCIA Y ANÁLISIS BIMODAL")
     print("=" * 60)
@@ -101,16 +107,16 @@ int main() {
         await session.commit()
         await session.refresh(ref_code)
 
-        # Indexar en ChromaDB con tensor híbrido (769 dims)
-        ref_hybrid_emb = await inference_engine.generate_hybrid_embedding(ref_code.contenido, lang="c")
-        assert len(ref_hybrid_emb) == 769, f"Esperado 769 dims, obtenido {len(ref_hybrid_emb)}"
+        # Indexar en ChromaDB solo con el vector semántico (768 dims)
+        ref_emb = await inference_engine.extract_semantic_embedding(ref_code.contenido, lang="c")
+        assert len(ref_emb) == 768, f"Esperado 768 dims, obtenido {len(ref_emb)}"
         await vector_store.upsert_reference(
             reference_id=str(ref_code.id),
-            embedding=ref_hybrid_emb,
+            embedding=ref_emb,
             metadata={"problema_id": problema.id, "lenguaje": "c"},
             document=ref_code.contenido
         )
-        print(f"✅ Código de Referencia indexado en PostgreSQL y ChromaDB (769 dims, UUID={ref_code.id})")
+        print(f"✅ Código de Referencia indexado en PostgreSQL y ChromaDB (768 dims, UUID={ref_code.id})")
 
         # 6. Crear Entrega de Alumno (variación de factorial con punteros y while)
         student_code_str = """
