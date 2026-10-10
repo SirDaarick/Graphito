@@ -52,8 +52,8 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU2: Dedup (independent of WU3)
 
-- [ ] 2.1 RED `tests/test_eval_dedup.py`: exact `jaccard`; MinHash estimate within +-0.1 of exact on planted pairs; LSH recall on planted near-dups; p = 2^31-1 with no uint64 overflow; `UnionFind`; determinism. [DS2.4, DS2.5]
-- [ ] 2.2 GREEN `models/evaluation/dedup.py` (`token_ids`, `shingle_hashes(k=5)`, `minhash`, `lsh_candidates` 16x8, `jaccard`, `UnionFind`). Check: the 2.1 tests pass.
+- [x] 2.1 RED `tests/test_eval_dedup.py`: exact `jaccard`; MinHash estimate within +-0.1 of exact on planted pairs; LSH recall on planted near-dups; p = 2^31-1 with no uint64 overflow; `UnionFind`; determinism. [DS2.4, DS2.5]
+- [x] 2.2 GREEN `models/evaluation/dedup.py` (`token_ids`, `shingle_hashes(k=5)`, `minhash`, `lsh_candidates` 16x8, `jaccard`, `UnionFind`). Check: the 2.1 tests pass.
 
 ## WU3: Ground truth (independent of WU2)
 
