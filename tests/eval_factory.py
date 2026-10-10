@@ -111,14 +111,17 @@ def make_tree(
     root: Path,
     *,
     n_blocks: int = 6,
+    n_zy: int = 1,
     lang_b: str = "cpp",
     cpp_blocks: Optional[int] = None,
     planted: bool = True,
 ) -> Tree:
     """Write a synthetic corpus under `root` and return its paths and planted ids.
 
-    `lang_b="c"` makes course B C-only; with `cpp_blocks=k` the first k blocks of B2016 keep
-    C++ files (used to build an unfillable lang stratum).
+    Every course gets `n_blocks` topics Z1..Zn, each with `n_zy` assignments Z1..Zm (so a
+    letter has `n_blocks * n_zy` split blocks, since years merge). `lang_b="c"` makes course
+    B C-only; with `cpp_blocks=k` the first k topics of B2016 keep C++ files (used to build an
+    unfillable lang stratum).
     """
     tree = Tree(
         repo_root=root,
@@ -134,25 +137,27 @@ def make_tree(
                 lang = "c" if letter == "A" else lang_b
                 if letter == "B" and cpp_blocks is not None and course == "B2016" and z <= cpp_blocks:
                     lang = "cpp"
-                folder = f"{course}/Z{z}/Z1"
-                for s in range(1, STUDENTS + 1):
-                    student = f"student{STUDENT_BASE[course] + s}"
-                    rel = f"data/raw/src/{folder}/{student}.{lang}"
+                for y in range(1, n_zy + 1):
+                    folder = f"{course}/Z{z}/Z{y}"
+                    for s in range(1, STUDENTS + 1):
+                        student = f"student{STUDENT_BASE[course] + s}"
+                        rel = f"data/raw/src/{folder}/{student}.{lang}"
+                        _write(tree, rel, program(rel, lang))
+                    profile = PROFILES[z % 2]
+                    model = MODELS[(z + int(year)) % 2]
+                    ai = f"ref_{profile}_or-{model}_20260714_2234{z:02d}_{z:04d}.{lang}"
+                    rel = f"data/output/{folder}/{ai}"
                     _write(tree, rel, program(rel, lang))
-                profile = PROFILES[z % 2]
-                model = MODELS[(z + int(year)) % 2]
-                ai = f"ref_{profile}_or-{model}_20260714_2234{z:02d}_{z:04d}.{lang}"
-                rel = f"data/output/{folder}/{ai}"
-                _write(tree, rel, program(rel, lang))
 
     gt_lines: List[str] = []
     for course in ("A2016", "A2017", "B2016"):
         base = STUDENT_BASE[course]
         for z in range(1, n_blocks + 1):
-            if course == "A2017" and z == 6:
-                continue  # unheaded assignment of a labelled course
-            gt_lines.append(f"- {course}/Z{z}/Z1")
-            gt_lines.append(f"student{base + 1},student{base + 2}")
+            for y in range(1, n_zy + 1):
+                if course == "A2017" and z == 6:
+                    continue  # unheaded assignment of a labelled course
+                gt_lines.append(f"- {course}/Z{z}/Z{y}")
+                gt_lines.append(f"student{base + 1},student{base + 2}")
     if planted:
         _plant(tree, gt_lines, n_blocks)
     tree.gt_static.parent.mkdir(parents=True, exist_ok=True)

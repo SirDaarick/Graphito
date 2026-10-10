@@ -65,7 +65,7 @@ class TestDiscovery:
         human = entries["data/raw/src/A2016/Z1/Z1/student1001.c"]
         assert human["source"] == "human" and human["lang"] == "c"
         assert human["model"] is None and human["profile"] is None
-        assert human["course"] == "A2016" and human["block"] == "A/Z1"
+        assert human["course"] == "A2016" and human["block"] == "A/Z1/Z1"
         assert human["assignment"] == "A2016/Z1/Z1" and human["student"] == "student1001"
 
     def test_ai_metadata_is_parsed_from_the_filename(self, entries):
@@ -124,13 +124,23 @@ class TestDiscovery:
 
     def test_parse_path(self):
         ai = parse_path("B2016/Z2/Z1/ref_comentado-basic_or-kimi_20260714_200817_0002.cpp", "ai")
-        assert ai["course"] == "B2016" and ai["block"] == "B/Z2"
+        assert ai["course"] == "B2016" and ai["block"] == "B/Z2/Z1"
         assert ai["assignment"] == "B2016/Z2/Z1" and ai["lang"] == "cpp"
         assert (ai["profile"], ai["model"], ai["student"]) == ("comentado-basic", "kimi", None)
         human = parse_path("A2017/Z3/Z2/student42 (1).c", "human")
         assert human["student"] == "student42" and human["lang"] == "c"
         with pytest.raises(ValueError, match="layout"):
             parse_path("A2016/student1.c", "human")
+
+    def test_block_is_the_assignment_with_years_merged(self):
+        a16 = parse_path("A2016/Z3/Z1/student1.c", "human")["block"]
+        a17 = parse_path("A2017/Z3/Z1/student2.c", "human")["block"]
+        sibling = parse_path("A2017/Z3/Z2/student2.c", "human")["block"]
+        assert a16 == a17 == "A/Z3/Z1"
+        assert sibling == "A/Z3/Z2"
+        assert parse_path("A2017/Z3/Z2/student2.c", "human", group_key="zx_block")["block"] == "A/Z3"
+        with pytest.raises(ValueError, match="group_key"):
+            parse_path("A2017/Z3/Z2/student2.c", "human", group_key="course")
 
 
 # --- hygiene and dedup (DS2.1-2.5) -------------------------------------------------------------
@@ -279,8 +289,8 @@ class TestAssignment:
 
     def test_blocks_section_maps_every_block_to_its_split(self, built, entries):
         blocks = built[1]["blocks"]
-        assert sorted(blocks) == [f"{L}/Z{z}" for L in "AB" for z in range(1, 7)]
-        assert blocks["A/Z1"]["courses"] == ["A2016", "A2017"]
+        assert sorted(blocks) == [f"{L}/Z{z}/Z1" for L in "AB" for z in range(1, 7)]
+        assert blocks["A/Z1/Z1"]["courses"] == ["A2016", "A2017"]
         for block, info in blocks.items():
             members = [e for e in entries.values() if e["block"] == block]
             assert info["n_samples"] == len(members)
@@ -364,7 +374,7 @@ class TestAssignment:
 
     def test_validate_rejects_a_block_spanning_splits(self, built):
         manifest = json.loads(json.dumps(built[1]))
-        entry = next(e for e in manifest["entries"] if e["block"] == "A/Z1")
+        entry = next(e for e in manifest["entries"] if e["block"] == "A/Z1/Z1")
         entry["split"] = next(s for s in SPLITS if s != entry["split"])
         with pytest.raises(ValueError, match="block"):
             validate(manifest)
@@ -381,6 +391,78 @@ class TestAssignment:
         assert built[1]["groups"]["dup"]
         cross = [g for g in built[1]["groups"]["dup"].values() if g["cross_block"]]
         assert any(g["kind"] == "exact" and len(g["blocks"]) == 6 for g in cross)
+
+    def test_cross_split_near_pairs_are_counted(self, built, entries):
+        ids, dedup = built[0].ids, built[1]["stats"]["dedup"]
+        a, b = entries[ids["cross_near_a"]], entries[ids["cross_near_b"]]
+        assert 0 <= dedup["cross_split_near_pairs"] <= dedup["cross_block_near_pairs"]
+        assert dedup["cross_split_near_pairs"] >= int(a["split"] != b["split"])
+
+
+# --- grouping unit: one assignment across years (DS3.1, DS3.2) ---------------------------------
+
+
+@pytest.fixture(scope="module")
+def siblings(tmp_path_factory):
+    """3 topics x 2 assignments per letter: 6 blocks per letter, sibling assignments per Zx."""
+    tree = make_tree(tmp_path_factory.mktemp("siblings"), n_blocks=3, n_zy=2, planted=False)
+    return tree, build_split(_config(tree))
+
+
+class TestAssignmentBlocks:
+    def test_years_merge_and_sibling_assignments_are_separate_blocks(self, siblings):
+        entries = {e["id"]: e for e in siblings[1]["entries"]}
+        block = {i: e["block"] for i, e in entries.items()}
+        a16 = block["data/raw/src/A2016/Z1/Z1/student1001.c"]
+        a17 = block["data/raw/src/A2017/Z1/Z1/student2001.c"]
+        z2 = block["data/raw/src/A2016/Z1/Z2/student1001.c"]
+        assert a16 == a17 == "A/Z1/Z1" and z2 == "A/Z1/Z2"
+        assert sorted(siblings[1]["blocks"]) == [
+            f"{L}/Z{z}/Z{y}" for L in "AB" for z in range(1, 4) for y in (1, 2)
+        ]
+        assert siblings[1]["blocks"]["A/Z1/Z1"]["courses"] == ["A2016", "A2017"]
+
+    def test_invariants_hold_and_quotas_apply_per_letter(self, siblings):
+        manifest = siblings[1]
+        validate(manifest)
+        for letter in "AB":
+            splits = [v["split"] for k, v in manifest["blocks"].items() if k.startswith(letter)]
+            plan = manifest["stats"]["blocks"][letter]
+            assert plan["n_blocks"] == 6 and (plan["test"], plan["val"], plan["train"]) == (2, 2, 2)
+            assert (splits.count("test"), splits.count("val"), splits.count("train")) == (2, 2, 2)
+
+    def test_config_records_the_group_key_rule(self, siblings):
+        config = siblings[1]["config"]
+        assert config["group_key"] == "letter/Zx/Zy (years merged)"
+        assert config["builder_version"] == "1.1"
+
+    def test_zx_groups_split_counts_sibling_assignments_per_split(self, siblings):
+        manifest = siblings[1]
+        zx = manifest["stats"]["zx_groups_split"]
+        assert sorted(zx) == [f"{L}/Z{z}" for L in "AB" for z in range(1, 4)]
+        for group, counts in zx.items():
+            assert set(counts) == set(SPLITS) and sum(counts.values()) == 2
+            for split in SPLITS:
+                assert counts[split] == sum(
+                    1 for b, info in manifest["blocks"].items()
+                    if b.rsplit("/", 1)[0] == group and info["split"] == split
+                )
+        assert "cross_split_near_pairs" in manifest["stats"]["dedup"]
+
+    def test_rebuild_is_byte_identical(self, siblings):
+        again = build_split(_config(siblings[0]))
+        assert dumps_manifest(again) == dumps_manifest(siblings[1])
+
+    def test_zx_block_option_keeps_the_previous_grouping(self, tmp_path):
+        tree = make_tree(tmp_path / "corpus")
+        manifest = build_split(_config(tree, group_key="zx_block"))
+        assert sorted(manifest["blocks"]) == [f"{L}/Z{z}" for L in "AB" for z in range(1, 7)]
+        assert manifest["config"]["group_key"] == "letter/Zx (years merged)"
+        validate(manifest)
+
+    def test_unknown_group_key_is_rejected(self, siblings):
+        with pytest.raises(ValueError, match="group_key"):
+            build_split(_config(siblings[0], group_key="course"))
 
 # --- CLI (scripts/build_split.py) --------------------------------------------------------------
 

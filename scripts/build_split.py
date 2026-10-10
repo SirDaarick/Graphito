@@ -3,7 +3,7 @@
 
 Scans human (`data/raw/src`) and AI (`data/output`) submissions from disk, flags broken files,
 groups exact and near duplicates, resolves ground-truth clusters and assigns whole blocks
-(course letter + Zx) to splits. The same inputs and seed always produce byte-identical output.
+(one assignment, years merged: course letter + Zx + Zy) to splits. The same inputs and seed always produce byte-identical output.
 Per-stage timings are printed to stdout and never written into the manifest.
 
 Usage:

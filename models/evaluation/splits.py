@@ -3,11 +3,14 @@
 Disk is the source of truth (never `.generation_state.json`) and nothing is deleted or modified:
 every exclusion is a flag. Exact duplicates (same `norm_hash`) are grouped globally; near
 duplicates (identifier-normalized 5-token-shingle Jaccard >= threshold) only within a block, while
-cross-block near duplicates are counted but never merged. Whole blocks (course letter + Zx) are
-assigned to splits; a dup group spanning blocks in different splits is pinned to its most
-held-out split and its other members are excluded (`cross_split_dup`). GT clusters live inside
-one assignment, so they never span splits; a student clustered in several blocks is reported as
-overlap, not merged. See design "Split Algorithm".
+cross-block near duplicates are counted but never merged. A block is one assignment with its
+years merged (course letter + Zx + Zy: `A2016/Z3/Z1` and `A2017/Z3/Z1` form `A/Z3/Z1`); the
+`zx_block` option keeps the older letter + Zx unit. Whole blocks are assigned to splits; a dup
+group spanning blocks in different splits is pinned to its most held-out split and its other
+members are excluded (`cross_split_dup`). Sibling assignments of one Zx may land in different
+splits: `stats.zx_groups_split` and `stats.dedup.cross_split_near_pairs` quantify that topic
+leakage. GT clusters live inside one assignment, so they never span splits; a student clustered
+in several blocks is reported as overlap, not merged. See design "Split Algorithm".
 """
 
 import hashlib
@@ -52,7 +55,7 @@ from .provenance import atomic_write_bytes
 from .seed import stable_rng
 
 ROOT = Path(__file__).resolve().parents[2]
-BUILDER_VERSION = "1.0"
+BUILDER_VERSION = "1.1"
 _PARALLEL_MIN = 2000  # below this many files a process pool costs more than it saves
 MIN_EFFECTIVE_BYTES = 50  # hygiene: below this effective length a file is `too_short`
 
@@ -60,6 +63,8 @@ EXTENSIONS = {".c": "c", ".cpp": "cpp"}
 COPY_SUFFIX_RE = re.compile(r"\s\(\d+\)")  # same rule as data/golden_set/build_corpus.py
 STUDENT_RE = re.compile(r"^student\d+$")
 AI_NAME_RE = re.compile(r"^ref_(?P<profile>[a-z-]+)_or-(?P<model>.+)_\d{8}_\d{6}_\d+$")
+# Split unit (`SplitConfig.group_key`) -> the rule recorded in `config.group_key`.
+GROUP_KEYS = {"assignment": "letter/Zx/Zy (years merged)", "zx_block": "letter/Zx (years merged)"}
 
 
 @dataclass(frozen=True)
@@ -74,6 +79,7 @@ class SplitConfig:
     gt_ambiguous: Tuple[Path, ...] = ()  # dynamic/full ground truth: marks `ambiguous` only
     test_fraction: float = 0.20
     val_fraction: float = 0.15
+    group_key: str = "assignment"  # split unit, see GROUP_KEYS
     min_blocks: int = 2
     max_attempts: int = 1000
     min_effective_bytes: int = MIN_EFFECTIVE_BYTES
@@ -120,7 +126,15 @@ def scan(raw_root: Path, ai_root: Path, repo_root: Path) -> List[ScannedFile]:
     return sorted(files, key=lambda f: f.id)
 
 
-def parse_path(rel: str, source: str) -> Dict[str, object]:
+def block_key(course: str, zx: str, zy: str, group_key: str = "assignment") -> str:
+    """Split block of an assignment: `A/Z3/Z1` (years merged), or `A/Z3` with `zx_block`."""
+    if group_key not in GROUP_KEYS:
+        raise ValueError(f"unknown group_key {group_key!r} (want one of {sorted(GROUP_KEYS)})")
+    letter = course[:1]
+    return f"{letter}/{zx}/{zy}" if group_key == "assignment" else f"{letter}/{zx}"
+
+
+def parse_path(rel: str, source: str, group_key: str = "assignment") -> Dict[str, object]:
     """Parse `<course>/<Zx>/<Zy>/<file>` into manifest metadata plus informational flags."""
     parts = rel.split("/")
     if len(parts) != 4:
@@ -132,7 +146,7 @@ def parse_path(rel: str, source: str) -> Dict[str, object]:
     stem = COPY_SUFFIX_RE.sub("", pure.stem)
     meta: Dict[str, object] = {
         "course": course,
-        "block": f"{course[:1]}/{zx}",
+        "block": block_key(course, zx, zy, group_key),
         "assignment": f"{course}/{zx}/{zy}",
         "student": None,
         "lang": EXTENSIONS[pure.suffix],
@@ -279,15 +293,15 @@ def _dedup(
     )
 
 
-def _analyze_file(task: Tuple[ScannedFile, int, int]) -> Tuple[Dict, Optional[np.ndarray]]:
+def _analyze_file(task: Tuple[ScannedFile, int, int, str]) -> Tuple[Dict, Optional[np.ndarray]]:
     """Read one file and build its entry plus shingle hashes (None when broken).
 
     Top-level so a process pool can run it; the result depends only on the file bytes.
     """
-    f, min_bytes, shingle_k = task
+    f, min_bytes, shingle_k, group_key = task
     data = f.path.read_bytes()
     text, non_utf8 = _decode(data)
-    meta = parse_path(f.rel, f.source)
+    meta = parse_path(f.rel, f.source, group_key)
     broken = _broken_reasons(
         PurePosixPath(f.rel).name, text, len(data), f.source, meta["student"], min_bytes
     )
@@ -332,12 +346,14 @@ def _threshold_key(t: float) -> str:
 
 def build_split(config: SplitConfig, timings: Optional[Dict[str, float]] = None) -> Dict:
     """Build the split manifest dict. Per-stage seconds go to `timings`, never into the manifest."""
+    if config.group_key not in GROUP_KEYS:
+        raise ValueError(f"unknown group_key {config.group_key!r} (want one of {sorted(GROUP_KEYS)})")
     raw_root, ai_root, gt_path = config.roots()
     clock = time.perf_counter()
     files = scan(raw_root, ai_root, config.repo_root)
     clock = _tick(timings, "scan", clock)
 
-    tasks = [(f, config.min_effective_bytes, config.shingle_k) for f in files]
+    tasks = [(f, config.min_effective_bytes, config.shingle_k, config.group_key) for f in files]
     workers = config.workers or (min(8, os.cpu_count() or 1) if len(files) >= _PARALLEL_MIN else 1)
     if workers > 1:
         with ProcessPoolExecutor(max_workers=workers) as pool:  # map() keeps input order
@@ -391,7 +407,7 @@ def build_split(config: SplitConfig, timings: Optional[Dict[str, float]] = None)
         "schema": SCHEMA,
         "config": config_section,
         "blocks": _blocks_section(entries),
-        "groups": _groups_section(entries, dd, resolution, assignment.block_split),
+        "groups": _groups_section(entries, dd, resolution, assignment.block_split, config.group_key),
         "entries": entries,
         "stats": _stats(entries, dd, resolution, assignment, config),
     }
@@ -521,7 +537,7 @@ def _blocks_section(entries: List[Dict]) -> Dict[str, Dict]:
     return blocks
 
 
-def _groups_section(entries, dd: _Dedup, resolution, block_split: Dict[str, str]) -> Dict:
+def _groups_section(entries, dd: _Dedup, resolution, block_split: Dict[str, str], group_key: str) -> Dict:
     dup: Dict[str, Dict] = {}
     for root, members in dd.groups.items():
         if len(members) < 2:
@@ -540,16 +556,24 @@ def _groups_section(entries, dd: _Dedup, resolution, block_split: Dict[str, str]
             "members": list(c.members),
             "students": list(c.students),
             "unresolved": list(c.unresolved),
-            "split": block_split[_block_of_assignment(c.assignment)],
+            "split": block_split[_block_of_assignment(c.assignment, group_key)],
         }
         for cid, c in resolution.clusters.items()
     }
     return {"dup": dup, "clusters": clusters}
 
 
-def _block_of_assignment(assignment: str) -> str:
-    course, zx, _ = assignment.split("/")
-    return f"{course[:1]}/{zx}"
+def _block_of_assignment(assignment: str, group_key: str) -> str:
+    return block_key(*assignment.split("/"), group_key)
+
+
+def _zx_groups_split(block_split: Dict[str, str]) -> Dict[str, Dict[str, int]]:
+    """Per topic (`letter/Zx`): how many of its blocks each split holds (sibling leakage)."""
+    out: Dict[str, Dict[str, int]] = {}
+    for block, split in sorted(block_split.items()):
+        letter, zx = block.split("/")[:2]
+        out.setdefault(f"{letter}/{zx}", {s: 0 for s in SPLITS})[split] += 1
+    return out
 
 
 def _overlap(students: Dict[str, Set[str]]) -> Dict[str, int]:
@@ -576,7 +600,8 @@ def _stats(entries, dd: _Dedup, resolution, assignment: _Assignment, config: Spl
 
     block_split = assignment.block_split
     cluster_split = {
-        cid: block_split[_block_of_assignment(c.assignment)] for cid, c in resolution.clusters.items()
+        cid: block_split[_block_of_assignment(c.assignment, config.group_key)]
+        for cid, c in resolution.clusters.items()
     }
     clusters_by_split = {s: 0 for s in SPLITS}
     for split in cluster_split.values():
@@ -611,6 +636,7 @@ def _stats(entries, dd: _Dedup, resolution, assignment: _Assignment, config: Spl
             "cross_split_dup": len(assignment.pinned),
         },
         "blocks": assignment.plans,
+        "zx_groups_split": _zx_groups_split(block_split),
         "student_overlap": {
             "overall": _overlap(overall),
             "by_letter": {L: _overlap(s) for L, s in sorted(by_letter.items())},
@@ -629,6 +655,11 @@ def _stats(entries, dd: _Dedup, resolution, assignment: _Assignment, config: Spl
                 1 for g in live_groups if len({entries[i]["block"] for i in g}) > 1
             ),
             "cross_block_near_pairs": len(dd.cross_near_pairs),
+            "cross_split_near_pairs": sum(
+                1
+                for p, q in dd.cross_near_pairs
+                if block_split[entries[p]["block"]] != block_split[entries[q]["block"]]
+            ),
             "pinned_groups": assignment.pinned_groups,
             "pinned_exclusions": len(assignment.pinned),
             "size_distribution": {str(k): v for k, v in Counter(len(g) for g in live_groups).items()},
@@ -709,7 +740,7 @@ def _config_section(config: SplitConfig, raw_root: Path, ai_root: Path, gt_path:
         "builder_version": BUILDER_VERSION,
         "seed": config.seed,
         "roots": {"raw": _repo_relative(raw_root, repo), "ai": _repo_relative(ai_root, repo)},
-        "group_key": "course_letter/Zx",
+        "group_key": GROUP_KEYS[config.group_key],
         "fractions": {"target": {"test": config.test_fraction, "val": config.val_fraction}},
         "min_blocks_per_split": config.min_blocks,
         "hygiene": {

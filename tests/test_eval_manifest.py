@@ -226,11 +226,11 @@ def test_check_invariants_passes_and_detects_tampering(corpus, tmp_path, manifes
     manifest.check_invariants()
 
     def tamper(data):
-        entry = next(e for e in data["entries"] if e["block"] == "B/Z1")
+        entry = next(e for e in data["entries"] if e["block"] == "B/Z1/Z1")
         entry["split"] = next(s for s in ("train", "val", "test") if s != entry["split"])
 
     tampered = load_manifest(_rewrite(corpus[1], tmp_path, tamper))
-    with pytest.raises(ManifestError, match="block B/Z1"):
+    with pytest.raises(ManifestError, match="block B/Z1/Z1"):
         tampered.check_invariants()
 
 
