@@ -61,6 +61,8 @@ __all__ = [
     "EvaluationResult",
     "resolve_device",
     "write_json",
+    "write_csv",
+    "append_report",
     "describe_error",
     "set_run_status",
     "score_split",
@@ -71,6 +73,7 @@ __all__ = [
     "complete_per_group",
     "per_generator",
     "abstention_counts",
+    "render_generator_section",
     "update_run_config",
     "evaluate_run",
     "reevaluate",
@@ -265,7 +268,7 @@ def _union(*views: EncodedSet) -> EncodedSet:
     return EncodedSet.build(samples, arrays)
 
 
-def _write_csv(path: Path, header: Sequence[str], rows: Iterable[Sequence[Any]]) -> None:
+def write_csv(path: Path, header: Sequence[str], rows: Iterable[Sequence[Any]]) -> None:
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(header)
@@ -280,7 +283,7 @@ def update_run_config(ctx: RunContext, **fields: Any) -> RunContext:
     return replace(ctx, config=doc)
 
 
-def _append_report(path: Path, sections: Sequence[str]) -> None:
+def append_report(path: Path, sections: Sequence[str]) -> None:
     text = path.read_text(encoding="utf-8") + "\n" + "\n".join(sections)
     atomic_write_bytes(path, text.encode("utf-8"))
 
@@ -303,7 +306,7 @@ def _view_section(metrics: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _generator_section(metrics: Mapping[str, Any]) -> str:
+def render_generator_section(metrics: Mapping[str, Any]) -> str:
     points = list(metrics["operating_points"])
     lines = [
         "## Per generator (vs all humans)",
@@ -383,7 +386,7 @@ def evaluate_run(
         calibration_sha256=calibration.sha256,
         threshold_source=f"calibration:{calibration.sha256}",
     )
-    _write_csv(
+    write_csv(
         run_dir / "scores_val.csv",
         ("id", "y", "raw", "calibrated"),
         zip(val.ids, val.y.tolist(), p_val.tolist(), calibration.apply(p_val).tolist()),
@@ -394,7 +397,7 @@ def evaluate_run(
     raw_by_id = dict(zip(test_files.ids, score_split(model, test_files, device, batch_size, name="test").tolist()))
     representatives = set(views["test"].ids)
     raw_test = np.array([raw_by_id[i] for i in test_files.ids], dtype=np.float64)
-    _write_csv(
+    write_csv(
         run_dir / "scores_test.csv",
         ("id", "y", "raw", "calibrated", "representative"),
         zip(
@@ -441,14 +444,14 @@ def evaluate_run(
         )
         target.path.mkdir(exist_ok=True)
         written[name] = target.write(view.y, calibrated, metrics)
-        _append_report(
+        append_report(
             target.path / "report.md",
-            [_view_section(metrics), _generator_section(metrics), _abstention_section(n_abstained, min_non_ws)],
+            [_view_section(metrics), render_generator_section(metrics), _abstention_section(n_abstained, min_non_ws)],
         )
 
     if shortcuts is not None:
         write_json(run_dir / "shortcuts.json", shortcuts)
-        _append_report(run_dir / "report.md", [render_markdown(shortcuts)])
+        append_report(run_dir / "report.md", [render_markdown(shortcuts)])
 
     return EvaluationResult(
         run=ctx,
