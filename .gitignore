@@ -41,6 +41,9 @@ models/char_cnn/weights/
 *.bin
 checkpoint-*/
 
+# Evaluation run directories (select files are committed with `git add -f`)
+runs/
+
 # Docker y variables de entorno
 .env
 .env.*

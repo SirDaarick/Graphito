@@ -44,10 +44,11 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU1: Repo config, seeding, normalization
 
-- [ ] 1.1 (D-A resolved: ignore all `runs/`). Edit `.gitignore` (`runs/` rules), edit existing `.gitattributes` (`data/splits/*.json -diff eol=lf linguist-generated`), edit `requirements-dev.txt` (`matplotlib`). RED first: `tests/test_eval_repo_config.py` (`git check-ignore` on `runs/char_cnn/x/roc.png`, `runs/char_cnn/x/metrics.json`, `data/splits/split_v1.json` attrs; skip if git is missing). [ER1.7, NF1, D7]
-- [ ] 1.2 RED `tests/test_eval_seed.py`: `seed_everything` without torch seeds random/numpy and returns the seed; `stable_rng` is deterministic; importing the package needs no torch. GREEN: create `models/evaluation/__init__.py`, `models/evaluation/seed.py`. [EM4.1]
-- [ ] 1.3 RED `tests/test_eval_normalize.py`: string-aware `strip_comments`; `effective_length` (< 50 case); `norm_hash` equal across comment/whitespace changes and different on logic change; `shingle_tokens` maps identifiers to `ID` and keeps keywords. GREEN: `models/evaluation/normalize.py` (port of `data/golden_set/perturb_corpus.py:35-66`, regex lexer). [DS2.1, DS2.3, DS2.4]
+- [x] 1.1 (D-A resolved: ignore all `runs/`). Edit `.gitignore` (`runs/` rules), edit existing `.gitattributes` (`data/splits/*.json -diff eol=lf linguist-generated`), edit `requirements-dev.txt` (`matplotlib`). RED first: `tests/test_eval_repo_config.py` (`git check-ignore` on `runs/char_cnn/x/roc.png`, `runs/char_cnn/x/metrics.json`, `data/splits/split_v1.json` attrs; skip if git is missing). [ER1.7, NF1, D7]
+- [x] 1.2 RED `tests/test_eval_seed.py`: `seed_everything` without torch seeds random/numpy and returns the seed; `stable_rng` is deterministic; importing the package needs no torch. GREEN: create `models/evaluation/__init__.py`, `models/evaluation/seed.py`. [EM4.1]
+- [x] 1.3 RED `tests/test_eval_normalize.py`: string-aware `strip_comments`; `effective_length` (< 50 case); `norm_hash` equal across comment/whitespace changes and different on logic change; `shingle_tokens` maps identifiers to `ID` and keeps keywords. GREEN: `models/evaluation/normalize.py` (port of `data/golden_set/perturb_corpus.py:35-66`, regex lexer). [DS2.1, DS2.3, DS2.4]
 - Check: `pytest tests/test_eval_seed.py tests/test_eval_normalize.py tests/test_eval_repo_config.py -v`.
+- Evidence: route delegated (writer had no shell; parent ran checks). 54/54 new eval tests pass; full suite 151 passed, 1 skipped, 1 pre-existing failure in untouched tests/test_calibration_experiment.py. RED was written first but not observed (executor lacked a shell).
 
 ## WU2: Dedup (independent of WU3)
 
