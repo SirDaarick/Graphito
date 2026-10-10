@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import re
 
 import numpy as np
@@ -197,6 +198,77 @@ def test_load_rejects_bad_files(tmp_path, mutate):
     path.write_text(json.dumps(artifact), encoding="utf-8")
     with pytest.raises(ValueError):
         C.load_calibration(path)
+
+
+def _set_param(name, value):
+    return lambda d: d["params"].__setitem__(name, value)
+
+
+def _set_threshold_field(name, value):
+    return lambda d: d["thresholds"]["fpr_0.05"].__setitem__(name, value)
+
+
+@pytest.mark.parametrize(
+    "method, mutate, message",
+    [
+        ("temperature", _set_param("T", 0.0), "T must be > 0"),
+        ("temperature", _set_param("T", -2.0), "T must be > 0"),
+        ("temperature", _set_param("T", "2.0"), "params.T"),
+        ("temperature", _set_param("eps", float("nan")), "params.eps"),
+        ("platt", _set_param("a", float("inf")), "params.a"),
+        ("platt", _set_param("b", None), "params.b"),
+        ("platt", _set_param("a", True), "params.a"),
+        ("isotonic", _set_param("x", "0.1,0.9"), "params.x must be a list"),
+        ("isotonic", _set_param("y", {"0": 0.5}), "params.y must be a list"),
+        ("isotonic", _set_param("x", []), "non-empty"),
+        ("isotonic", lambda d: d["params"]["x"].append(2.0), "equal length"),
+        ("isotonic", lambda d: d["params"]["x"].reverse(), "strictly increasing"),
+        ("isotonic", lambda d: d["params"]["y"].__setitem__(0, "low"), r"params.y\[0\]"),
+        ("platt", _set_threshold_field("threshold", "0.5"), r"thresholds.fpr_0.05.threshold"),
+        ("platt", _set_threshold_field("target_fpr", None), r"thresholds.fpr_0.05.target_fpr"),
+        ("platt", lambda d: d.update(thresholds=[]), "thresholds must be a JSON object"),
+        ("platt", lambda d: d.update(primary="fpr_0.5"), "primary 'fpr_0.5' is not among"),
+    ],
+)
+def test_validate_rejects_bad_params_and_thresholds(method, mutate, message):
+    artifact, _ = C.build_calibration(_val_set(200), channel="channel_b", score_name="ai_prob", method=method, seed=0)
+    C.validate_calibration(artifact)
+    mutate(artifact)
+    with pytest.raises(C.CalibrationError, match=message):
+        C.validate_calibration(artifact)
+
+
+def test_save_calibration_failure_keeps_previous_file_and_no_temp(tmp_path, monkeypatch):
+    artifact, _ = C.build_calibration(_val_set(200), channel="channel_b", score_name="ai_prob", seed=0)
+    path = tmp_path / "calibration.json"
+    path.write_bytes(b"previous\n")
+
+    def failing_replace(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "replace", failing_replace)
+    with pytest.raises(OSError, match="disk full"):
+        C.save_calibration(artifact, path)
+    monkeypatch.undo()
+    assert path.read_bytes() == b"previous\n"
+    assert [p.name for p in tmp_path.iterdir()] == ["calibration.json"]
+    digest = C.save_calibration(artifact, path)
+    assert digest == P.file_sha256(path) and [p.name for p in tmp_path.iterdir()] == ["calibration.json"]
+
+
+def test_scored_set_normalizes_and_validates_inputs():
+    data = C.ScoredSet(ids=[1, 2], scores=[0, 1], y=[0, 1], split="val", entry_splits=["val", "val"])
+    assert data.ids == ("1", "2") and data.entry_splits == ("val", "val")
+    assert data.scores.dtype == np.float64 and data.y.dtype == np.int64
+    assert data.manifest_sha256 is None
+    with pytest.raises(AttributeError):
+        data.split = "test"
+    with pytest.raises(ValueError, match="differ in length"):
+        C.ScoredSet(["a"], [0.1, 0.2], [0, 1], "val")
+    with pytest.raises(ValueError, match="one split per id"):
+        C.ScoredSet(["a", "b"], [0.1, 0.2], [0, 1], "val", None, ["val"])
+    with pytest.raises(ValueError, match="binary"):
+        C.ScoredSet(["a", "b"], [0.1, 0.2], [0, 2], "val")
 
 
 def test_build_requires_manifest_hash():

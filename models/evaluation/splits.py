@@ -48,6 +48,7 @@ from .manifest import (  # schema constants live with the loader; re-exported he
     validate_schema,
 )
 from .normalize import effective_length, norm_hash, shingle_tokens
+from .provenance import atomic_write_bytes
 from .seed import stable_rng
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -697,22 +698,9 @@ def dumps_manifest(manifest: Dict) -> str:
 def write_manifest(manifest: Dict, path: "str | Path") -> Path:
     """Write `dumps_manifest` output as UTF-8 bytes (no platform newline translation).
 
-    Atomic: the bytes go to a sibling temp file that `os.replace` moves onto `path`, so a
-    failed write leaves any previous manifest intact; the temp file is removed on failure."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data = dumps_manifest(manifest).encode("utf-8")
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    try:
-        tmp.write_bytes(data)
-        os.replace(tmp, path)
-    except BaseException:
-        try:
-            tmp.unlink()
-        except FileNotFoundError:
-            pass
-        raise
-    return path
+    Atomic (`provenance.atomic_write_bytes`): a failed write leaves any previous manifest
+    intact and no temp file behind."""
+    return atomic_write_bytes(path, dumps_manifest(manifest).encode("utf-8"))
 
 
 def _config_section(config: SplitConfig, raw_root: Path, ai_root: Path, gt_path: Path) -> Dict:

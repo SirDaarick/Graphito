@@ -86,6 +86,17 @@ def test_non_binary_labels_are_rejected():
         M.roc_auc([1, 0], [0.2])
 
 
+def test_validate_labels_is_public_and_strict():
+    y = M.validate_labels([0, 1, True, np.int8(0)])
+    assert y.dtype == np.int64 and y.tolist() == [0, 1, 1, 0]
+    assert M.validate_labels([]).size == 0
+    with pytest.raises(ValueError, match="binary"):
+        M.validate_labels([0, -1])
+    with pytest.raises(ValueError, match="1-D"):
+        M.validate_labels([[0, 1]])
+    assert not hasattr(M, "_labels")
+
+
 # --- 7.2 threshold metrics, views and groups -----------------------------------------------
 
 

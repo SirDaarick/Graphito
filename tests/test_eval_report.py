@@ -1,5 +1,6 @@
 """Run reporting: run directories, config/metrics JSON, curve CSVs, headless plots, report.md."""
 
+import csv
 import json
 import re
 import subprocess
@@ -11,6 +12,7 @@ import numpy as np
 import pytest
 
 from models.evaluation import calibration as C
+from models.evaluation import metrics as M
 from models.evaluation import provenance as P
 from models.evaluation import report as R
 
@@ -171,6 +173,112 @@ def test_grouped_bootstrap_and_non_probability_scores(tmp_path, manifest):
     assert metrics["bootstrap"]["unit"] == "atomic_unit" and metrics["bootstrap"]["n_units"] == 100
     assert metrics["threshold_free"]["ece"]["value"] is None
     assert metrics["threshold_free"]["ece"]["reason"] == "scores_not_probabilities"
+
+
+def test_roc_csv_columns_match_roc_curve(tmp_path, manifest):
+    y, p = _scores()
+    ctx = _run(tmp_path, manifest, y=y, p=p)
+    with open(ctx.path / "roc.csv", encoding="utf-8", newline="") as fh:
+        header, *rows = list(csv.reader(fh))
+    assert header == ["threshold", "fpr", "tpr"]
+    fpr, tpr, thresholds = M.roc_curve(y, p)
+    table = np.array(rows, dtype=np.float64)
+    assert table.shape == (thresholds.size, 3)
+    np.testing.assert_array_equal(table[:, 0], thresholds)
+    np.testing.assert_array_equal(table[:, 1], fpr)
+    np.testing.assert_array_equal(table[:, 2], tpr)
+    assert table[0].tolist() == [np.inf, 0.0, 0.0] and table[-1, 1:].tolist() == [1.0, 1.0]
+
+
+def test_plot_failure_is_recorded_and_run_completes(tmp_path, manifest, calibration, monkeypatch):
+    pytest.importorskip("matplotlib")
+
+    def broken_plot(*_args, **_kwargs):
+        raise RuntimeError("renderer exploded")
+
+    monkeypatch.setattr(R, "_plot_reliability", broken_plot)
+    ctx = _run(tmp_path, manifest, calibration)
+    metrics = json.loads((ctx.path / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["artifacts_missing"] == [{"file": "reliability.png", "reason": "RuntimeError: renderer exploded"}]
+    assert all((ctx.path / name).is_file() for name in ("roc.png", "pr.png", "confusion.png"))
+    assert not (ctx.path / "reliability.png").exists()
+    text = (ctx.path / "report.md").read_text(encoding="utf-8")
+    assert "reliability.png not produced: RuntimeError: renderer exploded" in text
+
+
+def _bootstrap_case():
+    rng = np.random.default_rng(11)
+    y = rng.integers(0, 2, 120)
+    p = np.clip(rng.beta(2, 5, 120) + 0.3 * y, 0, 1)
+    points = {
+        "fpr_0.05": {"threshold": 0.45, "primary": True, "source": "manual"},
+        "fpr_0.01": {"threshold": 0.6, "primary": False, "source": "manual"},
+    }
+    return y, p, points
+
+
+# CI95s produced by the per-metric implementation (threshold_views recomputed for every
+# view/metric entry) before views were shared per resample; sharing must not change them.
+EXPECTED_CI95 = {
+    ("fpr_0.05", "observed", "precision"): [0.7090909090909091, 0.9155506883604505],
+    ("fpr_0.05", "observed", "recall"): [0.6417462686567164, 0.8492115027829313],
+    ("fpr_0.05", "observed", "fpr"): [0.06424251152073733, 0.2784604519774011],
+    ("fpr_0.05", "observed", "f1"): [0.6839473684210526, 0.8574197120708748],
+    ("fpr_0.05", "balanced", "precision"): [0.7193010449741136, 0.9202795031055899],
+    ("fpr_0.05", "balanced", "recall"): [0.6417462686567164, 0.8492115027829312],
+    ("fpr_0.05", "balanced", "fpr"): [0.06424251152073733, 0.27846045197740094],
+    ("fpr_0.05", "balanced", "f1"): [0.6872883082651431, 0.8581643527636547],
+    ("fpr_0.05", "natural", "precision"): [0.3904800502260396, 0.7426915229085512],
+    ("fpr_0.05", "natural", "recall"): [0.6417462686567164, 0.8492115027829313],
+    ("fpr_0.05", "natural", "fpr"): [0.06424251152073734, 0.27846045197740116],
+    ("fpr_0.05", "natural", "f1"): [0.4940867736605979, 0.7421368061701858],
+    ("fpr_0.01", "observed", "precision"): [0.7212121212121212, 0.9663793103448276],
+    ("fpr_0.01", "observed", "recall"): [0.25996551724137934, 0.5],
+    ("fpr_0.01", "observed", "fpr"): [0.013732394366197184, 0.09132867132867131],
+    ("fpr_0.01", "observed", "f1"): [0.3894289533995416, 0.6546524064171123],
+    ("fpr_0.01", "balanced", "precision"): [0.7537288688840021, 0.9715963139120095],
+    ("fpr_0.01", "balanced", "recall"): [0.25996551724137923, 0.5],
+    ("fpr_0.01", "balanced", "fpr"): [0.01373239436619719, 0.0913286713286713],
+    ("fpr_0.01", "balanced", "f1"): [0.39502230716046804, 0.6489272777932572],
+    ("fpr_0.01", "natural", "precision"): [0.43354783813940045, 0.8955166757791141],
+    ("fpr_0.01", "natural", "recall"): [0.2599655172413794, 0.5],
+    ("fpr_0.01", "natural", "fpr"): [0.013732394366197186, 0.0913286713286713],
+    ("fpr_0.01", "natural", "f1"): [0.3326698745619827, 0.6159152223059533],
+}
+
+
+def test_operating_point_cis_are_reproducible_for_a_seed():
+    y, p, points = _bootstrap_case()
+    metrics = R.compute_metrics(
+        y, p, channel="c", split="test", mode="m", seed=3, n_boot=40,
+        operating_points=points, natural_prevalence=0.2,
+    )
+    got = {
+        (key, view, metric): metrics["operating_points"][key][view][metric]["ci95"]
+        for key, view, metric in EXPECTED_CI95
+    }
+    for name, expected in EXPECTED_CI95.items():
+        assert got[name] == pytest.approx(expected, rel=1e-12, abs=1e-15), name
+
+
+def test_threshold_views_runs_once_per_point_per_resample(monkeypatch):
+    y, p, points = _bootstrap_case()
+    real = M.threshold_views
+    calls = []
+
+    def counting(y_, s_, t, natural_prevalence=None):
+        calls.append(t)
+        return real(y_, s_, t, natural_prevalence)
+
+    monkeypatch.setattr(M, "threshold_views", counting)
+    n_boot = 25
+    R.compute_metrics(
+        y, p, channel="c", split="test", mode="m", seed=3, n_boot=n_boot,
+        operating_points=points, natural_prevalence=0.2,
+    )
+    # one evaluation per resample plus one on the full set, per operating point
+    assert sorted(set(calls)) == [0.45, 0.6]
+    assert calls.count(0.45) == calls.count(0.6) == n_boot + 1
 
 
 def test_run_requires_a_manifest_hash(tmp_path):

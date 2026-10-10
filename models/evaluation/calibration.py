@@ -10,15 +10,15 @@
 import hashlib
 import json
 import math
-import os
 from dataclasses import dataclass
+from numbers import Real
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from . import provenance
-from .metrics import _labels
+from .metrics import validate_labels
 
 SCHEMA = "graphito.calibration/v1"
 METHODS = ("temperature", "platt", "isotonic")
@@ -27,6 +27,12 @@ DEFAULT_TARGETS = (0.05, 0.01)
 EPS = 1e-7
 # Default support rule (design): a target is low-support when n_neg * target < 10.
 MIN_EXPECTED_FALSE_POSITIVES = 10
+# Slack subtracted before ceil(10 / target) so float error (10 / (1 / 49) = 490.00000000000006)
+# cannot round the default minimum negatives up by one.
+CEIL_FLOAT_SLACK = 1e-9
+# Bounded search interval for log T in temperature scaling: T in [e^-5, e^5] ~ [0.0067, 148].
+LOG_T_BOUNDS = (-5.0, 5.0)
+LOG_T_XATOL = 1e-8
 
 TOP_LEVEL_KEYS = (
     "schema", "channel", "score_name", "method", "params", "space", "thresholds", "primary",
@@ -48,7 +54,9 @@ class ScoredSet:
     """Scores and binary labels for identified entries of one split.
 
     `split` is the tag the caller asserts; `entry_splits` (optional) is each entry's split as
-    reported by the loader, checked one by one by `fit`.
+    reported by the loader, checked one by one by `fit`. Any iterables/array-likes are
+    accepted and normalized in `__post_init__` (ids to str tuple, scores to float64, labels
+    validated as 0/1 int64, entry_splits to a tuple).
     """
 
     ids: Tuple[str, ...]
@@ -58,21 +66,22 @@ class ScoredSet:
     manifest_sha256: Optional[str] = None
     entry_splits: Optional[Tuple[str, ...]] = None
 
-    def __init__(self, ids, scores, y, split, manifest_sha256=None, entry_splits=None):
-        ids = tuple(str(i) for i in ids)
-        scores = np.asarray(scores, dtype=np.float64)
-        y = _labels(y)
+    def __post_init__(self):
+        ids = tuple(str(i) for i in self.ids)
+        scores = np.asarray(self.scores, dtype=np.float64)
+        y = validate_labels(self.y)
         if not (len(ids) == scores.size == y.size) or scores.ndim != 1:
             raise ValueError(f"ids, scores and labels differ in length: {len(ids)}, {scores.shape}, {y.shape}")
+        entry_splits = self.entry_splits
         if entry_splits is not None:
             entry_splits = tuple(entry_splits)
             if len(entry_splits) != len(ids):
                 raise ValueError("entry_splits must have one split per id")
-        for name, value in (
-            ("ids", ids), ("scores", scores), ("y", y), ("split", split),
-            ("manifest_sha256", manifest_sha256), ("entry_splits", entry_splits),
-        ):
-            object.__setattr__(self, name, value)
+        # frozen dataclass: normalized values are stored with object.__setattr__
+        object.__setattr__(self, "ids", ids)
+        object.__setattr__(self, "scores", scores)
+        object.__setattr__(self, "y", y)
+        object.__setattr__(self, "entry_splits", entry_splits)
 
     @classmethod
     def from_samples(cls, samples: Sequence, scores, y, *, manifest_sha256: Optional[str] = None) -> "ScoredSet":
@@ -161,7 +170,7 @@ class TemperatureCalibrator(Calibrator):
             logits = z / math.exp(log_t)
             return float(np.sum(np.logaddexp(0.0, logits) - y * logits))
 
-        res = minimize_scalar(nll, bounds=(-5.0, 5.0), method="bounded", options={"xatol": 1e-8})
+        res = minimize_scalar(nll, bounds=LOG_T_BOUNDS, method="bounded", options={"xatol": LOG_T_XATOL})
         self.T = float(math.exp(res.x))
         return self
 
@@ -266,7 +275,7 @@ def select_threshold(y, p, target_fpr: float, *, min_negatives: Optional[int] = 
     positives). When no observed score meets the target (or there are no negatives) the
     result is `unachievable` with `threshold` None, never an arbitrary value.
     """
-    y = _labels(y)
+    y = validate_labels(y)
     p = np.asarray(p, dtype=np.float64)
     if p.shape != y.shape:
         raise ValueError(f"labels and scores differ in length: {y.shape} vs {p.shape}")
@@ -274,7 +283,7 @@ def select_threshold(y, p, target_fpr: float, *, min_negatives: Optional[int] = 
         raise ValueError(f"target FPR must be in (0, 1), got {target_fpr}")
     neg, pos = np.sort(p[y == 0]), p[y == 1]
     if min_negatives is None:
-        min_negatives = math.ceil(MIN_EXPECTED_FALSE_POSITIVES / target_fpr - 1e-9)
+        min_negatives = math.ceil(MIN_EXPECTED_FALSE_POSITIVES / target_fpr - CEIL_FLOAT_SLACK)
     result = {
         "target_fpr": float(target_fpr),
         "threshold": None,
@@ -368,21 +377,61 @@ def _require_keys(doc: Mapping, keys, where: str) -> None:
         raise CalibrationError(f"{where} lacks keys {missing}")
 
 
+def _require_number(value, where: str, *, optional: bool = False) -> None:
+    """A finite real number (bools rejected); None too when `optional`."""
+    if value is None and optional:
+        return
+    if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value):
+        raise CalibrationError(f"{where} must be a finite number, got {value!r}")
+
+
+def _require_number_list(value, where: str) -> None:
+    if not isinstance(value, (list, tuple)):
+        raise CalibrationError(f"{where} must be a list of numbers, got {type(value).__name__}")
+    for i, item in enumerate(value):
+        _require_number(item, f"{where}[{i}]")
+
+
+def _validate_params(method: str, params: Mapping) -> None:
+    _require_keys(params, PARAM_KEYS[method], "params")
+    if method == "isotonic":
+        x, y = params["x"], params["y"]
+        _require_number_list(x, "params.x")
+        _require_number_list(y, "params.y")
+        if not x or len(x) != len(y):
+            raise CalibrationError("isotonic knots x and y must be non-empty and of equal length")
+        if any(b <= a for a, b in zip(x, x[1:])):
+            raise CalibrationError("isotonic knots x must be strictly increasing")
+        return
+    for key in PARAM_KEYS[method]:
+        _require_number(params[key], f"params.{key}")
+    if method == "temperature" and params["T"] <= 0:
+        raise CalibrationError(f"temperature T must be > 0, got {params['T']!r}")
+
+
 def validate_calibration(artifact: Mapping) -> None:
-    """Raise `CalibrationError` unless `artifact` matches `graphito.calibration/v1`."""
+    """Raise `CalibrationError` unless `artifact` matches `graphito.calibration/v1`.
+
+    Beyond the key layout, calibrator params must be finite numbers (temperature T > 0;
+    isotonic knots equal-length lists with strictly increasing x) and every threshold entry
+    must carry a numeric `target_fpr` and a numeric or null `threshold`."""
     _require_keys(artifact, ("schema",), "calibration")
     if artifact["schema"] != SCHEMA:
         raise CalibrationError(f"unknown calibration schema {artifact['schema']!r} (want {SCHEMA})")
     _require_keys(artifact, TOP_LEVEL_KEYS, "calibration")
     if artifact["method"] not in METHODS:
         raise CalibrationError(f"unknown calibration method {artifact['method']!r}")
-    _require_keys(artifact["params"], PARAM_KEYS[artifact["method"]], "params")
+    _validate_params(artifact["method"], artifact["params"])
     if artifact["space"] != "calibrated":
         raise CalibrationError(f"thresholds must be in calibrated space, got {artifact['space']!r}")
-    if not isinstance(artifact["thresholds"], Mapping) or artifact["primary"] not in artifact["thresholds"]:
+    if not isinstance(artifact["thresholds"], Mapping):
+        raise CalibrationError(f"thresholds must be a JSON object, got {type(artifact['thresholds']).__name__}")
+    if artifact["primary"] not in artifact["thresholds"]:
         raise CalibrationError(f"primary {artifact['primary']!r} is not among the thresholds")
     for key, entry in artifact["thresholds"].items():
         _require_keys(entry, THRESHOLD_KEYS, f"thresholds.{key}")
+        _require_number(entry["target_fpr"], f"thresholds.{key}.target_fpr")
+        _require_number(entry["threshold"], f"thresholds.{key}.threshold", optional=True)
     _require_keys(artifact["fit_set"], ("split", "n", "n_pos", "n_neg", "ids_labels_sha256"), "fit_set")
     if artifact["fit_set"]["split"] != "val":
         raise CalibrationError(f"calibration must be fitted on val, got {artifact['fit_set']['split']!r}")
@@ -400,15 +449,11 @@ def calibrator_from_artifact(artifact: Mapping) -> Calibrator:
 def save_calibration(artifact: Mapping, path: Union[str, Path]) -> str:
     """Validate and write deterministically (sorted keys, LF, no wall clock); return sha256.
 
-    The file is written to a sibling temp file and moved into place, so a failed write
-    never leaves a partial `calibration.json`."""
+    Atomic (`provenance.atomic_write_bytes`): a failed write never leaves a partial
+    `calibration.json` nor a temp file, and any previous file stays intact."""
     validate_calibration(artifact)
     raw = (json.dumps(artifact, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(raw)
-    os.replace(tmp, path)
+    provenance.atomic_write_bytes(path, raw)
     return hashlib.sha256(raw).hexdigest()
 
 

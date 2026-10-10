@@ -2,8 +2,9 @@
 
 A run lives in `<root>/<channel>/<YYYYmmdd-HHMMSS>[-N]/` (UTC; `-N` on collision, so two runs
 never share a directory). matplotlib is imported lazily and drawn on the Agg canvas; when it
-is missing, or a plot is undefined (e.g. ROC on a single class), the run still completes and
-the omission is recorded in `metrics.json` (`artifacts_missing`) and explained in report.md.
+is missing, a plot is undefined (e.g. ROC on a single class) or drawing it raises, the run
+still completes and the omission is recorded in `metrics.json` (`artifacts_missing`) and
+explained in report.md.
 """
 
 import csv
@@ -77,8 +78,27 @@ def operating_points_from_calibration(calibration, *, source: Optional[str] = No
     return points
 
 
-def _view_metric(y, s, *, t, view, metric, natural_prevalence):
-    return M.threshold_views(y, s, t, natural_prevalence)[view][metric]
+class _SharedViews:
+    """`threshold_views` at one threshold, computed once per `(y, s)` pair.
+
+    `bootstrap_many` calls every metric function with the same resampled arrays before moving
+    to the next resample, so caching on array identity (references are held, so ids cannot be
+    reused) lets all view/metric entries of an operating point share one evaluation."""
+
+    def __init__(self, t: float, natural_prevalence: Optional[float]):
+        self.t, self.natural_prevalence = t, natural_prevalence
+        self._key = None
+        self._views = None
+
+    def __call__(self, y, s) -> Dict[str, Dict]:
+        if self._key is None or self._key[0] is not y or self._key[1] is not s:
+            self._views = M.threshold_views(y, s, self.t, self.natural_prevalence)
+            self._key = (y, s)
+        return self._views
+
+
+def _view_metric(y, s, *, views: _SharedViews, view: str, metric: str):
+    return views(y, s)[view][metric]
 
 
 def _is_probability(s: np.ndarray) -> bool:
@@ -111,7 +131,7 @@ def compute_metrics(
     units, e.g. atomic units). `s` should be calibrated scores when the operating points come
     from a calibration file (thresholds live in calibrated space).
     """
-    y = M._labels(y)
+    y = M.validate_labels(y)
     s = np.asarray(s, dtype=np.float64)
     views = ["observed", "balanced"] + (["natural"] if natural_prevalence is not None else [])
     probabilistic = _is_probability(s)
@@ -120,15 +140,14 @@ def compute_metrics(
     fns = {"roc_auc": M.roc_auc, "pr_auc": M.average_precision}
     if probabilistic:
         fns["ece"] = partial(M.ece, n_bins=n_bins)
+    shared: Dict[str, _SharedViews] = {}
     for key, point in points.items():
         if point.get("threshold") is None:
             continue
+        shared[key] = _SharedViews(point["threshold"], natural_prevalence)
         for view in views:
             for metric in POINT_METRICS:
-                fns[f"{key}|{view}|{metric}"] = partial(
-                    _view_metric, t=point["threshold"], view=view, metric=metric,
-                    natural_prevalence=natural_prevalence,
-                )
+                fns[f"{key}|{view}|{metric}"] = partial(_view_metric, views=shared[key], view=view, metric=metric)
     boot = M.bootstrap_many(fns, y, s, n_boot=n_boot, seed=seed, groups=bootstrap_groups, alpha=alpha)
     counts = {"n": int(y.size), "n_pos": int(y.sum()), "n_neg": int(y.size - y.sum())}
 
@@ -175,7 +194,7 @@ def compute_metrics(
             warnings.append(f"unachievable: operating point {key} has no threshold ({entry['reason']})")
             op_out[key] = entry
             continue
-        at = M.threshold_views(y, s, t, natural_prevalence)
+        at = shared[key](y, s)  # usually cached from the bootstrap's full-set evaluation
         for view in views:
             base = {k: at[view][k] for k in ("tp", "fp", "tn", "fn", "n", "n_pos", "n_neg", "prevalence")}
             for metric in POINT_METRICS:
@@ -371,7 +390,7 @@ class RunContext:
 
     def write(self, y, s, metrics: Mapping, *, manifest_stats: Optional[Mapping] = None) -> Dict:
         """Write curve CSVs, plots, `metrics.json` and `report.md`; return the metrics written."""
-        y = M._labels(y)
+        y = M.validate_labels(y)
         s = np.asarray(s, dtype=np.float64)
         metrics = dict(metrics)
         missing: List[Dict[str, str]] = []
@@ -379,7 +398,8 @@ class RunContext:
         roc = M.roc_curve(y, s)
         pr = M.pr_curve(y, s)
         rel = M.reliability_bins(y, s) if _is_probability(s) else None
-        _write_csv(self.path / "roc.csv", ("threshold", "fpr", "tpr"), zip(*roc) if roc else [])
+        # roc_curve returns (fpr, tpr, thresholds); rows follow the header order
+        _write_csv(self.path / "roc.csv", ("threshold", "fpr", "tpr"), zip(roc[2], roc[0], roc[1]) if roc else [])
         _write_csv(self.path / "pr.csv", ("threshold", "precision", "recall"),
                    zip(pr[2], pr[0], pr[1]) if pr else [])
         _write_csv(
@@ -405,16 +425,20 @@ class RunContext:
                 missing.append({"file": name, "reason": reason})
                 continue
             target = self.path / name
-            if name == "roc.png":
-                auc = metrics["threshold_free"]["roc_auc"]["value"]
-                _plot_curve(mpl, target, roc[0], roc[1], f"ROC (AUC={_fmt(auc)})", "FPR", "TPR", True)
-            elif name == "pr.png":
-                ap = metrics["threshold_free"]["pr_auc"]["value"]
-                _plot_curve(mpl, target, pr[1], pr[0], f"PR (AP={_fmt(ap)})", "Recall", "Precision", False)
-            elif name == "confusion.png":
-                _plot_confusion(mpl, target, primary[1], primary[0])
-            else:
-                _plot_reliability(mpl, target, rel)
+            try:
+                if name == "roc.png":
+                    auc = metrics["threshold_free"]["roc_auc"]["value"]
+                    _plot_curve(mpl, target, roc[0], roc[1], f"ROC (AUC={_fmt(auc)})", "FPR", "TPR", True)
+                elif name == "pr.png":
+                    ap = metrics["threshold_free"]["pr_auc"]["value"]
+                    _plot_curve(mpl, target, pr[1], pr[0], f"PR (AP={_fmt(ap)})", "Recall", "Precision", False)
+                elif name == "confusion.png":
+                    _plot_confusion(mpl, target, primary[1], primary[0])
+                else:
+                    _plot_reliability(mpl, target, rel)
+            except Exception as exc:  # a plot is optional: record it, keep metrics.json and report.md
+                target.unlink(missing_ok=True)  # never leave a half-written image behind
+                missing.append({"file": name, "reason": f"{type(exc).__name__}: {exc}"})
 
         metrics["artifacts_missing"] = missing
         _write_json(self.path / "metrics.json", metrics)

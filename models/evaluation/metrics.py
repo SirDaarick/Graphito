@@ -20,7 +20,8 @@ MetricFn = Callable[[np.ndarray, np.ndarray], Optional[float]]
 VIEWS = ("observed", "balanced", "natural")
 
 
-def _labels(y) -> np.ndarray:
+def validate_labels(y) -> np.ndarray:
+    """1-D binary 0/1 labels as int64; raises `ValueError` on any other shape or value."""
     y = np.asarray(y)
     if y.ndim != 1:
         raise ValueError(f"labels must be 1-D, got shape {y.shape}")
@@ -30,7 +31,7 @@ def _labels(y) -> np.ndarray:
 
 
 def _prepare(y, s, sample_weight=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    y = _labels(y)
+    y = validate_labels(y)
     s = np.asarray(s, dtype=np.float64)
     if s.shape != y.shape:
         raise ValueError(f"labels and scores differ in length: {y.shape} vs {s.shape}")
@@ -49,7 +50,7 @@ def _float(value) -> Optional[float]:
 
 def undefined_reason(y) -> Optional[str]:
     """`empty` without samples, `single_class` when only one label occurs, else None."""
-    y = _labels(y)
+    y = validate_labels(y)
     if y.size == 0:
         return "empty"
     if y.min() == y.max():
@@ -179,7 +180,7 @@ def prevalence_weights(y, pi: Optional[float] = None) -> Optional[np.ndarray]:
     `pi=None` is the observed view (all ones). None when a class is absent, since no
     reweighting can create it. AUC is invariant to these weights; precision/F1 are not.
     """
-    y = _labels(y)
+    y = validate_labels(y)
     if pi is None:
         return np.ones(y.size, dtype=np.float64)
     if not 0.0 < pi < 1.0:

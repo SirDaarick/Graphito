@@ -1,10 +1,11 @@
-"""Provenance helpers shared by calibration files and run reports (stdlib only).
+"""Provenance helpers shared by split manifests, calibration files and run reports (stdlib only).
 
 Git state is best effort: when git is missing, times out or the directory is not a checkout,
 the sha and dirty flag are the string `"unknown"` and callers keep going.
 """
 
 import hashlib
+import os
 import platform
 import subprocess
 import sys
@@ -46,6 +47,27 @@ def file_sha256(path: Union[str, Path], chunk_size: int = 1 << 20) -> str:
         for chunk in iter(lambda: fh.read(chunk_size), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def atomic_write_bytes(path: Union[str, Path], data: bytes) -> Path:
+    """Write `data` to `path` atomically and return the path.
+
+    The bytes go to a pid-unique sibling temp file that `os.replace` moves onto `path`, so a
+    failed or interrupted write leaves any previous file intact; the temp file is removed on
+    any failure (including `KeyboardInterrupt`). Parent directories are created."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+    return path
 
 
 def package_versions(names: Iterable[str] = DEFAULT_PACKAGES) -> Dict[str, Optional[str]]:
