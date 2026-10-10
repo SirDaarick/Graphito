@@ -13,7 +13,9 @@ leakage. GT clusters live inside one assignment, so they never span splits; a st
 in several blocks is reported as overlap, not merged. See design "Split Algorithm".
 """
 
+import gzip
 import hashlib
+import io
 import json
 import math
 import os
@@ -23,7 +25,7 @@ from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
@@ -55,7 +57,7 @@ from .provenance import atomic_write_bytes
 from .seed import stable_rng
 
 ROOT = Path(__file__).resolve().parents[2]
-BUILDER_VERSION = "1.1"
+BUILDER_VERSION = "1.2"
 _PARALLEL_MIN = 2000  # below this many files a process pool costs more than it saves
 MIN_EFFECTIVE_BYTES = 50  # hygiene: below this effective length a file is `too_short`
 
@@ -65,6 +67,7 @@ STUDENT_RE = re.compile(r"^student\d+$")
 AI_NAME_RE = re.compile(r"^ref_(?P<profile>[a-z-]+)_or-(?P<model>.+)_\d{8}_\d{6}_\d+$")
 # Split unit (`SplitConfig.group_key`) -> the rule recorded in `config.group_key`.
 GROUP_KEYS = {"assignment": "letter/Zx/Zy (years merged)", "zx_block": "letter/Zx (years merged)"}
+NEG_HISTOGRAM_EDGES = (0.90, 0.95)  # inner edges of the GT-negative near-dup Jaccard histogram
 
 
 @dataclass(frozen=True)
@@ -670,16 +673,31 @@ def _stats(entries, dd: _Dedup, resolution, assignment: _Assignment, config: Spl
             "unlabeled_courses": resolution.unlabeled_courses,
             "unlabeled_assignments": resolution.unlabeled_assignments,
             "cross_split_student_clusters": cross_split_students,
-            "negative_near_dup": {
+            "negative_near_dup": {  # counts only: the pair list was 32 MB on real data
                 "by_split": neg_by_split,
-                "pairs": [[entries[a]["id"], entries[b]["id"]] for a, b in neg_pairs],
+                "histogram": jaccard_histogram(neg_pairs.values(), config.threshold),
+                "n_pairs": len(neg_pairs),
             },
         },
     }
 
 
-def _negative_near_dup_pairs(entries: List[Dict], dd: _Dedup) -> List[Tuple[int, int]]:
-    """Verified same-assignment human pairs of different students, both GT negatives."""
+def jaccard_histogram(sims: Iterable[Optional[float]], threshold: float) -> Dict[str, int]:
+    """Bucket verified Jaccard values: `[t,0.90)`, `[0.90,0.95)`, `[0.95,1.00]` for the
+    default t = 0.85; `None` (identical `norm_hash`, never MinHash-verified) counts as `exact`."""
+    edges = [threshold, *(e for e in NEG_HISTOGRAM_EDGES if e > threshold)]
+    keys = [f"[{lo:.2f},{hi:.2f})" for lo, hi in zip(edges, edges[1:])] + [f"[{edges[-1]:.2f},1.00]"]
+    hist = dict.fromkeys([*keys, "exact"], 0)
+    for sim in sims:
+        hist["exact" if sim is None else keys[sum(sim >= e for e in edges[1:])]] += 1
+    return hist
+
+
+def _negative_near_dup_pairs(
+    entries: List[Dict], dd: _Dedup
+) -> Dict[Tuple[int, int], Optional[float]]:
+    """Verified same-assignment human pairs of different students, both GT negatives, sorted,
+    mapped to their verified Jaccard (`None` for identical `norm_hash`)."""
 
     def eligible(p: int, q: int) -> bool:
         a, b = entries[p], entries[q]
@@ -689,10 +707,10 @@ def _negative_near_dup_pairs(entries: List[Dict], dd: _Dedup) -> List[Tuple[int,
             and a["student"] != b["student"]
         )
 
-    found: Set[Tuple[int, int]] = set()
-    for p, q, _ in dd.near_edges:
+    found: Dict[Tuple[int, int], Optional[float]] = {}
+    for p, q, sim in dd.near_edges:
         if eligible(p, q):
-            found.add((min(p, q), max(p, q)))
+            found[(min(p, q), max(p, q))] = sim
     by_hash: Dict[Tuple[str, str], List[int]] = {}
     for members in dd.groups.values():
         for m in members:
@@ -702,8 +720,8 @@ def _negative_near_dup_pairs(entries: List[Dict], dd: _Dedup) -> List[Tuple[int,
         for x, p in enumerate(members):
             for q in members[x + 1 :]:
                 if eligible(p, q):
-                    found.add((min(p, q), max(p, q)))
-    return sorted(found)
+                    found[(min(p, q), max(p, q))] = None
+    return dict(sorted(found.items()))
 
 
 # --- serialization ------------------------------------------------------------------------------
@@ -726,12 +744,25 @@ def dumps_manifest(manifest: Dict) -> str:
     return "{\n" + ",\n".join(parts) + "\n}\n"
 
 
+def gzip_bytes(data: bytes) -> bytes:
+    """Deterministic gzip: `mtime=0`, empty embedded file name, level 9.
+
+    Byte identity holds for one zlib build; consumers hash the decompressed bytes instead
+    (`manifest.manifest_sha256`), so the recorded hash never depends on gzip settings."""
+    buf = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=buf, compresslevel=9, mtime=0) as gz:
+        gz.write(data)
+    return buf.getvalue()
+
+
 def write_manifest(manifest: Dict, path: "str | Path") -> Path:
-    """Write `dumps_manifest` output as UTF-8 bytes (no platform newline translation).
+    """Write `dumps_manifest` output as UTF-8 bytes (no platform newline translation), gzipped
+    with `gzip_bytes` when `path` ends in `.gz` (the committed `split_v1.json.gz`).
 
     Atomic (`provenance.atomic_write_bytes`): a failed write leaves any previous manifest
     intact and no temp file behind."""
-    return atomic_write_bytes(path, dumps_manifest(manifest).encode("utf-8"))
+    data = dumps_manifest(manifest).encode("utf-8")
+    return atomic_write_bytes(path, gzip_bytes(data) if Path(path).suffix == ".gz" else data)
 
 
 def _config_section(config: SplitConfig, raw_root: Path, ai_root: Path, gt_path: Path) -> Dict:

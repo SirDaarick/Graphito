@@ -155,10 +155,10 @@ Tests that need model weights or cached HuggingFace files are skipped automatica
 
 ### Offline evaluation (split, golden set, benchmark)
 
-Every reported metric comes from one shared split manifest and a run directory that records its sha256:
+Every reported metric comes from one shared split manifest and a run directory that records its sha256. The manifest is committed as deterministic gzip (`data/splits/split_v1.json.gz`; plain `.json` also loads), and its sha256 is taken over the decompressed JSON bytes, so it does not depend on gzip settings:
 
 ```bash
-python scripts/build_split.py                                   # -> data/splits/split_v1.json
+python scripts/build_split.py                                   # -> data/splits/split_v1.json.gz
 python data/golden_set/build_corpus.py --split test --force     # -> data/golden_set/corpus
 python data/golden_set/build_corpus.py --split val --force      # -> data/golden_set/corpus_val (calibration only)
 python data/golden_set/build_manifest.py data/golden_set/corpus --out data/golden_set/manifest.json

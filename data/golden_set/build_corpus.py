@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the golden-set corpus from ONE split of the split manifest (`data/splits/split_v1.json`).
+"""Assemble the golden-set corpus from ONE split of the split manifest (`data/splits/split_v1.json.gz`).
 
 Produces the layout consumed by build_manifest.py:
 
@@ -24,7 +24,8 @@ without ground truth, e.g. B2017) are skipped: their label is unknown.
 Only problems with AI files and at least one labelled human are kept. Human classes are capped
 per problem with a seeded, per-problem RNG, so the selection is deterministic for a seed.
 `provenance.json` maps every corpus file to its split id, split, class, model, profile,
-dup_group, cluster and gt_status, and records the sha256 of the source split manifest.
+dup_group, cluster and gt_status, and records the sha256 of the source split manifest (taken over its
+decompressed JSON bytes, see `models.evaluation.manifest`).
 
 Usage:
     python data/golden_set/build_corpus.py --split test --force

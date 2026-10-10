@@ -23,6 +23,7 @@ from .manifest import (
     SplitManifest,
     load_manifest,
     load_split,
+    manifest_sha256,
 )
 from .report import RunContext, compute_metrics, operating_points_from_calibration
 from .seed import seed_everything, stable_rng
@@ -42,6 +43,7 @@ __all__ = [
     "load_calibration",
     "load_manifest",
     "load_split",
+    "manifest_sha256",
     "operating_points_from_calibration",
     "save_calibration",
     "seed_everything",

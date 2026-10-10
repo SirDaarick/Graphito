@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Build the deterministic train/val/test split manifest (data/splits/split_v1.json).
+"""Build the deterministic train/val/test split manifest (data/splits/split_v1.json.gz).
 
 Scans human (`data/raw/src`) and AI (`data/output`) submissions from disk, flags broken files,
 groups exact and near duplicates, resolves ground-truth clusters and assigns whole blocks
-(one assignment, years merged: course letter + Zx + Zy) to splits. The same inputs and seed always produce byte-identical output.
-Per-stage timings are printed to stdout and never written into the manifest.
+(one assignment, years merged: course letter + Zx + Zy) to splits. The same inputs and seed
+always produce byte-identical output. Per-stage timings are printed to stdout and never written
+into the manifest. An `--out` ending in `.gz` is written as deterministic gzip (mtime 0, no file
+name), anything else as plain JSON; the printed sha256 is over the decompressed JSON bytes, the
+hash consumers record.
 
 Usage:
     python scripts/build_split.py --seed 42
@@ -12,7 +15,6 @@ Usage:
 """
 
 import argparse
-import hashlib
 import sys
 import time
 from pathlib import Path
@@ -22,9 +24,10 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from models.evaluation.manifest import manifest_sha256  # noqa: E402
 from models.evaluation.splits import SplitConfig, build_split, write_manifest  # noqa: E402
 
-DEFAULT_OUT = Path("data") / "splits" / "split_v1.json"
+DEFAULT_OUT = Path("data") / "splits" / "split_v1.json.gz"
 DEFAULT_AMBIGUOUS = (
     Path("data") / "raw" / "ground-truth-dynamic-anon.txt",
     Path("data") / "raw" / "ground-truth-anon.txt",
@@ -77,7 +80,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     stats = manifest["stats"]
     print(f"entries: {stats['n_entries']} (included {stats['n_included']}), attempt {manifest['config']['attempt']}")
     print(f"wrote {out}")
-    print(f"sha256 {hashlib.sha256(out.read_bytes()).hexdigest()}")
+    print(f"sha256 {manifest_sha256(out)}")
     return 0
 
 

@@ -1,13 +1,20 @@
 """Split manifest loader: schema validation, file hashing, split filters and GT views.
 
 Light by design (stdlib, plus numpy for `PairSet`): training and evaluation code import this
-module, never the builder. The manifest does not embed its own hash; the loader computes the
-file's sha256 and consumers record it (calibration files, run reports). `expected_sha256`
-refuses a file that changed since a consumer recorded it.
+module, never the builder. The manifest does not embed its own hash; the loader computes it and
+consumers record it (calibration files, run reports). `expected_sha256` refuses a file that
+changed since a consumer recorded it.
+
+The committed manifest is gzip (`split_v1.json.gz`); plain `.json` also loads. Gzip is detected
+by its magic bytes, not the suffix. The sha256 is always taken over the DECOMPRESSED canonical
+JSON bytes (`manifest_sha256`), so it does not depend on gzip level, header or zlib version, and
+a `.json` and a `.json.gz` holding the same manifest share one hash.
 """
 
+import gzip
 import hashlib
 import json
+import zlib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Tuple
@@ -15,7 +22,8 @@ from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MANIFEST = ROOT / "data" / "splits" / "split_v1.json"
+DEFAULT_MANIFEST = ROOT / "data" / "splits" / "split_v1.json.gz"
+GZIP_MAGIC = b"\x1f\x8b"
 SCHEMA = "graphito.split/v1"
 SPLITS = ("train", "val", "test")
 HELD_OUT_ORDER = ("test", "val", "train")
@@ -252,12 +260,29 @@ class SplitManifest:
         check_invariants(asdict(s) for s in self.entries)
 
 
+def read_manifest_bytes(path: "str | Path") -> bytes:
+    """Canonical JSON bytes of a manifest file, decompressed when the file is gzip."""
+    raw = Path(path).read_bytes()
+    if raw[:2] != GZIP_MAGIC:
+        return raw
+    try:
+        return gzip.decompress(raw)
+    except (OSError, EOFError, zlib.error) as exc:
+        raise ManifestError(f"{path}: corrupt gzip manifest ({exc})") from None
+
+
+def manifest_sha256(path: "str | Path") -> str:
+    """The manifest hash consumers record: sha256 of the decompressed canonical JSON bytes."""
+    return hashlib.sha256(read_manifest_bytes(path)).hexdigest()
+
+
 def load_manifest(
     path: "str | Path" = DEFAULT_MANIFEST, expected_sha256: Optional[str] = None
 ) -> SplitManifest:
-    """Load and schema-validate a manifest; refuse it when `expected_sha256` does not match."""
+    """Load (`.json` or `.json.gz`) and schema-validate a manifest; refuse it when
+    `expected_sha256` does not match the sha256 of its decompressed bytes."""
     path = Path(path)
-    raw = path.read_bytes()
+    raw = read_manifest_bytes(path)
     digest = hashlib.sha256(raw).hexdigest()
     if expected_sha256 is not None and expected_sha256.lower() != digest:
         raise ManifestHashError(f"{path}: sha256 {digest} does not match expected {expected_sha256}")

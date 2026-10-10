@@ -577,6 +577,10 @@ def test_internal_value_error_is_not_reported_as_an_input_error(env, tmp_path, m
     _no_run_left(tmp_path / "runs")
 
 
+def test_default_split_manifest_is_the_gzip_manifest():
+    assert suite.DEFAULT_MANIFEST.as_posix().endswith("data/splits/split_v1.json.gz")
+
+
 def test_config_records_golden_and_split_manifest_paths(env, tmp_path):
     runs = tmp_path / "runs"
     assert suite.main(_args(env, runs, "--mode", "uncalibrated")) == 0

@@ -1,7 +1,7 @@
 # Golden set
 
 Benchmark corpus for `scripts/benchmark_suite.py`, rebuilt from the shared split manifest
-(`data/splits/split_v1.json`, written by `scripts/build_split.py`).
+(`data/splits/split_v1.json.gz`, written by `scripts/build_split.py`).
 
 ## Why it was rebuilt (leakage in the previous version)
 
@@ -36,19 +36,19 @@ Human classes are capped per problem with a seeded per-problem RNG (deterministi
 
 `<corpus>/provenance.json` maps every corpus file to its split id, split, class, model, profile,
 dup_group, cluster and gt_status, and records `source_manifest_sha256` (the sha256 of the split
-manifest file). The golden manifests carry the same hash.
+manifest's decompressed JSON bytes, so `.json` and `.json.gz` copies share it). The golden manifests carry the same hash.
 
 ## Build
 
 ```bash
-python scripts/build_split.py                                       # data/splits/split_v1.json
+python scripts/build_split.py                                       # data/splits/split_v1.json.gz
 python data/golden_set/build_corpus.py --split test --force         # -> data/golden_set/corpus
 python data/golden_set/build_corpus.py --split val --force          # -> data/golden_set/corpus_val
 python data/golden_set/build_manifest.py data/golden_set/corpus --out data/golden_set/manifest.json
 python data/golden_set/build_manifest.py data/golden_set/corpus_val --out data/golden_set/manifest_val.json
 ```
 
-`build_corpus.py` flags: `--split-manifest PATH` (default `data/splits/split_v1.json`),
+`build_corpus.py` flags: `--split-manifest PATH` (default `data/splits/split_v1.json.gz`),
 `--split test|val`, `--repo-root PATH` (base of the manifest ids), `--out`, `--seed`, `--cap`,
 `--expected-sha256`, `--force`.
 
@@ -66,7 +66,7 @@ problems or classes are all kept: an exact copy of its original is a labelled po
 
 ```bash
 python data/golden_set/perturb_corpus.py --transform strip-comments \
-    --split-manifest data/splits/split_v1.json --split test
+    --split-manifest data/splits/split_v1.json.gz --split test
 ```
 
 The transform is applied to every class, `provenance.json` is copied, and `--split-manifest`

@@ -1,5 +1,6 @@
 """Split builder: discovery, hygiene, dedup grouping, assignment and CLI on a synthetic tree."""
 
+import gzip
 import hashlib
 import inspect
 import json
@@ -18,6 +19,7 @@ from models.evaluation.splits import (
     build_split,
     dumps_manifest,
     hygiene_flags,
+    jaccard_histogram,
     parse_path,
     scan,
     validate,
@@ -261,6 +263,22 @@ class TestAssignment:
         assert dumps_manifest(manifest) == data.decode("utf-8")
         assert tree.repo_root.as_posix() not in data.decode("utf-8")
 
+    def test_gz_manifest_is_deterministic_gzip_of_the_canonical_json(self, tmp_path):
+        tree = make_tree(tmp_path / "corpus")
+        first = write_manifest(build_split(_config(tree)), tmp_path / "a" / "split_v1.json.gz")
+        second = write_manifest(build_split(_config(tree)), tmp_path / "b" / "split_v1.json.gz")
+        data = first.read_bytes()
+        assert data[:2] == b"\x1f\x8b" and data == second.read_bytes()
+        assert data[3] & 0x08 == 0  # FLG: no embedded file name
+        assert data[4:8] == b"\x00\x00\x00\x00"  # MTIME = 0
+        assert gzip.decompress(data) == dumps_manifest(build_split(_config(tree))).encode("utf-8")
+        assert [p.name for p in first.parent.iterdir()] == ["split_v1.json.gz"]
+
+    def test_negative_near_dup_histogram_buckets(self):
+        hist = jaccard_histogram([0.85, 0.899, 0.9, 0.949, 0.95, 0.99, 1.0, None, None], 0.85)
+        assert hist == {"[0.85,0.90)": 2, "[0.90,0.95)": 2, "[0.95,1.00]": 3, "exact": 2}
+        assert jaccard_histogram([], 0.85) == dict.fromkeys(hist, 0)
+
     def test_write_manifest_failure_leaves_previous_file_and_no_temp(self, built, tmp_path, monkeypatch):
         path = tmp_path / "out" / "split.json"
         path.parent.mkdir()
@@ -379,11 +397,13 @@ class TestAssignment:
         with pytest.raises(ValueError, match="block"):
             validate(manifest)
 
-    def test_negative_near_dups_are_listed_in_gt_stats(self, built):
-        ids = built[0].ids
+    def test_negative_near_dups_are_counted_with_a_jaccard_histogram(self, built):
         neg = built[1]["stats"]["gt"]["negative_near_dup"]
-        assert [ids["near_a"], ids["near_b"]] in neg["pairs"]
-        assert sum(neg["by_split"].values()) == len(neg["pairs"])
+        assert "pairs" not in neg  # 365k pairs (32 MB) on real data; counts only
+        assert set(neg) == {"by_split", "histogram", "n_pairs"}
+        assert list(neg["histogram"]) == ["[0.85,0.90)", "[0.90,0.95)", "[0.95,1.00]", "exact"]
+        assert neg["n_pairs"] == sum(neg["by_split"].values()) == sum(neg["histogram"].values())
+        assert neg["histogram"]["[0.95,1.00]"] >= 1  # near_a/near_b: same shingles, new norm_hash
 
     def test_dup_group_size_distribution(self, built):
         sizes = built[1]["stats"]["dedup"]["size_distribution"]
@@ -434,7 +454,7 @@ class TestAssignmentBlocks:
     def test_config_records_the_group_key_rule(self, siblings):
         config = siblings[1]["config"]
         assert config["group_key"] == "letter/Zx/Zy (years merged)"
-        assert config["builder_version"] == "1.1"
+        assert config["builder_version"] == "1.2"
 
     def test_zx_groups_split_counts_sibling_assignments_per_split(self, siblings):
         manifest = siblings[1]
@@ -490,6 +510,20 @@ class TestCli:
         for stage in ("scan", "read_normalize", "dedup", "assign", "total"):
             assert stage in proc.stdout
         assert hashlib.sha256(out.read_bytes()).hexdigest() in proc.stdout
+
+    def test_cli_default_output_is_gzip_hashed_on_decompressed_bytes(self, tmp_path):
+        tree = make_tree(tmp_path / "corpus")
+        cmd = [
+            sys.executable, str(SCRIPT), "--seed", "7", "--repo-root", str(tree.repo_root),
+            "--gt-ambiguous", str(tree.gt_dynamic),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(tmp_path))
+        assert proc.returncode == 0, proc.stderr
+        out = tree.repo_root / "data" / "splits" / "split_v1.json.gz"
+        raw = gzip.decompress(out.read_bytes())
+        assert raw == dumps_manifest(build_split(_config(tree))).encode("utf-8")
+        assert f"sha256 {hashlib.sha256(raw).hexdigest()}" in proc.stdout
+        assert hashlib.sha256(out.read_bytes()).hexdigest() not in proc.stdout
 
     def test_cli_reports_builder_errors_with_non_zero_exit(self, tmp_path):
         tree = make_tree(tmp_path / "corpus", n_blocks=3, planted=False)

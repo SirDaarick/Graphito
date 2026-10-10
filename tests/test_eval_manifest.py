@@ -1,6 +1,7 @@
 """Split manifest loader: schema validation, hashing, split filters and GT views."""
 
 import dataclasses
+import gzip
 import hashlib
 import json
 
@@ -18,6 +19,7 @@ from models.evaluation.manifest import (
     SplitManifest,
     load_manifest,
     load_split,
+    manifest_sha256,
 )
 from models.evaluation.splits import SplitConfig, build_split, write_manifest
 
@@ -257,4 +259,49 @@ def test_samples_are_frozen_and_split_of_rejects_unknown_ids(manifest):
 def test_package_exports_and_default_path():
     assert evaluation.load_split is load_split
     assert evaluation.SplitManifest is SplitManifest
-    assert DEFAULT_MANIFEST.as_posix().endswith("data/splits/split_v1.json")
+    assert evaluation.manifest_sha256 is manifest_sha256
+    assert DEFAULT_MANIFEST.as_posix().endswith("data/splits/split_v1.json.gz")
+
+
+# --- gzip storage ------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def gz_path(corpus):
+    return write_manifest(load_json(corpus[1]), corpus[1].with_name("split_v1.json.gz"))
+
+
+def load_json(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_gz_and_json_manifests_load_identically(corpus, gz_path, manifest):
+    assert gz_path.read_bytes()[:2] == b"\x1f\x8b"
+    gz = load_manifest(gz_path)
+    assert gz.entries == manifest.entries and gz.stats == manifest.stats and gz.config == manifest.config
+    assert [s.id for s in load_split("val", path=gz_path)] == [s.id for s in load_split("val", path=corpus[1])]
+
+
+def test_gz_sha256_is_over_the_decompressed_bytes(corpus, gz_path, manifest):
+    raw = gzip.decompress(gz_path.read_bytes())
+    assert raw == corpus[1].read_bytes()
+    assert load_manifest(gz_path).sha256 == hashlib.sha256(raw).hexdigest() == manifest.sha256
+    assert manifest_sha256(gz_path) == manifest_sha256(corpus[1]) == manifest.sha256
+    assert load_manifest(gz_path, expected_sha256=manifest.sha256).sha256 == manifest.sha256
+
+
+def test_gz_expected_sha256_mismatch_raises(gz_path):
+    with pytest.raises(ManifestHashError, match="sha256"):
+        load_manifest(gz_path, expected_sha256="0" * 64)
+    with pytest.raises(ManifestHashError):
+        load_split("test", path=gz_path, expected_sha256="0" * 64)
+
+
+def test_gzip_is_detected_by_magic_and_corrupt_gzip_is_rejected(gz_path, manifest, tmp_path):
+    renamed = tmp_path / "split.json"
+    renamed.write_bytes(gz_path.read_bytes())
+    assert load_manifest(renamed).sha256 == manifest.sha256
+    truncated = tmp_path / "broken.json.gz"
+    truncated.write_bytes(gz_path.read_bytes()[:200])
+    with pytest.raises(ManifestError, match="gzip"):
+        load_manifest(truncated)

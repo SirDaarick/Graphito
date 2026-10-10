@@ -14,7 +14,7 @@ A new import-only package `models/evaluation/` holds everything that SDD-2/3/4 w
 | D4 | A cross-block exact dup group whose blocks land in different splits is **pinned** to its most held-out split (test > val > train). Members in other splits get `excluded: true` plus the flag `cross_split_dup`. Their `split` keeps the block's value. | Merging the blocks into one super-block | With roughly 20-28 blocks per letter (5-6 under the old letter + Zx unit), merging chains could collapse the quotas. Pinning keeps the block invariant strict, removes the leak from training and is counted in stats. |
 | D5 | New `normalize.py` owns the string-aware `strip_comments` (ported from `perturb_corpus.py:35-66`) plus a regex C/C++ lexer. `perturb_corpus.py` re-exports it. | `CharPreprocessor.strip_c_comments` (`models/char_cnn/preprocess.py:40`); the tree-sitter parser | SDD-2/3 rewrite those modules, so coupling to them would break the split. The state machine is already tested and keeps the line count. |
 | D6 | MinHash/LSH in pure numpy: 128 permutations, 16 bands x 8 rows, candidates verified by **exact** Jaccard on the shingle sets. | datasketch; LSH estimate only | No new dependency. Exact verification lets one pass serve the 0.80/0.85/0.90 sensitivity counts. |
-| D7 | The manifest is a single deterministic JSON file: a header plus one sample object per line, LF only, `sort_keys`, no wall clock, no absolute paths. `.gitattributes`: `data/splits/*.json -diff eol=lf linguist-generated`. | `.json.gz` (zlib output can differ by platform); pretty JSON (about 2x size) | Byte identity is testable. Diffs stay readable per line. `eol=lf` protects identity under Windows `core.autocrlf`. |
+| D7 | The manifest is a single deterministic JSON document: a header plus one sample object per line, LF only, `sort_keys`, no wall clock, no absolute paths. Amended 2026-10-10 (D-B resolved): it is committed as deterministic gzip `data/splits/split_v1.json.gz` (`gzip.GzipFile(mtime=0)`, empty embedded file name, level 9, written atomically); its sha256 is computed over the DECOMPRESSED canonical JSON bytes. `.gitattributes`: `data/splits/*.json -diff eol=lf linguist-generated` and `data/splits/*.json.gz binary`. | Plain JSON (52.8 MB on the first real run, 26 MB without the GT-negative pair list); pretty JSON (about 2x size) | Byte identity of the JSON stays testable; hashing the decompressed bytes makes the recorded hash immune to zlib differences across platforms. The loader reads `.json` and `.json.gz` (gzip detected by magic bytes). |
 | D8 | Metric cores are numpy (AUC via average ranks, AP, threshold metrics, ECE, MAP@R, bootstrap). sklearn is used only for Platt/isotonic and as the test oracle. scipy (pulled in by sklearn) is used for the 1-D temperature fit. | sklearn for everything | Small, auditable functions with explicit tie and single-class behavior. This replaces the O(n*m) loop at `benchmark_suite.py:38-51`. |
 | D9 | `runs/` is fully gitignored. Selected `metrics.json`, `report.md`, `provenance.json` and `calibration.json` are committed with `git add -f` (documented). | Negation patterns `runs/*/*/*` + `!…` | Negation leaves every run showing up as untracked noise. Force-adding is explicit and selective. |
 | D10 | `calibration.json` is per channel, fit on val only (raises `ValueError`, not `assert`, so `-O` cannot strip the check). Thresholds live in calibrated space. | Thresholds in raw space | Isotonic plateaus make a raw-space inverse ambiguous, so consumers always apply calibrator then threshold. |
@@ -49,7 +49,7 @@ A new import-only package `models/evaluation/` holds everything that SDD-2/3/4 w
 ## Data Flow
 
     data/raw/src + data/output + ground-truth*.txt
-        -> splits.build_split -> data/splits/split_v1.json (committed)
+        -> splits.build_split -> data/splits/split_v1.json.gz (committed)
              |-> manifest.load_split -> SDD-2 CharCNN / SDD-3 GraphCodeBERT training
              |-> golden_set/build_corpus --split test|val -> corpus/ , corpus_val/ (+ provenance.json)
                     -> build_manifest -> manifest*.json -> benchmark_suite
@@ -58,16 +58,16 @@ A new import-only package `models/evaluation/` holds everything that SDD-2/3/4 w
 
 ## Interfaces / Contracts
 
-**Manifest `data/splits/split_v1.json`** (`"schema": "graphito.split/v1"`):
+**Manifest `data/splits/split_v1.json.gz`** (`"schema": "graphito.split/v1"`):
 - `config`: seed, roots, group_key, fractions (target and actual per letter), min_blocks_per_split, attempt, hygiene thresholds, dedup params (k, num_perm, bands, rows, operative 0.85, sensitivity list, scope `block`), gt files, unlabeled_courses, builder_version.
 - `blocks`: `{"A/Z1/Z1": {"split", "courses", "n_samples"}}`.
-- `stats`: counts split x source x lang; block counts and ratios per letter; `zx_groups_split` (per `letter/Zx`, blocks per split); `student_overlap` (distinct students shared by train-val, train-test and val-test, overall and per letter); hygiene counts per flag; dedup (exact groups, near-dup `{0.80, 0.85, 0.90}: {n_groups, n_samples, max_size}`, mixed-source groups, cross-block groups, `cross_split_near_pairs` and pinned exclusions); gt (clusters per split, merged lines, `unresolved[]`, `negative_near_dup` counts per split plus the sorted human-human pair list).
+- `stats`: counts split x source x lang; block counts and ratios per letter; `zx_groups_split` (per `letter/Zx`, blocks per split); `student_overlap` (distinct students shared by train-val, train-test and val-test, overall and per letter); hygiene counts per flag; dedup (exact groups, near-dup `{0.80, 0.85, 0.90}: {n_groups, n_samples, max_size}`, mixed-source groups, cross-block groups, `cross_split_near_pairs` and pinned exclusions); gt (clusters per split, merged lines, `unresolved[]`, `negative_near_dup` counts per split, `n_pairs` and a verified-Jaccard histogram `[0.85,0.90)`/`[0.90,0.95)`/`[0.95,1.00]`/`exact`; the pair list was dropped on 2026-10-10: 365,325 pairs, 32 MB of the 52.8 MB first real manifest).
 - `groups`: non-singleton `dup` groups `{members, kind: exact|near|mixed, blocks, cross_block}` and `clusters` `{members, students, unresolved}`. Cluster id format: `A2016/Z1/Z1#03`.
 - `samples[]`: `id, course, block, assignment, student, lang, source, model, profile, sha256, norm_hash, n_tokens, dup_group, dup_rep, cluster_id, gt_status, split, excluded, flags`.
-- Size: about 44k records x about 330 B, so about 15 MB. If the file goes over 25 MB, the fallback is `.json.gz` with `mtime=0`, hashed on the decompressed bytes (open question).
+- Size: about 44k records; the first real run gave 52.8 MB of JSON, about 26 MB without the GT-negative pair list, so the manifest is stored as `.json.gz` with `mtime=0`, hashed on the decompressed bytes (D-B resolved 2026-10-10).
 
 ```python
-def load_split(path="data/splits/split_v1.json", expected_sha256: str | None = None) -> SplitManifest
+def load_split(path="data/splits/split_v1.json.gz", expected_sha256: str | None = None) -> SplitManifest
 class SplitManifest:
     path: Path; sha256: str; config: dict; stats: dict
     def samples(self, split=None, source=None, lang=None, *, include_excluded=False,
@@ -100,7 +100,7 @@ class PairSet: a: np.ndarray; b: np.ndarray; label: np.ndarray; assignment: np.n
                 "fpr_0.01": {"...": "..."}},
  "primary": "fpr_0.05",
  "fit_set": {"split": "val", "n": 2100, "ids_labels_sha256": "..."},
- "manifest": {"path": "data/splits/split_v1.json", "sha256": "..."},
+ "manifest": {"path": "data/splits/split_v1.json.gz", "sha256": "..."},
  "provenance": {"git_sha": "...", "dirty": false, "seed": 42}}
 ```
 
@@ -123,7 +123,7 @@ class PairSet: a: np.ndarray; b: np.ndarray; label: np.ndarray; assignment: np.n
 | File | Action |
 |------|--------|
 | `models/evaluation/{__init__,seed,normalize,dedup,ground_truth,splits,manifest,metrics,calibration,report}.py` | Create |
-| `scripts/build_split.py`, `data/splits/split_v1.json`, `.gitattributes` | Create |
+| `scripts/build_split.py`, `data/splits/split_v1.json.gz`, `.gitattributes` | Create |
 | `data/golden_set/{build_corpus,build_manifest,perturb_corpus}.py`, `README.md`, `manifest*.json` | Modify / regenerate |
 | `scripts/benchmark_suite.py` | Modify |
 | `tests/test_benchmark_suite.py`, `tests/test_perturb_corpus.py`, `tests/fixtures/golden_set_tiny/provenance.json` | Modify / create |
@@ -151,7 +151,7 @@ Proposed work-unit order (about 400 authored lines each; advisory only):
 3. `feat(eval)`: `ground_truth.py` + tests
 4. `feat(eval)`: `splits.py`, `scripts/build_split.py`, `tests/eval_factory.py` + tests
 5. `feat(eval)`: `manifest.py` loader + tests
-6. `data(splits)`: generated `split_v1.json` (generated, not counted as authored)
+6. `data(splits)`: generated `split_v1.json.gz` (generated, not counted as authored)
 7. `feat(eval)`: `metrics.py` + tests
 8. `feat(eval)`: `calibration.py` + tests
 9. `feat(eval)`: `report.py` + tests
@@ -168,5 +168,5 @@ Proposed work-unit order (about 400 authored lines each; advisory only):
 
 ## Open Questions
 
-- [ ] If the real manifest exceeds about 25 MB, commit `.json.gz` (`mtime=0`) instead of plain JSON?
+- [x] If the real manifest exceeds about 25 MB, commit `.json.gz` (`mtime=0`) instead of plain JSON? Resolved 2026-10-10: yes (52.8 MB first run); hash over decompressed bytes.
 - [ ] Natural-prevalence value per channel. Until the thesis supplies a figure, the `natural` view is omitted and `observed` and `balanced` are always reported.

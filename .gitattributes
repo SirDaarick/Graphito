@@ -1,2 +1,3 @@
 Documentacion/** linguist-vendored
 data/splits/*.json -diff eol=lf linguist-generated
+data/splits/*.json.gz binary

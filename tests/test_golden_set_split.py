@@ -8,8 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from eval_factory import make_tree
-from models.evaluation.manifest import load_manifest
-from models.evaluation.provenance import file_sha256
+from models.evaluation.manifest import DEFAULT_MANIFEST, load_manifest, manifest_sha256
 from models.evaluation.splits import SplitConfig, build_split, write_manifest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -51,7 +50,7 @@ def split_env(tmp_path_factory):
         gt_static=tree.gt_static,
         gt_ambiguous=(tree.gt_dynamic,),
     )
-    split_path = write_manifest(build_split(config), base / "split.json")
+    split_path = write_manifest(build_split(config), base / "split_v1.json.gz")  # the committed format
     manifest = load_manifest(split_path)
     corpora = {}
     for split in ("test", "val"):
@@ -123,7 +122,7 @@ class TestBuildCorpus:
     def test_source_manifest_sha256_matches_the_split_file(self, split_env):
         _, split_path, _, corpora = split_env
         for out in corpora.values():
-            assert _provenance(out)["source_manifest_sha256"] == file_sha256(split_path)
+            assert _provenance(out)["source_manifest_sha256"] == manifest_sha256(split_path)
 
     def test_val_corpus_holds_only_val_ids(self, split_env):
         _, _, manifest, corpora = split_env
@@ -162,6 +161,10 @@ class TestBuildCorpus:
             corpus_builder.build_corpus(tmp_path / "split.json", "test", tmp_path / "out", repo_root=repo)
         assert not list((tmp_path / "out").rglob("outside.c"))
 
+    def test_default_split_manifest_is_the_gzip_manifest(self):
+        assert DEFAULT_MANIFEST.name == "split_v1.json.gz"
+        assert corpus_builder.DEFAULT_MANIFEST == DEFAULT_MANIFEST
+
     def test_val_corpus_goes_to_corpus_val_by_default(self):
         assert corpus_builder.default_out("test").name == "corpus"
         assert corpus_builder.default_out("val").name == "corpus_val"
@@ -184,7 +187,7 @@ class TestBuildManifest:
     def test_manifest_carries_provenance_and_no_train(self, split_env):
         _, split_path, _, corpora = split_env
         m = manifest_builder.build_manifest(corpora["test"])
-        assert m["source_manifest_sha256"] == file_sha256(split_path)
+        assert m["source_manifest_sha256"] == manifest_sha256(split_path)
         assert m["samples"]
         assert {s["split"] for s in m["samples"]} == {"test"}
         prov = _provenance(corpora["test"])["files"]

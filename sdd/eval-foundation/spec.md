@@ -36,7 +36,7 @@ Scenarios
 - DS3.6 Entries from a course/year without ground truth (B2017) MUST have `cluster_id: null` and MUST be recorded as unlabeled for Channel A; they MUST NOT be exposed as negatives by the loader.
 - DS3.7 With the same inputs and seed, the builder MUST write a byte-identical manifest (stable key order, sorted entries, no timestamps or absolute paths in the file). Different seeds MAY yield different assignments.
 - DS3.8 Every split MUST contain both C and C++ entries and both human and AI entries whenever the (non-broken) input contains them; otherwise the builder MUST fail with an explicit error naming the missing stratum.
-- DS3.9 `stats` MUST include: per-split counts by lang and source, block counts per course and split, student overlap across splits (count of student ids in >1 split, by pair), near-dups among GT negatives, and dup-group size distribution. Student overlap MUST be reported, not prevented.
+- DS3.9 `stats` MUST include: per-split counts by lang and source, block counts per course and split, student overlap across splits (count of student ids in >1 split, by pair), near-dups among GT negatives (counts per split, `n_pairs` and a Jaccard histogram `[0.85,0.90)`, `[0.90,0.95)`, `[0.95,1.00]`, `exact`; the pair list itself MUST NOT be stored, it was 32 MB on real data), and dup-group size distribution. Student overlap MUST be reported, not prevented.
 
 Scenarios
 - Given a fixture of 10 blocks per course letter, When the builder runs with seed 7 twice, Then the two manifests are byte-identical (`sha256` equal); with seed 8 the file is valid but MAY differ.
@@ -49,7 +49,7 @@ Scenarios
 - Given the same student id in blocks assigned to different splits, When the builder runs, Then `stats` lists the overlap and no error is raised.
 
 ### DS4. Split loader API
-- DS4.1 `models/evaluation` MUST expose a loader returning entries for a requested split (and optional filters: lang, source, course), validating the manifest schema, computing the manifest file's sha256, and refusing to load when a caller-supplied `expected_sha256` does not match. The manifest MUST NOT embed its own hash; consumers (calibration files, run reports) MUST record the manifest sha256 they used.
+- DS4.1 `models/evaluation` MUST expose a loader returning entries for a requested split (and optional filters: lang, source, course), validating the manifest schema, computing the manifest sha256, and refusing to load when a caller-supplied `expected_sha256` does not match. The committed manifest is `data/splits/split_v1.json.gz`, written as deterministic gzip (`mtime=0`, empty embedded file name); the loader MUST accept both `.json` and `.json.gz`. The sha256 MUST be computed over the DECOMPRESSED canonical JSON bytes, so it is independent of gzip settings and zlib version. The manifest MUST NOT embed its own hash; consumers (calibration files, run reports) MUST record the manifest sha256 they used.
 - DS4.2 The loader MUST NOT return `broken`-flagged entries unless `include_broken=True` is passed.
 
 Scenarios
@@ -154,7 +154,7 @@ Scenarios
 - Given a fixture manifest with train/val/test entries, When the golden set is built, Then every golden id has `split == "test"` and the intersection with train and val ids is empty.
 - Given a `broken` test entry, When built, Then it is absent from the golden set.
 - Given the same seed, When built twice, Then the golden manifests are byte-identical.
-- Given a golden manifest, Then it contains `source_manifest_sha256` equal to the hash of `split_v1.json`.
+- Given a golden manifest, Then it contains `source_manifest_sha256` equal to the sha256 of the decompressed bytes of `split_v1.json.gz`.
 
 ## Non-functional and compatibility
 
