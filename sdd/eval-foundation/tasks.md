@@ -57,8 +57,8 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU3: Ground truth (independent of WU2)
 
-- [ ] 3.1 RED `tests/test_eval_ground_truth.py` on a synthetic GT file: per-assignment clusters; a student in two clusters leads to a merge and one deterministic `A2016/Z1/Z1#03`-style id (rule returned for `config`); missing file goes to `unresolved`; course absent from GT is `unlabeled`; `pairs()` labels same-cluster = 1. [DS3.4, DS3.5, DS3.6]
-- [ ] 3.2 GREEN `models/evaluation/ground_truth.py` (`parse_ground_truth`, `resolve_clusters`, `pairs`). Check: the 3.1 tests pass.
+- [x] 3.1 RED `tests/test_eval_ground_truth.py` on a synthetic GT file: per-assignment clusters; a student in two clusters leads to a merge and one deterministic `A2016/Z1/Z1#03`-style id (rule returned for `config`); missing file goes to `unresolved`; course absent from GT is `unlabeled`; `pairs()` labels same-cluster = 1. [DS3.4, DS3.5, DS3.6]
+- [x] 3.2 GREEN `models/evaluation/ground_truth.py` (`parse_ground_truth`, `resolve_clusters`, `pairs`). Check: the 3.1 tests pass.
 
 ## WU4: Split builder and CLI (depends on WU1-3)
 
