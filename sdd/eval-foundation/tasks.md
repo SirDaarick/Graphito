@@ -62,6 +62,8 @@ Decisions needed from the user (tasks flagged DECISION):
 
 ## WU4: Split builder and CLI (depends on WU1-3)
 
+- Review follow-up from PR1 (advisory, R3-gt-course-granularity-negative): `resolve_clusters` labels as `negative` every file of a labelled course whose assignment has no GT header. Before 4.6, check `data/raw/readme.txt` for whether unheaded assignments were inspected; if not guaranteed, treat unheaded assignments as `unlabeled` and add a test (`ground_truth.py:147-165`).
+
 - [ ] 4.1 Create `tests/eval_factory.py`: synthetic tree in `tmp_path` (2 letters x 6 blocks, 2 years, C and C++, AI names incl. `weird.c`, GT file with overlapping lines and a missing member, `x (1).c`, 0-byte, 30-byte and comment-only files, a planted cross-block exact dup, B2017 without GT, a repeated student id).
 - [ ] 4.2 RED `tests/test_eval_splits.py::discovery`: DS1.2 keys all present with `null` for N/A, AI `model/profile` parsed, `unparsed_name` kept, `config`/`stats` present, roots overridable, source files untouched. [DS1.1-1.4, DS2.2]
 - [ ] 4.3 RED `::hygiene_dedup`: four broken files flagged with sub-flags and absent from dup groups; comment/whitespace/rename pair shares a `dup_group`; cross-block identical pair not merged and `cross_block_dup_groups` >= 1; sensitivity counts non-decreasing, 0.85 count equals distinct non-broken groups. [DS2.1-2.5]
