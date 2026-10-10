@@ -22,9 +22,12 @@ from models.char_cnn.v2.data import (
     load_views,
     view_samples,
 )
+from models.char_cnn.v2.config import CharCNNV2Config
 from models.char_cnn.v2.preprocess import encode, preprocess_v2
 from models.evaluation.manifest import Sample, load_manifest
 from models.evaluation.splits import SplitConfig, build_split, write_manifest
+
+WINDOW = CharCNNV2Config().window
 
 
 @pytest.fixture(scope="module")
@@ -157,6 +160,14 @@ class TestLoadEncoded:
         with pytest.raises(ValueError, match="not in the manifest"):
             load_encoded(manifest, [foreign], root=tree.repo_root)
 
+    def test_sample_with_another_split_is_rejected_with_both_splits(self, corpus):
+        tree, manifest = corpus
+        sample = view_samples(manifest, "val")[0]
+        moved = Sample(**{**sample.__dict__, "split": "train"})
+        with pytest.raises(ValueError, match=r"split 'train' but the manifest has 'val'") as info:
+            load_encoded(manifest, [moved], root=tree.repo_root)
+        assert "not in the manifest" not in str(info.value)
+
     def test_unknown_view_is_rejected(self, corpus):
         with pytest.raises(ValueError, match="view"):
             view_samples(corpus[1], "train_all")
@@ -186,7 +197,7 @@ def _ids(train: EncodedSet, plan) -> list[str]:
 class TestEpochs:
     def test_balanced_epoch_uses_all_ai_and_equal_humans(self):
         train = _set(3, 10)
-        plan = epoch_batches(train, epoch=0, seed=1, batch_size=2)
+        plan = epoch_batches(train, epoch=0, seed=1, batch_size=2, window=WINDOW)
         ids = _ids(train, plan)
         assert sorted(i for i in ids if i.startswith("ai")) == ["ai00.c", "ai01.c", "ai02.c"]
         assert sum(i.startswith("h") for i in ids) == 3
@@ -197,28 +208,29 @@ class TestEpochs:
         train = _set(3, 10)
         humans = {}
         for epoch in range(4):
-            a = epoch_batches(train, epoch=epoch, seed=1, batch_size=2)
-            b = epoch_batches(train, epoch=epoch, seed=1, batch_size=2)
+            a = epoch_batches(train, epoch=epoch, seed=1, batch_size=2, window=WINDOW)
+            b = epoch_batches(train, epoch=epoch, seed=1, batch_size=2, window=WINDOW)
             assert _ids(train, a) == _ids(train, b)
             assert [x.indices for x in a.batches] == [x.indices for x in b.batches]
             humans[epoch] = frozenset(i for i in _ids(train, a) if i.startswith("h"))
         assert humans[0] != humans[1]
         assert len(set(humans.values())) > 1
-        other_seed = epoch_batches(train, epoch=0, seed=2, batch_size=2)
-        assert _ids(train, other_seed) != _ids(train, epoch_batches(train, epoch=0, seed=1, batch_size=2))
+        other_seed = epoch_batches(train, epoch=0, seed=2, batch_size=2, window=WINDOW)
+        same_seed = epoch_batches(train, epoch=0, seed=1, batch_size=2, window=WINDOW)
+        assert _ids(train, other_seed) != _ids(train, same_seed)
 
     def test_human_draw_uses_keyed_rng(self):
         from models.evaluation.seed import stable_rng
 
         train = _set(3, 10)
-        plan = epoch_batches(train, epoch=5, seed=9, batch_size=4)
+        plan = epoch_batches(train, epoch=5, seed=9, batch_size=4, window=WINDOW)
         human_ids = sorted(i for i in train.ids if i.startswith("h"))
         expected = set(stable_rng(9, "epoch5").sample(human_ids, 3))
         assert {i for i in _ids(train, plan) if i.startswith("h")} == expected
 
     def test_fewer_humans_than_ai_uses_all_and_records_shortfall(self):
         train = _set(5, 2)
-        plan = epoch_batches(train, epoch=0, seed=1, batch_size=3)
+        plan = epoch_batches(train, epoch=0, seed=1, batch_size=3, window=WINDOW)
         ids = _ids(train, plan)
         assert sorted(ids) == sorted(train.ids)
         assert (plan.n_ai, plan.n_human, plan.human_shortfall) == (5, 2, 3)
@@ -229,8 +241,8 @@ class TestEpochs:
 
     def test_crops_are_bounded_and_keyed(self):
         train = _set(1, 1, lengths=[9000, 100])
-        a = epoch_batches(train, epoch=0, seed=3, batch_size=2)
-        b = epoch_batches(train, epoch=0, seed=3, batch_size=2)
+        a = epoch_batches(train, epoch=0, seed=3, batch_size=2, window=WINDOW)
+        b = epoch_batches(train, epoch=0, seed=3, batch_size=2, window=WINDOW)
         crops_a = {train.ids[i]: arr for batch in a.batches for i, arr in zip(batch.indices, batch.arrays)}
         crops_b = {train.ids[i]: arr for batch in b.batches for i, arr in zip(batch.indices, batch.arrays)}
         assert len(crops_a["ai00.c"]) == 4096
@@ -240,7 +252,7 @@ class TestEpochs:
         train = EncodedSet.build(train.samples, [long.astype(np.uint8), train.arrays[1]])
         starts = set()
         for epoch in range(6):
-            plan = epoch_batches(train, epoch=epoch, seed=3, batch_size=2)
+            plan = epoch_batches(train, epoch=epoch, seed=3, batch_size=2, window=WINDOW)
             crop = next(arr for batch in plan.batches for i, arr in zip(batch.indices, batch.arrays) if i == 0)
             assert len(crop) == 4096
             starts.add(int(crop[0]))
@@ -251,10 +263,15 @@ class TestEpochs:
         plan = epoch_batches(train, epoch=0, seed=1, batch_size=4, window=64)
         assert max(len(arr) for batch in plan.batches for arr in batch.arrays) == 64
 
+    def test_window_is_required(self):
+        # The crop length must come from the run's CharCNNV2Config, never a silent default.
+        with pytest.raises(TypeError, match="window"):
+            epoch_batches(_set(2, 2), epoch=0, seed=1, batch_size=2)
+
     def test_batches_are_length_bucketed(self):
         lengths = [5, 90, 40, 300, 12, 77, 150, 33]
         train = _set(4, 4, lengths=lengths)
-        plan = epoch_batches(train, epoch=0, seed=4, batch_size=2)
+        plan = epoch_batches(train, epoch=0, seed=4, batch_size=2, window=WINDOW)
         assert all(1 <= len(batch.indices) <= 2 for batch in plan.batches)
         spans = sorted((min(len(a) for a in b.arrays), max(len(a) for a in b.arrays)) for b in plan.batches)
         assert all(prev[1] <= nxt[0] for prev, nxt in zip(spans, spans[1:]))  # disjoint length ranges
@@ -264,9 +281,9 @@ class TestEpochs:
 
     def test_invalid_arguments(self):
         with pytest.raises(ValueError, match="batch_size"):
-            epoch_batches(_set(2, 2), epoch=0, seed=1, batch_size=0)
+            epoch_batches(_set(2, 2), epoch=0, seed=1, batch_size=0, window=WINDOW)
         with pytest.raises(ValueError, match="AI"):
-            epoch_batches(_set(0, 3), epoch=0, seed=1, batch_size=2)
+            epoch_batches(_set(0, 3), epoch=0, seed=1, batch_size=2, window=WINDOW)
 
 
 class TestCollate:
@@ -283,7 +300,7 @@ class TestCollate:
 
     def test_plan_batches_collate(self):
         train = _set(3, 3)
-        plan = epoch_batches(train, epoch=0, seed=1, batch_size=4)
+        plan = epoch_batches(train, epoch=0, seed=1, batch_size=4, window=WINDOW)
         for batch in plan.batches:
             x, y = collate(batch.arrays, batch.labels)
             assert x.shape == (len(batch.indices), max(len(a) for a in batch.arrays))

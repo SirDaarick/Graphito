@@ -29,6 +29,9 @@ from models.char_cnn.v2.scoring import predict_one
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Placeholder values of the legacy numeric keys when the input is too short to score (D15).
+# They mirror the literals returned by the frozen `_predict_text_legacy` abstention branch, so
+# v1 and v2 abstentions look identical to consumers; `tests/test_char_cnn_v2_inference.py::
+# TestV2Contract::test_abstention_placeholders_equal_the_legacy_path_values` pins the equality.
 _ABSTAIN_PLACEHOLDERS = {
     "prediction": "humano",
     "class_id": 0,

@@ -89,11 +89,27 @@ def view_samples(manifest: SplitManifest, view: str) -> List[Sample]:
     return manifest.samples(split, representatives_only=representatives)
 
 
-def _in_manifest(manifest: SplitManifest, sample: Sample) -> bool:
+def _manifest_split(manifest: SplitManifest, sample: Sample) -> Optional[str]:
+    """The sample's split according to `manifest`, or None when the id is not in it."""
     try:
-        return manifest.split_of(sample.id) == sample.split
+        return manifest.split_of(sample.id)
     except KeyError:
-        return False
+        return None
+
+
+def _check_membership(manifest: SplitManifest, samples: Sequence[Sample]) -> None:
+    """Raise `ValueError` for ids absent from `manifest` or tagged with another split."""
+    foreign, moved = [], []
+    for s in samples:
+        split = _manifest_split(manifest, s)
+        if split is None:
+            foreign.append(s.id)
+        elif split != s.split:
+            moved.append(f"{s.id} (split {s.split!r} but the manifest has {split!r})")
+    if foreign:
+        raise ValueError(f"{len(foreign)} samples are not in the manifest {manifest.path} (first: {foreign[:3]})")
+    if moved:
+        raise ValueError(f"{len(moved)} samples disagree with the manifest split (first: {moved[:3]})")
 
 
 def _read_text(path: Path) -> str:
@@ -109,14 +125,13 @@ def load_encoded(
 ) -> EncodedSet:
     """Read, normalize and encode `samples` (files at `root / sample.id`).
 
-    Every sample must belong to `manifest` (`ValueError` otherwise). All missing files are
-    counted before raising a single `FileNotFoundError`, so a wrong `root` is reported at once.
+    Every sample must belong to `manifest` with the same split (`ValueError` otherwise). All
+    missing files are counted before raising a single `FileNotFoundError`, so a wrong `root` is
+    reported at once.
     """
     root = Path(root)
     samples = list(samples)
-    foreign = [s.id for s in samples if not _in_manifest(manifest, s)]
-    if foreign:
-        raise ValueError(f"{len(foreign)} samples are not in the manifest {manifest.path} (first: {foreign[:3]})")
+    _check_membership(manifest, samples)
     missing = [s.id for s in samples if not (root / s.id).is_file()]
     if missing:
         raise FileNotFoundError(
@@ -197,12 +212,14 @@ def epoch_batches(
     epoch: int,
     seed: int,
     batch_size: int,
-    window: int = 4096,
+    *,
+    window: int,
     bucket_batches: int = 50,
 ) -> EpochPlan:
     """Plan epoch `epoch`: all AI samples + an equal human draw, seeded crops, sortish batches.
 
-    The human draw is `stable_rng(seed, f"epoch{epoch}").sample(sorted human ids, n_ai)` (all
+    `window` is required (the run's `CharCNNV2Config.window`), so training crops can never
+    silently disagree with the windows the model is scored on. The human draw is `stable_rng(seed, f"epoch{epoch}").sample(sorted human ids, n_ai)` (all
     humans when there are fewer). The same rng shuffles the pool, which is cut into chunks of
     `bucket_batches * batch_size`; each chunk is sorted by crop length and split into batches,
     and the batch order is shuffled. Crop offsets use `stable_rng(seed, f"epoch{epoch}:crop:{id}")`.

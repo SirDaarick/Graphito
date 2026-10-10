@@ -47,22 +47,30 @@ def checkpoint_versions(config: Mapping[str, Any]) -> tuple[int, int]:
     return arch, preproc
 
 
+def _check_layout(checkpoint: Any, path: "str | Path") -> Mapping[str, Any]:
+    """Raise `ValueError` unless the checkpoint is a mapping whose `config` (if any) is a mapping."""
+    if not isinstance(checkpoint, Mapping):
+        raise ValueError(f"{path}: not a CharCNN checkpoint dict (got {type(checkpoint).__name__})")
+    if "config" in checkpoint and not isinstance(checkpoint["config"], Mapping):
+        raise ValueError(f"{path}: checkpoint config must be a dict (got {type(checkpoint['config']).__name__})")
+    return checkpoint
+
+
 def load_checkpoint(path: "str | Path", map_location: "str | torch.device | None" = None) -> dict:
     """Load a checkpoint with `weights_only=True`.
 
     Legacy checkpoints (no version fields) written by the old trainer may pickle extra objects;
     for those only, the load falls back to `weights_only=False` with a warning, which is what the
     legacy facade always did. A versioned checkpoint must load safely, otherwise `ValueError`.
+    On both paths a checkpoint (or its `config`) that is not a mapping raises `ValueError`.
     """
     try:
-        return torch.load(path, map_location=map_location, weights_only=True)
+        return _check_layout(torch.load(path, map_location=map_location, weights_only=True), path)
     except pickle.UnpicklingError as exc:
         reason = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
-    checkpoint = torch.load(path, map_location=map_location, weights_only=False)
-    if not isinstance(checkpoint, Mapping):
-        raise ValueError(f"{path}: not a CharCNN checkpoint dict")
+    checkpoint = _check_layout(torch.load(path, map_location=map_location, weights_only=False), path)
     config = checkpoint.get("config") or {}
-    if isinstance(config, Mapping) and ("arch_version" in config or "preproc_version" in config):
+    if "arch_version" in config or "preproc_version" in config:
         raise ValueError(f"{path}: versioned CharCNN checkpoints must load with weights_only=True ({reason})")
     warnings.warn(
         f"{path}: legacy CharCNN checkpoint is not weights_only-loadable; loaded with "

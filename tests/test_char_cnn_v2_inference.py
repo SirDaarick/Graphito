@@ -6,6 +6,7 @@ they do not depend on torch's init) is the always-running guard; the real `best_
 cases only run when the checkpoint on disk has the sha256 they were captured with.
 """
 
+import argparse
 import hashlib
 import json
 import warnings
@@ -379,6 +380,20 @@ class TestV2Contract:
         assert res["n_windows"] == 1
         assert any(x != 0.0 for x in res["embedding"])
 
+    def test_abstention_placeholders_equal_the_legacy_path_values(self, in_tmp):
+        # Consumers read the same numbers whichever checkpoint version abstains (D15).
+        from models.char_cnn.inference import _ABSTAIN_PLACEHOLDERS
+
+        legacy = _engine(make_v1_checkpoint(in_tmp / "v1.pth", 11, {})).predict_text("int x;")
+        v2 = _engine(make_v2_checkpoint(in_tmp / "v2.pth")[0]).predict_text("int x;")
+        assert legacy["insufficient_length"] is True and v2["abstained"] is True
+        assert set(_ABSTAIN_PLACEHOLDERS) == {
+            "prediction", "class_id", "confidence", "prob_humano", "prob_sintetico", "ai_probability"
+        }
+        for key, value in _ABSTAIN_PLACEHOLDERS.items():
+            assert legacy[key] == value and type(legacy[key]) is type(value), key
+            assert v2[key] == legacy[key] and type(v2[key]) is type(legacy[key]), key
+
     def test_empty_normalized_input_abstains_with_zero_embedding(self, tmp_path):
         res = _engine(make_v2_checkpoint(tmp_path / "v2.pth")[0]).predict_text("  // only a comment\n\t\n")
         assert_contract(res, embedding_dim=TINY_V2["fc_units"])
@@ -445,6 +460,28 @@ class TestVersionDispatch:
         from models.char_cnn.v2.checkpoint import checkpoint_versions
 
         assert checkpoint_versions(config) == expected
+
+    @pytest.mark.parametrize(
+        "payload,match",
+        [
+            ([1, 2, 3], "not a CharCNN checkpoint"),  # weights_only-loadable, not a mapping
+            ({"model_state_dict": {}, "config": [1, 2]}, "config"),  # weights_only, bad config
+            (argparse.Namespace(a=1), "not a CharCNN checkpoint"),  # fallback path, not a mapping
+            ({"model_state_dict": {}, "config": argparse.Namespace(arch_version=2)}, "config"),  # fallback
+        ],
+        ids=["list", "list-config", "namespace", "namespace-config"],
+    )
+    def test_non_mapping_checkpoint_or_config_raises_value_error(self, tmp_path, payload, match):
+        from models.char_cnn.v2.checkpoint import load_checkpoint
+
+        path = tmp_path / "odd.pth"
+        torch.save(payload, path)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with pytest.raises(ValueError, match=match):
+                load_checkpoint(path)
+            with pytest.raises(ValueError, match=match):
+                _engine(path)
 
     def test_make_checkpoint_round_trip(self, tmp_path):
         from models.char_cnn.v2.checkpoint import CHECKPOINT_FORMAT, load_checkpoint, make_checkpoint, load_v2_model
