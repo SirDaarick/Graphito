@@ -3,19 +3,18 @@ import { Calendar, GitCompare, ChevronDown, Plus, ShieldCheck, HelpCircle } from
 import { GradientButton } from "../ui/GradientButton"
 import { cn } from "../../lib/utils";
 import { getSavedVerdicts, VerdictType } from "../../lib/verdicts";
+import { ComparisonView, describeDictamen } from "../../lib/dictamen";
 
-export interface Comparison {
-    id: string | number
-    title: string
-    subtitle: string
-    similarity: number
-    similitud_semantica?: number
-    probabilidad_ia?: number
-    discrepancia_score?: number
-    dictamen?: string
-    indicadores?: any[]
+export interface Comparison extends ComparisonView {
     veredicto?: VerdictType | null
-    grupo_id?: number
+}
+
+// Color from the backend verdict (calibrated flags), never from fixed score cut-offs.
+function scoreColor(comparison: Comparison): string {
+    const verdict = describeDictamen(comparison.dictamen, comparison.estado)
+    if (verdict.flagged) return "text-risk-high"
+    if (verdict.tone === "clear") return "text-risk-low"
+    return "text-slate-400"
 }
 
 interface ReferenceCardProps {
@@ -163,12 +162,16 @@ export function ReferenceCard({
                                                 </div>
 
                                                 <div className="flex items-center gap-4">
-                                                    <div className={cn(
-                                                        "text-sm font-black font-mono",
-                                                        comparison.similarity > 70 ? "text-risk-high" :
-                                                            comparison.similarity > 30 ? "text-risk-medium" : "text-risk-low"
-                                                    )}>
-                                                        {comparison.similarity}%
+                                                    {comparison.engine === "stub" && (
+                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                                            STUB
+                                                        </span>
+                                                    )}
+                                                    <div
+                                                        className={cn("text-sm font-black font-mono", scoreColor(comparison))}
+                                                        title="Canal A: Jaccard léxico, 5 tokens (similitud bruta)"
+                                                    >
+                                                        {comparison.similarity == null ? "—" : `${comparison.similarity}%`}
                                                     </div>
                                                     <ChevronDown className="h-4 w-4 text-slate-400 dark:text-slate-600 -rotate-90 group-hover:translate-x-0.5 transition-transform" />
                                                 </div>

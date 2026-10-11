@@ -3,6 +3,7 @@ import { ReferenceCard, Comparison } from "../components/layout/ReferenceCard";
 import { PaginationControls } from "../components/ui/PaginationControls";
 import { SearchBar } from "../components/layout/SearchBar";
 import { api, Problema, Grupo, CodigoFuente } from "../lib/api";
+import { toComparison } from "../lib/dictamen";
 import { Loader2, UploadCloud } from "lucide-react";
 import { GroupFilterDropdown } from "../components/groups/GroupFilterDropdown";
 import { CreateGroupModal } from "../components/groups/CreateGroupModal";
@@ -78,21 +79,16 @@ export function Biblioteca({
                             activeComparisons: subs.length,
                             comparisons: subs.map((s, idx) => {
                                 const rep = s.reporte;
-                                const similarity = rep ? Math.round(rep.similitud_semantica * 100) : 0;
-                                const subtitle = rep
-                                    ? `Dictamen: ${rep.dictamen} (${s.lenguaje})`
-                                    : `Entrega #${idx + 1} (${s.lenguaje})`;
-
+                                if (rep) {
+                                    const view = toComparison(rep, `${s.autor}`, s.grupo_id);
+                                    return { ...view, subtitle: `${view.subtitle} (${s.lenguaje})` };
+                                }
+                                // Sin reporte todavía: sin puntaje (nunca 0%) y sin dictamen.
                                 return {
-                                    id: String(rep?.id || s.id),
+                                    id: String(s.id),
                                     title: `${s.autor}`,
-                                    subtitle,
-                                    similarity,
-                                    similitud_semantica: rep?.similitud_semantica,
-                                    probabilidad_ia: rep?.probabilidad_ia,
-                                    discrepancia_score: rep?.discrepancia_score,
-                                    dictamen: rep?.dictamen,
-                                    indicadores: rep?.indicadores,
+                                    subtitle: `Entrega #${idx + 1} (${s.lenguaje})`,
+                                    similarity: null,
                                     grupo_id: s.grupo_id,
                                 };
                             }),

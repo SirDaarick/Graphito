@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
 import { GradientButton } from "../components/ui/GradientButton";
 import { api, Problema, IS_DEMO_MODE } from "../lib/api";
+import { toComparison } from "../lib/dictamen";
 
 interface NewComparisonModalProps {
     isOpen: boolean;
@@ -98,26 +99,17 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewC
             );
             // 2. Disparar análisis bimodal en segundo plano (asíncrono)
             setLoadingMessage("Iniciando inferencia bimodal en segundo plano...");
-            const initialReport = await api.analysis.run(submission.id, undefined, 0.85, 0.20, true);
+            // Los umbrales los fija el servidor desde los artefactos de calibración.
+            const initialReport = await api.analysis.run(submission.id, undefined, true);
 
             let report = initialReport;
             if (initialReport.estado === "PROCESANDO") {
-                setLoadingMessage("Analizando DFG (Canal A) y estilo CharCNN (Canal B)...");
+                setLoadingMessage("Analizando similitud léxica (Canal A) y estilo CharCNN (Canal B)...");
                 report = await api.analysis.pollUntilComplete(initialReport.id);
             }
 
-            // Adaptar para visualización en SimilarityReportModal
-            const adaptedComparison = {
-                id: String(report.id),
-                title: `${author} — Entrega`,
-                subtitle: `Diagnóstico: ${report.dictamen.replace(/_/g, ' ')}`,
-                similarity: Math.round(report.similitud_semantica * 100),
-                similitud_semantica: report.similitud_semantica,
-                probabilidad_ia: report.probabilidad_ia,
-                discrepancia_score: report.discrepancia_score,
-                dictamen: report.dictamen,
-                indicadores: report.indicadores,
-            };
+            // Adaptar para visualización en SimilarityReportModal (campos del reporte tal cual).
+            const adaptedComparison = toComparison(report, `${author} — Entrega`);
 
             onAnalysisComplete?.(adaptedComparison);
             onClose();

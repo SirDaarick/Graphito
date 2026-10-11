@@ -1,0 +1,83 @@
+"""Static scan of the frontend contract (spec AR2; there is no frontend test runner).
+
+The UI must not invent scores (62/85 fallbacks), must not send thresholds, must not show the
+deprecated discrepancy as a result, and must never map an unknown or missing verdict to
+"Conforme". It must show Channel A's method, the engine (stub marker), the calibration state,
+GraphCodeBERT as exploratory zero-shot and the validation label.
+"""
+
+import re
+from pathlib import Path
+
+import pytest
+
+SRC = Path(__file__).resolve().parents[2] / "frontend" / "src"
+pytestmark = pytest.mark.skipif(not SRC.is_dir(), reason="frontend sources not present")
+
+
+def _read(rel: str) -> str:
+    return (SRC / rel).read_text(encoding="utf-8")
+
+
+def _all_sources():
+    return {p.relative_to(SRC).as_posix(): p.read_text(encoding="utf-8") for p in SRC.rglob("*.ts*")}
+
+
+def test_no_invented_score_fallbacks():
+    modal = _read("pages/SimilarityReportModal.tsx")
+    assert not re.search(r"(\?\?|:)\s*(62|85)\s*[;)]", modal)
+    assert "overallScore > 70" not in modal
+    assert not re.search(r"\?\?\s*3\b", _read("components/xai/EvidenceDrawer.tsx"))
+    for rel, text in _all_sources().items():
+        # NULL scores are never coerced to 0% (`rep ? x * 100 : 0` and friends).
+        assert not re.search(r"similitud_semantica\s*\*\s*100\)\s*:\s*0\b", text), rel
+
+
+def test_api_client_sends_no_thresholds():
+    api = _read("lib/api.ts")
+    assert "threshold_sem" not in api and "threshold_ai" not in api
+    assert "thresholdSem" not in api and "thresholdAi" not in api
+    assert not re.search(r"analysis\.run\([^)]*0\.85", _read("pages/NewComparisonModal.tsx"))
+
+
+def test_discrepancy_is_not_rendered():
+    for rel, text in _all_sources().items():
+        if rel.endswith(".tsx"):
+            assert "discrepancia_score" not in text, rel
+            assert not re.search(r">\s*Discrepancia\s*<", text), rel
+
+
+def test_verdict_mapping_never_falls_back_to_conforme():
+    mapping = _read("lib/dictamen.ts")
+    for verdict in ("SIN_ALERTAS", "REVISION_ESTILOMETRICA", "REVISION_SEMANTICA", "DISCREPANCIA_DUAL",
+                    "NO_EVALUABLE", "SIN_REFERENCIA"):
+        assert verdict in mapping, verdict
+    assert "Conforme" not in mapping and "No evaluable" in mapping and "Sin referencia" in mapping
+    assert "Pendiente" in mapping
+    modal = _read("pages/SimilarityReportModal.tsx")
+    assert "Conforme (Sin Alertas)" not in modal and "getAuditInfo" not in modal
+
+
+def test_ui_shows_method_engine_calibration_gcb_and_label():
+    texts = "\n".join(_all_sources().values())
+    assert "Jaccard léxico, 5 tokens" in texts
+    assert "Exploratorio, zero-shot, no decide" in texts
+    assert "No validado contra plagio derivado de la referencia" in texts
+    assert "STUB" in _read("pages/SimilarityReportModal.tsx")
+    assert "estado_calibracion" in _read("pages/SimilarityReportModal.tsx")
+    assert "Heurística" in _read("components/xai/EvidenceDrawer.tsx")
+
+
+def test_report_type_is_nullable_and_has_provenance():
+    api = _read("lib/api.ts")
+    for field in ("similitud_semantica", "probabilidad_ia", "dictamen"):
+        assert re.search(rf"{field}\??:\s*[^;]*\bnull\b", api), field
+    for field in ("engine", "canal_a_metodo", "estado_canal_a", "estado_canal_b", "flag_a", "flag_b", "umbral_a",
+                  "umbral_b", "gcb_similarity", "etiqueta_validacion", "estado_calibracion"):
+        assert re.search(rf"\b{field}\??:", api), field
+
+
+def test_demo_data_is_labelled_demo_and_uses_the_new_shape():
+    demo = _read("lib/demoData.ts")
+    assert "DEMO" in demo and "engine: \"demo\"" in demo
+    assert "PLAGIO_PROBABLE" not in demo and "SOSPECHA_IA" not in demo and "INTEGRO" not in demo

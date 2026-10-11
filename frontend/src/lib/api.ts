@@ -11,6 +11,15 @@ import {
     DEMO_COMMENTS,
     DEMO_GRUPOS,
 } from "./demoData";
+import {
+    GCB_LABEL,
+    VALIDATION_LABEL,
+    channelAMethod,
+    describeDictamen,
+    engineLabel,
+    formatNumber,
+    formatPct,
+} from "./dictamen";
 
 export const IS_DEMO_MODE: boolean =
     import.meta.env.DEMO_MODE === "true" ||
@@ -125,18 +134,65 @@ export interface IndicadorIntegridad {
     severidad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | string;
     numero_linea?: number | null;
     categoria?: string;
+    /** "decision" for rows driven by calibrated flags, "heuristica" for rule-based rows. */
+    origen?: "decision" | "heuristica" | string;
 }
 
-export interface ReporteAnalisis {
+export type Dictamen =
+    | "SIN_ALERTAS"
+    | "REVISION_ESTILOMETRICA"
+    | "REVISION_SEMANTICA"
+    | "DISCREPANCIA_DUAL"
+    | "NO_EVALUABLE"
+    | "SIN_REFERENCIA";
+
+export type EstadoAnalisis = "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "ERROR";
+
+/** "demo" only labels the frontend mock data (VITE_DEMO_MODE); the backend sends the others. */
+export type EngineLabel = "real" | "stub" | "legacy" | "demo";
+
+/**
+ * Decision and provenance fields of a report (spec AR1.1). Every score is nullable: null means
+ * "not evaluated", never 0. The decision comes only from the calibrated flags.
+ */
+export interface ReportScoring {
+    /** Raw Channel A Jaccard (lexical, 5-token shingles). */
+    similitud_semantica?: number | null;
+    /** Calibrated Channel B CharCNN score. */
+    probabilidad_ia?: number | null;
+    dictamen?: Dictamen | string | null;
+    estado?: EstadoAnalisis;
+    engine?: EngineLabel | string | null;
+    canal_a_metodo?: string | null;
+    estado_canal_a?: string | null;
+    estado_canal_b?: string | null;
+    flag_a?: boolean | null;
+    flag_b?: boolean | null;
+    umbral_a?: number | null;
+    umbral_b?: number | null;
+    clave_umbral_a?: string | null;
+    clave_umbral_b?: string | null;
+    puntaje_calibrado_a?: number | null;
+    calibracion_sha_a?: string | null;
+    calibracion_sha_b?: string | null;
+    checkpoint_sha_b?: string | null;
+    manifest_sha?: string | null;
+    /** GraphCodeBERT zero-shot cosine: exploratory, never decides. */
+    gcb_similarity?: number | null;
+    gcb_estado?: string | null;
+    versiones_modelo?: Record<string, string | number | null> | null;
+    etiqueta_validacion?: string;
+    estado_calibracion?: "calibrado" | "no_calibrado" | "stub" | "legacy" | string | null;
+}
+
+export interface ReporteAnalisis extends ReportScoring {
     id: number;
     entrega_id: string;
-    referencia_id?: string;
-    lote_id?: string;
-    similitud_semantica: number;
-    probabilidad_ia: number;
-    discrepancia_score: number;
-    dictamen: "SIN_ALERTAS" | "REVISION_ESTILOMETRICA" | "REVISION_SEMANTICA" | "DISCREPANCIA_DUAL" | "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE" | string;
-    estado?: "PENDIENTE" | "PROCESANDO" | "COMPLETADO" | "ERROR";
+    referencia_id?: string | null;
+    reference_id?: string | null;
+    lote_id?: string | null;
+    /** Deprecated: never shown as a result and never part of the decision. */
+    discrepancia_score?: number | null;
     decision_docente?: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "EN_DUDA";
     fecha_decision?: string;
     notas_docente?: string;
@@ -303,11 +359,10 @@ export const api = {
     },
 
     analysis: {
+        /** Thresholds come only from the calibration artifacts on the server; none are sent. */
         async run(
             entregaId: string,
             referenciaId?: string,
-            thresholdSem = 0.85,
-            thresholdAi = 0.20,
             asyncMode = true
         ): Promise<ReporteAnalisis> {
             if (IS_DEMO_MODE) {
@@ -318,8 +373,6 @@ export const api = {
                 body: JSON.stringify({
                     entrega_id: entregaId,
                     referencia_id: referenciaId || null,
-                    threshold_sem: thresholdSem,
-                    threshold_ai: thresholdAi,
                 }),
             });
         },
@@ -361,10 +414,12 @@ export const api = {
                     "",
                     `Problema: ${codeComp.problem_title}`,
                     `Estudiante Evaluado: ${codeComp.student_author}`,
-                    `Dictamen Automático: ${rep.dictamen}`,
-                    `Similitud Semántica (AST / DFG): ${(rep.similitud_semantica * 100).toFixed(1)}%`,
-                    `Probabilidad Generación IA (CharCNN): ${(rep.probabilidad_ia * 100).toFixed(1)}%`,
-                    `Discrepancia Score: ${rep.discrepancia_score}`,
+                    `Dictamen: ${describeDictamen(rep.dictamen, rep.estado).label}`,
+                    `Canal A (${channelAMethod(rep)}): ${formatPct(rep.similitud_semantica)}`,
+                    `Canal B (CharCNN v2, calibrado): ${formatPct(rep.probabilidad_ia)}`,
+                    `GraphCodeBERT (${GCB_LABEL}): ${formatNumber(rep.gcb_similarity)}`,
+                    `Motor: ${engineLabel(rep.engine)}`,
+                    VALIDATION_LABEL,
                     "",
                     "Indicadores de Integridad:",
                     ...(rep.indicadores.length > 0

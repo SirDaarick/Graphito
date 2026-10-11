@@ -3,8 +3,20 @@ import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
-import { api, IndicadorIntegridad } from "../lib/api";
+import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
 import { saveVerdict } from "../lib/verdicts";
+import {
+    GCB_LABEL,
+    VALIDATION_LABEL,
+    calibrationLabel,
+    channelAMethod,
+    describeDictamen,
+    engineLabel,
+    formatFlag,
+    formatNumber,
+    isAbstained,
+    toPct,
+} from "../lib/dictamen";
 import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
 import { EvidenceDrawer } from "../components/xai/EvidenceDrawer";
 
@@ -39,17 +51,15 @@ export interface IndicadorItem {
     severidad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | string;
     numero_linea?: number | null;
     categoria?: string;
+    origen?: string;
 }
 
-export interface ComparisonData {
+/** Report fields as returned by the API (nullable scores, provenance) plus display text. */
+export interface ComparisonData extends ReportScoring {
     id?: string | number;
     title?: string;
     subtitle?: string;
-    similarity?: number;
-    similitud_semantica?: number;
-    probabilidad_ia?: number;
-    discrepancia_score?: number;
-    dictamen?: "INTEGRO" | "SOSPECHA_IA" | "PLAGIO_PROBABLE" | string;
+    similarity?: number | null;
     indicadores?: IndicadorItem[];
 }
 
@@ -404,55 +414,40 @@ int main() {
         }
     }, [isOpen, shouldRender]);
 
-    // Dynamic metrics from backend or mock fallback
-    const semanticPct = comparison?.similitud_semantica !== undefined
-        ? Math.round(comparison.similitud_semantica * 100)
-        : (comparison?.similarity ?? 62);
-    const aiPct = comparison?.probabilidad_ia !== undefined
-        ? Math.round(comparison.probabilidad_ia * 100)
-        : 85;
-    const overallScore = comparison?.similarity ?? semanticPct;
-    const dictamenRaw = comparison?.dictamen || (overallScore > 70 ? 'REVISION_ESTILOMETRICA' : 'SIN_ALERTAS');
+    // Scores straight from the backend: null means "not evaluated" and is shown as a dash.
+    const semanticPct = toPct(comparison?.similitud_semantica);
+    const aiPct = toPct(comparison?.probabilidad_ia);
+    const abstained = comparison ? isAbstained(comparison) : false;
+    const auditInfo = describeDictamen(comparison?.dictamen, comparison?.estado);
+    const methodA = comparison ? channelAMethod(comparison) : "—";
+    const isStub = comparison?.engine === "stub";
+    const isDemo = comparison?.engine === "demo";
+    const keyA = comparison?.clave_umbral_a ? ` (${comparison.clave_umbral_a})` : "";
+    const keyB = comparison?.clave_umbral_b ? ` (${comparison.clave_umbral_b})` : "";
+    const channelBText = abstained
+        ? "ABSTENIDO: código demasiado corto para CharCNN; no aporta bandera."
+        : aiPct === null
+        ? `No evaluado (${comparison?.estado_canal_b ?? "sin estado"}).`
+        : `${aiPct}% calibrado, umbral ${formatNumber(comparison?.umbral_b)}${keyB}, bandera ${formatFlag(comparison?.flag_b)}.`;
+    const channelAText = semanticPct === null
+        ? `No evaluado (${comparison?.estado_canal_a ?? "sin estado"}).`
+        : `${semanticPct}% de similitud bruta, umbral calibrado ${formatNumber(comparison?.umbral_a)}${keyA}, bandera ${formatFlag(comparison?.flag_a)}.`;
 
-    const getAuditInfo = (status: string) => {
-        switch (status) {
-            case "REVISION_ESTILOMETRICA":
-            case "SOSPECHA_IA":
-                return {
-                    label: "Revisión Sugerida (IA)",
-                    color: "text-amber-400",
-                };
-            case "REVISION_SEMANTICA":
-            case "PLAGIO_PROBABLE":
-                return {
-                    label: "Coincidencia Lógica",
-                    color: "text-purple-400",
-                };
-            case "DISCREPANCIA_DUAL":
-                return {
-                    label: "Alerta Dual (Lógica + IA)",
-                    color: "text-rose-400",
-                };
-            default:
-                return {
-                    label: "Conforme (Sin Alertas)",
-                    color: "text-emerald-400",
-                };
-        }
-    };
-    const auditInfo = getAuditInfo(dictamenRaw);
-
-    // Typewriter effect description
+    // Typewriter effect description (built only from the report's fields and flags)
     const fullInterpretationText = comparison?.dictamen
         ? `Diagnóstico de Soporte Docente: ${auditInfo.label}
 
-Canal A (Similitud Semántica): ${semanticPct}% de coincidencia con soluciones de referencia mediante Grafos de Flujo de Datos (DFG).
-Canal B (Estilometría CharCNN): ${aiPct}% de probabilidad de sintaxis afín a modelos generativos (LLM).
-Puntaje de Discrepancia Asimétrica: ${comparison.discrepancia_score ?? (semanticPct * aiPct / 10000).toFixed(2)}.
+Canal A (${methodA}): ${channelAText}
+Canal B (CharCNN v2): ${channelBText}
+GraphCodeBERT (${GCB_LABEL}): ${formatNumber(comparison.gcb_similarity)}.
 
-${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || dictamenRaw === 'DISCREPANCIA_DUAL'
-    ? 'Recomendación Pericial: Se identificaron regularidades sintácticas afines a modelos generativos. Este dato es una guía orientativa de apoyo; se sugiere formular preguntas conceptuales al estudiante sobre sus decisiones de implementación.'
-    : 'Recomendación Pericial: El código analizado presenta una redacción y estructura acordes a la variabilidad esperada de autoría humana estudiantil.'}`
+${auditInfo.flagged
+    ? 'Recomendación: al menos un canal superó su umbral calibrado. Es una guía orientativa; se sugiere formular preguntas conceptuales al estudiante sobre sus decisiones de implementación.'
+    : auditInfo.tone === 'clear'
+    ? 'Recomendación: ningún canal superó su umbral calibrado. La resolución final corresponde al docente.'
+    : 'Recomendación: el sistema no emite dictamen automático para esta entrega; revise el código directamente.'}
+
+${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
         : `Este informe técnico proporciona evidencia cuantitativa para asistir la evaluación académica del docente. La resolución pedagógica final es potestad exclusiva de la cátedra.`;
 
     const typewriterText = useTypewriter(isOpen ? fullInterpretationText : "", 3);
@@ -478,7 +473,8 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
     // SVG Circle Graphic calculations
     const radius = 90;
     const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = isAnimating ? circumference - (overallScore / 100) * circumference : circumference;
+    const ringPct = semanticPct ?? 0; // an empty ring when Channel A was not evaluated
+    const strokeDashoffset = isAnimating ? circumference - (ringPct / 100) * circumference : circumference;
 
     return (
         <div className={`fixed inset-0 z-[100] flex items-center justify-center ${viewMode === 'code_diff' ? 'p-2 sm:p-3 md:p-4' : 'p-4'}`}>
@@ -649,60 +645,64 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                         {viewMode === "code_diff" && (
                             <div className="px-5 sm:px-8 py-3 bg-slate-100/90 dark:bg-[#0a0f1d] border-b border-slate-200 dark:border-[#1a2337] flex items-center justify-between gap-4 overflow-x-auto shrink-0 scrollbar-none">
                                 <div className="flex items-center gap-5 sm:gap-8 lg:gap-10">
-                                    {/* Metric 1: Global Similarity (Hero) */}
+                                    {/* Metric 1: Dictamen (no "global similarity" exists: each channel decides with its own flag) */}
                                     <div className="flex items-center gap-3">
                                         <div className="flex flex-col">
                                             <div className="flex items-baseline gap-2">
-                                                <span className={`text-2xl sm:text-3xl lg:text-4xl font-black font-mono tracking-tight ${auditInfo.color}`}>
-                                                    {overallScore}%
-                                                </span>
                                                 <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border font-sans ${
-                                                    dictamenRaw === 'INTEGRO' || dictamenRaw === 'SIN_ALERTAS'
+                                                    auditInfo.flagged
+                                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                        : auditInfo.tone === 'clear'
                                                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                                        : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                        : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
                                                 }`}>
                                                     {auditInfo.label}
                                                 </span>
+                                                {(isStub || isDemo) && (
+                                                    <span className="text-[10px] font-extrabold font-mono px-2 py-0.5 rounded-md border bg-amber-500/15 text-amber-500 border-amber-500/40">
+                                                        {isStub ? "STUB" : "DEMO"}
+                                                    </span>
+                                                )}
                                             </div>
                                             <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                                Similitud Global
+                                                Dictamen (banderas calibradas)
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Metric 2: Canal A (Semántica DFG) */}
+                                    {/* Metric 2: Canal A (Jaccard léxico) */}
                                     <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
                                         <div className="flex items-baseline gap-1">
                                             <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-cyan-500 dark:text-cyan-400 tracking-tight">
-                                                {semanticPct}%
+                                                {semanticPct === null ? "—" : `${semanticPct}%`}
                                             </span>
                                         </div>
                                         <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Semántica (Grafo DFG)
+                                            Canal A · {methodA}
                                         </span>
                                     </div>
 
-                                    {/* Metric 3: Canal B (Estilometría IA) */}
+                                    {/* Metric 3: Canal B (CharCNN v2) */}
                                     <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
                                         <div className="flex items-baseline gap-1">
                                             <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-violet-500 dark:text-violet-400 tracking-tight">
-                                                {aiPct}%
+                                                {abstained ? "Abstenido" : aiPct === null ? "—" : `${aiPct}%`}
                                             </span>
                                         </div>
                                         <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Sintaxis IA (CharCNN)
+                                            Canal B · CharCNN v2 (calibrado)
                                         </span>
                                     </div>
 
-                                    {/* Metric 4: Discrepancia Asimétrica */}
+                                    {/* Metric 4: GraphCodeBERT (secundaria, no decide) */}
                                     <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
                                         <div className="flex items-baseline gap-1">
-                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-amber-500 dark:text-amber-300 tracking-tight">
-                                                {comparison.discrepancia_score ?? (semanticPct * aiPct / 10000).toFixed(2)}
+                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-slate-400 tracking-tight">
+                                                {formatNumber(comparison.gcb_similarity, 2)}
                                             </span>
                                         </div>
                                         <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Discrepancia
+                                            GraphCodeBERT · {GCB_LABEL}
                                         </span>
                                     </div>
                                 </div>
@@ -728,9 +728,18 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         <span>14 de Abril, 2026</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 bg-slate-100 dark:bg-[#1a2031] border border-slate-200 dark:border-[#2b3346] px-4 py-2 rounded-full">
-                                    <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Análisis completado</span>
+                                <div className="flex items-center gap-2">
+                                    {(isStub || isDemo) && (
+                                        <span className="px-3 py-1.5 rounded-full text-xs font-black font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
+                                            {isStub ? "STUB · no es un modelo" : "DEMO · datos de ejemplo"}
+                                        </span>
+                                    )}
+                                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-[#1a2031] border border-slate-200 dark:border-[#2b3346] px-4 py-2 rounded-full">
+                                        <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
+                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                            {comparison.estado && comparison.estado !== "COMPLETADO" ? `Análisis ${comparison.estado.toLowerCase()}` : "Análisis completado"}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -769,6 +778,23 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                     <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-700 dark:text-blue-200">
                                         <Info size={18} className="shrink-0 text-blue-500 dark:text-blue-400" />
                                         <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee métricas periciales automatizadas sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
+                                    </div>
+
+                                    {/* Procedencia: motor, calibración y etiqueta de validación (spec AR2.3) */}
+                                    <div className="flex flex-wrap items-center gap-2 mb-6 text-[11px] font-medium">
+                                        <span className={`px-2.5 py-1 rounded-full border font-mono font-bold ${
+                                            isStub || isDemo
+                                                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40"
+                                                : "bg-slate-100 dark:bg-[#1a2031] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#2b3346]"
+                                        }`}>
+                                            {engineLabel(comparison.engine)}
+                                        </span>
+                                        <span className="px-2.5 py-1 rounded-full border bg-slate-100 dark:bg-[#1a2031] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#2b3346]">
+                                            Calibración: {calibrationLabel(comparison.estado_calibracion)}
+                                        </span>
+                                        <span className="px-2.5 py-1 rounded-full border bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30">
+                                            {VALIDATION_LABEL}
+                                        </span>
                                     </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -813,7 +839,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         {/* Score Text */}
                                         <div className="absolute flex flex-col items-center justify-center text-center px-4">
                                             <span className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                                                {overallScore}%
+                                                {semanticPct === null ? "—" : `${semanticPct}%`}
                                             </span>
                                             <span className={`text-xs font-bold uppercase tracking-wider mt-1.5 ${auditInfo.color}`}>
                                                 {auditInfo.label}
@@ -821,9 +847,9 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         </div>
                                     </div>
 
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-2">Similitud total</h3>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-2">Similitud léxica (Canal A)</h3>
                                     <p className="text-sm text-center text-slate-600 dark:text-slate-400">
-                                        Se detectó una coincidencia {overallScore > 50 ? 'significativa' : 'menor'} en la estructura lógica central del código analizado.
+                                        {methodA}: {channelAText}
                                     </p>
                                 </div>
 
@@ -845,15 +871,22 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                             <div className="space-y-4">
                                                 <div>
                                                     <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
-                                                        <span>Probabilidad de IA</span>
-                                                        <span className="text-slate-900 dark:text-white">{aiPct}%</span>
+                                                        <span>CharCNN v2 (puntaje calibrado)</span>
+                                                        {abstained ? (
+                                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-500/15 text-slate-500 dark:text-slate-300 border border-slate-500/30">
+                                                                ABSTENIDO
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-900 dark:text-white">{aiPct === null ? "—" : `${aiPct}%`}</span>
+                                                        )}
                                                     </div>
                                                     <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-graphito-violet rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating ? `${aiPct}%` : '0%' }}
+                                                            style={{ width: isAnimating && aiPct !== null ? `${aiPct}%` : '0%' }}
                                                         ></div>
                                                     </div>
+                                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{channelBText}</p>
                                                 </div>
 
                                                 <ul className="space-y-3 mt-6">
@@ -868,11 +901,7 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                                         <>
                                                             <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
                                                                 <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                                <span>Nomenclatura y patrones sintácticos analizados con CharCNN.</span>
-                                                            </li>
-                                                            <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                                <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                                <span>Estructura léxica y regularidad de comentarios evaluada.</span>
+                                                                <span>Sin indicadores registrados para este reporte.</span>
                                                             </li>
                                                         </>
                                                     )}
@@ -886,31 +915,35 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                                 <div className="w-10 h-10 rounded-xl bg-graphito-blue/10 flex items-center justify-center text-graphito-blue">
                                                     <PlayCircle size={20} />
                                                 </div>
-                                                <h4 className="font-bold text-slate-900 dark:text-white">Análisis semántico</h4>
+                                                <h4 className="font-bold text-slate-900 dark:text-white">Similitud con la referencia</h4>
                                             </div>
 
                                             <div className="space-y-4">
                                                 <div>
                                                     <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
-                                                        <span>Similitud de flujo DFG</span>
-                                                        <span className="text-slate-900 dark:text-white">{semanticPct}%</span>
+                                                        <span>Canal A · {methodA}</span>
+                                                        <span className="text-slate-900 dark:text-white">{semanticPct === null ? "—" : `${semanticPct}%`}</span>
                                                     </div>
                                                     <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-graphito-blue rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating ? `${semanticPct}%` : '0%' }}
+                                                            style={{ width: isAnimating && semanticPct !== null ? `${semanticPct}%` : '0%' }}
                                                         ></div>
                                                     </div>
+                                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{channelAText}</p>
                                                 </div>
 
                                                 <ul className="space-y-3 mt-6">
                                                     <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
                                                         <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                        <span>Grafo de flujo de datos (DFG) comparado contra soluciones canónicas.</span>
+                                                        <span>Máxima similitud Jaccard de shingles de 5 tokens normalizados contra las referencias del problema.</span>
                                                     </li>
                                                     <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
                                                         <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                        <span>Invarianza ante renombramiento de variables y reordenamiento de bloques.</span>
+                                                        <span>
+                                                            GraphCodeBERT ({GCB_LABEL}): {formatNumber(comparison.gcb_similarity)}
+                                                            {comparison.gcb_estado && comparison.gcb_estado !== "OK" ? ` · ${comparison.gcb_estado}` : ""}
+                                                        </span>
                                                     </li>
                                                 </ul>
                                             </div>
@@ -947,10 +980,14 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                             {/* Sección XAI: Desglose de Evidencias Técnicas */}
                             <div className="mt-8">
                                 <EvidenceDrawer
-                                    semanticScore={semanticPct}
-                                    aiScore={aiPct}
-                                    discrepancyScore={comparison.discrepancia_score ?? Number((semanticPct * aiPct / 10000).toFixed(2))}
-                                    dictamen={dictamenRaw}
+                                    semanticPct={semanticPct}
+                                    aiPct={aiPct}
+                                    flagA={comparison.flag_a}
+                                    flagB={comparison.flag_b}
+                                    estadoCanalA={comparison.estado_canal_a}
+                                    estadoCanalB={comparison.estado_canal_b}
+                                    umbralA={comparison.umbral_a}
+                                    umbralB={comparison.umbral_b}
                                     indicadores={(
                                         (comparison.indicadores && comparison.indicadores.length > 0)
                                             ? comparison.indicadores
@@ -962,8 +999,9 @@ ${dictamenRaw === 'REVISION_ESTILOMETRICA' || dictamenRaw === 'SOSPECHA_IA' || d
                                         tipo_alerta: ind.tipo_alerta,
                                         descripcion: ind.descripcion,
                                         severidad: (ind.severidad as "BAJA" | "MEDIA" | "ALTA" | "CRITICA") || "MEDIA",
-                                        numero_linea: (ind as any).numero_linea ?? null,
-                                        categoria: (ind as any).categoria ?? "OBSERVACION",
+                                        numero_linea: ind.numero_linea ?? null,
+                                        categoria: ind.categoria ?? "GENERAL",
+                                        origen: ind.origen,
                                     }))}
                                     codeMetrics={codeData?.metricas_codigo}
                                     onNavigateToLine={(lineNumber) => {
