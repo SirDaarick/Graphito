@@ -1,0 +1,2 @@
+# Vendored upstream files must stay byte-identical (no CRLF conversion on Windows checkouts).
+* -text
