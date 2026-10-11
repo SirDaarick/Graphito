@@ -233,10 +233,20 @@ def test_manifest_write_is_atomic(tmp_path, corpus, runs, monkeypatch):
         return real_write(path, data)
 
     monkeypatch.setattr(bda, "atomic_write_bytes", failing)
-    with pytest.raises(OSError):
-        bda.main(_argv(corpus, runs, out, "--force"))
+    assert bda.main(_argv(corpus, runs, out, "--force")) == bda.WRITE_FAILED_EXIT
     assert (out / "manifest.json").read_bytes() == before
     assert not list(out.rglob("*.tmp"))
+
+
+def test_write_failure_returns_documented_exit_code_without_traceback(tmp_path, corpus, runs, monkeypatch, capsys):
+    def failing(path, data):
+        raise PermissionError("read-only filesystem")
+
+    monkeypatch.setattr(bda, "atomic_write_bytes", failing)
+    assert bda.main(_argv(corpus, runs, tmp_path / "deploy")) == bda.WRITE_FAILED_EXIT == 3
+    err = capsys.readouterr().err
+    assert "write failed" in err and "Traceback" not in err
+    assert "Exit codes" in bda.__doc__ and "3 write failed" in bda.__doc__
 
 
 def test_dry_run_writes_nothing(tmp_path, corpus, runs, capsys):
@@ -246,8 +256,12 @@ def test_dry_run_writes_nothing(tmp_path, corpus, runs, capsys):
     assert "graphito.deploy-manifest/v1" in capsys.readouterr().out
 
 
-def test_limit_assignments_is_debug_only(tmp_path, corpus, runs):
-    assert bda.main(_argv(corpus, runs, bda.DEFAULT_OUT, "--limit-assignments", "2")) == 1
+def test_limit_assignments_is_debug_only(tmp_path, corpus, runs, monkeypatch):
+    # Point DEFAULT_OUT at a tmp dir so a regression can never overwrite the committed bundle.
+    default_out = tmp_path / "default_deploy"
+    monkeypatch.setattr(bda, "DEFAULT_OUT", default_out)
+    assert bda.main(_argv(corpus, runs, default_out, "--limit-assignments", "2")) == 1
+    assert not default_out.exists()
     out = tmp_path / "deploy"
     assert bda.main(_argv(corpus, runs, out, "--limit-assignments", "4")) == 0
     assert _read_manifest(out)["build"]["limit_assignments"] == 4

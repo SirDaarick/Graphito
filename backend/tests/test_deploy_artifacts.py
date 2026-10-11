@@ -192,6 +192,99 @@ def test_loading_needs_numpy_only(fake_artifacts):
     assert done.returncode == 0, done.stderr
 
 
+def test_inference_workers_must_be_positive():
+    with pytest.raises(ValidationError, match="INFERENCE_WORKERS"):
+        _settings(INFERENCE_WORKERS=0)
+    assert _settings(INFERENCE_WORKERS=2).INFERENCE_WORKERS == 2
+
+
+# --- malformed manifests: always a typed ArtifactError with a stable reason (PR1 review) -------
+
+
+def _mutate(fake_artifacts, mutate):
+    doc = fake_artifacts.read()
+    mutate(doc)
+    fake_artifacts.write(doc)
+
+
+def _set(path, value):
+    def mutate(doc):
+        target = doc
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+    return mutate
+
+
+def _drop(key):
+    return lambda doc: doc.pop(key)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        _set(("channel_a", "calibration"), ["channel_a/calibration.json"]),
+        _set(("channel_a", "calibration"), {"path": "channel_a/calibration.json"}),
+        _set(("channel_b", "checkpoint"), ["channel_b/best.pth"]),
+        _set(("channel_b", "calibration"), 7),
+        _set(("channel_a", "threshold"), "high"),
+        _set(("channel_a", "threshold"), {"v": 0.5}),
+        _set(("channel_b", "threshold"), [0.1715]),
+        _set(("channel_b", "threshold"), True),
+        _set(("channel_a",), "jaccard"),
+        _set(("channel_b",), ["charcnn"]),
+        _set(("gcb",), ["secondary"]),
+        _set(("gcb",), "secondary"),
+        _set(("label",), {"text": "x"}),
+        _set(("files",), ["channel_a/calibration.json"]),
+        _set(("files",), {}),
+        _set(("files", "channel_b/best.pth"), "XYZ"),
+        _set(("files", "channel_b/best.pth"), 12345),
+        _set(("split_manifest_sha256",), "e" * 63),
+        _set(("split_manifest_sha256",), None),
+        _drop("split_manifest_sha256"),
+        _drop("files"),
+    ],
+    ids=[
+        "cal-path-list", "cal-path-mapping", "checkpoint-path-list", "cal-path-int",
+        "threshold-str", "threshold-mapping", "threshold-list", "threshold-bool",
+        "channel-a-str", "channel-b-list", "gcb-list", "gcb-str", "label-mapping",
+        "files-list", "files-empty", "sha-bad-format", "sha-int",
+        "split-short", "split-null", "split-missing", "files-missing",
+    ],
+)
+def test_malformed_manifest_fields_raise_typed_error(fake_artifacts, mutate):
+    _mutate(fake_artifacts, mutate)
+    with pytest.raises(ArtifactError) as exc:
+        load_bundle(fake_artifacts.manifest)
+    assert _reason(exc) in {"manifest_invalid", "not_in_manifest"}
+
+
+@pytest.mark.parametrize(
+    "raw", [b"", b"{not json", b"\xff\xfe\x00", b"[]", b'"manifest"', b"42", b"null"],
+    ids=["empty", "non-json", "non-utf8", "array", "string", "number", "null"],
+)
+def test_unparseable_or_non_object_manifest_is_invalid(fake_artifacts, raw):
+    fake_artifacts.manifest.write_bytes(raw)
+    with pytest.raises(ArtifactError) as exc:
+        load_bundle(fake_artifacts.manifest)
+    assert _reason(exc) == "manifest_invalid"
+
+
+def test_section_path_not_listed_in_files_is_not_in_manifest(fake_artifacts):
+    _mutate(fake_artifacts, _set(("channel_a", "calibration"), "channel_a/other.json"))
+    with pytest.raises(ArtifactError) as exc:
+        load_bundle(fake_artifacts.manifest)
+    assert _reason(exc) == "not_in_manifest"
+
+
+def test_manifest_threshold_must_equal_calibration_threshold(fake_artifacts):
+    _mutate(fake_artifacts, _set(("channel_b", "threshold"), 0.2))
+    with pytest.raises(ArtifactError) as exc:
+        load_bundle(fake_artifacts.manifest)
+    assert _reason(exc) == "manifest_inconsistent"
+
+
 @pytest.mark.skipif(not COMMITTED_MANIFEST.is_file(), reason="models/deploy/manifest.json not built yet (task 2.1)")
 def test_committed_deploy_bundle_integrity():
     # DA1.2 / DA2.2: the committed bundle verifies (sha256, keys, non-escaping paths, val fit) and

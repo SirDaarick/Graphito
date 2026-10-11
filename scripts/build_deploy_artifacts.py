@@ -22,7 +22,9 @@ build never leaves a manifest that points at the wrong bytes. `models/char_cnn/b
 (the legacy checkpoint) is never read or written. `--limit-assignments N` (debug) scores only the
 first N val assignments and is refused for the default output directory unless `--dry-run`.
 
-Exit codes: 0 built (or dry run), 1 refused (nothing written), 2 usage error.
+Exit codes: 0 built (or dry run), 1 refused (nothing written), 2 usage error, 3 write failed
+(an OSError while writing; the manifest is written last and atomically, so it is either the
+previous one or absent, and the backend loader refuses any file whose sha256 it does not list).
 
 The artifacts are NOT validated against reference-derived plagiarism; the manifest carries that
 label and the backend shows it.
@@ -66,6 +68,7 @@ GCB_FINGERPRINT_FIELDS = (
 )
 VERSION_PACKAGES = ("numpy", "scipy", "scikit-learn")
 REFUSED_EXIT = 1
+WRITE_FAILED_EXIT = 3
 
 A_CALIBRATION = "channel_a/calibration.json"
 B_CHECKPOINT = "channel_b/best.pth"
@@ -344,7 +347,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.dry_run:
             print(json.dumps(doc, indent=2, sort_keys=True))
             return 0
-        write_outputs(out, outputs, force=args.force)
+        try:
+            write_outputs(out, outputs, force=args.force)
+        except OSError as exc:
+            print(f"write failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return WRITE_FAILED_EXIT
     except BuildRefused as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return REFUSED_EXIT

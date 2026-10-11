@@ -99,7 +99,24 @@ def read_manifest(path: Union[str, Path]) -> DeployManifest:
     split = doc.get("split_manifest_sha256")
     if not isinstance(split, str) or not _SHA256.match(split):
         raise ArtifactError("manifest_invalid", "deploy manifest lacks split_manifest_sha256")
+    for name in ("channel_a", "channel_b"):
+        manifest.channel(name)
+    gcb = doc.get("gcb")
+    if gcb is not None and not isinstance(gcb, Mapping):
+        raise ArtifactError("manifest_invalid", "deploy manifest 'gcb' section must be an object")
+    label = doc.get("label")
+    if label is not None and not isinstance(label, str):
+        raise ArtifactError("manifest_invalid", "deploy manifest 'label' must be a string")
     return manifest
+
+
+def manifest_number(value: Any, what: str) -> float:
+    """A finite JSON number (bools refused), or `ArtifactError("manifest_invalid")`."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (
+        float("inf"), float("-inf")
+    ):
+        raise ArtifactError("manifest_invalid", f"{what} must be a finite number, got {type(value).__name__}")
+    return float(value)
 
 
 def verify_files(manifest: DeployManifest) -> None:

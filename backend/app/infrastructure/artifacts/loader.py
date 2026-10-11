@@ -19,7 +19,13 @@ from typing import Any, Dict, Optional, Union
 
 import numpy as np
 
-from app.infrastructure.artifacts.manifest import ArtifactError, DeployManifest, read_manifest, verify_files
+from app.infrastructure.artifacts.manifest import (
+    ArtifactError,
+    DeployManifest,
+    manifest_number,
+    read_manifest,
+    verify_files,
+)
 
 # backend/app/infrastructure/artifacts/loader.py -> repository root (`/` in the container,
 # where `./models` is mounted at `/models`).
@@ -86,6 +92,8 @@ class ArtifactBundle:
 
 def _entry(manifest: DeployManifest, section: Dict[str, Any], key: str, channel: str) -> str:
     rel = section.get(key)
+    if rel is not None and not isinstance(rel, str):
+        raise ArtifactError("manifest_invalid", f"{channel}.{key} must be a path string")
     if rel not in manifest.files:
         raise ArtifactError("not_in_manifest", f"{channel}.{key} is not listed in the manifest files")
     return rel
@@ -119,7 +127,8 @@ def _load_channel(manifest: DeployManifest, name: str, key: str, configured: Opt
     if entry.get("unachievable") or entry.get("threshold") is None:
         raise ArtifactError("threshold_unachievable", f"{name} threshold {key!r} is unachievable")
     threshold = float(entry["threshold"])
-    if section.get("threshold") is not None and float(section["threshold"]) != threshold:
+    manifest_threshold = section.get("threshold")
+    if manifest_threshold is not None and manifest_number(manifest_threshold, f"{name}.threshold") != threshold:
         raise ArtifactError("manifest_inconsistent", f"{name} manifest threshold differs from its calibration")
     return ChannelCalibration(
         name=name,
