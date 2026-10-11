@@ -43,7 +43,11 @@ class StubInferenceEngine(InferencePort):
             return StylometryResult(raw_score=None, abstained=True, reason="insufficient_length")
         return StylometryResult(raw_score=await self.predict_synthetic_prob(code), abstained=False)
 
-    # --- legacy decision path (removed when ScoringService lands, WU8) ---------------------------
+    # --- legacy, outside the port -----------------------------------------------------------------
+    # `predict_synthetic_prob` is the deterministic heuristic behind `predict_stylometry`.
+    # `compute_decision` is NOT used by the backend (the decision is `ScoringService` +
+    # `domain.scoring.decide`); it stays only for `tests/test_calibration_experiment.py` and
+    # `scripts/benchmark_student_archetypes.py` until they are migrated.
 
     async def predict_synthetic_prob(self, code: str) -> float:
         # Heurística simple para pruebas: comentarios típicos de LLMs o longitud de indentación

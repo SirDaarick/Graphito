@@ -9,8 +9,34 @@ from app.infrastructure.inference import get_inference_engine
 from app.infrastructure.vector_store import get_vector_store
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
+from app.domain.errors import NotReadyError
+from app.application.services.scoring_service import ScoringService
+from app.infrastructure.inference import runtime as inference_runtime
+from app.infrastructure.lexical.jaccard import JaccardSimilarity
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+
+def get_scoring_service(
+    inference: InferencePort = Depends(get_inference_engine),
+    vector_store: VectorStorePort = Depends(get_vector_store),
+) -> ScoringService:
+    """The shared scoring service: the started engine, its frozen calibrations (artifacts in REAL,
+    fixed defaults in STUB), the fingerprinted vector store and the Channel A Jaccard."""
+    calibration = inference_runtime.current_runtime().calibration
+    if calibration is None:
+        raise NotReadyError("calibration_unavailable", "no calibration loaded")
+    return ScoringService(inference, calibration, vector_store, _lexical())
+
+
+def _lexical() -> JaccardSimilarity:
+    global _lexical_instance
+    if _lexical_instance is None:
+        _lexical_instance = JaccardSimilarity()
+    return _lexical_instance
+
+
+_lexical_instance = None
 
 
 async def get_current_docente(

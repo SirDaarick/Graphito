@@ -199,6 +199,67 @@ async def test_degraded_real_mode_returns_503_before_any_write(client, db_sessio
     assert (await client.get(f"/api/v1/problems/{problema_id}", headers=headers)).status_code == 200
 
 
+class _FakeCharCNN:
+    arch_version = 2
+    preproc_version = 2
+
+    def predict_text(self, code):
+        # v2 keys plus legacy keys that must never be read (CI8.1).
+        return {"score": 0.3, "abstained": False, "ai_probability": 0.05, "prob_sintetico": 0.05}
+
+
+class _FakeGCB:
+    def predict_code(self, code, language="c"):
+        vec = [float((len(code) + i) % 7) + 1.0 for i in range(768)]
+        return {"success": True, "embedding": vec, "input_version": "v2", "pooling": "mean"}
+
+
+@pytest.mark.asyncio
+async def test_real_ready_runtime_completes_analysis_end_to_end(client, db_session, fake_artifacts, monkeypatch):
+    """Readiness must never claim ready while scoring is broken: a REAL runtime (fake artifacts and
+    fake models behind the real engine) scores single and batch analyses with artifact provenance."""
+    import asyncio
+
+    from app.infrastructure.artifacts import load_bundle
+    from app.infrastructure.inference.real_engine import RealBimodalInferenceEngine
+    from app.main import app
+
+    settings = _real_settings(fake_artifacts)
+    runtime = rt.build_runtime(settings, engine_factory=lambda s, b: RealBimodalInferenceEngine(
+        b, s, charcnn_factory=lambda path: _FakeCharCNN(), gcb_factory=lambda kwargs: _FakeGCB(),
+    ))
+    assert runtime.ready, runtime.reason
+    monkeypatch.setattr(rt, "_runtime", runtime)
+    app.dependency_overrides[get_inference_engine] = lambda: runtime.engine
+    try:
+        headers, problema_id, entrega_id = await _setup(client)
+        run = await client.post("/api/v1/analysis/run", json={"entrega_id": entrega_id}, headers=headers)
+        assert run.status_code == 201, run.text
+        batch = await client.post(
+            "/api/v1/analysis/batch", data={"problema_id": str(problema_id)},
+            files={"files": ("a.c", STUDENT_CODE.encode(), "text/plain")}, headers=headers,
+        )
+        assert batch.status_code == 202, batch.text
+        rows = []
+        for _ in range(50):
+            await asyncio.sleep(0.05)
+            db_session.expire_all()
+            rows = (await db_session.execute(select(ReporteAnalisis).order_by(ReporteAnalisis.id))).scalars().all()
+            if len(rows) == 2 and all(r.estado.value == "COMPLETADO" for r in rows):
+                break
+        assert [r.estado.value for r in rows] == ["COMPLETADO", "COMPLETADO"]
+        bundle = load_bundle(fake_artifacts.manifest)
+        for row in rows:
+            assert row.engine == "real" and row.umbral_a == 0.5 and row.umbral_b == 0.1715
+            assert row.calibracion_sha_a == bundle.channel_a.calibration_sha256
+            assert row.calibracion_sha_b == bundle.channel_b.calibration_sha256
+            assert row.checkpoint_sha_b == bundle.checkpoint_sha256 and row.manifest_sha == bundle.manifest_sha256
+            assert row.probabilidad_ia != 0.05 and row.gcb_estado == "OK" and row.gcb_similarity is not None
+        assert rows[0].dictamen == rows[1].dictamen and rows[0].flag_b == rows[1].flag_b
+    finally:
+        runtime.engine.close()
+
+
 @pytest.mark.asyncio
 async def test_ready_runtime_health_reports_engine(client):
     body = (await client.get("/health")).json()

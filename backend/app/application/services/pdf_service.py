@@ -171,9 +171,13 @@ class PdfReportService:
 
         # 4. Metrics Table
         elements.append(Paragraph("Desglose del Analisis Bimodal", h2_style))
-        sem_pct = f"{round(report.similitud_semantica * 100, 1)}%"
-        ai_pct = f"{round(report.probabilidad_ia * 100, 1)}%"
-        disc_score = f"{round(report.discrepancia_score, 4)}"
+        # NULL means "not evaluated": never print it as 0 (spec AR1.2). Full PDF rework: WU9.
+        def _pct(value):
+            return "No evaluado" if value is None else f"{round(value * 100, 1)}%"
+
+        sem_pct = _pct(report.similitud_semantica)
+        ai_pct = _pct(report.probabilidad_ia)
+        disc_score = "No disponible" if report.discrepancia_score is None else f"{round(report.discrepancia_score, 4)}"
 
         metrics_data = [
             [

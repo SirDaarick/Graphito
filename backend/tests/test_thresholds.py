@@ -1,35 +1,43 @@
-"""R3: one canonical source for the decision thresholds."""
+"""Decision thresholds come only from the calibration artifacts (spec AS5; design D6, D9).
 
-import inspect
+Client thresholds are still accepted by the request schema for older clients, default to None and
+never reach the decision (the API effect is covered in `test_api_flow.py`).
+"""
+
+import re
 import uuid
+from pathlib import Path
 
-from app.config import settings
 from app.infrastructure.inference.stub_engine import StubInferenceEngine
 from app.presentation.schemas.analysis import AnalysisRunRequest
 
+APP_DIR = Path(__file__).resolve().parents[1] / "app"
 
-def test_defaults_are_0_85_and_0_20():
-    # Assumes no THRESHOLD_* override in the environment/.env used for the test run.
+
+def test_request_thresholds_are_optional_and_default_to_none():
     req = AnalysisRunRequest(entrega_id=uuid.uuid4())
-    assert req.threshold_sem == settings.THRESHOLD_SEM == 0.85
-    assert req.threshold_ai == settings.THRESHOLD_AI == 0.20
+    assert req.threshold_sem is None and req.threshold_ai is None
 
 
-def test_request_default_follows_settings(monkeypatch):
-    monkeypatch.setattr(settings, "THRESHOLD_SEM", 0.70)
-    monkeypatch.setattr(settings, "THRESHOLD_AI", 0.55)
-    req = AnalysisRunRequest(entrega_id=uuid.uuid4())
-    assert req.threshold_sem == 0.70
-    assert req.threshold_ai == 0.55
+def test_request_still_accepts_legacy_thresholds():
+    req = AnalysisRunRequest(entrega_id=uuid.uuid4(), threshold_sem=0.01, threshold_ai=0.01)
+    assert req.threshold_sem == 0.01 and req.threshold_ai == 0.01
 
 
-def test_request_can_still_override_per_call():
-    req = AnalysisRunRequest(entrega_id=uuid.uuid4(), threshold_sem=0.5)
-    assert req.threshold_sem == 0.5
+def test_no_app_module_calls_the_legacy_decision():
+    # The stub keeps `compute_decision` only for legacy root tests/scripts; the backend never calls it.
+    callers = [
+        str(p.relative_to(APP_DIR)) for p in APP_DIR.rglob("*.py")
+        if p.name != "stub_engine.py" and re.search(r"\.compute_decision\(|\.predict_synthetic_prob\(", p.read_text(encoding="utf-8"))
+    ]
+    assert callers == []
+    assert "compute_decision" not in StubInferenceEngine.__abstractmethods__
 
 
-def test_compute_decision_thresholds_are_required_keyword_only():
-    params = inspect.signature(StubInferenceEngine.compute_decision).parameters
-    for name in ("threshold_sem", "threshold_ai"):
-        assert params[name].kind is inspect.Parameter.KEYWORD_ONLY
-        assert params[name].default is inspect.Parameter.empty
+def test_no_app_module_reads_legacy_threshold_settings():
+    pattern = re.compile(r"\bTHRESHOLD_(SEM|AI)\b")
+    readers = [
+        str(p.relative_to(APP_DIR)) for p in APP_DIR.rglob("*.py")
+        if p.name != "config.py" and pattern.search(p.read_text(encoding="utf-8"))
+    ]
+    assert readers == []

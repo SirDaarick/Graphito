@@ -14,7 +14,8 @@ from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestra
 from app.application.services.pdf_service import PdfReportService
 from app.application.services.batch_analysis_service import BatchAnalysisService
 from app.application.services.xai_service import XAIService
-from app.presentation.api.v1.deps import get_current_docente
+from app.application.services.scoring_service import ScoringService
+from app.presentation.api.v1.deps import get_current_docente, get_scoring_service
 from app.presentation.schemas.analysis import (
     AnalysisRunRequest,
     ReporteAnalisisResponse,
@@ -36,10 +37,9 @@ async def run_analysis(
     async_mode: bool = Query(False, description="Ejecutar inferencia en segundo plano"),
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
+    scoring: ScoringService = Depends(get_scoring_service),
 ):
-    orchestrator = AnalysisOrchestrator(db, inference, vector_store)
+    orchestrator = AnalysisOrchestrator(db, scoring=scoring)
     if async_mode:
         return await orchestrator.start_async_analysis(current_user.id, request)
     return await orchestrator.execute_analysis(current_user.id, request)
@@ -175,8 +175,7 @@ async def upload_batch_submissions(
     files: List[UploadFile] = File(...),
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
+    scoring: ScoringService = Depends(get_scoring_service),
 ):
     """
     Carga masiva de entregas de estudiantes (archivos múltiples o carpetas completas).
@@ -187,7 +186,8 @@ async def upload_batch_submissions(
         if not f.filename.lower().endswith((".c", ".cpp", ".cc", ".h")):
             continue
         raw_bytes = await f.read()
-        content = raw_bytes.decode("utf-8", errors="ignore")
+        # Same decoding as the evaluation data (`errors="replace"`), so Channel A sees the same text.
+        content = raw_bytes.decode("utf-8", errors="replace")
         # Extraer nombre preliminar del archivo si no viene en metadatos
         clean_name = f.filename.rsplit(".", 1)[0]
         # Si tiene patrón boleta_nombre_apellido, aislar nombres
@@ -196,7 +196,7 @@ async def upload_batch_submissions(
 
         files_data.append((f.filename, content, author))
 
-    batch_service = BatchAnalysisService(db, inference, vector_store)
+    batch_service = BatchAnalysisService(db, scoring=scoring)
     batch_id = await batch_service.create_batch(
         docente_id=current_user.id,
         problema_id=problema_id,
@@ -204,12 +204,11 @@ async def upload_batch_submissions(
         files_data=files_data,
     )
 
-    # Lanzar worker en segundo plano
+    # Lanzar worker en segundo plano (mismo ScoringService que el análisis individual)
     batch_service.dispatch_batch_worker(
         batch_id=batch_id,
         problema_id=problema_id,
-        inference=inference,
-        vector_store=vector_store,
+        scoring=scoring,
     )
 
     return BatchUploadResponse(

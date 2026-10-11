@@ -2,7 +2,6 @@ import uuid
 import asyncio
 import logging
 
-from app.config import settings
 from typing import List, Tuple, Optional, Dict, Any
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -14,15 +13,13 @@ from app.infrastructure.database.models import (
     Grupo,
     CodigoFuente,
     ReporteAnalisis,
-    IndicadorIntegridad,
     LoteAnalisis,
     TipoCodigoEnum,
-    DictamenEnum,
     EstadoAnalisisEnum,
 )
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
-from app.application.services.xai_service import XAIService
+from app.application.services.scoring_service import ScoringService
 from app.presentation.schemas.batch import BatchStatusResponse
 
 logger = logging.getLogger("graphito-batch")
@@ -32,12 +29,20 @@ class BatchAnalysisService:
     def __init__(
         self,
         db: AsyncSession,
-        inference: InferencePort,
-        vector_store: VectorStorePort,
+        inference: Optional[InferencePort] = None,
+        vector_store: Optional[VectorStorePort] = None,
+        scoring: Optional[ScoringService] = None,
     ):
         self.db = db
         self.inference = inference
         self.vector_store = vector_store
+        self.scoring = scoring
+
+    @property
+    def engine_label(self) -> Optional[str]:
+        if self.scoring is not None:
+            return self.scoring.engine_label
+        return getattr(self.inference, "engine", None) or None
 
     async def create_batch(
         self,
@@ -99,14 +104,12 @@ class BatchAnalysisService:
             self.db.add(codigo)
             await self.db.flush()
 
+            # Sin puntajes ni dictamen hasta que el worker lo evalúe (NULL, nunca 0).
             reporte = ReporteAnalisis(
                 entrega_id=codigo.id,
                 lote_id=batch_id,
-                similitud_semantica=0.0,
-                probabilidad_ia=0.0,
-                discrepancia_score=0.0,
-                dictamen=DictamenEnum.SIN_ALERTAS,
                 estado=EstadoAnalisisEnum.PENDIENTE,
+                engine=self.engine_label,
             )
             self.db.add(reporte)
 
@@ -159,8 +162,7 @@ class BatchAnalysisService:
         cls,
         batch_id: uuid.UUID,
         problema_id: int,
-        inference: InferencePort,
-        vector_store: VectorStorePort,
+        scoring: ScoringService,
     ):
         """
         Lanza la tarea en segundo plano no bloqueante usando asyncio.create_task.
@@ -169,8 +171,7 @@ class BatchAnalysisService:
             cls._process_batch_pipeline(
                 batch_id=batch_id,
                 problema_id=problema_id,
-                inference=inference,
-                vector_store=vector_store,
+                scoring=scoring,
             )
         )
 
@@ -179,18 +180,16 @@ class BatchAnalysisService:
         cls,
         batch_id: uuid.UUID,
         problema_id: int,
-        inference: InferencePort,
-        vector_store: VectorStorePort,
+        scoring: ScoringService,
     ):
+        """Score every pending report of the batch with the shared ScoringService (spec AS1)."""
         from app.infrastructure.database.session import async_session_maker
         logger.info(f"Iniciando pipeline asíncrono para lote {batch_id}...")
-        semaphore = asyncio.Semaphore(3)  # Máximo 3 inferencias concurrentes
+        semaphore = asyncio.Semaphore(3)  # Máximo 3 análisis concurrentes (la inferencia se encola en el pool)
 
         async with async_session_maker() as session:
-            # Consultar todos los reportes pendientes del lote
             stmt = (
                 select(ReporteAnalisis)
-                .options(selectinload(ReporteAnalisis.entrega))
                 .where(
                     and_(
                         ReporteAnalisis.lote_id == batch_id,
@@ -199,7 +198,7 @@ class BatchAnalysisService:
                 )
             )
             res = await session.execute(stmt)
-            reportes = res.scalars().all()
+            reportes = [(r.id, r.entrega_id) for r in res.scalars().all()]
 
         async def _process_single_report(rep_id: int, entrega_id: uuid.UUID):
             async with semaphore:
@@ -212,75 +211,15 @@ class BatchAnalysisService:
                         if not entrega:
                             return
 
-                        # 1. Inferencia concurrente bimodal
-                        sem_task = inference.extract_semantic_embedding(
-                            entrega.contenido, lang=entrega.lenguaje
-                        )
-                        prob_task = inference.predict_synthetic_prob(entrega.contenido)
-                        sem_vec, ai_prob = await asyncio.gather(sem_task, prob_task)
+                        # Misma medición, dictamen e indicadores que el análisis individual.
+                        outcome = await scoring.score(inner_session, entrega)
 
-                        # 2. Búsqueda de referencia canónica en ChromaDB (768-dim semantic only)
-                        matches = await vector_store.query_nearest(
-                            embedding=sem_vec,
-                            problema_id=problema_id,
-                            top_k=1,
-                        )
-                        target_ref_id = None
-                        raw_sim = 0.0
-                        if matches:
-                            target_ref_id = uuid.UUID(matches[0]["reference_id"])
-                            raw_sim = matches[0]["similarity"]
-
-                        # 3. Calibración de similitud semántica
-                        baseline = 0.75
-                        calibrated_sim = (
-                            max(0.0, (raw_sim - baseline) / (1.0 - baseline))
-                            if raw_sim > baseline
-                            else 0.0
-                        )
-
-                        # 4. Decisión del orquestador
-                        decision = inference.compute_decision(
-                            semantic_similarity=calibrated_sim,
-                            synthetic_prob=ai_prob,
-                            threshold_sem=settings.THRESHOLD_SEM,
-                            threshold_ai=settings.THRESHOLD_AI,
-                        )
-
-                        # 5. Generar explicaciones XAI línea por línea
-                        xai_explanations = XAIService.extract_explanations(
-                            code=entrega.contenido,
-                            language=entrega.lenguaje,
-                            semantic_sim=calibrated_sim,
-                            ai_prob=ai_prob,
-                        )
-
-                        # 6. Actualizar reporte
                         r_res = await inner_session.execute(
                             select(ReporteAnalisis).where(ReporteAnalisis.id == rep_id)
                         )
                         reporte = r_res.scalar_one()
-                        reporte.referencia_id = target_ref_id
-                        reporte.similitud_semantica = round(calibrated_sim, 4)
-                        reporte.probabilidad_ia = round(ai_prob, 4)
-                        reporte.discrepancia_score = decision["discrepancia_score"]
-                        reporte.dictamen = DictamenEnum(decision["dictamen"])
-                        reporte.estado = EstadoAnalisisEnum.COMPLETADO
+                        scoring.persist(inner_session, reporte, outcome, entrega)
 
-                        # Combinar indicadores básicos con explicaciones XAI
-                        all_indicators = decision.get("indicadores", [])
-                        for exp in xai_explanations:
-                            ind_obj = IndicadorIntegridad(
-                                reporte_id=reporte.id,
-                                tipo_alerta=exp["tipo_alerta"],
-                                descripcion=exp["descripcion"],
-                                severidad=exp["severidad"],
-                                numero_linea=exp["numero_linea"],
-                                categoria=exp["categoria"],
-                            )
-                            inner_session.add(ind_obj)
-
-                        # También actualizar contador en LoteAnalisis
                         l_res = await inner_session.execute(
                             select(LoteAnalisis).where(LoteAnalisis.id == batch_id)
                         )
@@ -292,13 +231,15 @@ class BatchAnalysisService:
                     except Exception as err:
                         logger.error(f"Error procesando reporte {rep_id} del lote {batch_id}: {err}", exc_info=True)
                         try:
+                            await inner_session.rollback()
                             r_res = await inner_session.execute(
                                 select(ReporteAnalisis).where(ReporteAnalisis.id == rep_id)
                             )
                             reporte = r_res.scalar_one_or_none()
                             if reporte:
                                 reporte.estado = EstadoAnalisisEnum.ERROR
-                                reporte.error_mensaje = str(err)
+                                reporte.dictamen = None
+                                reporte.error_mensaje = str(getattr(err, "reason", None) or type(err).__name__)
 
                             l_res = await inner_session.execute(
                                 select(LoteAnalisis).where(LoteAnalisis.id == batch_id)
@@ -309,10 +250,9 @@ class BatchAnalysisService:
 
                             await inner_session.commit()
                         except Exception:
-                            pass
+                            logger.exception(f"No se pudo marcar el reporte {rep_id} como ERROR.")
 
-        # Procesar secuencialmente o en grupos controlados
-        tasks = [_process_single_report(r.id, r.entrega_id) for r in reportes]
+        tasks = [_process_single_report(rep_id, entrega_id) for rep_id, entrega_id in reportes]
         await asyncio.gather(*tasks)
 
         # Marcar lote como COMPLETADO

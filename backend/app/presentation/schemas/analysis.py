@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 import uuid
-from pydantic import BaseModel, ConfigDict, Field
-from app.config import settings
+from pydantic import BaseModel, ConfigDict
 from app.infrastructure.database.models import (
     DictamenEnum,
     EstadoAnalisisEnum,
@@ -12,9 +11,12 @@ from app.infrastructure.database.models import (
 
 class AnalysisRunRequest(BaseModel):
     entrega_id: uuid.UUID
-    referencia_id: Optional[uuid.UUID] = None  # Si es None, busca la más cercana en ChromaDB
-    threshold_sem: float = Field(default_factory=lambda: settings.THRESHOLD_SEM)
-    threshold_ai: float = Field(default_factory=lambda: settings.THRESHOLD_AI)
+    # Si es None, el Canal A usa todas las referencias del problema.
+    referencia_id: Optional[uuid.UUID] = None
+    # Deprecated and ignored (design D9, spec AS5): thresholds come only from the calibration
+    # artifacts. Still accepted so older clients keep working; a warning is logged.
+    threshold_sem: Optional[float] = None
+    threshold_ai: Optional[float] = None
 
 
 class IndicadorResponse(BaseModel):
@@ -35,10 +37,12 @@ class ReporteAnalisisResponse(BaseModel):
     entrega_id: uuid.UUID
     referencia_id: Optional[uuid.UUID] = None
     lote_id: Optional[uuid.UUID] = None
-    similitud_semantica: float = 0.0
-    probabilidad_ia: float = 0.0
-    discrepancia_score: float = 0.0
-    dictamen: DictamenEnum = DictamenEnum.SIN_ALERTAS
+    # NULL means "not evaluated", never 0 (spec AR1.2); dictamen is NULL until scored.
+    similitud_semantica: Optional[float] = None
+    probabilidad_ia: Optional[float] = None
+    # Deprecated (design D15): NULL for new reports.
+    discrepancia_score: Optional[float] = None
+    dictamen: Optional[DictamenEnum] = None
     estado: EstadoAnalisisEnum = EstadoAnalisisEnum.COMPLETADO
     decision_docente: DecisionDocenteEnum = DecisionDocenteEnum.PENDIENTE
     fecha_decision: Optional[datetime] = None
