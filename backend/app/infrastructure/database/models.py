@@ -27,6 +27,9 @@ class DictamenEnum(str, enum.Enum):
     REVISION_ESTILOMETRICA = "REVISION_ESTILOMETRICA"
     REVISION_SEMANTICA = "REVISION_SEMANTICA"
     DISCREPANCIA_DUAL = "DISCREPANCIA_DUAL"
+    # SDD-4 (spec AS4.2): a channel could not be evaluated / the problem has no references.
+    NO_EVALUABLE = "NO_EVALUABLE"
+    SIN_REFERENCIA = "SIN_REFERENCIA"
     # Compatibilidad retroactiva
     INTEGRO = "SIN_ALERTAS"
     SOSPECHA_IA = "REVISION_ESTILOMETRICA"
@@ -158,10 +161,31 @@ class ReporteAnalisis(Base):
     entrega_id = Column(Uuid(as_uuid=True), ForeignKey("codigos_fuente.id", ondelete="CASCADE"), nullable=False)
     referencia_id = Column(Uuid(as_uuid=True), ForeignKey("codigos_fuente.id", ondelete="SET NULL"), nullable=True)
     lote_id = Column(Uuid(as_uuid=True), ForeignKey("lotes_analisis.id", ondelete="SET NULL"), nullable=True, index=True)
-    similitud_semantica = Column(Float, nullable=False, default=0.0)
-    probabilidad_ia = Column(Float, nullable=False, default=0.0)
-    discrepancia_score = Column(Float, nullable=False, default=0.0)
-    dictamen = Column(Enum(DictamenEnum), nullable=False, default=DictamenEnum.SIN_ALERTAS)
+    # Scores: NULL means "not evaluated", never 0 (spec AR1.2). `similitud_semantica` is the raw
+    # Channel A Jaccard, `probabilidad_ia` the calibrated Channel B score (design D8).
+    similitud_semantica = Column(Float, nullable=True)
+    probabilidad_ia = Column(Float, nullable=True)
+    # Deprecated (design D15): NULL for new rows; never read by the decision.
+    discrepancia_score = Column(Float, nullable=True)
+    # NULL while PENDIENTE / PROCESANDO / ERROR.
+    dictamen = Column(Enum(DictamenEnum), nullable=True)
+    # Provenance and decision inputs (spec AR1.1, MG1.1); VARCHAR states, not PG enums (D14).
+    engine = Column(String(20), nullable=True)  # "real" | "stub" | "legacy"
+    canal_a_metodo = Column(String(30), nullable=True)
+    estado_canal_a = Column(String(30), nullable=True)
+    estado_canal_b = Column(String(30), nullable=True)
+    flag_a = Column(Boolean, nullable=True)
+    flag_b = Column(Boolean, nullable=True)
+    umbral_a = Column(Float, nullable=True)
+    umbral_b = Column(Float, nullable=True)
+    puntaje_calibrado_a = Column(Float, nullable=True)
+    calibracion_sha_a = Column(String(64), nullable=True)
+    calibracion_sha_b = Column(String(64), nullable=True)
+    checkpoint_sha_b = Column(String(64), nullable=True)
+    manifest_sha = Column(String(64), nullable=True)
+    # GraphCodeBERT v2 zero-shot cosine: exploratory, never decides (spec AS8).
+    gcb_similarity = Column(Float, nullable=True)
+    gcb_estado = Column(String(20), nullable=True)
     estado = Column(Enum(EstadoAnalisisEnum), nullable=False, default=EstadoAnalisisEnum.COMPLETADO)
     decision_docente = Column(Enum(DecisionDocenteEnum), nullable=False, default=DecisionDocenteEnum.PENDIENTE, index=True)
     fecha_decision = Column(DateTime(timezone=True), nullable=True)

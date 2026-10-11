@@ -1,55 +1,101 @@
+"""Apply `migrations/migration_features.sql` to the configured database (spec MG1; design D13).
+
+Each statement runs on its own on an AUTOCOMMIT connection, so `ALTER TYPE ... ADD VALUE` is never
+inside a transaction block and one failure cannot silently abort the statements after it. The run
+stops at the first failing statement and exits 1; nothing after it is executed. Every statement in
+the file is idempotent, so a successful run can be repeated.
+
+Order: start the backend once (`create_all` creates missing tables), then run this script.
+
+Usage (from backend/ or inside the backend container):
+  python apply_migrations.py
+"""
+
 import asyncio
-import os
 import sys
 from pathlib import Path
-from sqlalchemy import text
-from app.infrastructure.database.session import engine
+from typing import Awaitable, Callable, List, Sequence
+
+MIGRATION_FILE = Path(__file__).parent / "migrations" / "migration_features.sql"
+
+Execute = Callable[[str], Awaitable[object]]
 
 
-async def run_migrations():
+def split_statements(sql: str) -> List[str]:
+    """Split a SQL script into single statements (pure).
+
+    Full-line `--` comments and blank lines are dropped. A statement ends at a line ending in `;`
+    outside a `$$ ... $$` block (an odd number of `$$` on a line toggles the block).
     """
-    Lee y ejecuta de forma idempotente las sentencias DDL de migration_features.sql
-    utilizando el motor asíncrono configurado en Graphito.
-    """
-    migration_file = Path(__file__).parent / "migrations" / "migration_features.sql"
-    if not migration_file.exists():
-        print(f"Error: No se encontró el archivo de migración en {migration_file}")
-        sys.exit(1)
+    statements: List[str] = []
+    current: List[str] = []
+    in_dollar_block = False
+    for line in sql.splitlines():
+        stripped = line.strip()
+        if not stripped or (stripped.startswith("--") and not current):
+            continue
+        if line.count("$$") % 2 == 1:
+            in_dollar_block = not in_dollar_block
+        current.append(line.rstrip())
+        if not in_dollar_block and stripped.endswith(";"):
+            statement = "\n".join(current).strip()
+            if statement:
+                statements.append(statement)
+            current = []
+    if current:
+        tail = "\n".join(current).strip()
+        if tail:
+            statements.append(tail)
+    return statements
 
-    print(f"Leyendo sentencias SQL desde {migration_file}...")
-    sql_script = migration_file.read_text(encoding="utf-8")
 
-    async with engine.begin() as conn:
-        print("Conectado a la base de datos. Aplicando migraciones...")
-        # Dividir por sentencias separadas por punto y coma (respetando bloques DO $$ ... $$;)
-        statements = []
-        current_stmt = []
-        in_dollar_block = False
+async def run_statements(statements: Sequence[str], execute: Execute) -> int:
+    """Run statements in order; on the first failure report it and return 1 (later ones never run)."""
+    for index, statement in enumerate(statements, start=1):
+        try:
+            await execute(statement)
+        except Exception as exc:
+            print(
+                f"ERROR: statement {index}/{len(statements)} failed; nothing after it was run.\n"
+                f"{statement[:200]}\nDetail: {type(exc).__name__}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"ok {index}/{len(statements)}: {' '.join(statement.split())[:80]}")
+    print(f"Migration completed: {len(statements)} statements applied.")
+    return 0
 
-        for line in sql_script.splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("--"):
-                continue
 
-            if "$$" in line:
-                in_dollar_block = not in_dollar_block
+async def run_migrations(path: Path = MIGRATION_FILE, engine=None) -> int:
+    if not path.exists():
+        print(f"ERROR: migration file not found: {path}", file=sys.stderr)
+        return 1
+    statements = split_statements(path.read_text(encoding="utf-8"))
+    if engine is None:
+        from app.infrastructure.database.session import engine as default_engine
 
-            current_stmt.append(line)
+        engine = default_engine
+    from sqlalchemy import text
 
-            if not in_dollar_block and stripped.endswith(";"):
-                stmt_str = "\n".join(current_stmt).strip()
-                if stmt_str:
-                    statements.append(stmt_str)
-                current_stmt = []
+    try:
+        async with engine.connect() as conn:
+            conn = await conn.execution_options(isolation_level="AUTOCOMMIT")
 
-        for stmt in statements:
-            try:
-                await conn.execute(text(stmt))
-            except Exception as e:
-                print(f"Advertencia/Error al ejecutar sentencia:\n{stmt[:80]}...\nDetalle: {e}")
+            async def execute(statement: str):
+                # AUTOCOMMIT: every statement is its own transaction.
+                return await conn.execute(text(statement))
 
-        print("¡Migración completada exitosamente!")
+            return await run_statements(statements, execute)
+    except Exception as exc:
+        print(f"ERROR: could not connect or run migrations: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        await engine.dispose()
+
+
+def main() -> int:
+    return asyncio.run(run_migrations())
 
 
 if __name__ == "__main__":
-    asyncio.run(run_migrations())
+    sys.exit(main())

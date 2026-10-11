@@ -88,3 +88,31 @@ CREATE INDEX IF NOT EXISTS ix_comentarios_docente_id ON comentarios_revision(doc
 -- 7. INTERPRETABILIDAD Y EXPLICABILIDAD (XAI)
 ALTER TABLE indicadores_integridad ADD COLUMN IF NOT EXISTS numero_linea INTEGER;
 ALTER TABLE indicadores_integridad ADD COLUMN IF NOT EXISTS categoria VARCHAR(50) DEFAULT 'GENERAL';
+
+-- 8. INTEGRACIÓN DE MODELOS (SDD-4): puntajes anulables, procedencia y dictámenes nuevos
+-- apply_migrations.py ejecuta cada sentencia sola en AUTOCOMMIT y se detiene en el primer error.
+-- ADD VALUE va fuera de un bloque de transacción (requisito de PostgreSQL).
+ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'NO_EVALUABLE';
+ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'SIN_REFERENCIA';
+-- NULL significa "no evaluado", nunca 0 (dictamen NULL mientras PENDIENTE/PROCESANDO/ERROR).
+ALTER TABLE reportes_analisis ALTER COLUMN similitud_semantica DROP NOT NULL;
+ALTER TABLE reportes_analisis ALTER COLUMN probabilidad_ia DROP NOT NULL;
+ALTER TABLE reportes_analisis ALTER COLUMN discrepancia_score DROP NOT NULL;
+ALTER TABLE reportes_analisis ALTER COLUMN dictamen DROP NOT NULL;
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS engine VARCHAR(20);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS canal_a_metodo VARCHAR(30);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS estado_canal_a VARCHAR(30);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS estado_canal_b VARCHAR(30);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS flag_a BOOLEAN;
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS flag_b BOOLEAN;
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS umbral_a DOUBLE PRECISION;
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS umbral_b DOUBLE PRECISION;
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS puntaje_calibrado_a DOUBLE PRECISION;
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS calibracion_sha_a VARCHAR(64);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS calibracion_sha_b VARCHAR(64);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS checkpoint_sha_b VARCHAR(64);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS manifest_sha VARCHAR(64);
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS gcb_similarity DOUBLE PRECISION;
+ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS gcb_estado VARCHAR(20);
+-- Filas previas: procedencia "legacy"; sus puntajes no se tocan ni se recalculan.
+UPDATE reportes_analisis SET engine = 'legacy' WHERE engine IS NULL;
