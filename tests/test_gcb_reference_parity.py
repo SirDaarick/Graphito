@@ -131,3 +131,83 @@ def test_extracted_run_features_and_mask_run_on_fake_tokenizer():
     assert mask.shape == (20, 20)
     node_index = sum(p > 1 for p in feats.position_idx_1)
     assert mask[node_index, node_index + 1]  # node a -> its parent b
+
+
+# --- GD1.2: walker golden parity (design D2/D3) --------------------------------------------
+#
+# The vendored `DFG_java` walks the same tree-sitter tree through `JavaView`, so token indices
+# coincide and the comparison is exact. Snippets cover only constructs shared with the Java
+# walker and avoid the documented C deviations (design D4; e.g. no variable defined before an
+# if/else and redefined in both branches, no compound assignment, no pointer/array declarator
+# names, declaration-initialised `for` only). Parent code lists are compared as sets because
+# upstream builds them with `list(set(...))` in loops and does not align them with the indices.
+
+GOLDEN = [
+    ("decl_init_chain", "c", "int f(){ int a = 1; int b = a; return b; }"),
+    ("decl_without_init", "c", "int f(){ int a; a = 1; int c = a; return c; }"),
+    ("multi_declarators", "c", "int f(int x){ int a = x, b, c = a; b = c; return b; }"),
+    ("last_definition", "c", "int f(){ int a = 1; a = 2; int c = a; return c; }"),
+    ("update", "c", "int f(int i){ i++; --i; int j = i; return j; }"),
+    ("if_braced_no_else", "c", "int f(int c){ int a = 0; if (c) { a = 1; } int b = a; return b; }"),
+    ("if_braceless_else", "c", "int f(int c){ int x = c; if (x > 0) y = x; else y = 2; return y; }"),
+    ("else_if_chain", "c", "int f(int c){ if (c > 1) r = 1; else if (c > 0) r = c; else r = 3; return r; }"),
+    ("for_decl_init", "c", "int f(int n){ int s = 0; for (int i = 0; i < n; i++) s = s + i; return s; }"),
+    ("for_block_body", "c", "int f(int n){ int s = 1; for (int i = 0; i < n; i++) { int t = s; s = t * 2; } return s; }"),
+    ("while", "c", "int f(int x){ int y = 0; while (x > 0) { y = y + x; x = x - 1; } return y; }"),
+    ("call", "c", "int f(int a, int b){ int x = g(a, b); return x; }"),
+    ("return_expression", "c", "int f(int a, int b){ return a * b + a; }"),
+    ("literals", "c", "int f(){ char c = 'x'; char *s = \"hi\"; int n = c; return n; }"),
+    ("nested_block", "c", "int f(int a){ { int b = a; a = b; } return a; }"),
+    ("cpp_range_for", "cpp", "int f(std::vector<int> v){ int s = 0; for (int x : v) s = s + x; return s; }"),
+    ("cpp_while_braceless", "cpp", "int f(int x){ while (x) x--; return x; }"),
+    ("cpp_if_else", "cpp", "int f(int c){ int a = c; if (a) b = a; else b = c; return b; }"),
+]
+
+
+def _normalise(dfg):
+    return [(code, idx, rel, tuple(sorted(set(codes))), tuple(idxs)) for code, idx, rel, codes, idxs in dfg]
+
+
+def _v2_raw(code, lang):
+    from models.graphcodebert.v2 import dfg as v2_dfg
+
+    source = v2_dfg.prepare_source(code)
+    root = v2_dfg.parse_source(source, lang).root_node
+    tokens, index_to_code = v2_dfg.index_tokens(root, source)
+    return tokens, v2_dfg.walk_dfg(root, index_to_code)
+
+
+@pytest.mark.parametrize("name,lang,code", GOLDEN, ids=[g[0] for g in GOLDEN])
+def test_token_parity_with_upstream(name, lang, code):
+    ref_tokens, _ = harness.upstream_raw_dfg(code, lang)
+    v2_tokens, _ = _v2_raw(code, lang)
+    assert v2_tokens == ref_tokens
+
+
+@pytest.mark.parametrize("name,lang,code", GOLDEN, ids=[g[0] for g in GOLDEN])
+def test_raw_walker_parity_with_upstream_dfg_java(name, lang, code):
+    _, ref = harness.upstream_raw_dfg(code, lang)
+    _, ours = _v2_raw(code, lang)
+    assert ref, "upstream walker produced nothing; the JavaView proxy is broken"
+    assert _normalise(ours) == _normalise(ref)
+
+
+@pytest.mark.parametrize("name,lang,code", GOLDEN, ids=[g[0] for g in GOLDEN])
+def test_filtered_dataflow_parity_with_upstream_extract_dataflow(name, lang, code):
+    from models.graphcodebert.v2.dfg import extract_dfg_v2
+
+    ref_tokens, ref = harness.upstream_dataflow(code, lang)
+    result = extract_dfg_v2(code, lang)
+    assert ref, "upstream extract_dataflow produced nothing (it swallows exceptions)"
+    assert result.code_tokens == ref_tokens
+    assert _normalise(result.dfg) == _normalise(ref)
+    assert result.parse_errors is False and result.dfg_error is None
+
+
+def test_parity_detects_a_divergence():
+    """Guard against a vacuous comparison: a C deviation (else does not union the pre-if
+    definitions, design D4) must show up as a difference."""
+    code = "int f(int c){ int a = 0; if (c) a = 1; else a = 2; int b = a; return b; }"
+    _, ref = harness.upstream_raw_dfg(code, "c")
+    _, ours = _v2_raw(code, "c")
+    assert _normalise(ours) != _normalise(ref)
