@@ -14,6 +14,7 @@ Dispatch on `config.input_version`:
 The adapter is never loaded here: an explicit `adapter_path` is ignored with a WARNING, and
 `peft` is never imported. `predict_code` keeps the legacy keys and adds `dfg_nodes_used`,
 `n_windows`, `input_version`, `pooling`, `adapter_loaded`, `truncated` and `parse_errors`.
+On the legacy path `truncated` may be None (unknown, see `_legacy_truncated`).
 """
 
 import logging
@@ -56,17 +57,51 @@ class GraphCodeBERTInference(LegacyGraphCodeBERTInference):
         return self._predict_legacy(code, language)
 
     def _predict_legacy(self, code: str, language: str) -> dict:
-        res = super().predict_code(code, language)
+        self._truncation_log = []
+        try:
+            res = super().predict_code(code, language)
+            log = self._truncation_log
+        finally:
+            self._truncation_log = None
         res.update(
             dfg_nodes_used=res["dfg_node_count"],
             n_windows=res.get("chunks", 1),
             input_version="legacy",
             pooling="cls",
             adapter_loaded=self.is_lora_loaded,
-            truncated=False,
+            truncated=self._legacy_truncated(code, res, log),
             parse_errors=self._legacy_parse_errors(code, language),
         )
         return res
+
+    def _legacy_truncated(self, code: str, res: dict, log: list) -> Optional[bool]:
+        """Whether the legacy encoding dropped content: True, False, or None when unknown.
+
+        Observable losses: the tokenizer cut at `max_code_tokens`, DFG nodes beyond the
+        `max_position_embeddings` budget (both recorded per `_build_graph_aware_input` call), and
+        the `code[:2000]` fallback after every chunk failed. A chunked file whose chunks all fit is
+        `None`: chunks whose parse fails are skipped inside the frozen class without a trace, so
+        their loss cannot be ruled out from here.
+        """
+        if any(log):
+            return True
+        if "chunks" in res:
+            return None
+        if len(self.tokenizer.encode(code, add_special_tokens=True)) >= self.config.max_code_tokens:
+            return len(code) > 2000  # the chunked path fell back to `code[:2000]`
+        return False
+
+    def _build_graph_aware_input(self, code_tokens, dfg_edges):
+        """The frozen legacy input, unchanged; also records whether it truncated (code or nodes)
+        while a facade `predict_code` call is in progress."""
+        out = super()._build_graph_aware_input(code_tokens, dfg_edges)
+        log = getattr(self, "_truncation_log", None)
+        if log is not None:
+            n_code = len(self.tokenizer.encode(" ".join(code_tokens), add_special_tokens=True))
+            code_len = min(n_code, self.config.max_code_tokens)
+            node_budget = max(0, self.config.max_position_embeddings - code_len)
+            log.append(n_code > self.config.max_code_tokens or len(dfg_edges) > node_budget)
+        return out
 
     def _legacy_parse_errors(self, code: str, language: str) -> bool:
         """tree-sitter `has_error` with the legacy parser selection (`"c"` else C++)."""

@@ -215,6 +215,62 @@ def test_legacy_chunked_file_reports_chunks_as_windows(hf, monkeypatch):
     assert res["chunks"] > 1 and res["n_windows"] == res["chunks"]
 
 
+# --- legacy `truncated` is reported honestly (slice-3 review follow-up) ------------------------
+
+
+def test_legacy_truncated_when_dfg_nodes_exceed_the_position_budget(hf, monkeypatch):
+    engine = GraphCodeBERTInference()
+    tokens = engine._dfg_extractor.parse_code(SHORT, "c").code_tokens
+    code_len = len(engine.tokenizer.encode(" ".join(tokens), add_special_tokens=True))
+    monkeypatch.setattr(engine.config, "max_position_embeddings", code_len + 1)  # room for one node
+    res = engine.predict_code(SHORT, "c")
+    assert res["used_graph"] and res["dfg_node_count"] > 1
+    assert res["truncated"] is True
+
+
+def test_legacy_truncated_when_a_chunk_exceeds_max_code_tokens(hf, monkeypatch):
+    engine = GraphCodeBERTInference()
+    monkeypatch.setattr(engine.config, "max_code_tokens", 60)
+    one_long_line = " ".join(f"int v{i} = {i};" for i in range(40))  # one line, > 60 subtokens
+    res = engine.predict_code(one_long_line, "c")
+    assert res["truncated"] is True
+
+
+def test_legacy_truncated_is_unknown_for_untruncated_chunked_files(hf, monkeypatch):
+    # Chunks whose parse fails are skipped inside the frozen class and are not observable here.
+    engine = GraphCodeBERTInference()
+    monkeypatch.setattr(engine.config, "max_code_tokens", 60)
+    res = engine.predict_code(LONG, "c")
+    assert res["chunks"] > 1 and res["truncated"] is None
+
+
+def test_legacy_truncated_on_the_2000_char_fallback(hf, monkeypatch):
+    engine = GraphCodeBERTInference()
+    monkeypatch.setattr(engine.config, "max_code_tokens", 60)
+    real_parse = engine._dfg_extractor.parse_code
+    fallback = LONG[:2000]
+    assert len(LONG) > 2000
+
+    def parse(code, language):  # every chunk fails, only the fallback slice parses
+        if code == fallback:
+            return real_parse(code, language)
+        return legacy_inference.DFGResult(success=False)
+
+    monkeypatch.setattr(engine._dfg_extractor, "parse_code", parse)
+    res = engine.predict_code(LONG, "c")
+    assert "chunks" not in res and res["truncated"] is True
+
+
+def test_legacy_truncation_probe_does_not_change_the_contrastive_api(hf):
+    engine = GraphCodeBERTInference()
+    frozen = legacy_inference.LegacyGraphCodeBERTInference.__dict__["_build_graph_aware_input"]
+    tokens = engine._dfg_extractor.parse_code(SHORT, "c")
+    a = engine._build_graph_aware_input(tokens.code_tokens, tokens.dfg_edges)
+    b = frozen(engine, tokens.code_tokens, tokens.dfg_edges)
+    for x, y in zip(a, b):
+        assert torch.equal(x, y)
+
+
 def test_contrastive_private_api_still_resolves_on_the_facade(hf):
     engine = GraphCodeBERTInference()
     for name in ("_build_graph_aware_input", "_inject_dfg_embeddings", "_dfg_extractor", "encoder", "tokenizer", "device"):
