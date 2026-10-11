@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from typing import Any, Callable, Iterable
 
 REF_DIR = Path(__file__).resolve().parent
-VENDORED_FILES = ("parser/DFG.py", "parser/utils.py", "clonedetection/run.py", "LICENSE")
+VENDORED_FILES = ("parser/DFG.py", "parser/utils.py", "clonedetection/run.py", "clonedetection/model.py", "LICENSE")
 
 _COMMIT_RE = re.compile(r"Commit:\s*([0-9a-f]{40})\b")
 _HASH_ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|[^|]*\|\s*`([0-9a-f]{64})`\s*\|", re.MULTILINE)
@@ -140,6 +140,19 @@ def load_run_reference(extract_dataflow: Callable) -> SimpleNamespace:
         getitem=ns["__getitem__"],
         InputFeatures=ns["InputFeatures"],
     )
+
+
+def load_upstream_model_class() -> type:
+    """Upstream clone-detection `Model` (`clonedetection/model.py`): node embeddings as the mean
+    of aligned code word embeddings, then `encoder.roberta(inputs_embeds, attention_mask,
+    position_ids, token_type_ids)`, then a pair classifier."""
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    from torch.nn import CrossEntropyLoss
+
+    ns = {"torch": torch, "nn": nn, "F": F, "CrossEntropyLoss": CrossEntropyLoss}
+    return _extract("clonedetection/model.py", ["RobertaClassificationHead", "Model"], ns)["Model"]
 
 
 # --- JavaView -----------------------------------------------------------------------------
