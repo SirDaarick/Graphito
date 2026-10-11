@@ -81,6 +81,47 @@ def test_engine_factory_failure_is_not_ready(fake_artifacts):
     assert "secret" not in json.dumps(runtime.health())
 
 
+class _ClosableEngine(StubInferenceEngine):
+    """An engine whose readiness is scripted; records `close()` (its inference pool shutdown)."""
+
+    def __init__(self, readiness):
+        self._readiness = readiness
+        self.closed = 0
+
+    def readiness(self):
+        if isinstance(self._readiness, Exception):
+            raise self._readiness
+        return self._readiness
+
+    def close(self):
+        self.closed += 1
+
+
+def test_engine_readiness_raising_is_not_ready_and_closes_engine(fake_artifacts):
+    engine = _ClosableEngine(RuntimeError("probe failed at C:/secret/model"))
+    runtime = rt.build_runtime(_real_settings(fake_artifacts), engine_factory=lambda s, b: engine)
+    assert not runtime.ready and runtime.reason == "engine_readiness_failed"
+    assert runtime.engine is None and engine.closed == 1
+    assert "secret" not in json.dumps(runtime.health())
+
+
+def test_engine_not_ready_is_discarded_and_closed(fake_artifacts):
+    from app.domain.ports.inference_port import Readiness
+
+    engine = _ClosableEngine(Readiness(ready=False, reason="gcb_load_failed"))
+    runtime = rt.build_runtime(_real_settings(fake_artifacts), engine_factory=lambda s, b: engine)
+    assert not runtime.ready and runtime.reason == "gcb_load_failed"
+    assert runtime.engine is None and engine.closed == 1
+
+
+def test_ready_engine_is_kept_open(fake_artifacts):
+    from app.domain.ports.inference_port import Readiness
+
+    engine = _ClosableEngine(Readiness(ready=True))
+    runtime = rt.build_runtime(_real_settings(fake_artifacts), engine_factory=lambda s, b: engine)
+    assert runtime.ready and runtime.engine is engine and engine.closed == 0
+
+
 def test_get_inference_engine_raises_when_not_ready(fake_artifacts, monkeypatch):
     monkeypatch.setattr(rt, "_runtime", _corrupted_runtime(fake_artifacts))
     with pytest.raises(NotReadyError) as exc:

@@ -61,6 +61,17 @@ def _default_engine_factory(settings, bundle) -> InferencePort:
     return create_real_engine(settings, bundle)
 
 
+def _close_engine(engine: InferencePort) -> None:
+    """Release a discarded engine (its inference thread pool); never raises."""
+    close = getattr(engine, "close", None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception as exc:  # a failing close must not turn into a startup crash
+        logger.warning("Discarded engine failed to close: %s", type(exc).__name__)
+
+
 def _not_ready(mode: str, label: str, reason: str) -> InferenceRuntime:
     return InferenceRuntime(mode=mode, engine_label=label, ready=False, reason=reason)
 
@@ -102,9 +113,15 @@ def build_runtime(settings=None, *, engine_factory: Optional[EngineFactory] = No
     except Exception as exc:
         logger.exception("Inference not ready (engine construction failed): %s", type(exc).__name__)
         return _not_ready(mode, "real", "engine_init_failed")
-    readiness = engine.readiness()
+    try:
+        readiness = engine.readiness()
+    except Exception as exc:
+        logger.exception("Inference not ready (engine readiness check failed): %s", type(exc).__name__)
+        _close_engine(engine)
+        return _not_ready(mode, "real", "engine_readiness_failed")
     if not readiness.ready:
         logger.error("Inference not ready (engine readiness): %s", readiness.reason)
+        _close_engine(engine)
         return _not_ready(mode, "real", readiness.reason or "engine_not_ready")
     logger.info("Inference ready: engine=real manifest=%s", bundle.manifest_sha256[:12])
     return InferenceRuntime(
