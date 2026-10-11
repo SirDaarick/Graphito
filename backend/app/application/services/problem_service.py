@@ -19,9 +19,11 @@ class ProblemService:
     def __init__(
         self,
         db: AsyncSession,
-        inference_engine: InferencePort,
-        vector_store: VectorStorePort,
+        inference_engine: Optional[InferencePort] = None,
+        vector_store: Optional[VectorStorePort] = None,
     ):
+        # Only reference creation needs the engine and the vector store; reads and problem or
+        # submission CRUD work while inference is not ready.
         self.db = db
         self.inference = inference_engine
         self.vector_store = vector_store

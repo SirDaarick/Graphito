@@ -182,6 +182,27 @@ def set_runtime(runtime: Optional[InferenceRuntime]) -> None:
     _runtime = runtime
 
 
+def report_context(engine: Optional[str], manifest_sha: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Threshold keys and model versions for a report produced by the running engine.
+
+    Only when the report's engine and manifest sha match the loaded runtime: the manifest pins the
+    checkpoint, the calibration keys and the GraphCodeBERT pipeline, so those values are the ones
+    the report was scored with. Anything else (another manifest, legacy, not ready) gives None.
+    """
+    rt = _runtime
+    if rt is None or not rt.ready or rt.calibration is None or rt.engine_label != engine:
+        return None
+    if manifest_sha != rt.calibration.manifest_sha256:
+        return None
+    channels = {name: rt.calibration.channel(name) for name in ("a", "b")}
+    versions = getattr(rt.engine, "model_versions", None)
+    return {
+        "clave_umbral_a": getattr(channels["a"], "threshold_key", None),
+        "clave_umbral_b": getattr(channels["b"], "threshold_key", None),
+        "versiones_modelo": dict(versions) if isinstance(versions, dict) else None,
+    }
+
+
 def current_runtime() -> InferenceRuntime:
     """The started runtime, building it on first use (scripts without the app lifespan)."""
     global _runtime

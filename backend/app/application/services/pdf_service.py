@@ -1,6 +1,16 @@
+"""Institutional PDF report (spec AR3).
+
+`PdfReportService.build_content` turns a report into a plain content model (verdict banner, metric
+rows, provenance rows, validation label); `generate_pdf` only lays it out. The content never
+falls back to a conformity verdict for unknown or missing verdicts, prints NULL scores as not
+evaluated, and has no discrepancy row (design D15). Text is kept ASCII for the standard fonts.
+"""
+
 import io
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Tuple
+from xml.sax.saxutils import escape
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -14,7 +24,85 @@ from reportlab.platypus import (
     HRFlowable,
     Preformatted,
 )
-from app.infrastructure.database.models import ReporteAnalisis, DictamenEnum
+from app.infrastructure.database.models import ReporteAnalisis
+from app.presentation.schemas.analysis import ReporteAnalisisResponse
+
+PDF_LABEL = (
+    "No validado contra plagio derivado de la referencia: umbrales calibrados con pares "
+    "estudiante-estudiante. Apoyo a la decision docente, no un dictamen automatico."
+)
+
+# tone -> (background, border, text color)
+TONES = {
+    "dual": ("#faf5ff", "#8b5cf6", "#6d28d9"),
+    "semantic": ("#fef2f2", "#ef4444", "#b91c1c"),
+    "stylometric": ("#fff7ed", "#f97316", "#c2410c"),
+    "clear": ("#f0fdf4", "#22c55e", "#15803d"),
+    "neutral": ("#f8fafc", "#94a3b8", "#475569"),
+}
+
+VERDICTS = {
+    "DISCREPANCIA_DUAL": ("dual", "ALERTA DUAL: AMBOS CANALES SUPERARON SU UMBRAL CALIBRADO"),
+    "REVISION_SEMANTICA": ("semantic", "ALERTA CANAL A: SIMILITUD LEXICA CON LA REFERENCIA SOBRE EL UMBRAL"),
+    "REVISION_ESTILOMETRICA": ("stylometric", "ALERTA CANAL B: ESTILO COMPATIBLE CON CODIGO GENERADO SOBRE EL UMBRAL"),
+    "SIN_ALERTAS": ("clear", "SIN ALERTAS: NINGUN CANAL SUPERO SU UMBRAL CALIBRADO"),
+    "NO_EVALUABLE": ("neutral", "NO EVALUABLE: AL MENOS UN CANAL NO PUDO EVALUARSE; SIN DICTAMEN AUTOMATICO"),
+    "SIN_REFERENCIA": ("neutral", "SIN REFERENCIA: EL PROBLEMA NO TIENE CODIGO DE REFERENCIA (CANAL A NO EVALUADO)"),
+}
+
+METHODS_A = {"jaccard": "Jaccard lexico, shingles de 5 tokens"}
+ENGINES = {
+    "real": "real (artefactos de despliegue verificados)",
+    "stub": "stub (desarrollo; no es resultado de un modelo)",
+    "legacy": "legacy (reporte anterior a la calibracion; no se recalcula)",
+}
+CALIBRATION_STATES = {
+    "calibrado": "calibrado (umbrales de los artefactos)",
+    "no_calibrado": "NO calibrado (solo desarrollo): banderas nulas",
+    "stub": "stub: umbrales fijos de desarrollo",
+    "legacy": "legacy: sin calibracion",
+}
+
+
+def verdict_banner(dictamen: Optional[str], estado: Optional[str]) -> Tuple[str, str]:
+    """(tone, text) for the verdict; unknown or missing verdicts are never shown as conformity."""
+    estado = estado or "COMPLETADO"
+    if dictamen is None or estado != "COMPLETADO":
+        return "neutral", f"SIN DICTAMEN: ANALISIS {estado}"
+    if dictamen in VERDICTS:
+        return VERDICTS[dictamen]
+    return "neutral", f"NO EVALUABLE: DICTAMEN DESCONOCIDO ({dictamen})"
+
+
+def _num(value: Optional[float]) -> str:
+    return "-" if value is None else f"{value:.4f}"
+
+
+def _pct(value: Optional[float]) -> str:
+    return f"{round(value * 100, 1)}%"
+
+
+def _flag(value: Optional[bool]) -> str:
+    return "-" if value is None else ("SI" if value else "NO")
+
+
+def _sha(value: Optional[str]) -> str:
+    return value[:12] if value else "-"
+
+
+def _threshold(umbral: Optional[float], clave: Optional[str], estado: Optional[str], flag: Optional[bool]) -> str:
+    key = f" ({clave})" if clave else ""
+    return f"umbral {_num(umbral)}{key}; estado {estado or '-'}; bandera {_flag(flag)}"
+
+
+@dataclass(frozen=True)
+class PdfContent:
+    verdict_tone: str
+    verdict_text: str
+    # (canal, metodo, valor, umbral/estado)
+    metric_rows: List[Tuple[str, str, str, str]] = field(default_factory=list)
+    provenance_rows: List[Tuple[str, str]] = field(default_factory=list)
+    label: str = PDF_LABEL
 
 
 class PdfReportService:
@@ -22,6 +110,52 @@ class PdfReportService:
     Servicio generador de reportes academicos oficiales en formato PDF.
     Diseno formal para catedras universitarias y comisiones de integridad.
     """
+
+    @staticmethod
+    def build_content(report: ReporteAnalisisResponse) -> PdfContent:
+        """The content model handed to the renderer (spec AR3.2)."""
+        dictamen = getattr(report.dictamen, "value", report.dictamen)
+        estado = getattr(report.estado, "value", report.estado)
+        tone, text = verdict_banner(dictamen, estado)
+
+        if report.similitud_semantica is None:
+            a_value = f"No evaluado ({report.estado_canal_a or estado})"
+        else:
+            a_value = f"Jaccard {_pct(report.similitud_semantica)}"
+            if report.puntaje_calibrado_a is not None:
+                a_value += f"; calibrado {_num(report.puntaje_calibrado_a)}"
+        if report.estado_canal_b == "ABSTENIDO":
+            b_value = "ABSTENIDO (codigo demasiado corto para CharCNN)"
+        elif report.probabilidad_ia is None:
+            b_value = f"No evaluado ({report.estado_canal_b or estado})"
+        else:
+            b_value = f"calibrado {_num(report.probabilidad_ia)}"
+        gcb_value = (
+            f"coseno {_num(report.gcb_similarity)}" if report.gcb_similarity is not None
+            else f"No disponible ({report.gcb_estado or '-'})"
+        )
+        legacy = report.engine == "legacy"
+        method_a = METHODS_A.get(report.canal_a_metodo or "", report.canal_a_metodo or (
+            "Legado: GraphCodeBERT sin calibrar" if legacy else "-"
+        ))
+        metric_rows = [
+            ("Canal A: similitud con la referencia", method_a, a_value,
+             _threshold(report.umbral_a, report.clave_umbral_a, report.estado_canal_a, report.flag_a)),
+            ("Canal B: estilometria", "Legado: CharCNN sin calibrar" if legacy else "CharCNN v2 (caracteres)", b_value,
+             _threshold(report.umbral_b, report.clave_umbral_b, report.estado_canal_b, report.flag_b)),
+            ("Senal secundaria", "GraphCodeBERT v2 zero-shot: exploratorio, no decide", gcb_value, "no interviene en el dictamen"),
+        ]
+        versions = report.versiones_modelo or {}
+        version_text = ", ".join(f"{k}={v}" for k, v in versions.items() if v is not None) or "-"
+        provenance_rows = [
+            ("Motor", ENGINES.get(report.engine or "", report.engine or "-")),
+            ("Estado de calibracion", CALIBRATION_STATES.get(report.estado_calibracion or "", "sin evaluar")),
+            ("Manifiesto de despliegue (sha256)", _sha(report.manifest_sha)),
+            ("Calibracion A / B (sha256)", f"{_sha(report.calibracion_sha_a)} / {_sha(report.calibracion_sha_b)}"),
+            ("Checkpoint CharCNN (sha256)", _sha(report.checkpoint_sha_b)),
+            ("Versiones de modelo", version_text),
+        ]
+        return PdfContent(tone, text, metric_rows, provenance_rows)
 
     @staticmethod
     def generate_pdf(
@@ -132,88 +266,32 @@ class PdfReportService:
         elements.append(meta_table)
         elements.append(Spacer(1, 16))
 
-        # 3. Decision Support Diagnostic Banner
-        dictamen_val = report.dictamen.value if hasattr(report.dictamen, "value") else report.dictamen
-        estado_val = getattr(report.estado, "value", report.estado) or "COMPLETADO"
-        if dictamen_val is None or estado_val != "COMPLETADO":
-            # PENDIENTE / PROCESANDO / ERROR: no verdict exists yet; never fall back to conformity.
-            verdict_bg = colors.HexColor("#f8fafc")
-            verdict_border = colors.HexColor("#94a3b8")
-            verdict_color = "#475569"
-            verdict_text = f"SIN DICTAMEN: ANALISIS {estado_val}"
-        elif dictamen_val in (DictamenEnum.REVISION_ESTILOMETRICA.value, "SOSPECHA_IA"):
-            verdict_bg = colors.HexColor("#fff7ed")
-            verdict_border = colors.HexColor("#f97316")
-            verdict_color = "#c2410c"
-            verdict_text = "ALERTA ESTILOMETRICA: PATRONES COMPATIBLES CON MODELOS GENERATIVOS"
-        elif dictamen_val in (DictamenEnum.REVISION_SEMANTICA.value, "PLAGIO_PROBABLE"):
-            verdict_bg = colors.HexColor("#fef2f2")
-            verdict_border = colors.HexColor("#ef4444")
-            verdict_color = "#b91c1c"
-            verdict_text = "ALERTA SEMANTICA: ALTA CONVERGENCIA ESTRUCTURAL CON REFERENCIA"
-        elif dictamen_val == DictamenEnum.DISCREPANCIA_DUAL.value:
-            verdict_bg = colors.HexColor("#faf5ff")
-            verdict_border = colors.HexColor("#8b5cf6")
-            verdict_color = "#6d28d9"
-            verdict_text = "ALERTA DUAL: COINCIDENCIA LOGICA Y ESTILOMETRIA SINTETICA"
-        else:
-            verdict_bg = colors.HexColor("#f0fdf4")
-            verdict_border = colors.HexColor("#22c55e")
-            verdict_color = "#15803d"
-            verdict_text = "CONFORMIDAD: SIN BANDERAS CRITICAS DETECTADAS"
-
+        # 3. Decision Support Diagnostic Banner (never a conformity fallback, spec AR3.1)
+        content = PdfReportService.build_content(ReporteAnalisisResponse.model_validate(report))
+        verdict_bg, verdict_border, verdict_color = TONES[content.verdict_tone]
         verdict_paragraph = Paragraph(
-            f"<font color='{verdict_color}'><b>{verdict_text}</b></font>",
+            f"<font color='{verdict_color}'><b>{escape(content.verdict_text)}</b></font>",
             verdict_style,
         )
         verdict_table = Table([[verdict_paragraph]], colWidths=[520])
         verdict_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), verdict_bg),
-            ('BOX', (0, 0), (-1, -1), 1.5, verdict_border),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(verdict_bg)),
+            ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor(verdict_border)),
             ('TOPPADDING', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
         elements.append(verdict_table)
-        elements.append(Spacer(1, 16))
+        elements.append(Spacer(1, 8))
+        elements.append(Paragraph(f"<b>{escape(content.label)}</b>", body_style))
+        elements.append(Spacer(1, 12))
 
-        # 4. Metrics Table
+        # 4. Metrics Table: method, value (or not evaluated), threshold + key, state and flag.
         elements.append(Paragraph("Desglose del Analisis Bimodal", h2_style))
-        # NULL means "not evaluated": never print it as 0 (spec AR1.2). Full PDF rework: WU9.
-        def _pct(value):
-            return "No evaluado" if value is None else f"{round(value * 100, 1)}%"
-
-        sem_pct = _pct(report.similitud_semantica)
-        ai_pct = _pct(report.probabilidad_ia)
-        disc_score = "No disponible" if report.discrepancia_score is None else f"{round(report.discrepancia_score, 4)}"
-
-        metrics_data = [
-            [
-                Paragraph("<b>Canal de Inspeccion</b>", body_style),
-                Paragraph("<b>Tecnica Utilizada</b>", body_style),
-                Paragraph("<b>Valor Obtenido</b>", body_style),
-                Paragraph("<b>Interpretacion</b>", body_style),
-            ],
-            [
-                Paragraph("<b>Canal A: Semantica</b>", body_style),
-                Paragraph("Grafo de Flujo de Datos (Tree-Sitter DFG + GraphCodeBERT)", body_style),
-                Paragraph(f"<b>{sem_pct}</b>", body_style),
-                Paragraph("Similitud de logica interna independiente de identificadores", body_style),
-            ],
-            [
-                Paragraph("<b>Canal B: Estilometria</b>", body_style),
-                Paragraph("Clasificador Convolucional de Caracteres (CharCNN)", body_style),
-                Paragraph(f"<b>{ai_pct}</b>", body_style),
-                Paragraph("Probabilidad de patrones de sintaxis propios de LLMs", body_style),
-            ],
-            [
-                Paragraph("<b>Discrepancia Asimetrica</b>", body_style),
-                Paragraph("Calibracion Bimodal Ponderada", body_style),
-                Paragraph(f"<b>{disc_score}</b>", body_style),
-                Paragraph("Metrica de divergencia entre estructura y estilo", body_style),
-            ],
-        ]
-
-        metrics_table = Table(metrics_data, colWidths=[120, 160, 90, 150])
+        header = ["Canal", "Metodo", "Valor", "Umbral y estado"]
+        metrics_data = [[Paragraph(f"<b>{h}</b>", body_style) for h in header]]
+        for row in content.metric_rows:
+            metrics_data.append([Paragraph(escape(cell), body_style) for cell in row])
+        metrics_table = Table(metrics_data, colWidths=[115, 135, 120, 150])
         metrics_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
@@ -223,9 +301,25 @@ class PdfReportService:
             ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ]))
         elements.append(metrics_table)
+        elements.append(Spacer(1, 10))
+
+        provenance_data = [
+            [Paragraph(f"<b>{escape(k)}</b>", body_style), Paragraph(escape(v), body_style)]
+            for k, v in content.provenance_rows
+        ]
+        provenance_table = Table(provenance_data, colWidths=[180, 340])
+        provenance_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#f8fafc")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(provenance_table)
         elements.append(Spacer(1, 16))
 
-        # 5. Indicators Table
+        # 5. Indicators Table (rule-based rows are marked as heuristics, spec AR4.1)
         elements.append(Paragraph("Indicadores y Evidencias de Integridad", h2_style))
         if report.indicadores and len(report.indicadores) > 0:
             indicators_data = [
@@ -238,10 +332,12 @@ class PdfReportService:
             for ind in report.indicadores:
                 sev = getattr(ind, 'severidad', 'MEDIA')
                 sev_color = "#ef4444" if sev in ("ALTA", "CRITICA") else "#f59e0b" if sev == "MEDIA" else "#10b981"
+                categoria = getattr(ind, "categoria", None) or "GENERAL"
+                origin = "decision" if categoria in ("GENERAL", "SIMILITUD_ARCHIVO") else "heuristica"
                 indicators_data.append([
-                    Paragraph(f"<b>{ind.tipo_alerta}</b>", body_style),
-                    Paragraph(f"<font color='{sev_color}'><b>{sev}</b></font>", body_style),
-                    Paragraph(ind.descripcion, body_style),
+                    Paragraph(f"<b>{escape(ind.tipo_alerta)}</b><br/>({origin})", body_style),
+                    Paragraph(f"<font color='{sev_color}'><b>{escape(sev)}</b></font>", body_style),
+                    Paragraph(escape(ind.descripcion), body_style),
                 ])
             ind_table = Table(indicators_data, colWidths=[130, 80, 310])
             ind_table.setStyle(TableStyle([
@@ -255,7 +351,7 @@ class PdfReportService:
             elements.append(ind_table)
         else:
             elements.append(Paragraph(
-                "<i>No se registraron anomalias criticas ni patrones convergentes en el codigo analizado.</i>",
+                "<i>Sin indicadores registrados para este reporte.</i>",
                 body_style,
             ))
 
@@ -328,10 +424,11 @@ class PdfReportService:
 
         # 8. Legal / Institutional Footer
         elements.append(Paragraph(
-            "<b>Aviso Institucional (Sistema de Soporte a la Decision):</b> Este reporte es generado pericialmente por la plataforma Graphito "
-            "mediante analisis bimodal (Canal Semantico GraphCodeBERT y Canal Estilometrico CharCNN). "
-            "Los resultados proporcionan evidencia tecnica y metricas probabilísticas de orientacion pericial; "
-            "no constituyen una sancion disciplinaria automatica ni sustituyen el juicio academico y pedagogico del docente evaluador.",
+            "<b>Aviso Institucional (Sistema de Soporte a la Decision):</b> Este reporte es generado por la plataforma Graphito "
+            "con dos canales calibrados (Canal A: similitud lexica Jaccard con la referencia; Canal B: estilometria CharCNN v2); "
+            "GraphCodeBERT solo aporta una senal exploratoria que no decide. Las indicaciones heuristicas no son salida de un modelo. "
+            "Los resultados orientan la revision; no constituyen una sancion disciplinaria automatica ni sustituyen el juicio "
+            "academico y pedagogico del docente evaluador.",
             ParagraphStyle(
                 "FooterNote",
                 parent=styles["Normal"],

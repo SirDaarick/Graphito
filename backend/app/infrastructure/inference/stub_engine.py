@@ -46,8 +46,8 @@ class StubInferenceEngine(InferencePort):
     # --- legacy, outside the port -----------------------------------------------------------------
     # `predict_synthetic_prob` is the deterministic heuristic behind `predict_stylometry`.
     # `compute_decision` is NOT used by the backend (the decision is `ScoringService` +
-    # `domain.scoring.decide`); it stays only for `tests/test_calibration_experiment.py` and
-    # `scripts/benchmark_student_archetypes.py` until they are migrated.
+    # `domain.scoring.decide`); it stays only for `tests/test_calibration_experiment.py` until that
+    # test is migrated.
 
     async def predict_synthetic_prob(self, code: str) -> float:
         # Heurística simple para pruebas: comentarios típicos de LLMs o longitud de indentación

@@ -180,6 +180,9 @@ class ScoringService:
         )
         if outcome.reference_id is None and referencia_id is not None:
             outcome = dataclasses.replace(outcome, reference_id=str(referencia_id))
+        author = next((r.autor for r in refs if str(r.id) == outcome.reference_id), None)
+        if author is not None:
+            outcome = dataclasses.replace(outcome, provenance={**outcome.provenance, "reference_author": author})
         return outcome
 
     async def score_code(
@@ -277,13 +280,8 @@ class ScoringService:
         self.apply_outcome(reporte, outcome)
         for ind in self.build_indicators(outcome):
             db.add(IndicadorIntegridad(reporte_id=reporte.id, numero_linea=None, categoria="GENERAL", **ind))
-        # Heuristic rows are gated on the decision flags so they never contradict them (AR4.3).
-        explanations = XAIService.extract_explanations(
-            code=entrega.contenido,
-            language=entrega.lenguaje,
-            semantic_sim=outcome.channel_a.calibrated if outcome.flag_a else 0.0,
-            ai_prob=outcome.channel_b.calibrated if outcome.flag_b else 0.0,
-        )
+        # XAI rows are derived from the decision flags so they never contradict them (AR4.2, AR4.3).
+        explanations = XAIService.extract_explanations(entrega.contenido, entrega.lenguaje, outcome)
         for exp in explanations:
             db.add(IndicadorIntegridad(
                 reporte_id=reporte.id,

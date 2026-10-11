@@ -20,10 +20,8 @@ async def create_problem(
     data: ProblemaCreate,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
-    service = ProblemService(db, inference, vector_store)
+    service = ProblemService(db)
     return await service.create_problem(current_user.id, data)
 
 
@@ -31,10 +29,8 @@ async def create_problem(
 async def list_problems(
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
-    service = ProblemService(db, inference, vector_store)
+    service = ProblemService(db)
     return await service.list_problems(current_user.id)
 
 
@@ -43,10 +39,8 @@ async def get_problem(
     problem_id: int,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
-    service = ProblemService(db, inference, vector_store)
+    service = ProblemService(db)
     problem = await service.get_problem(current_user.id, problem_id)
     return ProblemaResponse.model_validate(problem)
 
@@ -74,11 +68,9 @@ async def add_submission(
     data: CodigoFuenteCreate,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
     data.problema_id = problem_id
-    service = ProblemService(db, inference, vector_store)
+    service = ProblemService(db)
     return await service.add_submission(current_user.id, data)
 
 
@@ -87,8 +79,6 @@ async def list_submissions(
     problem_id: int,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
-    service = ProblemService(db, inference, vector_store)
+    service = ProblemService(db)
     return await service.list_submissions(current_user.id, problem_id)

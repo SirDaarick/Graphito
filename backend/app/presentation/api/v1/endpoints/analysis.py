@@ -6,10 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
 from app.infrastructure.database.models import Docente, CodigoFuente, TipoCodigoEnum
 from sqlalchemy import select
-from app.domain.ports.inference_port import InferencePort
-from app.domain.ports.vector_store_port import VectorStorePort
-from app.infrastructure.inference import get_inference_engine
-from app.infrastructure.vector_store import get_vector_store
 from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
 from app.application.services.pdf_service import PdfReportService
 from app.application.services.batch_analysis_service import BatchAnalysisService
@@ -50,10 +46,8 @@ async def get_report(
     report_id: int,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
-    orchestrator = AnalysisOrchestrator(db, inference, vector_store)
+    orchestrator = AnalysisOrchestrator(db)
     return await orchestrator.get_report(report_id)
 
 
@@ -62,15 +56,13 @@ async def download_report_pdf(
     report_id: int,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
     """
     Genera y descarga en streaming el dictamen pericial institucional en formato PDF,
     incluyendo métricas bimodales, señales forenses, código fuente con numeración de líneas
     y anotaciones pedagógicas registradas por el docente.
     """
-    orchestrator = AnalysisOrchestrator(db, inference, vector_store)
+    orchestrator = AnalysisOrchestrator(db)
     report = await orchestrator.get_report_model(report_id)
 
     student_author = report.entrega.autor if report.entrega else None
@@ -104,14 +96,12 @@ async def get_report_code(
     report_id: int,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
     """
     Obtiene los códigos fuente necesarios para el cotejo visual lado a lado (Side-by-Side Diff):
     código evaluado del estudiante frente al código canónico de referencia del problema o entrega contrastada.
     """
-    orchestrator = AnalysisOrchestrator(db, inference, vector_store)
+    orchestrator = AnalysisOrchestrator(db)
     report = await orchestrator.get_report_model(report_id)
 
     student_author = report.entrega.autor if report.entrega else "Estudiante"
@@ -224,13 +214,11 @@ async def get_batch_status(
     batch_id: uuid.UUID,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
     """
     Consulta en tiempo real el progreso de procesamiento del lote para actualización reactiva en la UI.
     """
-    batch_service = BatchAnalysisService(db, inference, vector_store)
+    batch_service = BatchAnalysisService(db)
     return await batch_service.get_batch_status(current_user.id, batch_id)
 
 
@@ -240,14 +228,12 @@ async def update_report_verdict(
     request: VerdictUpdateRequest,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
-    inference: InferencePort = Depends(get_inference_engine),
-    vector_store: VectorStorePort = Depends(get_vector_store),
 ):
     """
     Persiste en base de datos la decisión humana final del docente (Human-in-the-Loop)
     para active learning y seguimiento de integridad académica institucional.
     """
-    orchestrator = AnalysisOrchestrator(db, inference, vector_store)
+    orchestrator = AnalysisOrchestrator(db)
     return await orchestrator.update_verdict(
         docente_id=current_user.id,
         report_id=report_id,

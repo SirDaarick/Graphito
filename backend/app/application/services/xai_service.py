@@ -1,11 +1,17 @@
 import re
 from typing import List, Dict, Any, Optional
 
+from app.domain.scoring import ScoringOutcome
+
+ORIGEN_DECISION = "decision"
+ORIGEN_HEURISTICA = "heuristica"
+
 
 class XAIService:
     """
-    Servicio de Inteligencia Artificial Explicable (Explainable AI - XAI) para Graphito.
-    Transforma probabilidades algorítmicas en evidencias visuales y pedagógicas concretas.
+    Explicaciones para el docente (spec AR4). Las filas se derivan de las banderas de decisión
+    calibradas: nunca de umbrales fijos en este módulo. Las reglas por línea son heurísticas
+    (no salida del modelo) y se etiquetan así.
     """
 
     # Patrones estilométricos característicos de modelos generativos (LLMs)
@@ -87,88 +93,69 @@ class XAIService:
         cls,
         code: str,
         language: str = "c",
-        semantic_sim: float = 0.0,
-        ai_prob: float = 0.0,
+        outcome: Optional[ScoringOutcome] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Analiza el código línea por línea y genera la lista de evidencias técnicas contextualizadas.
+        """Explanations for one scored submission, consistent with its decision (spec AR4).
+
+        - A file-level `SIMILITUD_ARCHIVO` row (origin `decision`) only when `flag_a` is true: the
+          raw and calibrated Channel A Jaccard, the artifact threshold and key, and the argmax
+          reference. Nothing asserts similarity when `flag_a` is false or null.
+        - Rule-based line rows (origin `heuristica`, labelled "no es salida del modelo") only when
+          `flag_b` is true, so a stylistic pattern never contradicts a negative or abstained
+          Channel B. Without an outcome there is no decision to explain and nothing is returned.
         """
         explanations: List[Dict[str, Any]] = []
-        if not code:
+        if not code or outcome is None:
             return explanations
 
-        lines = code.split("\n")
+        if outcome.flag_a is True:
+            explanations.append(cls._file_similarity_row(outcome))
+        if outcome.flag_b is True:
+            explanations.extend(cls._heuristic_rows(code))
+        return explanations
 
-        # 1. Reglas estilométricas de LLMs
-        for idx, line in enumerate(lines, start=1):
+    @staticmethod
+    def _file_similarity_row(outcome: ScoringOutcome) -> Dict[str, Any]:
+        a = outcome.channel_a
+        author = (outcome.provenance or {}).get("reference_author")
+        reference = f"{author} ({outcome.reference_id})" if author else str(outcome.reference_id)
+        raw = "no disponible" if a.raw is None else f"{a.raw:.4f}"
+        return {
+            "numero_linea": None,
+            "tipo_alerta": "Similitud léxica con la referencia (archivo completo)",
+            "descripcion": (
+                f"Jaccard léxico (shingles de 5 tokens) {raw}; calibrado {a.calibrated:.4f} >= umbral "
+                f"{a.threshold:.4f} ({a.threshold_key}). Referencia más cercana: {reference}."
+            ),
+            "severidad": "ALTA",
+            "categoria": "SIMILITUD_ARCHIVO",
+            "reference_id": outcome.reference_id,
+            "origen": ORIGEN_DECISION,
+        }
+
+    @classmethod
+    def _heuristic_rows(cls, code: str) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        for idx, line in enumerate(code.split("\n"), start=1):
             line_str = line.strip()
             if not line_str:
                 continue
-
-            for pattern, reason, categoria, severidad in cls.LLM_COMMENT_PATTERNS:
-                if re.search(pattern, line_str, re.IGNORECASE):
-                    explanations.append(
-                        {
+            for patterns, titulo, flags in (
+                (cls.LLM_COMMENT_PATTERNS, "Patrón de Documentación LLM", re.IGNORECASE),
+                (cls.ADVANCED_CONSTRUCTS, "Construcción Atípica para Nivel Escolar", 0),
+            ):
+                for pattern, reason, categoria, severidad in patterns:
+                    if re.search(pattern, line_str, flags):
+                        rows.append({
                             "numero_linea": idx,
-                            "tipo_alerta": "Patrón de Documentación LLM",
-                            "descripcion": f"Línea {idx}: {reason}",
+                            "tipo_alerta": f"Heurística: {titulo}",
+                            "descripcion": f"Heurística (no es salida del modelo). Línea {idx}: {reason}",
                             "severidad": severidad,
                             "categoria": categoria,
-                        }
-                    )
-                    break
-
-            for pattern, reason, categoria, severidad in cls.ADVANCED_CONSTRUCTS:
-                if re.search(pattern, line_str):
-                    explanations.append(
-                        {
-                            "numero_linea": idx,
-                            "tipo_alerta": "Construcción Atípica para Nivel Escolar",
-                            "descripcion": f"Línea {idx}: {reason}",
-                            "severidad": severidad,
-                            "categoria": categoria,
-                        }
-                    )
-                    break
-
-        # 2. Detección de isomorfismo y flujo de datos
-        if semantic_sim >= 0.80:
-            # Buscar la función principal o bucle crítico para marcar evidencia de flujo
-            critical_line = 1
-            for idx, line in enumerate(lines, start=1):
-                if re.search(r"\b(for|while|if|switch)\b", line):
-                    critical_line = idx
-                    break
-
-            explanations.append(
-                {
-                    "numero_linea": critical_line,
-                    "tipo_alerta": "Isomorfismo en Flujo de Datos (DFG)",
-                    "descripcion": (
-                        f"Línea {critical_line}: El grafo de flujo de variables y ramificaciones lógicas "
-                        f"presenta una concordancia del {round(semantic_sim * 100, 1)}% con el código de referencia."
-                    ),
-                    "severidad": "CRITICA" if semantic_sim >= 0.90 else "ALTA",
-                    "categoria": "ISOMORFISMO_DFG",
-                }
-            )
-
-        # 3. Alerta global si probabilidad sintética es alta pero no se hallaron comentarios
-        if ai_prob >= 0.75 and not any(e["categoria"] == "ESTILO_LLM" for e in explanations):
-            explanations.append(
-                {
-                    "numero_linea": 1,
-                    "tipo_alerta": "Anomalía Estilométrica Característica (CharCNN)",
-                    "descripcion": (
-                        f"El clasificador convolucional detectó una regularidad sintáctica atípica "
-                        f"(probabilidad de síntesis del {round(ai_prob * 100, 1)}%) a nivel de espaciado y estructura."
-                    ),
-                    "severidad": "ALTA",
-                    "categoria": "ESTILO_LLM",
-                }
-            )
-
-        return explanations
+                            "origen": ORIGEN_HEURISTICA,
+                        })
+                        break
+        return rows
 
     @classmethod
     def compute_code_metrics(cls, code: str) -> Dict[str, Any]:
