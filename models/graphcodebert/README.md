@@ -42,6 +42,26 @@ Código C/C++ → tree-sitter AST → DFG (def-use chains)
 
 **Salida**: diccionario con `embedding`, `language`, `dfg_node_count`, `used_graph`
 
+### Facade, input versions and adapter policy
+
+`GraphCodeBERTInference` (`inference.py`) is now a facade over two pipelines, selected by
+`GraphCodeBERTConfig.input_version`:
+
+- `"legacy"` (default until SDD-4 reindexes Chroma): the frozen pre-v2 encoding described above,
+  moved verbatim to `legacy_inference.py` (`LegacyGraphCodeBERTInference`).
+- `"v2"` (explicit): `models/graphcodebert/v2/` — upstream GraphCodeBERT DFG input, mask and
+  forward for C/C++, DFG extracted once per file, sliding windows of 382 subtokens (stride 191,
+  at most 16), `cls` or `mean` pooling (`config.pooling`).
+
+The LoRA adapter is never loaded by the facade: `adapter_path` has no default any more and an
+explicit path is ignored with a `WARNING`; `peft` is not imported. Only the labelled legacy
+baseline loads it, through `LegacyGraphCodeBERTInference(load_adapter=True)`.
+
+`predict_code` keeps the keys above and adds `dfg_nodes_used`, `n_windows`, `input_version`,
+`pooling`, `adapter_loaded` (always `False`), `truncated` and `parse_errors`. On the v2 path
+`used_graph` is true only if at least one DFG node was placed, and a failure (empty input or an
+exception) gives `success=False` with `embedding=[]`.
+
 ## Integración con Canal B
 
 ```python

@@ -1,349 +1,115 @@
-from pathlib import Path
+"""`GraphCodeBERTInference` facade (design D1, D13; spec GE7 as amended 2026-10-11).
+
+Public API kept for the backend, fusion, scripts and tests: constructor `(config, device)`,
+`predict(file_path)`, `predict_code(code, language)`, `config`, `encoder`, `tokenizer`, and the
+private legacy methods `contrastive_graphcodebert.py` calls (inherited from the frozen
+`LegacyGraphCodeBERTInference`).
+
+Dispatch on `config.input_version`:
+
+- `"legacy"` (default until SDD-4 reindexes Chroma): the frozen legacy encoding, adapter off;
+- `"v2"`: `models.graphcodebert.v2` (DFG once per file, sliding windows, upstream mask and
+  forward, eager fp32) on the same base encoder.
+
+The adapter is never loaded here: an explicit `adapter_path` is ignored with a WARNING, and
+`peft` is never imported. `predict_code` keeps the legacy keys and adds `dfg_nodes_used`,
+`n_windows`, `input_version`, `pooling`, `adapter_loaded`, `truncated` and `parse_errors`.
+"""
+
+import logging
 from typing import Optional
 
 import torch
-import torch.nn.functional as F
-from transformers import RobertaTokenizer, RobertaModel
 
 from models.graphcodebert.config import GraphCodeBERTConfig
-from models.graphcodebert.parser import DFGExtractor, DFGResult
+from models.graphcodebert.legacy_inference import LegacyGraphCodeBERTInference, lora_weights_applied
+
+__all__ = ["GraphCodeBERTInference", "lora_weights_applied", "ADAPTER_IGNORED_WARNING"]
+
+logger = logging.getLogger("graphcodebert")
+
+ADAPTER_IGNORED_WARNING = (
+    "adapter_path ignored (zero-shot v2/legacy facade never loads adapters): %s"
+)
 
 
-def lora_weights_applied(model: torch.nn.Module) -> bool:
-    """True only if the model has LoRA B matrices and at least one is non-zero.
-
-    LoRA initialises B to zero, so an all-zero B after loading an adapter means
-    the checkpoint weights never reached the model.
-    """
-    return any(
-        bool(param.detach().abs().sum() > 0)
-        for name, param in model.named_parameters()
-        if "lora_B" in name
-    )
-
-
-class GraphCodeBERTInference:
+class GraphCodeBERTInference(LegacyGraphCodeBERTInference):
+    """Zero-shot GraphCodeBERT with legacy/v2 dispatch and no adapter."""
 
     def __init__(
         self,
         config: Optional[GraphCodeBERTConfig] = None,
         device: Optional[torch.device] = None,
     ):
-        self.config = config or GraphCodeBERTConfig()
-        self.device = device or torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
-        self._dfg_extractor = DFGExtractor()
-
-        cache_dir_str = str(self.config.cache_dir) if self.config.cache_dir else None
-        self.tokenizer = RobertaTokenizer.from_pretrained(
-            self.config.model_name, cache_dir=cache_dir_str
-        )
-        base_encoder = RobertaModel.from_pretrained(
-            self.config.model_name, cache_dir=cache_dir_str
-        )
+        config = config or GraphCodeBERTConfig()
+        if config.adapter_path is not None:
+            logger.warning(ADAPTER_IGNORED_WARNING, config.adapter_path)
+        super().__init__(config, device, load_adapter=False)
         self.is_lora_loaded = False
-        self.encoder = base_encoder
-        if self.config.adapter_path and Path(self.config.adapter_path).exists():
-            try:
-                merged = self._load_merged_adapter(base_encoder, cache_dir_str)
-            except Exception as e:
-                import logging
-                logging.getLogger("graphcodebert").warning(f"No se pudo cargar LoRA adapter: {e}")
-                merged = None
-            if merged is not None:
-                self.encoder = merged
-                self.is_lora_loaded = True
-            else:
-                import logging
-                logging.getLogger("graphcodebert").warning(
-                    "LoRA adapter at %s loaded but none of its weights were applied "
-                    "(key names do not match the model); using base GraphCodeBERT.",
-                    self.config.adapter_path,
-                )
+        self._v2 = None
 
-        self.encoder.to(self.device)
-        self.encoder.eval()
-
-    def _load_merged_adapter(self, base_encoder: RobertaModel, cache_dir: Optional[str]):
-        """Return the encoder with the LoRA merged in, or None if no weight was applied.
-
-        The shipped adapter was trained on RobertaForMaskedLM, so its keys are prefixed
-        "roberta.*" and only match that wrapper. Try it first and keep just `.roberta`; fall
-        back to a bare RobertaModel for adapters trained directly on the encoder.
-        """
-        from peft import PeftModel
-        from transformers import RobertaForMaskedLM
-
-        adapter = str(self.config.adapter_path)
-        mlm = RobertaForMaskedLM.from_pretrained(self.config.model_name, cache_dir=cache_dir)
-        peft_mlm = PeftModel.from_pretrained(mlm, adapter)
-        if lora_weights_applied(peft_mlm):
-            return peft_mlm.merge_and_unload().roberta
-
-        peft_enc = PeftModel.from_pretrained(base_encoder, adapter)
-        if lora_weights_applied(peft_enc):
-            return peft_enc.merge_and_unload()
-        return None
-
-    def predict(self, file_path: Path) -> dict:
-        code_bytes = file_path.read_bytes()
-        code = code_bytes.decode("utf-8", errors="replace")
-        return self.predict_code(code, self._dfg_extractor._detect_language(file_path))
+    # --- dispatch -----------------------------------------------------------------------------
 
     def predict_code(self, code: str, language: str = "c") -> dict:
-        token_count = len(self.tokenizer.encode(code, add_special_tokens=True))
-        if token_count < self.config.max_code_tokens:
-            result = self._dfg_extractor.parse_code(code, language)
-            return self._embed(result, language)
+        if self.config.input_version == "v2":
+            return self._predict_v2(code, language)
+        return self._predict_legacy(code, language)
 
-        return self._embed_chunked(code, language)
+    def _predict_legacy(self, code: str, language: str) -> dict:
+        res = super().predict_code(code, language)
+        res.update(
+            dfg_nodes_used=res["dfg_node_count"],
+            n_windows=res.get("chunks", 1),
+            input_version="legacy",
+            pooling="cls",
+            adapter_loaded=self.is_lora_loaded,
+            truncated=False,
+            parse_errors=self._legacy_parse_errors(code, language),
+        )
+        return res
 
-    def _embed_chunked(self, code: str, language: str) -> dict:
-        lines = code.split("\n")
-        chunks: list[str] = []
-        current_chunk: list[str] = []
-        current_tokens = 0
+    def _legacy_parse_errors(self, code: str, language: str) -> bool:
+        """tree-sitter `has_error` with the legacy parser selection (`"c"` else C++)."""
+        ext = self._dfg_extractor
+        parser = ext._c_parser if language == "c" else ext._cpp_parser
+        try:
+            return bool(parser.parse(code.encode("utf-8")).root_node.has_error)
+        except Exception:
+            return True
 
-        for line in lines:
-            line_tokens = len(self.tokenizer.encode(line, add_special_tokens=False))
-            if current_tokens + line_tokens >= self.config.max_code_tokens and current_chunk:
-                chunks.append("\n".join(current_chunk))
-                overlap = max(0, len(current_chunk) // 4)
-                current_chunk = current_chunk[-overlap:] if overlap else []
-                current_tokens = sum(len(self.tokenizer.encode(l, add_special_tokens=False))
-                                     for l in current_chunk)
-            current_chunk.append(line)
-            current_tokens += line_tokens
+    # --- v2 -----------------------------------------------------------------------------------
 
-        if current_chunk:
-            chunks.append("\n".join(current_chunk))
+    def _v2_embedder(self):
+        """The v2 embedder on the shared base encoder (switched to eager attention), built once."""
+        if self._v2 is None:
+            from models.graphcodebert.v2.embed import GraphCodeBERTV2Embedder
+            from models.graphcodebert.v2.model import GraphCodeBERTV2Encoder
 
-        if not chunks:
-            chunks = [code]
+            if hasattr(self.encoder, "set_attn_implementation"):
+                self.encoder.set_attn_implementation(self.config.attn_implementation)
+            else:  # pragma: no cover - older transformers
+                self.encoder.config._attn_implementation = self.config.attn_implementation
+            encoder = GraphCodeBERTV2Encoder(self.encoder, device=self.device)
+            revision = getattr(self.encoder.config, "_commit_hash", None)
+            self._v2 = GraphCodeBERTV2Embedder(self.tokenizer, encoder, self.config.v2_config(), model_revision=revision)
+        return self._v2
 
-        chunk_embeddings: list[list[float]] = []
-        total_code_tokens = 0
-        total_dfg_nodes = 0
-        for chunk in chunks:
-            result = self._dfg_extractor.parse_code(chunk, language)
-            if not result.success or len(result.code_tokens) == 0:
-                continue
-            emb = self._embed(result, language)
-            chunk_embeddings.append(emb["embedding"])
-            total_code_tokens += emb["code_tokens_count"]
-            total_dfg_nodes += emb["dfg_node_count"]
-
-        if not chunk_embeddings:
-            result = self._dfg_extractor.parse_code(code[:2000], language)
-            emb = self._embed(result, language)
-            return emb
-
-        import numpy as np
-        avg = np.mean(chunk_embeddings, axis=0).tolist()
-
+    def _predict_v2(self, code: str, language: str) -> dict:
+        res = self._v2_embedder().embed(code, language)
+        if not res.success:
+            logger.warning("GraphCodeBERT v2 embedding failed: %s", res.error)
         return {
-            "embedding": avg,
+            "embedding": res.embedding.tolist() if res.success else [],
             "language": language,
-            "code_tokens_count": total_code_tokens,
-            "dfg_node_count": total_dfg_nodes,
-            "success": True,
-            "used_graph": True,
-            "chunks": len(chunk_embeddings),
+            "code_tokens_count": res.code_tokens_count,
+            "dfg_node_count": res.dfg_node_count,
+            "success": res.success,
+            "used_graph": bool(res.success and res.use_dfg and res.dfg_nodes_used > 0),
+            "dfg_nodes_used": res.dfg_nodes_used,
+            "n_windows": res.n_windows,
+            "input_version": "v2",
+            "pooling": res.pooling,
+            "adapter_loaded": False,
+            "truncated": res.truncated,
+            "parse_errors": res.parse_errors,
         }
-
-    def _embed(self, dfg_result: DFGResult, language: str) -> dict:
-        code_tokens = dfg_result.code_tokens
-        edges = dfg_result.dfg_edges
-
-        use_graph = dfg_result.success and len(code_tokens) > 0 and len(edges) > 0
-
-        input_ids, position_idx, graph_mask_4d = self._build_graph_aware_input(
-            code_tokens, edges if use_graph else []
-        )
-
-        code_len = (input_ids[0] != self.tokenizer.pad_token_id).sum().item()
-        num_dfg = (input_ids[0] == self.tokenizer.unk_token_id).sum().item()
-        real_code_len = code_len - num_dfg
-
-        token_embeds = self.encoder.embeddings.word_embeddings(
-            input_ids.to(self.device)
-        )
-        pos_embeds = self.encoder.embeddings.position_embeddings(
-            position_idx.to(self.device)
-        )
-
-        if use_graph:
-            token_embeds = self._inject_dfg_embeddings(
-                token_embeds, code_tokens, edges,
-                code_len=real_code_len, num_dfg=num_dfg,
-            )
-
-        embeds = token_embeds + pos_embeds
-        embeds = self.encoder.embeddings.LayerNorm(embeds)
-        embeds = self.encoder.embeddings.dropout(embeds)
-
-        # Transformación a máscara aditiva de atención (0.0 para conectado, -10000.0 para bloqueado)
-        # Esto asegura que RobertaEncoder aplique softmax(attn + mask) anulando las posiciones sin aristas DFG.
-        extended_graph_mask = (1.0 - graph_mask_4d.to(dtype=embeds.dtype, device=self.device)) * -10000.0
-
-        with torch.no_grad():
-            encoder_out = self.encoder.encoder(
-                hidden_states=embeds,
-                attention_mask=extended_graph_mask,
-            )
-            cls_embedding = encoder_out.last_hidden_state[:, 0, :].squeeze(0)
-
-        return {
-            "embedding": cls_embedding.cpu().tolist(),
-            "language": language,
-            "code_tokens_count": len(code_tokens),
-            "dfg_node_count": len(edges) if use_graph else 0,
-            "success": dfg_result.success,
-            "used_graph": use_graph,
-        }
-
-    def _build_graph_aware_input(
-        self, code_tokens: list[str], dfg_edges: list
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-
-        code_str = " ".join(code_tokens)
-        tokenized = self.tokenizer(
-            code_str,
-            return_tensors="pt",
-            truncation=True,
-            max_length=self.config.max_code_tokens,
-            return_attention_mask=False,
-            return_token_type_ids=False,
-        )
-        code_ids = tokenized["input_ids"][0]  # includes [CLS] and [SEP]
-        code_len = code_ids.size(0)
-
-        max_len = self.config.max_position_embeddings
-        if code_len >= max_len:
-            code_ids = code_ids[:max_len]
-            code_len = code_ids.size(0)
-            num_dfg = 0
-        else:
-            dfg_node_limit = max_len - code_len
-            used_edges = dfg_edges[:dfg_node_limit]
-            num_dfg = len(used_edges)
-
-        total_len = code_len + num_dfg
-        input_ids = torch.full((max_len,), self.tokenizer.pad_token_id, dtype=torch.long)
-        position_idx = torch.full((max_len,), 1, dtype=torch.long)
-
-        input_ids[:code_len] = code_ids
-        pos_start = 2
-        position_idx[:code_len] = torch.arange(pos_start, pos_start + code_len)
-
-        code_to_subtoken: dict[int, list[int]] = {}
-        if num_dfg > 0:
-            subtoken_idx = 1
-            for ci in range(len(code_tokens)):
-                tok_text = code_tokens[ci]
-                sub_ids = self.tokenizer.encode(tok_text, add_special_tokens=False)
-                code_to_subtoken[ci] = list(range(subtoken_idx, subtoken_idx + len(sub_ids)))
-                subtoken_idx += len(sub_ids)
-                if subtoken_idx >= code_len - 1:
-                    break
-
-        for d in range(num_dfg):
-            dfg_pos = code_len + d
-            input_ids[dfg_pos] = self.tokenizer.unk_token_id
-            # Align position embedding with target variable token in code (GraphCodeBERT paper)
-            edge = used_edges[d]
-            tgt_subs = code_to_subtoken.get(edge.target_index, [])
-            if tgt_subs and tgt_subs[0] < code_len:
-                position_idx[dfg_pos] = position_idx[tgt_subs[0]]
-            else:
-                dfg_pos_id = pos_start + code_len + d
-                if dfg_pos_id < max_len:
-                    position_idx[dfg_pos] = dfg_pos_id
-
-        # Graph-guided masked attention matrix M (Paper Section 3.2)
-        attn_mask_2d = torch.zeros((total_len, total_len), dtype=torch.bool)
-
-        # 1. Code tokens attend to all code tokens
-        attn_mask_2d[:code_len, :code_len] = True
-
-        # 2. DFG self-attention & selective code-to-node alignment
-        for d in range(num_dfg):
-            dfg_pos = code_len + d
-            edge = used_edges[d]
-
-            # DFG node attends to its target and source subtokens ONLY
-            relevant_subtokens: set[int] = set(code_to_subtoken.get(edge.target_index, []))
-            for src_idx in edge.source_indices:
-                relevant_subtokens.update(code_to_subtoken.get(src_idx, []))
-
-            for st in relevant_subtokens:
-                if st < code_len:
-                    attn_mask_2d[dfg_pos, st] = True
-                    attn_mask_2d[st, dfg_pos] = True
-
-            # Self-loop for DFG node
-            attn_mask_2d[dfg_pos, dfg_pos] = True
-
-        # 3. DFG-to-DFG attention ONLY when connected by data flow
-        for d1 in range(num_dfg):
-            e1 = used_edges[d1]
-            for d2 in range(num_dfg):
-                if d1 != d2:
-                    e2 = used_edges[d2]
-                    if (e1.target_index in e2.source_indices or
-                            e2.target_index in e1.source_indices):
-                        attn_mask_2d[code_len + d1, code_len + d2] = True
-
-        graph_mask_4d = torch.zeros((1, 1, max_len, max_len), dtype=torch.bool)
-        graph_mask_4d[0, 0, :total_len, :total_len] = attn_mask_2d
-
-        input_ids = input_ids.unsqueeze(0)
-        position_idx = position_idx.unsqueeze(0)
-
-        return input_ids, position_idx, graph_mask_4d
-
-    def _inject_dfg_embeddings(
-        self,
-        token_embeds: torch.Tensor,
-        code_tokens: list[str],
-        dfg_edges: list,
-        code_len: int,
-        num_dfg: int,
-    ) -> torch.Tensor:
-
-        if num_dfg == 0:
-            return token_embeds
-
-        max_subtoken = (token_embeds.shape[1] if code_len == 0 else code_len)
-
-        code_to_subtoken: dict[int, list[int]] = {}
-        subtoken_idx = 1  # after [CLS]
-        code_len_input = len(code_tokens)
-        for ci in range(code_len_input):
-            tok_text = code_tokens[ci]
-            sub_ids = self.tokenizer.encode(tok_text, add_special_tokens=False)
-            code_to_subtoken[ci] = list(range(subtoken_idx, subtoken_idx + len(sub_ids)))
-            subtoken_idx += len(sub_ids)
-            if subtoken_idx >= max_subtoken - 1:
-                break
-
-        for d in range(min(num_dfg, len(dfg_edges))):
-            edge = dfg_edges[d]
-            dfg_pos = code_len + d
-
-            relevant_subtokens: set[int] = set()
-            for src_idx in edge.source_indices:
-                relevant_subtokens.update(code_to_subtoken.get(src_idx, []))
-            target_subtokens = code_to_subtoken.get(edge.target_index, [])
-            relevant_subtokens.update(target_subtokens)
-
-            if not relevant_subtokens:
-                relevant_subtokens = {1}
-
-            valid_st = [s for s in relevant_subtokens if s < dfg_pos]
-            if valid_st:
-                avg_token = token_embeds[0, valid_st, :].mean(dim=0)
-                token_embeds[0, dfg_pos, :] = avg_token
-
-        return token_embeds
