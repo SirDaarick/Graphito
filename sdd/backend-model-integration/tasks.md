@@ -51,10 +51,14 @@ Solo-writer rule: single writer; "parallel" means order-independent, not concurr
 ## WU2 - Deploy artifacts data (PR1, data only)
 
 - [ ] 2.1 **[PARENT]** Decision D-A resolved first (see Decisions). Run `python scripts/build_deploy_artifacts.py --charcnn-run runs/char_cnn/20261011-015734 --gcb-run runs/graphcodebert/20261011-082155` (scores the full val pairs, ~1.6M; may be long, run detached). Verify output: Jaccard `fpr_0.05` threshold non-null, achieved FPR and TPR recorded, CharCNN `fpr_0.01` threshold = 0.1715, manifest sha256s match disk.
-- [ ] 2.2 Add `.gitignore` exception `!models/deploy/channel_b/best.pth` (exact path, D1). Confirm `git status` shows `models/deploy/**` and no change to `models/char_cnn/best_model.pth` staging.
-- [ ] 2.3 RED/GREEN: `tests/test_deploy_artifacts_integrity.py` reads the committed `models/deploy/` and fails if sha256 differs from the manifest, `fit_set.split != "val"`, key names differ from `fpr_0.05`/`fpr_0.01`, or manifest paths escape the directory (DA1.2, DA2.2). Skip with a clear reason only if the directory is absent.
-- [ ] 2.4 Confirm `docker-compose.yml` already mounts `./models:/models:ro` (DA1.3); add a test or comment only if a gap exists (no volume change expected).
-- [ ] 2.5 Stage explicit paths; commit `data(deploy): Jaccard calibration, CharCNN v2, manifest`.
+  - Not run by the writer (parent-run): the writer only tested the script on synthetic fixtures.
+- [x] 2.2 Add `.gitignore` exception `!models/deploy/channel_b/best.pth` (exact path, D1). Confirm `git status` shows `models/deploy/**` and no change to `models/char_cnn/best_model.pth` staging.
+  - Evidence: `git check-ignore -v --no-index` -> `models/deploy/channel_b/best.pth` matched by the `!` rule (line 41); `models/deploy/x.pth` and `models/deploy/channel_a/other.pth` still ignored by `*.pth`. The `git status` check of the built `models/deploy/**` is left to the parent after 2.1.
+- [x] 2.3 RED/GREEN: `tests/test_deploy_artifacts_integrity.py` reads the committed `models/deploy/` and fails if sha256 differs from the manifest, `fit_set.split != "val"`, key names differ from `fpr_0.05`/`fpr_0.01`, or manifest paths escape the directory (DA1.2, DA2.2). Skip with a clear reason only if the directory is absent.
+  - Evidence (location deviation: `backend/tests/test_deploy_artifacts.py::test_committed_deploy_bundle_integrity`, per the parent's allowed edit surfaces). The test runs the backend loader over the committed bundle and is skipped until `models/deploy/manifest.json` exists. The same file covers the fail-closed loader (`backend/app/infrastructure/artifacts/{manifest,loader}.py`) with the `fake_artifacts` fixture: sha mismatch, missing file or manifest, unknown schema, escaping paths, null threshold, key mismatch, missing key, split mismatch, invalid calibration, configured path not in the manifest, and numpy-only loading (subprocess check that sklearn, torch and scipy are absent). It also covers the new settings in `backend/app/config.py`, where `ALLOW_UNCALIBRATED` is refused in production. RED: collection ImportError (`app.infrastructure.artifacts` missing). GREEN: 21 passed, 1 skipped.
+- [x] 2.4 Confirm `docker-compose.yml` already mounts `./models:/models:ro` (DA1.3); add a test or comment only if a gap exists (no volume change expected).
+  - Evidence: `docker-compose.yml:63` contains `- ./models:/models:ro`, so there is no gap and no change was made.
+- [ ] 2.5 Stage explicit paths; commit `data(deploy): Jaccard calibration, CharCNN v2, manifest`. (Parent: run after 2.1. The writer's code commit is `feat(deploy): verify deploy manifest at load`.)
 
 ## WU3 - Scoring domain, ports, decision matrix (PR2, ~250 lines)
 

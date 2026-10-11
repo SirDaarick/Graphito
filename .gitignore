@@ -38,6 +38,7 @@ models/char_cnn/weights/
 *.pt
 *.pth
 !models/char_cnn/best_model.pth
+!models/deploy/channel_b/best.pth
 *.bin
 checkpoint-*/
 
