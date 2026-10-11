@@ -115,7 +115,7 @@ class PdfReportService:
                 Paragraph("<b>Estudiante Evaluado:</b>", body_style),
                 Paragraph(student_author or "Anonimo / Desconocido", body_style),
                 Paragraph("<b>Estado:</b>", body_style),
-                Paragraph(f"<b>{getattr(report, 'estado', 'COMPLETADO')}</b>", body_style),
+                Paragraph(f"<b>{getattr(report.estado, 'value', report.estado) or 'COMPLETADO'}</b>", body_style),
             ],
         ]
 
@@ -133,8 +133,15 @@ class PdfReportService:
         elements.append(Spacer(1, 16))
 
         # 3. Decision Support Diagnostic Banner
-        dictamen_val = report.dictamen.value if hasattr(report.dictamen, "value") else str(report.dictamen)
-        if dictamen_val in (DictamenEnum.REVISION_ESTILOMETRICA.value, "SOSPECHA_IA"):
+        dictamen_val = report.dictamen.value if hasattr(report.dictamen, "value") else report.dictamen
+        estado_val = getattr(report.estado, "value", report.estado) or "COMPLETADO"
+        if dictamen_val is None or estado_val != "COMPLETADO":
+            # PENDIENTE / PROCESANDO / ERROR: no verdict exists yet; never fall back to conformity.
+            verdict_bg = colors.HexColor("#f8fafc")
+            verdict_border = colors.HexColor("#94a3b8")
+            verdict_color = "#475569"
+            verdict_text = f"SIN DICTAMEN: ANALISIS {estado_val}"
+        elif dictamen_val in (DictamenEnum.REVISION_ESTILOMETRICA.value, "SOSPECHA_IA"):
             verdict_bg = colors.HexColor("#fff7ed")
             verdict_border = colors.HexColor("#f97316")
             verdict_color = "#c2410c"

@@ -230,6 +230,7 @@ async def test_real_ready_runtime_completes_analysis_end_to_end(client, db_sessi
     ))
     assert runtime.ready, runtime.reason
     monkeypatch.setattr(rt, "_runtime", runtime)
+    previous_override = app.dependency_overrides.get(get_inference_engine)
     app.dependency_overrides[get_inference_engine] = lambda: runtime.engine
     try:
         headers, problema_id, entrega_id = await _setup(client)
@@ -257,7 +258,49 @@ async def test_real_ready_runtime_completes_analysis_end_to_end(client, db_sessi
             assert row.probabilidad_ia != 0.05 and row.gcb_estado == "OK" and row.gcb_similarity is not None
         assert rows[0].dictamen == rows[1].dictamen and rows[0].flag_b == rows[1].flag_b
     finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(get_inference_engine, None)
+        else:
+            app.dependency_overrides[get_inference_engine] = previous_override
         runtime.engine.close()
+
+
+class _BrokenLexical:
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self):
+        self.calls += 1
+        raise ImportError("cannot import models.evaluation from C:/secret/models")
+
+
+@pytest.mark.parametrize("mode", ["STUB", "REAL"])
+def test_lexical_engine_failure_at_startup_is_not_ready(mode, fake_artifacts):
+    """Channel A's Jaccard is part of readiness: built once at startup, a failure is cached as a
+    not-ready runtime with a path-free reason, and the model engine is never built."""
+    settings = Settings(_env_file=None, INFERENCE_MODE="STUB") if mode == "STUB" else _real_settings(fake_artifacts)
+    lexical = _BrokenLexical()
+    built = []
+    runtime = rt.build_runtime(
+        settings, engine_factory=lambda s, b: built.append(1) or StubInferenceEngine(), lexical_factory=lexical
+    )
+    assert not runtime.ready and runtime.reason == "lexical_unavailable"
+    assert lexical.calls == 1 and built == [] and runtime.engine is None
+    assert "secret" not in json.dumps(runtime.health())
+    with pytest.raises(NotReadyError):
+        runtime.require_engine()
+
+
+def test_ready_runtime_shares_one_lexical_instance_with_scoring(monkeypatch):
+    from app.infrastructure.lexical.jaccard import JaccardSimilarity
+    from app.presentation.api.v1.deps import get_scoring_service
+
+    runtime = rt.build_runtime(Settings(_env_file=None, INFERENCE_MODE="STUB"))
+    assert runtime.ready and isinstance(runtime.lexical, JaccardSimilarity)
+    monkeypatch.setattr(rt, "_runtime", runtime)
+    first = get_scoring_service(inference=runtime.engine, vector_store=None)
+    second = get_scoring_service(inference=runtime.engine, vector_store=None)
+    assert first.lexical is runtime.lexical and second.lexical is runtime.lexical  # no per-request build
 
 
 @pytest.mark.asyncio

@@ -1,11 +1,17 @@
+"""Student-archetype benchmark over the backend's shared scoring path.
+
+Run from `backend/` (so `app` is importable), with the same settings as the backend:
+  INFERENCE_MODE=REAL python ../scripts/benchmark_student_archetypes.py
+Writes `benchmark_archetypes_results.json` in the current directory.
+"""
+
+import asyncio
 import json
-import numpy as np
-import torch
-from models.char_cnn.inference import CharCNNInference
-from models.graphcodebert.inference import GraphCodeBERTInference
-from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
+
+from app.application.services.scoring_service import ScoringService
 from app.config import settings
-from app.infrastructure.inference.stub_engine import StubInferenceEngine
+from app.domain.ports.vector_store_port import VectorStorePort
+from app.infrastructure.inference.runtime import build_runtime
 
 # ==============================================================================
 # PROBLEMA: Verificación y filtrado de números primos en el rango [1, N]
@@ -224,56 +230,59 @@ int main() {
     }
 }
 
-def run_benchmarks():
-    print("Iniciando motores de inferencia...")
-    char_cnn = CharCNNInference("models/char_cnn/best_model.pth")
-    gcb = GraphCodeBERTInference()
-    stub = StubInferenceEngine()
+class _NoVectorStore(VectorStorePort):
+    """No Chroma offline: the exploratory GraphCodeBERT signal reports `SIN_INDICE` (never decides)."""
 
-    # Embedding de la referencia
-    ref_emb = gcb.predict_code(REF_CODE)["embedding"]
+    async def upsert_reference(self, reference_id, embedding, metadata, document=None):
+        raise NotImplementedError("the benchmark never writes vectors")
 
-    def cosine(a, b):
-        a, b = np.array(a), np.array(b)
-        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+    async def query_nearest(self, embedding, problema_id, top_k=1):
+        return []
 
+    async def delete_reference(self, reference_id):
+        raise NotImplementedError("the benchmark never deletes vectors")
+
+
+async def _score_all(scoring: ScoringService):
     results = []
-
     for key, data in ARCHETYPES.items():
-        code = data["codigo"].strip()
-        
-        # Canal A: Semántica
-        sem_res = gcb.predict_code(code)
-        raw_sem = cosine(ref_emb, sem_res["embedding"])
-        calib_sem = AnalysisOrchestrator.calibrate_semantic_similarity(raw_sem)
-
-        # Canal B: Estilometría
-        char_res = char_cnn.predict_text(code)
-        ai_prob = char_res["prob_sintetico"]
-        hum_prob = char_res["prob_humano"]
-        char_pred = char_res["prediction"]
-
-        # Motor de Decisión Bimodal
-        decision = stub.compute_decision(
-            semantic_similarity=calib_sem,
-            synthetic_prob=ai_prob,
-            threshold_sem=settings.THRESHOLD_SEM,  # canonical 0.85 (was a local 0.75)
-            threshold_ai=settings.THRESHOLD_AI,
-        )
-
+        outcome = await scoring.score_code(data["codigo"].strip(), [("referencia", REF_CODE)], language="c")
+        a, b = outcome.channel_a, outcome.channel_b
         results.append({
             "key": key,
             "titulo": data["titulo"],
             "descripcion": data["descripcion"],
-            "raw_sem": round(raw_sem, 4),
-            "calib_sem": round(calib_sem, 4),
-            "ai_prob": round(ai_prob, 4),
-            "hum_prob": round(hum_prob, 4),
-            "char_pred": char_pred,
-            "dictamen": decision["dictamen"],
-            "discrepancia": decision["discrepancia_score"],
-            "indicadores": decision["indicadores"],
+            "engine": outcome.engine,
+            "jaccard_raw": a.raw,
+            "jaccard_calibrado": a.calibrated,
+            "umbral_a": a.threshold,
+            "estado_canal_a": outcome.estado_canal_a,
+            "flag_a": outcome.flag_a,
+            "charcnn_calibrado": b.calibrated,
+            "umbral_b": b.threshold,
+            "estado_canal_b": outcome.estado_canal_b,
+            "flag_b": outcome.flag_b,
+            "dictamen": outcome.dictamen,
+            "indicadores": ScoringService.build_indicators(outcome),
         })
+    return results
+
+
+def run_benchmarks():
+    """Score every archetype with the backend's shared `ScoringService` (spec AS1): Channel A
+    lexical Jaccard and Channel B CharCNN v2 with the deploy-artifact calibrations and thresholds
+    (`INFERENCE_MODE=REAL`), or the stub engine and fixed development thresholds (`STUB`)."""
+    print("Iniciando motores de inferencia...")
+    runtime = build_runtime(settings)
+    if not runtime.ready:
+        raise SystemExit(f"Inferencia no lista (engine={runtime.engine_label}, motivo={runtime.reason}).")
+    scoring = ScoringService(runtime.engine, runtime.calibration, _NoVectorStore(), runtime.lexical)
+    try:
+        results = asyncio.run(_score_all(scoring))
+    finally:
+        close = getattr(runtime.engine, "close", None)
+        if callable(close):
+            close()
 
     with open("benchmark_archetypes_results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)

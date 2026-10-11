@@ -71,10 +71,11 @@ async def run_migrations(path: Path = MIGRATION_FILE, engine=None) -> int:
         print(f"ERROR: migration file not found: {path}", file=sys.stderr)
         return 1
     statements = split_statements(path.read_text(encoding="utf-8"))
-    if engine is None:
-        from app.infrastructure.database.session import engine as default_engine
+    owns_engine = engine is None  # a caller-provided engine is never disposed here
+    if owns_engine:
+        from app.infrastructure.database import session as session_module
 
-        engine = default_engine
+        engine = session_module.engine
     from sqlalchemy import text
 
     try:
@@ -90,7 +91,8 @@ async def run_migrations(path: Path = MIGRATION_FILE, engine=None) -> int:
         print(f"ERROR: could not connect or run migrations: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     finally:
-        await engine.dispose()
+        if owns_engine:
+            await engine.dispose()
 
 
 def main() -> int:

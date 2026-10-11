@@ -113,6 +113,54 @@ async def test_commit_failure_after_upsert_compensates(db_session, vector_store,
     assert await _ref_count(db_session) == 0
 
 
+def _unreachable_chroma(monkeypatch):
+    """Use the real `get_vector_store` with a Chroma client that cannot connect."""
+    from app.infrastructure import vector_store as vs_module
+    from app.infrastructure.vector_store import chroma_adapter, get_vector_store
+
+    def unreachable():
+        raise ConnectionError("chroma down")
+
+    monkeypatch.setattr(chroma_adapter, "_default_client", unreachable)
+    monkeypatch.setattr(vs_module, "_stores", {})
+    monkeypatch.delitem(app.dependency_overrides, get_vector_store)
+
+
+@pytest.mark.asyncio
+async def test_reference_with_gcb_disabled_does_not_need_chroma(client, db_session, monkeypatch):
+    headers, problema_id = await _api_setup(client)
+    _unreachable_chroma(monkeypatch)
+    monkeypatch.setitem(app.dependency_overrides, get_inference_engine, lambda: RaisingEmbedder("gcb_disabled"))
+    res = await _post_ref(client, headers, problema_id)
+    assert res.status_code == 201, res.text
+    assert await _ref_count(db_session) == 1
+
+
+@pytest.mark.asyncio
+async def test_reference_with_gcb_enabled_and_chroma_down_is_503_and_writes_nothing(client, db_session, monkeypatch):
+    headers, problema_id = await _api_setup(client)
+    _unreachable_chroma(monkeypatch)
+    res = await _post_ref(client, headers, problema_id)
+    assert res.status_code == 503, res.text
+    assert res.json()["reason"] == "vector_store_unavailable"
+    assert "no se guardó nada" in res.json()["detail"]  # this endpoint guarantees it (rollback)
+    assert await _ref_count(db_session) == 0
+
+
+def test_dependency_failure_message_claims_nothing_saved_only_where_guaranteed():
+    from app.domain.errors import VectorStoreError
+    from app.presentation.deps import dependency_failure_body
+
+    exc = VectorStoreError("vector_store_unavailable", "down")
+    for method, path in (("POST", "/api/v1/analysis/run"), ("POST", "/api/v1/problems/3/references")):
+        body = dependency_failure_body(method, path, exc)
+        assert "no se guardó nada" in body["detail"] and body["reason"] == "vector_store_unavailable"
+    for method, path in (("POST", "/api/v1/analysis/batch"), ("GET", "/api/v1/analysis/reports/1"),
+                         ("PATCH", "/api/v1/analysis/reports/1/verdict")):
+        body = dependency_failure_body(method, path, exc)
+        assert "no se guardó" not in body["detail"] and body["reason"] == "vector_store_unavailable"
+
+
 @pytest.mark.asyncio
 async def test_gcb_disabled_stores_row_without_vector(db_session, vector_store):
     docente_id, problema_id = await _service_setup(db_session)

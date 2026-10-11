@@ -133,7 +133,11 @@ class ChromaVectorStoreAdapter(VectorStorePort):
         distances = results.get("distances")
         if not distances or distances[0] is None or len(distances[0]) != len(ids):
             raise VectorStoreError("vector_store_malformed", "query result lacks distances")
-        metadatas = results.get("metadatas") or [[{}] * len(ids)]
+        metadatas = results.get("metadatas")
+        if not metadatas or metadatas[0] is None:
+            metadatas = [[{}] * len(ids)]  # metadata not requested: empty dicts, never a guess
+        elif len(metadatas[0]) != len(ids):
+            raise VectorStoreError("vector_store_malformed", "query result metadatas do not match its ids")
         output = []
         for idx, ref_id in enumerate(ids):
             distance = distances[0][idx]
@@ -145,7 +149,7 @@ class ChromaVectorStoreAdapter(VectorStorePort):
                 "reference_id": ref_id,
                 "similarity": round(similarity, 4),
                 "distance": round(float(distance), 4),
-                "metadata": (metadatas[0] or [{}] * len(ids))[idx] or {},
+                "metadata": metadatas[0][idx] or {},
             })
         return output
 

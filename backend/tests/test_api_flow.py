@@ -356,7 +356,7 @@ async def test_gcb_signal_never_decides_and_failure_is_null(client, db_session, 
     assert (hi.gcb_similarity, lo.gcb_similarity) == (0.99, 0.0)
     assert (hi.flag_a, hi.flag_b, hi.dictamen) == (lo.flag_a, lo.flag_b, lo.dictamen)
 
-    vector_store.fail = True
+    monkeypatch.setattr(vector_store, "fail", True)
     res = await client.post("/api/v1/analysis/run", json={"entrega_id": entrega_id}, headers=headers)
     assert res.status_code == 201, res.text
     failed = await _row(db_session, res.json()["id"])

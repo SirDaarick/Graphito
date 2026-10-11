@@ -132,6 +132,18 @@ async def test_result_without_distances_raises():
 
 
 @pytest.mark.asyncio
+async def test_metadatas_shorter_than_ids_is_malformed():
+    store = _adapter()
+    store.collection.records["r1"] = {"embedding": VEC, "metadata": {"problema_id": 1}}
+    store.collection.query_result = {
+        "ids": [["r1", "r2"]], "distances": [[0.1, 0.2]], "metadatas": [[{"problema_id": 1}]],
+    }
+    with pytest.raises(VectorStoreError) as exc:
+        await store.query_nearest(VEC, problema_id=1)
+    assert exc.value.reason == "vector_store_malformed"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("op", ["query", "upsert", "delete"])
 async def test_failing_client_raises_not_empty(op):
     store = _adapter()

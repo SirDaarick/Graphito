@@ -82,6 +82,87 @@ def test_main_propagates_failure_exit_code(monkeypatch):
     assert apply_migrations.main() == 1
 
 
+class _FakeConnection:
+    """Records the isolation level in force when each statement runs."""
+
+    def __init__(self, log, fail_on=None):
+        self.log, self.fail_on, self.isolation_level = log, fail_on, None
+
+    async def execution_options(self, **options):
+        self.isolation_level = options.get("isolation_level")
+        return self
+
+    async def execute(self, statement):
+        sql = str(statement)
+        self.log.append((self.isolation_level, sql))
+        if sql == self.fail_on:
+            raise RuntimeError("boom")
+
+
+class _FakeEngine:
+    def __init__(self, fail_connect=False, fail_on=None):
+        self.log, self.disposed, self.fail_connect, self.fail_on = [], 0, fail_connect, fail_on
+
+    def connect(self):
+        engine = self
+
+        class _Ctx:
+            async def __aenter__(self):
+                if engine.fail_connect:
+                    raise ConnectionError("database unreachable")
+                return _FakeConnection(engine.log, engine.fail_on)
+
+            async def __aexit__(self, *exc):
+                return False
+
+        return _Ctx()
+
+    async def dispose(self):
+        self.disposed += 1
+
+
+@pytest.mark.asyncio
+async def test_run_migrations_executes_each_statement_on_autocommit(tmp_path):
+    sql_file = tmp_path / "m.sql"
+    sql_file.write_text("ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'X';\nSELECT 1;\nSELECT 2;\n", encoding="utf-8")
+    engine = _FakeEngine()
+    assert await apply_migrations.run_migrations(sql_file, engine=engine) == 0
+    assert [sql for _, sql in engine.log] == apply_migrations.split_statements(sql_file.read_text(encoding="utf-8"))
+    assert {level for level, _ in engine.log} == {"AUTOCOMMIT"}
+    assert engine.disposed == 0  # a caller-provided engine is not disposed
+
+
+@pytest.mark.asyncio
+async def test_run_migrations_stops_at_failure_and_keeps_caller_engine(tmp_path):
+    sql_file = tmp_path / "m.sql"
+    sql_file.write_text("SELECT 1;\nSELECT 2;\nSELECT 3;\n", encoding="utf-8")
+    engine = _FakeEngine(fail_on="SELECT 2;")
+    assert await apply_migrations.run_migrations(sql_file, engine=engine) == 1
+    assert [sql for _, sql in engine.log] == ["SELECT 1;", "SELECT 2;"]
+    assert engine.disposed == 0
+
+
+@pytest.mark.asyncio
+async def test_run_migrations_connect_failure_exits_one(tmp_path):
+    sql_file = tmp_path / "m.sql"
+    sql_file.write_text("SELECT 1;\n", encoding="utf-8")
+    engine = _FakeEngine(fail_connect=True)
+    assert await apply_migrations.run_migrations(sql_file, engine=engine) == 1
+    assert engine.log == [] and engine.disposed == 0
+
+
+@pytest.mark.asyncio
+async def test_run_migrations_disposes_only_its_own_default_engine(tmp_path, monkeypatch):
+    import app.infrastructure.database.session as session_module
+
+    sql_file = tmp_path / "m.sql"
+    sql_file.write_text("SELECT 1;\n", encoding="utf-8")
+    own = _FakeEngine()
+    monkeypatch.setattr(session_module, "engine", own)
+    assert await apply_migrations.run_migrations(sql_file) == 0
+    assert own.disposed == 1
+
+
 def test_sql_enum_additions_and_columns_are_idempotent():
     for stmt in STATEMENTS:
         flat = " ".join(stmt.split()).upper()

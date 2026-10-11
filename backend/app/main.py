@@ -10,7 +10,7 @@ from app.infrastructure.database.session import engine, Base
 import app.infrastructure.database.models  # Registra todas las entidades en Base.metadata
 from app.infrastructure.inference import runtime as inference_runtime
 from app.presentation.api.v1.api import api_router
-from app.presentation.deps import gate_response, not_ready_body, readiness_snapshot
+from app.presentation.deps import dependency_failure_body, gate_response, not_ready_body, readiness_snapshot
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("graphito-backend")
@@ -63,11 +63,11 @@ async def not_ready_handler(request: Request, exc: NotReadyError):
 @app.exception_handler(InferenceError)
 @app.exception_handler(VectorStoreError)
 async def dependency_failure_handler(request: Request, exc: GraphitoError):
-    # A model or the vector store failed for this request; nothing was committed (spec RI1, AS6.3).
+    # A model or the vector store failed for this request (spec RI1, AS6.3). The message says that
+    # nothing was saved only on the routes that guarantee it.
     logger.error("%s on %s %s: %s", type(exc).__name__, request.method, request.url.path, exc)
     return JSONResponse(
-        status_code=503,
-        content={"detail": "Servicio de inferencia o almacén vectorial no disponible; no se guardó nada.", "reason": exc.reason},
+        status_code=503, content=dependency_failure_body(request.method, request.url.path, exc)
     )
 
 

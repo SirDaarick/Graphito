@@ -48,6 +48,23 @@ def not_ready_body(snapshot: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# Routes that write nothing when a model or the vector store fails mid-request: the single
+# analysis scores before its first write, and reference creation rolls back (or compensates).
+ATOMIC_ON_DEPENDENCY_FAILURE = (
+    ("POST", re.compile(rf"^{_API}/analysis/run/?$")),
+    ("POST", re.compile(rf"^{_API}/problems/[^/]+/references/?$")),
+)
+
+
+def dependency_failure_body(method: str, path: str, exc: Any) -> Dict[str, Any]:
+    """503 body for an `InferenceError`/`VectorStoreError`; it only claims that nothing was saved
+    on the routes that guarantee it."""
+    atomic = any(method == m and pattern.match(path) for m, pattern in ATOMIC_ON_DEPENDENCY_FAILURE)
+    detail = "Servicio de inferencia o almacén vectorial no disponible"
+    detail += "; no se guardó nada." if atomic else "."
+    return {"detail": detail, "reason": getattr(exc, "reason", None) or "dependency_unavailable"}
+
+
 def is_gated(method: str, path: str) -> bool:
     return any(method == m and pattern.match(path) for m, pattern in GATED_ROUTES)
 

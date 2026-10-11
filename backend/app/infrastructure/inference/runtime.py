@@ -14,10 +14,12 @@ from typing import Any, Callable, Dict, Optional
 from app.domain.errors import GraphitoError, NotReadyError
 from app.domain.ports.calibration_port import CalibrationPort
 from app.domain.ports.inference_port import InferencePort
+from app.domain.ports.lexical_similarity_port import LexicalSimilarityPort
 
 logger = logging.getLogger(__name__)
 
 EngineFactory = Callable[[Any, Any], InferencePort]
+LexicalFactory = Callable[[], LexicalSimilarityPort]
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,8 @@ class InferenceRuntime:
     engine: Optional[InferencePort] = None
     calibration: Optional[CalibrationPort] = None
     artifacts: Optional[Dict[str, Any]] = field(default=None)
+    # Channel A's lexical similarity, built once with the runtime (never per request).
+    lexical: Optional[LexicalSimilarityPort] = None
 
     @property
     def calibration_state(self) -> str:
@@ -76,8 +80,32 @@ def _not_ready(mode: str, label: str, reason: str) -> InferenceRuntime:
     return InferenceRuntime(mode=mode, engine_label=label, ready=False, reason=reason)
 
 
-def build_runtime(settings=None, *, engine_factory: Optional[EngineFactory] = None) -> InferenceRuntime:
-    """Build the runtime for `settings.INFERENCE_MODE`; never raises (blocking: call off the loop)."""
+def _default_lexical_factory() -> LexicalSimilarityPort:
+    from app.infrastructure.lexical.jaccard import JaccardSimilarity
+
+    return JaccardSimilarity()
+
+
+def _build_lexical(factory: Optional[LexicalFactory]) -> Optional[LexicalSimilarityPort]:
+    """Channel A's Jaccard (imports the evaluation helpers); None when it cannot load."""
+    try:
+        return (factory or _default_lexical_factory)()
+    except Exception as exc:
+        logger.error("Inference not ready (Channel A lexical similarity): %s", type(exc).__name__)
+        return None
+
+
+def build_runtime(
+    settings=None,
+    *,
+    engine_factory: Optional[EngineFactory] = None,
+    lexical_factory: Optional[LexicalFactory] = None,
+) -> InferenceRuntime:
+    """Build the runtime for `settings.INFERENCE_MODE`; never raises (blocking: call off the loop).
+
+    Channel A's lexical similarity is built once here in every mode; if it cannot load, the
+    runtime is not ready (`lexical_unavailable`) and that result is kept, with no per-request retry.
+    """
     if settings is None:
         from app.config import settings as default_settings
 
@@ -87,8 +115,12 @@ def build_runtime(settings=None, *, engine_factory: Optional[EngineFactory] = No
         from app.infrastructure.artifacts.stub_artifacts import StubCalibration
         from app.infrastructure.inference.stub_engine import StubInferenceEngine
 
+        lexical = _build_lexical(lexical_factory)
+        if lexical is None:
+            return _not_ready(mode, "stub", "lexical_unavailable")
         return InferenceRuntime(
-            mode=mode, engine_label="stub", ready=True, engine=StubInferenceEngine(), calibration=StubCalibration()
+            mode=mode, engine_label="stub", ready=True, engine=StubInferenceEngine(), calibration=StubCalibration(),
+            lexical=lexical,
         )
     if mode != "REAL":
         logger.error("Inference not ready: unknown INFERENCE_MODE %r (expected STUB or REAL)", settings.INFERENCE_MODE)
@@ -105,8 +137,11 @@ def build_runtime(settings=None, *, engine_factory: Optional[EngineFactory] = No
     except Exception as exc:  # defensive: any unexpected loader failure is still fail-closed
         logger.exception("Inference not ready (deploy artifacts): %s", type(exc).__name__)
         return _not_ready(mode, "real", "artifact_load_failed")
+    lexical = _build_lexical(lexical_factory)
+    if lexical is None:
+        return _not_ready(mode, "real", "lexical_unavailable")
     try:
-        engine = (engine_factory or _default_engine_factory)(settings, bundle)
+        engine =(engine_factory or _default_engine_factory)(settings, bundle)
     except GraphitoError as exc:
         logger.error("Inference not ready (engine): %s", exc)
         return _not_ready(mode, "real", exc.reason)
@@ -131,6 +166,7 @@ def build_runtime(settings=None, *, engine_factory: Optional[EngineFactory] = No
         engine=engine,
         calibration=BundleCalibration(bundle),
         artifacts=bundle.summary(),
+        lexical=lexical,
     )
 
 

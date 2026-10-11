@@ -267,3 +267,33 @@ def build_fake_artifacts(root: _Path) -> FakeArtifacts:
 def fake_artifacts(tmp_path) -> FakeArtifacts:
     """A valid deploy bundle in a tmp dir (see `build_fake_artifacts`)."""
     return build_fake_artifacts(tmp_path / "deploy")
+
+
+# --- PDF text (spec AR3.2) ------------------------------------------------------------------------
+
+import base64 as _base64
+import re as _re
+import zlib as _zlib
+
+
+def pdf_text(data: bytes) -> str:
+    """The text drawn by a reportlab PDF: inflate every content stream and join its `(...) Tj`
+    strings with single spaces (no PDF library needed)."""
+    fragments = []
+    for match in _re.finditer(rb"stream\r?\n(.*?)endstream", data, _re.S):
+        raw = match.group(1).strip()
+        if raw.endswith(b"~>"):
+            raw = _base64.a85decode(raw[:-2].replace(b"\n", b"").replace(b"\r", b""))
+        try:
+            raw = _zlib.decompress(raw)
+        except _zlib.error:
+            pass
+        fragments.extend(_re.findall(rb"\(((?:[^()\\]|\\.)*)\)\s*Tj", raw, _re.S))
+    text = " ".join(f.decode("latin-1").replace("\\(", "(").replace("\\)", ")") for f in fragments)
+    return " ".join(text.split())
+
+
+@pytest.fixture(name="pdf_text")
+def pdf_text_fixture():
+    """`pdf_text` as a fixture (a module import of conftest would clash with the root tests/)."""
+    return pdf_text

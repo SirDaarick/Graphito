@@ -15,6 +15,7 @@ every path (AS1.2, AS1.3).
 """
 
 import asyncio
+import dataclasses
 import logging
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -143,13 +144,15 @@ class ScoringService:
             return ChannelResult.not_evaluated(SIN_CALIBRACION, raw=raw)
         return ChannelResult.evaluated(raw=raw, calibrated=cal.calibrate(raw), **info)
 
-    async def _gcb(self, entrega: CodigoFuente, has_references: bool) -> Tuple[Optional[float], str]:
+    async def _gcb(
+        self, code: str, language: str, problema_id: Optional[int], has_references: bool
+    ) -> Tuple[Optional[float], str]:
         """Exploratory secondary signal; never raises (AS8.2)."""
         if not has_references:
             return None, GCB_NO_REFERENCES
         try:
-            vector = await self.inference.extract_semantic_embedding(entrega.contenido, lang=entrega.lenguaje)
-            matches = await self.vector_store.query_nearest(embedding=vector, problema_id=entrega.problema_id, top_k=1)
+            vector = await self.inference.extract_semantic_embedding(code, lang=language)
+            matches = await self.vector_store.query_nearest(embedding=vector, problema_id=problema_id, top_k=1)
         except InferenceError as exc:
             if exc.reason == "gcb_disabled":
                 return None, GCB_DISABLED
@@ -169,14 +172,33 @@ class ScoringService:
     ) -> ScoringOutcome:
         """Measure and decide for one submission. Writes nothing."""
         refs = await self.resolve_references(db, entrega, referencia_id)
-        ref_pairs = [(str(r.id), r.contenido) for r in refs]
-        (channel_a, reference_id), channel_b, (gcb, gcb_estado) = await asyncio.gather(
-            self._channel_a(entrega.contenido, ref_pairs),
-            self._channel_b(entrega.contenido),
-            self._gcb(entrega, bool(ref_pairs)),
+        outcome = await self.score_code(
+            entrega.contenido,
+            [(str(r.id), r.contenido) for r in refs],
+            language=entrega.lenguaje,
+            problema_id=entrega.problema_id,
         )
-        if reference_id is None and referencia_id is not None:
-            reference_id = str(referencia_id)
+        if outcome.reference_id is None and referencia_id is not None:
+            outcome = dataclasses.replace(outcome, reference_id=str(referencia_id))
+        return outcome
+
+    async def score_code(
+        self,
+        code: str,
+        ref_pairs: Sequence[Tuple[str, str]],
+        *,
+        language: str = "c",
+        problema_id: Optional[int] = None,
+    ) -> ScoringOutcome:
+        """Measure and decide for raw code against `(reference_id, content)` pairs, sorted by id.
+
+        The database-free core of `score` (also used by offline scripts). Writes nothing.
+        """
+        (channel_a, reference_id), channel_b, (gcb, gcb_estado) = await asyncio.gather(
+            self._channel_a(code, ref_pairs),
+            self._channel_b(code),
+            self._gcb(code, language, problema_id, bool(ref_pairs)),
+        )
         provenance: Dict[str, Any] = {
             "canal_a_metodo": self.lexical.method,
             "manifest_sha": self.calibration.manifest_sha256,
