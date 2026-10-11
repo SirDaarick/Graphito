@@ -12,7 +12,6 @@ are imported there only when fitting, never when loading or applying).
 """
 
 import importlib
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -26,10 +25,7 @@ from app.infrastructure.artifacts.manifest import (
     read_manifest,
     verify_files,
 )
-
-# backend/app/infrastructure/artifacts/loader.py -> repository root (`/` in the container,
-# where `./models` is mounted at `/models`).
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+from app.infrastructure.artifacts.models_path import PROJECT_ROOT, ensure_on_path
 
 PathLike = Union[str, Path]
 
@@ -41,8 +37,7 @@ def resolve_setting_path(value: PathLike) -> Path:
 
 
 def _calibration_module():
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
+    ensure_on_path()
     return importlib.import_module("models.evaluation.calibration")
 
 
@@ -61,6 +56,10 @@ class ChannelCalibration:
 
     def apply(self, scores) -> np.ndarray:
         return np.asarray(self._loaded.apply(scores), dtype=np.float64)
+
+    def calibrate(self, score: float) -> float:
+        """One raw score in the calibrated space (`CalibratedChannel`)."""
+        return float(self.apply([score])[0])
 
     def flag(self, score: float) -> bool:
         return bool(self.apply([score])[0] >= self.threshold)

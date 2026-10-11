@@ -21,11 +21,11 @@ class Settings(BaseSettings):
     INFERENCE_MODE: str = "STUB"
     DEMO_MODE: bool = False
 
-    # Decision thresholds (single source of truth; override via env THRESHOLD_SEM / THRESHOLD_AI).
-    # NOTE: distinct from the `baseline` of calibrate_semantic_similarity (sigmoid midpoint).
+    # DEPRECATED legacy request defaults: only the legacy STUB decision path and the current API
+    # schema still read them. The new decision takes thresholds from the calibration artifacts
+    # (REAL) or the stub defaults (STUB) and ignores client thresholds (design D6, D9). Removed
+    # together with the API change that makes `threshold_*` optional and ignored (WU9).
     THRESHOLD_SEM: float = 0.85
-    # 0.20 is tuned for the format-invariant ("canonical") CharCNN, whose probabilities are lower
-    # than the legacy model's; chosen on dev and confirmed on test (recall 0.94, FPR 0.01).
     THRESHOLD_AI: float = 0.20
 
     # Environment: "production" refuses development-only switches (design D7).

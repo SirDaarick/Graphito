@@ -21,7 +21,7 @@ class Readiness:
 
 @dataclass(frozen=True)
 class StylometryResult:
-    """Channel B raw measurement: the CharCNN v2 `score` (logit) or an abstention.
+    """Channel B raw measurement: the CharCNN v2 `score` (uncalibrated probability) or an abstention.
 
     `raw_score` is None exactly when `abstained` is True; legacy probability keys are never used.
     """

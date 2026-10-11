@@ -34,8 +34,7 @@ class StubInferenceEngine(InferencePort):
         return [round(x / norm, 6) for x in raw_vals]
 
     async def predict_stylometry(self, code: str) -> StylometryResult:
-        prob = await self.predict_synthetic_prob(code)
-        return StylometryResult(raw_score=math.log(prob / (1.0 - prob)), abstained=False)
+        return StylometryResult(raw_score=await self.predict_synthetic_prob(code), abstained=False)
 
     # --- legacy decision path (removed when ScoringService lands, WU8) ---------------------------
 

@@ -109,6 +109,13 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     orig_maker = db_session_module.async_session_maker
     db_session_module.async_session_maker = test_session_maker
 
+    # A ready STUB runtime, whatever INFERENCE_MODE a local .env sets (the lifespan does not run
+    # under ASGITransport). Readiness tests swap it for a degraded one.
+    from app.config import Settings
+    from app.infrastructure.inference import runtime as inference_runtime
+    orig_runtime = inference_runtime.get_runtime()
+    inference_runtime.set_runtime(inference_runtime.build_runtime(Settings(_env_file=None, INFERENCE_MODE="STUB")))
+
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_inference_engine] = override_inference
     app.dependency_overrides[get_vector_store] = override_vector_store
@@ -119,6 +126,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides.clear()
     db_session_module.async_session_maker = orig_maker
+    inference_runtime.set_runtime(orig_runtime)
 
 
 # --- deploy artifacts (graphito.deploy-manifest/v1) ---------------------------------------------
