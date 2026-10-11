@@ -1,3 +1,10 @@
+"""Bimodal fusion of the semantic and stylometric channels.
+
+Research-only, not on the runtime decision path. The backend never imports this module: it
+decides from each channel's calibrated threshold (see `models/deploy/`), and the
+`sim x prob` combined risk computed here is unvalidated (`discrepancia_score` is deprecated).
+"""
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional

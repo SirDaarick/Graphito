@@ -1,28 +1,52 @@
 #!/usr/bin/env python3
-"""
-generate_tt_figures.py - Generador de gráficas de alta resolución para el reporte de Trabajo Terminal (TT).
+"""Generate the thesis (TT) figures from evaluation run artifacts.
 
-Genera:
-  1. figuras/curvas_entrenamiento_charcnn.png: Curvas de convergencia (Loss, Acc, F1)
-  2. figuras/matriz_confusion_charcnn.png: Matriz de confusión en test set no visto
-  3. figuras/benchmark_semantico_escom.png: Comparativa de similitud semántica en casos de ESCOM
-  4. figuras/invarianza_estilometrica.png: Robustez ante formateo y comentarios
+Every number drawn comes from a run directory; the script holds no metric values.
+
+Figures (written to ``--out-dir``):
+  1. ``curvas_entrenamiento_charcnn.png``: CharCNN training curves from ``history.csv``
+     (train loss, val ROC-AUC and val PR-AUC per epoch, with the selected epoch marked).
+  2. ``matriz_confusion_charcnn.png``: CharCNN test confusion matrix at the primary
+     operating point of ``metrics.json``.
+  3. ``comparativa_canal_a.png``: Channel A methods (v2, v2_nodfg, jaccard, winnowing,
+     legacy) on the ``__all`` view: ROC-AUC, PR-AUC and MAP@R with 95% CIs.
+
+The old ESCOM benchmark and stylometric invariance bars had no metrics source (their values
+were literals) and were removed rather than faked.
+
+Usage (from the repository root):
+  python scripts/generate_tt_figures.py \
+      --charcnn-run runs/char_cnn/20261011-015734 \
+      --gcb-run runs/graphcodebert/20261011-082155
+
+A missing ``metrics.json`` is an error (exit 1). ``history.csv`` is not tracked in git, so a
+missing history only skips the training-curves figure, with a message.
 """
 
+from __future__ import annotations
+
+import argparse
 import json
+import sys
+from dataclasses import dataclass
 from pathlib import Path
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import torch
 
-from models.char_cnn.inference import CharCNNInference
-from models.char_cnn.train import compute_metrics
+import matplotlib
 
-# Configuración de estilo académico
-plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
-plt.rcParams.update({
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+
+DEFAULT_OUT_DIR = Path("Documentacion/Documento/figuras")
+CURVES_FIGURE = "curvas_entrenamiento_charcnn.png"
+CONFUSION_FIGURE = "matriz_confusion_charcnn.png"
+CHANNEL_A_FIGURE = "comparativa_canal_a.png"
+GCB_METHODS = ("v2", "v2_nodfg", "jaccard", "winnowing", "legacy")
+GCB_VIEW = "all"
+
+STYLE = {
     "font.family": "serif",
     "font.size": 11,
     "axes.titlesize": 13,
@@ -30,183 +54,196 @@ plt.rcParams.update({
     "xtick.labelsize": 10,
     "ytick.labelsize": 10,
     "legend.fontsize": 10,
-    "figure.titlesize": 14,
     "figure.dpi": 300,
-})
-
-FIG_DIR = Path("Documentacion/Documento/figuras")
-FIG_DIR.mkdir(parents=True, exist_ok=True)
+}
 
 
-def plot_training_curves():
-    print("Generando curvas de entrenamiento...")
-    log_file = Path("models/char_cnn/logs/training_20260907_222227.csv")
-    if not log_file.exists():
-        print(f"No existe {log_file}")
-        return
+class RunNotFoundError(FileNotFoundError):
+    """A required run artifact is missing; figures are never drawn from defaults."""
 
-    df = pd.read_csv(log_file)
 
+@dataclass(frozen=True)
+class CharCNNRun:
+    path: Path
+    metrics: dict
+    history: pd.DataFrame | None
+
+
+@dataclass(frozen=True)
+class Confusion:
+    key: str
+    threshold: float
+    tn: int
+    fp: int
+    fn: int
+    tp: int
+
+
+@dataclass(frozen=True)
+class MethodMetrics:
+    method: str
+    roc_auc: float | None
+    roc_auc_ci: tuple[float, float] | None
+    pr_auc: float | None
+    pr_auc_ci: tuple[float, float] | None
+    map_at_r: float | None
+    map_at_r_ci: tuple[float, float] | None
+
+
+def _read_metrics(path: Path) -> dict:
+    if not path.is_file():
+        raise RunNotFoundError(f"missing run artifact: {path} (pass an existing run directory)")
+    with path.open("r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def load_charcnn_run(run_dir: Path) -> CharCNNRun:
+    run_dir = Path(run_dir)
+    metrics = _read_metrics(run_dir / "metrics.json")
+    history_path = run_dir / "history.csv"
+    history = pd.read_csv(history_path) if history_path.is_file() else None
+    return CharCNNRun(path=run_dir, metrics=metrics, history=history)
+
+
+def _value_ci(block: dict | None) -> tuple[float | None, tuple[float, float] | None]:
+    if not block:
+        return None, None
+    ci = block.get("ci95")
+    return block.get("value"), (tuple(ci) if ci else None)
+
+
+def load_gcb_run(run_dir: Path) -> list[MethodMetrics]:
+    run_dir = Path(run_dir)
+    rows = []
+    for method in GCB_METHODS:
+        metrics = _read_metrics(run_dir / f"{method}__{GCB_VIEW}" / "metrics.json")
+        tf = metrics.get("threshold_free", {})
+        roc, roc_ci = _value_ci(tf.get("roc_auc"))
+        pr, pr_ci = _value_ci(tf.get("pr_auc"))
+        mapr, mapr_ci = _value_ci(tf.get("map_at_r"))
+        rows.append(MethodMetrics(method, roc, roc_ci, pr, pr_ci, mapr, mapr_ci))
+    return rows
+
+
+def confusion_from_metrics(metrics: dict) -> Confusion:
+    points = metrics.get("operating_points") or {}
+    primary = [(k, p) for k, p in points.items() if p.get("primary")]
+    if len(primary) != 1:
+        raise ValueError(f"expected exactly one primary operating point, found {len(primary)}")
+    key, point = primary[0]
+    obs = point["observed"]
+    return Confusion(key, point["threshold"], int(obs["tn"]), int(obs["fp"]), int(obs["fn"]), int(obs["tp"]))
+
+
+def plot_training_curves(run: CharCNNRun, out_dir: Path) -> Path | None:
+    if run.history is None:
+        print(f"Omitida {CURVES_FIGURE}: no existe {run.path / 'history.csv'} (no se versiona en git).")
+        return None
+    df = run.history
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
-
-    # Gráfica 1: Pérdida
-    ax1.plot(df["epoch"], df["train_loss"], "o-", color="#1f77b4", label="Entrenamiento (Train Loss)", linewidth=2, markersize=4)
-    ax1.plot(df["epoch"], df["val_loss"], "s--", color="#d62728", label="Validación (Val Loss)", linewidth=2, markersize=4)
-    ax1.axvline(x=10, color="gray", linestyle=":", label="Mejor modelo (Epoch 10)")
+    ax1.plot(df["epoch"], df["train_loss"], "o-", color="#1f77b4", label="Pérdida de entrenamiento", markersize=3)
     ax1.set_xlabel("Época")
-    ax1.set_ylabel("Pérdida (Cross-Entropy Loss)")
-    ax1.set_title("Evolución de la Función de Pérdida")
-    ax1.legend(frameon=True)
-    ax1.grid(True, alpha=0.3)
-
-    # Gráfica 2: Métricas de Clasificación
-    ax2.plot(df["epoch"], df["accuracy"] * 100, "o-", color="#2ca02c", label="Accuracy", linewidth=2, markersize=4)
-    ax2.plot(df["epoch"], df["f1"] * 100, "^-", color="#ff7f0e", label="F1-Score", linewidth=2, markersize=4)
-    ax2.plot(df["epoch"], df["precision"] * 100, "d--", color="#9467bd", label="Precisión", linewidth=1.5, markersize=3)
-    ax2.plot(df["epoch"], df["recall"] * 100, "x--", color="#8c564b", label="Exhaustividad (Recall)", linewidth=1.5, markersize=3)
-    ax2.axhline(y=80, color="#d62728", linestyle="--", linewidth=1.5, label="Requisito RNF-04 (80%)")
+    ax1.set_ylabel("Pérdida")
+    ax1.set_title("Pérdida de entrenamiento")
+    ax2.plot(df["epoch"], df["val_roc_auc"], "o-", color="#2ca02c", label="ROC-AUC (val)", markersize=3)
+    ax2.plot(df["epoch"], df["val_pr_auc"], "s--", color="#ff7f0e", label="PR-AUC (val)", markersize=3)
     ax2.set_xlabel("Época")
-    ax2.set_ylabel("Porcentaje (%)")
-    ax2.set_title("Métricas de Validación en Problemas No Vistos")
-    ax2.set_ylim(70, 102)
-    ax2.legend(frameon=True, loc="lower right")
-    ax2.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    out_path = FIG_DIR / "curvas_entrenamiento_charcnn.png"
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Guardado: {out_path}")
+    ax2.set_ylabel("Métrica")
+    ax2.set_title("Métricas de validación")
+    selected = run.metrics.get("selected_epoch")
+    for ax in (ax1, ax2):
+        if selected is not None:
+            ax.axvline(x=selected, color="gray", linestyle=":", label=f"Época seleccionada ({selected})")
+        ax.legend(frameon=True)
+        ax.grid(True, alpha=0.3)
+    return _save(fig, out_dir / CURVES_FIGURE)
 
 
-def plot_confusion_matrix():
-    print("Generando matriz de confusión en test set...")
-    manifest_path = Path("models/char_cnn/dataset_manifest.json")
-    checkpoint_path = Path("models/char_cnn/best_model.pth")
-    if not manifest_path.exists() or not checkpoint_path.exists():
-        return
-
-    infer = CharCNNInference(checkpoint_path)
-    with open(manifest_path, "r", encoding="utf-8") as f:
-        manifest = json.load(f)
-
-    test_samples = manifest["splits"]["test"]
-    y_true, y_pred = [], []
-    for s in test_samples:
-        res = infer.predict(Path(s["file_path"]))
-        y_true.append(s["label"])
-        y_pred.append(res["class_id"])
-
-    # Matriz 2x2: [[TN, FP], [FN, TP]]
-    tn = sum(1 for yt, yp in zip(y_true, y_pred) if yt == 0 and yp == 0)
-    fp = sum(1 for yt, yp in zip(y_true, y_pred) if yt == 0 and yp == 1)
-    fn = sum(1 for yt, yp in zip(y_true, y_pred) if yt == 1 and yp == 0)
-    tp = sum(1 for yt, yp in zip(y_true, y_pred) if yt == 1 and yp == 1)
-
-    cm = np.array([[tn, fp], [fn, tp]])
-    cm_pct = cm / cm.sum(axis=1, keepdims=True) * 100
-
-    labels = [["Humano", "Sintético (IA)"], ["Humano", "Sintético (IA)"]]
-    annot = np.empty_like(cm, dtype=object)
+def plot_confusion_matrix(run: CharCNNRun, out_dir: Path) -> Path:
+    cm = confusion_from_metrics(run.metrics)
+    counts = np.array([[cm.tn, cm.fp], [cm.fn, cm.tp]])
+    row_totals = counts.sum(axis=1, keepdims=True)
+    pct = np.divide(counts * 100, row_totals, out=np.zeros(counts.shape, dtype=float), where=row_totals > 0)
+    labels = ["Humano", "Sintético (IA)"]
+    fig, ax = plt.subplots(figsize=(6, 5))
+    im = ax.imshow(counts, cmap="Blues")
+    fig.colorbar(im, ax=ax)
     for i in range(2):
         for j in range(2):
-            annot[i, j] = f"{cm[i, j]}\n({cm_pct[i, j]:.1f}%)"
+            color = "white" if counts[i, j] > counts.max() / 2 else "black"
+            ax.text(j, i, f"{counts[i, j]}\n({pct[i, j]:.1f}%)", ha="center", va="center", color=color, weight="bold")
+    ax.set_xticks([0, 1], labels)
+    ax.set_yticks([0, 1], labels)
+    ax.set_xlabel("Clase predicha")
+    ax.set_ylabel("Clase real")
+    split = run.metrics.get("split", "test")
+    ax.set_title(f"Matriz de confusión CharCNN ({split})\nPunto de operación {cm.key}, umbral {cm.threshold:.4g}", pad=12)
+    return _save(fig, out_dir / CONFUSION_FIGURE)
 
-    fig, ax = plt.subplots(figsize=(6, 5))
-    sns.heatmap(cm, annot=annot, fmt="", cmap="Blues", cbar=True, ax=ax,
-                xticklabels=["Humano", "Sintético (IA)"],
-                yticklabels=["Humano", "Sintético (IA)"],
-                annot_kws={"size": 13, "weight": "bold"})
 
-    ax.set_title("Matriz de Confusión — Test Set (13 Problemas No Vistos)\nAccuracy: 95.93% | F1: 0.9609", pad=12)
-    ax.set_ylabel("Clase Real")
-    ax.set_xlabel("Clase Predicha")
+def plot_channel_a_comparison(rows: list[MethodMetrics], out_dir: Path) -> Path:
+    series = (
+        ("ROC-AUC", "roc_auc", "#3498db"),
+        ("PR-AUC", "pr_auc", "#2ecc71"),
+        ("MAP@R", "map_at_r", "#9b59b6"),
+    )
+    x = np.arange(len(rows))
+    width = 0.27
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    for offset, (label, attr, color) in zip((-width, 0, width), series):
+        values = [getattr(r, attr) for r in rows]
+        cis = [getattr(r, f"{attr}_ci") for r in rows]
+        heights = [v if v is not None else 0 for v in values]
+        # Percentile CIs need not bracket the point estimate; clamp so error bars stay valid.
+        lower = [max(v - ci[0], 0) if (v is not None and ci) else 0 for v, ci in zip(values, cis)]
+        upper = [max(ci[1] - v, 0) if (v is not None and ci) else 0 for v, ci in zip(values, cis)]
+        bars = ax.bar(x + offset, heights, width, label=label, color=color, yerr=[lower, upper], capsize=3)
+        for bar, v, up in zip(bars, values, upper):
+            text = "n/d" if v is None else f"{v:.3f}"
+            y = bar.get_height() + up + 0.01
+            ax.text(bar.get_x() + bar.get_width() / 2, y, text, ha="center", va="bottom", fontsize=7, rotation=90)
+    ax.set_xticks(x, [r.method for r in rows])
+    ax.set_ylim(0, 1.15)
+    ax.set_ylabel("Valor (IC 95%)")
+    ax.set_title("Canal A: comparación de métodos (vista completa, test)")
+    ax.legend(frameon=True, loc="upper right")
+    ax.grid(True, axis="y", alpha=0.3)
+    return _save(fig, out_dir / CHANNEL_A_FIGURE)
 
-    plt.tight_layout()
-    out_path = FIG_DIR / "matriz_confusion_charcnn.png"
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+
+def _save(fig, path: Path) -> Path:
+    fig.tight_layout()
+    fig.savefig(path, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"  Guardado: {out_path}")
+    print(f"  Guardado: {path}")
+    return path
 
 
-def plot_escom_benchmark():
-    print("Generando gráfica de benchmark semántico ESCOM...")
-    topics = [
-        "U.I: Primo (for vs while)",
-        "U.I: Factorial (for vs do-while)",
-        "U.II: Invertir String (punteros)",
-        "U.II: Struct Alumno (puntero ->)",
-        "U.III: Malloc Vector (arit. *)",
-        "U.III: Archivos (fgetc vs fgets)",
-        "[NEG] Distinto U.I",
-        "[NEG] Distinto U.II",
-        "[NEG] Distinto U.III"
-    ]
-
-    base_scores = [0.9496, 0.9339, 0.8925, 0.9130, 0.9039, 0.9524, 0.9229, 0.8576, 0.8440]
-    lora_scores = [0.9011, 0.8842, 0.8354, 0.8526, 0.8410, 0.8533, 0.7831, 0.7512, 0.7527]
-
-    x = np.arange(len(topics))
-    width = 0.38
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    rects1 = ax.bar(x - width/2, base_scores, width, label="GraphCodeBERT (DFG Corregido)", color="#3498db", alpha=0.9)
-    rects2 = ax.bar(x + width/2, lora_scores, width, label="GraphCodeBERT (LoRA Contrastivo)", color="#2ecc71", alpha=0.9)
-
-    ax.axhline(y=0.85, color="#e74c3c", linestyle="--", alpha=0.7, label="Umbral sugerido equivalencia (0.85)")
-    ax.set_ylabel("Similitud Coseno")
-    ax.set_title("Benchmark en Casos Reales del Temario ESCOM IPN (ISC 2020)\nCapacidad de discriminación: Positivos vs Pares Negativos", pad=15)
-    ax.set_xticks(x)
-    ax.set_xticklabels(topics, rotation=35, ha="right")
-    ax.set_ylim(0.65, 1.05)
-    ax.legend(frameon=True, loc="lower left")
-
-    # Resaltar la separación en negativos
-    ax.axvspan(5.5, 8.5, color="#f39c12", alpha=0.15, label="Pares Negativos (Problemas Distintos)")
-
-    plt.tight_layout()
-    out_path = FIG_DIR / "benchmark_semantico_escom.png"
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Guardado: {out_path}")
+def parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--charcnn-run", type=Path, required=True, help="runs/char_cnn/<run> directory")
+    parser.add_argument("--gcb-run", type=Path, required=True, help="runs/graphcodebert/<run> directory")
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR, help="output directory for the PNGs")
+    return parser.parse_args(argv)
 
 
-def plot_robustness_barchart():
-    print("Generando gráfica de invarianza estilométrica...")
-    categories = [
-        "Código Estudiante Crudo\n(indentación desprolija)",
-        "Código Estudiante Formateado\n(con clang-format)",
-        "Código Sintético Limpio\n(sin comentarios)",
-        "Código Sintético con Docstrings\n(comentarios de LLM)"
-    ]
-
-    p_ai = [0.2975, 0.3095, 0.9793, 0.9793]
-    colors = ["#3498db", "#2980b9", "#e74c3c", "#c0392b"]
-
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    bars = ax.bar(categories, [p * 100 for p in p_ai], color=colors, width=0.5)
-
-    ax.axhline(y=50, color="gray", linestyle="--", label="Umbral de Decisión (50%)")
-    ax.set_ylabel("Probabilidad de IA (%)")
-    ax.set_title("Pruebas de Invarianza Estilométrica ante Formato y Comentarios\n(MultiScaleCharCNN)")
-    ax.set_ylim(0, 115)
-
-    for bar in bars:
-        yval = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2.0, yval + 2.5, f"{yval:.1f}%", ha="center", va="bottom", weight="bold")
-
-    ax.legend(frameon=True)
-    plt.tight_layout()
-    out_path = FIG_DIR / "invarianza_estilometrica.png"
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Guardado: {out_path}")
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        charcnn = load_charcnn_run(args.charcnn_run)
+        gcb = load_gcb_run(args.gcb_run)
+        confusion_from_metrics(charcnn.metrics)
+    except (RunNotFoundError, ValueError, KeyError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    with plt.rc_context(STYLE):
+        plot_training_curves(charcnn, args.out_dir)
+        plot_confusion_matrix(charcnn, args.out_dir)
+        plot_channel_a_comparison(gcb, args.out_dir)
+    print(f"Figuras generadas en: {args.out_dir.resolve()}")
+    return 0
 
 
 if __name__ == "__main__":
-    plot_training_curves()
-    plot_confusion_matrix()
-    plot_escom_benchmark()
-    plot_robustness_barchart()
-    print("\n✅ Todas las figuras fueron generadas con éxito en:", FIG_DIR.resolve())
+    sys.exit(main())

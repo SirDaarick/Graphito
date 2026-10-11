@@ -44,7 +44,7 @@ pytest backend/tests/test_api_flow.py::<test_name> -v   # single test
 
 - `backend/tests/` are API tests; `conftest.py` puts `backend/` on `sys.path`, uses in-memory SQLite (`aiosqlite`), `StubInferenceEngine`, and an in-memory vector store, so no Postgres/Chroma/models are needed.
 - Root `tests/` cover the ML side (DFG parser, CharCNN robustness, calibration, e2e analysis). `benchmark_semantic.py` is a benchmark, not a test.
-- `scripts/` holds `benchmark_student_archetypes.py` (writes `benchmark_archetypes_results.json`) and `generate_tt_figures.py`.
+- `scripts/` holds `benchmark_student_archetypes.py` (writes `benchmark_archetypes_results.json`), `build_deploy_artifacts.py` (writes `models/deploy/`), `reindex_references.py` and `generate_tt_figures.py` (requires `--charcnn-run` and `--gcb-run`; reads `runs/*/metrics.json`).
 
 ## Architecture
 
@@ -52,7 +52,7 @@ pytest backend/tests/test_api_flow.py::<test_name> -v   # single test
 
 **Analysis pipeline:** `AnalysisOrchestrator` runs S1–S7 (normalize/Tree-sitter → DFG + GraphCodeBERT → Chroma lookup → CharCNN → fusion/discrepancy → severity flags BAJA/MEDIA/ALTA/CRITICA → persist). `POST /analysis/run` supports `async_mode`. Batch uploads and groups go through `batch_analysis_service.py` and `group_service.py`; XAI output through `xai_service.py`.
 
-**Inference is swappable via `INFERENCE_MODE`** (`STUB` default | `REAL`), chosen in `infrastructure/inference/__init__.py`. `real_engine.py` loads the top-level `models/` package by inserting the project root into `sys.path`; in Docker `./models` is mounted read-only at `/models`. Use `STUB` unless you are working on the real models.
+**Inference is swappable via `INFERENCE_MODE`** (`STUB` default | `REAL`), chosen in `infrastructure/inference/__init__.py`. `real_engine.py` loads the top-level `models/` package by inserting the project root into `sys.path`; in Docker `./models` is mounted read-only at `/models`. Use `STUB` unless you are working on the real models. `REAL` loads the sha256-verified artifacts in `models/deploy/` (see its README); if they fail to load, `/health` reports `inference_ready=false` and analysis returns 503, never a stub fallback. `models/fusion.py` is research-only.
 
 **Config** is `backend/app/config.py` (pydantic-settings, reads `.env`, case-sensitive). Notable: `USE_CHROMA_SERVER` (embedded persistent Chroma at `CHROMA_PERSIST_DIRECTORY` vs. server at `CHROMA_HOST:CHROMA_PORT`; compose uses the server on 8000 inside the network, 8001 on the host) and `DEMO_MODE`.
 
