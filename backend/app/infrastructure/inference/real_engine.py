@@ -2,7 +2,8 @@ import os
 import sys
 import logging
 from typing import Dict, List, Any
-from app.domain.ports.inference_port import InferencePort
+from app.domain.errors import InferenceError
+from app.domain.ports.inference_port import InferencePort, Readiness, StylometryResult
 from app.infrastructure.inference.stub_engine import StubInferenceEngine
 
 logger = logging.getLogger(__name__)
@@ -83,10 +84,19 @@ class RealBimodalInferenceEngine(InferencePort):
                 logger.error(f"Error en inferencia CharCNN: {e}")
         return await self.stub_fallback.predict_synthetic_prob(code)
 
-    async def generate_hybrid_embedding(self, code: str, lang: str = "c") -> List[float]:
-        semantic = await self.extract_semantic_embedding(code, lang)
-        ai_prob = await self.predict_synthetic_prob(code)
-        return semantic + [ai_prob]
+    engine = "real"
+
+    def readiness(self) -> Readiness:
+        ready = self.gcb_engine is not None and self.charcnn_engine is not None
+        return Readiness(ready=ready, reason=None if ready else "models_not_loaded")
+
+    async def predict_stylometry(self, code: str) -> StylometryResult:
+        if self.charcnn_engine is None:
+            raise InferenceError("charcnn_not_loaded", "CharCNN is not loaded")
+        res = self.charcnn_engine.predict_text(code)
+        if res.get("abstained"):
+            return StylometryResult(raw_score=None, abstained=True)
+        return StylometryResult(raw_score=float(res["score"]), abstained=False)
 
     def compute_decision(
         self,

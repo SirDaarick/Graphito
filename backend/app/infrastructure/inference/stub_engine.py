@@ -1,7 +1,7 @@
 import hashlib
 import math
 from typing import Dict, List, Any
-from app.domain.ports.inference_port import InferencePort
+from app.domain.ports.inference_port import InferencePort, Readiness, StylometryResult
 
 
 class StubInferenceEngine(InferencePort):
@@ -11,21 +11,33 @@ class StubInferenceEngine(InferencePort):
     sin requerir pesos de PyTorch ni GPUs.
     """
 
+    engine = "stub"
+    embedding_fingerprint = hashlib.sha256(b'{"engine":"stub","dims":768,"version":1}').hexdigest()
+
+    def readiness(self) -> Readiness:
+        return Readiness(ready=True)
+
     async def extract_semantic_embedding(self, code: str, lang: str = "c") -> List[float]:
         # Generar un vector unitario de 768 dimensiones derivado del hash del código normalizado
         code_norm = "".join(code.split())
         h = hashlib.sha256(code_norm.encode("utf-8")).digest()
-        
+
         # Expandir bytes a 768 floats pseudo-aleatorios deterministas
         raw_vals = []
         for i in range(768):
             byte_val = h[i % len(h)]
             # Oscilación determinista
             raw_vals.append(math.sin((i + 1) * byte_val))
-            
+
         # Normalizar vector a norma L2 = 1.0 (para similitud del coseno)
         norm = math.sqrt(sum(x * x for x in raw_vals)) or 1.0
         return [round(x / norm, 6) for x in raw_vals]
+
+    async def predict_stylometry(self, code: str) -> StylometryResult:
+        prob = await self.predict_synthetic_prob(code)
+        return StylometryResult(raw_score=math.log(prob / (1.0 - prob)), abstained=False)
+
+    # --- legacy decision path (removed when ScoringService lands, WU8) ---------------------------
 
     async def predict_synthetic_prob(self, code: str) -> float:
         # Heurística simple para pruebas: comentarios típicos de LLMs o longitud de indentación
@@ -36,12 +48,6 @@ class StubInferenceEngine(InferencePort):
         if "// autor:" in code_lower or "// estudiante" in code_lower:
             score -= 0.15
         return max(0.01, min(0.99, round(score, 4)))
-
-    async def generate_hybrid_embedding(self, code: str, lang: str = "c") -> List[float]:
-        semantic = await self.extract_semantic_embedding(code, lang)
-        ai_prob = await self.predict_synthetic_prob(code)
-        # Vector híbrido de 769 dimensiones (768 semántico + 1 estilometría)
-        return semantic + [ai_prob]
 
     def compute_decision(
         self,

@@ -1,37 +1,58 @@
+"""Inference port (design D4): models produce measurements, never decisions.
+
+The decision lives in `app.domain.scoring.decide`; `compute_decision` and the hybrid 769-dim
+embedding are gone from the port. Engines run torch off the event loop (AS9.1) and raise
+`InferenceError` instead of falling back to fake values (AS6.1).
+"""
+
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any
+from dataclasses import dataclass, field
+from typing import List, Mapping, Optional
+
+
+@dataclass(frozen=True)
+class Readiness:
+    """Whether the engine (and its artifacts) can score. `reason` is a path-free code."""
+
+    ready: bool
+    reason: Optional[str] = None
+    details: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class StylometryResult:
+    """Channel B raw measurement: the CharCNN v2 `score` (logit) or an abstention.
+
+    `raw_score` is None exactly when `abstained` is True; legacy probability keys are never used.
+    """
+
+    raw_score: Optional[float]
+    abstained: bool
+    reason: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.abstained and self.raw_score is not None:
+            raise ValueError("an abstained result carries no score")
+        if not self.abstained and self.raw_score is None:
+            raise ValueError("a non-abstained result needs a score")
 
 
 class InferencePort(ABC):
-    """Puerto abstracto para el motor de inferencia bimodal (GraphCodeBERT + CharCNN)."""
+    """Bimodal inference engine: GraphCodeBERT v2 embeddings (secondary) and CharCNN v2 (Channel B)."""
+
+    #: "real" | "stub"
+    engine: str = ""
+    #: sha256 of the canonical embedding configuration (design D12); selects the Chroma collection.
+    embedding_fingerprint: str = ""
+
+    @abstractmethod
+    def readiness(self) -> Readiness:
+        """Current readiness; never raises."""
 
     @abstractmethod
     async def extract_semantic_embedding(self, code: str, lang: str = "c") -> List[float]:
-        """Extrae el vector semántico (768 dimensiones) del código fuente usando Canal A."""
-        pass
+        """GraphCodeBERT v2 embedding (768 dims). Raises `InferenceError` on failure."""
 
     @abstractmethod
-    async def predict_synthetic_prob(self, code: str) -> float:
-        """Predice la probabilidad (0.0 a 1.0) de que el código sea generado por IA usando Canal B."""
-        pass
-
-    @abstractmethod
-    async def generate_hybrid_embedding(self, code: str, lang: str = "c") -> List[float]:
-        """DEPRECATED: hybrid 769-dim embedding (768 semantic + 1 stylometric).
-
-        Do not use for indexing or querying the vector store: the stylometry channel
-        must not leak into semantic similarity. Use `extract_semantic_embedding` (768 dims).
-        """
-        pass
-
-    @abstractmethod
-    def compute_decision(
-        self,
-        semantic_similarity: float,
-        synthetic_prob: float,
-        *,
-        threshold_sem: float,
-        threshold_ai: float,
-    ) -> Dict[str, Any]:
-        """Calcula discrepancia, dictamen e indicadores de integridad."""
-        pass
+    async def predict_stylometry(self, code: str) -> StylometryResult:
+        """CharCNN v2 raw score or abstention. Raises `InferenceError` on failure."""

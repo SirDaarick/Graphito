@@ -13,17 +13,11 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Mapping, Union
 
+from app.domain.errors import ArtifactError
+
 SCHEMA = "graphito.deploy-manifest/v1"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _CHUNK = 1 << 20
-
-
-class ArtifactError(Exception):
-    """A deploy artifact is missing, tampered with or inconsistent with the configuration."""
-
-    def __init__(self, reason: str, message: str):
-        super().__init__(f"{reason}: {message}")
-        self.reason = reason
 
 
 @dataclass(frozen=True)
