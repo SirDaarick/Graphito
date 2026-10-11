@@ -7,9 +7,11 @@ pytest.importorskip("torch")
 pytest.importorskip("transformers")
 
 # Tests 1-2 need real weights; test 3 (decision engine) is pure and always runs.
+import torch
+
 from models.char_cnn.inference import CharCNNInference
+from models.graphcodebert.config import GraphCodeBERTConfig
 from models.graphcodebert.inference import GraphCodeBERTInference
-from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
 from app.config import settings
 from app.infrastructure.inference.stub_engine import StubInferenceEngine
 
@@ -117,36 +119,65 @@ def test_charcnn_calibration():
     print("✅ CharCNN sin padding distingue con éxito humano vs IA en códigos cortos!")
 
 
-@pytest.mark.requires_graphcodebert
-def test_graphcodebert_calibration():
-    print("\n--- [2] EVALUACIÓN DE GRAPHCODEBERT (CALIBRACIÓN DE ANISOTROPÍA) ---")
-    gcb = GraphCodeBERTInference()
+def _cosine(a, b):
+    a, b = np.array(a), np.array(b)
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
+
+@pytest.mark.requires_graphcodebert
+@pytest.mark.parametrize("pooling", ["cls", "mean"])
+def test_graphcodebert_v2_raw_cosine_ranks_variant_above_unrelated(pooling):
+    # Smoke only (TH1.1): raw zero-shot cosines, no thresholds and no calibration. The former
+    # test fitted a sigmoid on the very pair it scored (circular); calibration is now fitted on
+    # split val pairs only, see test_channel_a_calibration_fits_on_val_and_scores_test_once.
+    gcb = GraphCodeBERTInference(GraphCodeBERTConfig(input_version="v2", pooling=pooling), device=torch.device("cpu"))
     emb_ref = gcb.predict_code(CODE_HUMAN_FIZZBUZZ)["embedding"]
     emb_variant = gcb.predict_code(CODE_FIZZBUZZ_ERRORS_UGLY)["embedding"]
     emb_diff = gcb.predict_code(CODE_QUICKSORT_DIFFERENT)["embedding"]
+    assert _cosine(emb_ref, emb_variant) > _cosine(emb_ref, emb_diff)
 
-    def cosine(a, b):
-        a, b = np.array(a), np.array(b)
-        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
-    raw_sim_variant = cosine(emb_ref, emb_variant)
-    raw_sim_diff = cosine(emb_ref, emb_diff)
+def test_channel_a_calibration_fits_on_val_and_scores_test_once(tmp_path):
+    # Split-based Channel A calibration (TH1.1) on a synthetic fixture manifest: thresholds and
+    # the isotonic map are fitted on val pairs only; test pairs are scored with the frozen values.
+    from eval_factory import make_tree
+    from models.evaluation.calibration import DEFAULT_TARGETS, ScoredSet, build_calibration, select_threshold
+    from models.evaluation.manifest import load_manifest
+    from models.evaluation.splits import SplitConfig, build_split, write_manifest
+    from models.graphcodebert.v2.baselines import SetSimilarity, jaccard_set
+    from models.graphcodebert.v2.pairs import EvalPairs, score_pairs
 
-    calib_sim_variant = AnalysisOrchestrator.calibrate_semantic_similarity(raw_sim_variant)
-    calib_sim_diff = AnalysisOrchestrator.calibrate_semantic_similarity(raw_sim_diff)
+    tree = make_tree(tmp_path / "corpus")
+    config = SplitConfig(
+        seed=7, repo_root=tree.repo_root, raw_root=tree.raw_root, ai_root=tree.ai_root,
+        gt_static=tree.gt_static, gt_ambiguous=(tree.gt_dynamic,),
+    )
+    manifest = load_manifest(write_manifest(build_split(config), tmp_path / "split.json"))
 
-    print(f"FizzBuzz vs Variante Fea/Modificada:")
-    print(f"  Similitud Cruda:      {raw_sim_variant*100:.2f}%")
-    print(f"  Similitud Calibrada:  {calib_sim_variant*100:.2f}%")
+    def scored(split):
+        ep = EvalPairs.from_manifest(manifest, split)
+        texts = [(tree.repo_root / i).read_text(encoding="utf-8") for i in ep.pairs.ids]
+        return ep, score_pairs(SetSimilarity([jaccard_set(t) for t in texts]), ep).scores
 
-    print(f"FizzBuzz vs QuickSort (Completamente diferente):")
-    print(f"  Similitud Cruda:      {raw_sim_diff*100:.2f}%")
-    print(f"  Similitud Calibrada:  {calib_sim_diff*100:.2f}%")
+    val, val_scores = scored("val")
+    pair_ids = [f"{val.pairs.ids[a]}|{val.pairs.ids[b]}" for a, b in zip(val.pairs.a, val.pairs.b)]
+    assert all(manifest.split_of(i) == "val" for i in val.pairs.ids)
+    data = ScoredSet(pair_ids, val_scores, val.pairs.label, "val", manifest_sha256=manifest.sha256)
+    artifact, calibrator = build_calibration(data, channel="graphcodebert", score_name="jaccard", seed=1, method="isotonic")
+    assert artifact["fit_set"]["split"] == "val" and artifact["fit_set"]["n"] == len(pair_ids)
+    with pytest.raises(ValueError, match="val only"):
+        build_calibration(ScoredSet(pair_ids, val_scores, val.pairs.label, "test", manifest_sha256=manifest.sha256),
+                          channel="graphcodebert", score_name="jaccard", seed=1, method="isotonic")
 
-    assert calib_sim_variant > 0.75, f"Variante de FizzBuzz debería conservar alta similitud ({calib_sim_variant})"
-    assert calib_sim_diff < 0.25, f"QuickSort debería tener muy baja similitud (<25%), dio: {calib_sim_diff}"
-    print("✅ Calibración de anisotropía separa de manera nítida algoritmos iguales vs diferentes!")
+    thresholds = {t: select_threshold(val.pairs.label, val_scores, t) for t in DEFAULT_TARGETS}
+    test, test_scores = scored("test")
+    assert not set(test.pairs.ids) & set(val.pairs.ids)
+    calibrated = calibrator.transform(test_scores)
+    assert calibrated.shape == test_scores.shape and np.all((calibrated >= 0) & (calibrated <= 1))
+    for t, point in thresholds.items():
+        if point["threshold"] is not None:
+            predicted = test_scores >= point["threshold"]
+            assert predicted.shape == test.pairs.label.shape
 
 
 def test_decision_orchestrator():
