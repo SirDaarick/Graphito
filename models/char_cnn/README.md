@@ -144,9 +144,51 @@ runs/char_cnn_legacy/<ts>/          # legacy baseline (contaminated: true), same
 
 ## Results
 
-Pending (WU9): the v2 run on `split_v1` and the legacy baseline have not been reported yet. The
-legacy checkpoint's earlier 96% figure came from a split that overlaps `split_v1` test and must
-not be compared with v2 numbers.
+Reports are committed under `runs/char_cnn/20261011-015734/` (v2) and
+`runs/char_cnn_legacy/20261011-033124/` (legacy baseline); weights and score CSVs are not committed.
+
+**v2 run** (`split_v1` sha256 `e835362d…`, seed 42, CUDA, RTX 2060 SUPER). The leak guard passed:
+0.0056% of normalized human representatives still match a course marker (threshold 0.1%), 0% are
+outside the alphabet. Training used 874 AI + 874 freshly drawn human files per epoch (~6 s/epoch);
+model selection picked epoch 30 of 38 (early stop) by val ROC-AUC 0.9991 / PR-AUC 0.9890.
+Calibration (Platt) and thresholds were fitted on val only (2,868 human / 209 AI); test was scored
+once.
+
+| Test view | n (AI) | ROC-AUC [CI95] | PR-AUC [CI95] | ECE |
+|---|---|---|---|---|
+| Representatives (headline) | 4,531 (330) | 0.994 [0.991, 0.996] | 0.958 [0.944, 0.973] | 0.009 |
+| All files (secondary) | 9,649 (331) | 0.993 [0.990, 0.997] | 0.938 [0.919, 0.959] | 0.004 |
+
+Operating points on the headline view (thresholds from val, observed prevalence 7.3% AI):
+
+| Target FPR | Achieved FPR | Recall | Precision |
+|---|---|---|---|
+| 1% | 0.95% [0.69, 1.28] | 0.888 [0.858, 0.922] | 0.880 [0.840, 0.912] |
+| 5% | 4.57% [3.97, 5.18] | 0.973 [0.956, 0.989] | 0.626 [0.583, 0.669] |
+
+CIs are bootstrap CI95 resampled by duplicate group. Per generator (each AI group vs all test
+humans): deepseek-chat n=227, ROC-AUC 0.992, recall@1%FPR 0.88; qwen3 n=100, ROC-AUC 0.997,
+recall@1%FPR 0.90; every other generator has 0–1 test files and is `low_support`.
+
+**How to read these numbers.** They are honest for this corpus but they are *not* evidence of a
+general "AI style" detector:
+
+- Residual shortcuts after normalization (`shortcuts.json`, test): `std::` appears in 46% of human
+  vs 24% of AI files; `using namespace` in 7% of human vs 30% of AI files; AI files are shorter
+  (42% are 1–2 KB vs 24% of humans; 3% are ≥ 4 KB vs 13.5%). These course conventions and length
+  differences are learnable without any notion of authorship by an LLM.
+- 99% of AI test files come from two generators (deepseek-chat, qwen3) prompted with the same six
+  profiles; results do not transfer to unseen generators or to edited AI output (Phase 2:
+  leave-one-LLM-out, matched regeneration, TF-IDF probe).
+
+**Legacy baseline** (current `models/char_cnn/best_model.pth`, sha256 `d3692747…`, byte-identical
+before and after): headline ROC-AUC 0.999 [0.998, 1.000], PR-AUC 0.993, argmax@0.5 recall 0.967 at
+FPR 0.26%. It is labelled `contaminated`: the checkpoint was trained on the legacy subproblem split,
+which overlaps `split_v1` test, and it uses v1 preprocessing (course headers, CR and control
+characters visible). These numbers are not comparable with v2, and neither is the old 96% claim.
+
+**Promotion.** No checkpoint was promoted; `best_model.pth` is unchanged. Promoting the v2 model
+(and recalibrating the backend's `THRESHOLD_AI`) is a decision for SDD-4.
 
 ## Limitations
 
