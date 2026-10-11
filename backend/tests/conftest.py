@@ -142,6 +142,19 @@ FAKE_SPLIT_SHA = "e" * 64
 FAKE_CHECKPOINT_BYTES = b"fake-charcnn-v2-checkpoint"
 
 
+FAKE_GCB_FIELDS = {
+    "model_name": "microsoft/graphcodebert-base", "model_revision": "2b0488a7bb0eefc7041f1bb2cad1ab26b0da269d",
+    "input_version": "v2", "walker_version": "c-cpp-2", "pooling": "mean", "use_dfg": True,
+    "code_length": 384, "data_flow_length": 128, "max_windows": 16, "dtype": "float32",
+}
+
+
+def fake_gcb_fingerprint(fields):
+    # Same canonical JSON as scripts/build_deploy_artifacts.py:gcb_fingerprint (design D12).
+    canonical = _json.dumps({k: fields.get(k) for k in FAKE_GCB_FIELDS}, sort_keys=True, separators=(",", ":"))
+    return _hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _fake_threshold(target, threshold):
     return {
         "target_fpr": target, "threshold": threshold,
@@ -212,7 +225,8 @@ def build_fake_artifacts(root: _Path) -> FakeArtifacts:
         "channel_b": {"method": "charcnn_v2", "checkpoint": "channel_b/best.pth",
                       "calibration": "channel_b/calibration.json", "calibration_method": "platt",
                       "threshold_key": "fpr_0.01", "threshold": 0.1715, "source_run": "char_cnn/fake"},
-        "gcb": {"role": "secondary_non_deciding", "fingerprint": "f" * 64, "source_run": "graphcodebert/fake"},
+        "gcb": {"role": "secondary_non_deciding", **FAKE_GCB_FIELDS,
+                "fingerprint": fake_gcb_fingerprint(FAKE_GCB_FIELDS), "source_run": "graphcodebert/fake"},
     }
     fake = FakeArtifacts(root)
     fake.write(doc)

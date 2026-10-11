@@ -56,9 +56,9 @@ class InferenceRuntime:
 
 
 def _default_engine_factory(settings, bundle) -> InferencePort:
-    from app.infrastructure.inference.real_engine import RealBimodalInferenceEngine
+    from app.infrastructure.inference.real_engine import create_real_engine
 
-    return RealBimodalInferenceEngine()
+    return create_real_engine(settings, bundle)
 
 
 def _not_ready(mode: str, label: str, reason: str) -> InferenceRuntime:

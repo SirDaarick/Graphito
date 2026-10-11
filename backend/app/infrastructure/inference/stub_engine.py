@@ -3,12 +3,17 @@ import math
 from typing import Dict, List, Any
 from app.domain.ports.inference_port import InferencePort, Readiness, StylometryResult
 
+# Same minimum as `models.char_cnn.preprocess.MIN_NON_WS_CHARS` (asserted in tests); duplicated so
+# the stub never imports the models package.
+STUB_MIN_NON_WS_CHARS = 60
+
 
 class StubInferenceEngine(InferencePort):
     """
-    Motor de inferencia simulado (Stub).
-    Produce embeddings deterministas y probabilidades reproducibles para desarrollo y pruebas,
-    sin requerir pesos de PyTorch ni GPUs.
+    Motor de inferencia simulado (Stub), seleccionado solo con INFERENCE_MODE=STUB (AS7.1).
+    Produce embeddings deterministas y puntajes reproducibles para desarrollo y pruebas,
+    sin requerir pesos de PyTorch ni GPUs. Todo resultado lleva `engine == "stub"` y se abstiene
+    bajo el mismo mínimo de caracteres que CharCNN v2.
     """
 
     engine = "stub"
@@ -34,6 +39,8 @@ class StubInferenceEngine(InferencePort):
         return [round(x / norm, 6) for x in raw_vals]
 
     async def predict_stylometry(self, code: str) -> StylometryResult:
+        if len("".join(code.split())) < STUB_MIN_NON_WS_CHARS:
+            return StylometryResult(raw_score=None, abstained=True, reason="insufficient_length")
         return StylometryResult(raw_score=await self.predict_synthetic_prob(code), abstained=False)
 
     # --- legacy decision path (removed when ScoringService lands, WU8) ---------------------------
