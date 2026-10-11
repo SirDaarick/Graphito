@@ -20,28 +20,55 @@ from app.infrastructure.vector_store import get_vector_store
 from app.domain.ports.vector_store_port import VectorStorePort
 
 
-# Mock Vector Store en memoria para tests aislados
+from app.domain.errors import VectorStoreError
+
+
+def _cosine(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
+
+
+# In-memory vector store for isolated tests: real cosine similarity (non-constant, spec RI3), strict
+# errors like the Chroma adapter, and a `fail` switch that makes every call raise.
 class InMemoryVectorStore(VectorStorePort):
     EXPECTED_DIM = 768
 
     def __init__(self):
         self.store = {}
+        self.reset()
+
+    def reset(self):
+        self.store.clear()
         self.last_upsert_embedding = None
         self.last_query_embedding = None
+        self.fail = False
+        self.upserts = []
+        self.queries = []
+        self.deleted = []
+
+    def _maybe_fail(self, op):
+        if self.fail:
+            raise VectorStoreError(f"vector_store_{op}_failed", "in-memory store switched to fail")
 
     async def upsert_reference(self, reference_id: str, embedding: list, metadata: dict, document=None):
+        self._maybe_fail("write")
         self.last_upsert_embedding = list(embedding)
         assert len(embedding) == self.EXPECTED_DIM, (
             f"vector store received a {len(embedding)}-dim embedding, expected {self.EXPECTED_DIM}"
         )
+        self.upserts.append(reference_id)
         self.store[reference_id] = {
-            "embedding": embedding,
+            "embedding": list(embedding),
             "metadata": metadata,
             "document": document,
         }
         return True
 
     async def query_nearest(self, embedding: list, problema_id: int, top_k: int = 1):
+        self.queries.append(problema_id)
+        self._maybe_fail("query")
         self.last_query_embedding = list(embedding)
         assert len(embedding) == self.EXPECTED_DIM, (
             f"vector store queried with a {len(embedding)}-dim embedding, expected {self.EXPECTED_DIM}"
@@ -49,16 +76,19 @@ class InMemoryVectorStore(VectorStorePort):
         results = []
         for ref_id, data in self.store.items():
             if data["metadata"].get("problema_id") == problema_id:
-                # Simular similitud alta si coincide
+                sim = max(0.0, min(1.0, _cosine(embedding, data["embedding"])))
                 results.append({
                     "reference_id": ref_id,
-                    "similarity": 0.92,
-                    "distance": 0.08,
+                    "similarity": round(sim, 4),
+                    "distance": round(1.0 - sim, 4),
                     "metadata": data["metadata"],
                 })
+        results.sort(key=lambda r: (-r["similarity"], r["reference_id"]))
         return results[:top_k]
 
     async def delete_reference(self, reference_id: str):
+        self._maybe_fail("delete")
+        self.deleted.append(reference_id)
         self.store.pop(reference_id, None)
         return True
 
@@ -76,9 +106,7 @@ test_inference_engine = StubInferenceEngine()
 @pytest.fixture
 def vector_store() -> InMemoryVectorStore:
     """The shared in-memory store injected into the app by the `client` fixture."""
-    test_vector_store.store.clear()
-    test_vector_store.last_upsert_embedding = None
-    test_vector_store.last_query_embedding = None
+    test_vector_store.reset()
     return test_vector_store
 
 
@@ -104,6 +132,8 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     def override_vector_store():
         return test_vector_store
+
+    test_vector_store.reset()
 
     import app.infrastructure.database.session as db_session_module
     orig_maker = db_session_module.async_session_maker

@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 import uuid
 from sqlalchemy import select
@@ -5,12 +6,14 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.infrastructure.database.models import Problema, CodigoFuente, ReporteAnalisis, TipoCodigoEnum
+from app.domain.errors import InferenceError, VectorStoreError
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.presentation.schemas.problem import ProblemaCreate, ProblemaResponse
 from app.presentation.schemas.submission import CodigoFuenteCreate, CodigoFuenteResponse
 from app.presentation.schemas.analysis import ReporteAnalisisResponse
 
+logger = logging.getLogger(__name__)
 
 class ProblemService:
     def __init__(
@@ -52,11 +55,25 @@ class ProblemService:
     async def add_reference_code(
         self, docente_id: int, problema_id: int, autor: str, contenido: str, lenguaje: str = "c"
     ) -> CodigoFuenteResponse:
-        # Validar pertenencia del problema
+        """Embed before commit (spec RI1): embed -> add row (explicit id) -> flush -> upsert -> commit.
+
+        An embedding failure raises `InferenceError` (503) with nothing written; an upsert failure
+        rolls the row back (`VectorStoreError`, 503); a commit failure after the upsert removes the
+        vector again. With the GraphCodeBERT secondary signal disabled (`gcb_disabled`) the row is
+        stored without any vector; a placeholder embedding is never written.
+        """
         await self.get_problem(docente_id, problema_id)
 
-        # 1. Guardar en PostgreSQL
+        semantic_vector: Optional[List[float]] = None
+        try:
+            semantic_vector = await self.inference.extract_semantic_embedding(contenido, lang=lenguaje)
+        except InferenceError as exc:
+            if exc.reason != "gcb_disabled":
+                raise
+            logger.info("GraphCodeBERT disabled: reference stored without a vector.")
+
         codigo = CodigoFuente(
+            id=uuid.uuid4(),
             problema_id=problema_id,
             tipo=TipoCodigoEnum.REFERENCIA,
             autor=autor,
@@ -64,26 +81,44 @@ class ProblemService:
             lenguaje=lenguaje,
         )
         self.db.add(codigo)
-        await self.db.commit()
+        await self.db.flush()
+
+        upserted = False
+        if semantic_vector is not None:
+            metadata = {
+                "problema_id": problema_id,
+                "autor": autor,
+                "tipo": TipoCodigoEnum.REFERENCIA.value,
+                "lenguaje": lenguaje,
+            }
+            try:
+                await self.vector_store.upsert_reference(
+                    reference_id=str(codigo.id),
+                    embedding=semantic_vector,
+                    metadata=metadata,
+                    document=contenido,
+                )
+            except Exception as exc:
+                await self.db.rollback()
+                if isinstance(exc, VectorStoreError):
+                    raise
+                raise VectorStoreError("vector_store_write_failed", f"{type(exc).__name__}: {exc}") from exc
+            upserted = True
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            if upserted:
+                try:
+                    await self.vector_store.delete_reference(str(codigo.id))
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "Compensation failed: vector %s stays in the store without a row (%s).",
+                        codigo.id, type(cleanup_exc).__name__,
+                    )
+            raise
         await self.db.refresh(codigo)
-
-        # 2. Extraer vector semántico (768 dimensiones; sin componente estilométrica)
-        semantic_vector = await self.inference.extract_semantic_embedding(contenido, lang=lenguaje)
-
-        # 3. Indexar en ChromaDB
-        metadata = {
-            "problema_id": problema_id,
-            "autor": autor,
-            "tipo": TipoCodigoEnum.REFERENCIA.value,
-            "lenguaje": lenguaje,
-        }
-        await self.vector_store.upsert_reference(
-            reference_id=str(codigo.id),
-            embedding=semantic_vector,
-            metadata=metadata,
-            document=contenido,
-        )
-
         return CodigoFuenteResponse.model_validate(codigo)
 
     async def add_submission(

@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import settings
-from app.domain.errors import NotReadyError
+from app.domain.errors import GraphitoError, InferenceError, NotReadyError, VectorStoreError
 from app.infrastructure.database.session import engine, Base
 import app.infrastructure.database.models  # Registra todas las entidades en Base.metadata
 from app.infrastructure.inference import runtime as inference_runtime
@@ -58,6 +58,17 @@ async def inference_readiness_gate(request: Request, call_next):
 async def not_ready_handler(request: Request, exc: NotReadyError):
     snapshot = dict(readiness_snapshot(), inference_error=exc.reason)
     return JSONResponse(status_code=503, content=not_ready_body(snapshot))
+
+
+@app.exception_handler(InferenceError)
+@app.exception_handler(VectorStoreError)
+async def dependency_failure_handler(request: Request, exc: GraphitoError):
+    # A model or the vector store failed for this request; nothing was committed (spec RI1, AS6.3).
+    logger.error("%s on %s %s: %s", type(exc).__name__, request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Servicio de inferencia o almacén vectorial no disponible; no se guardó nada.", "reason": exc.reason},
+    )
 
 
 # CORS
