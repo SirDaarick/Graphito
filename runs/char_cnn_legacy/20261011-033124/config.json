@@ -1,0 +1,58 @@
+{
+  "argv": [
+    "-m",
+    "models.char_cnn.v2.baseline",
+    "--checkpoint",
+    "models/char_cnn/best_model.pth",
+    "--device",
+    "cuda"
+  ],
+  "calibration_path": null,
+  "calibration_sha256": null,
+  "channel": "char_cnn_legacy",
+  "checkpoint_sha256_after": "d3692747d2767b56806964ba2a23e686aa5e8515994d449f6b5e3afb18cb19e7",
+  "config": {
+    "arch_version": 1,
+    "calibrated": false,
+    "checkpoint": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito/models/char_cnn/best_model.pth",
+    "checkpoint_sha256_before": "d3692747d2767b56806964ba2a23e686aa5e8515994d449f6b5e3afb18cb19e7",
+    "contaminated": true,
+    "contamination_note": "contaminated: the legacy checkpoint was trained on a split that overlaps split_v1 test, and its preprocessing (v1) differs from preprocess v2; these numbers are not comparable to a v2 run",
+    "data_root": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito",
+    "device": "cuda",
+    "legacy_config": {
+      "seq_length": 4096,
+      "strip_comments": true,
+      "whitespace_mode": "canonical"
+    },
+    "n_boot": 1000,
+    "preproc_version": 1,
+    "score": "prob_sintetico",
+    "torch_version": "2.13.0+cu126"
+  },
+  "created_at": "2026-10-11T03:31:24.448110+00:00",
+  "dirty": true,
+  "failure": null,
+  "git_sha": "9cce24adeacacda88d07f78564390cebef2139dd",
+  "manifest_path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito/data/splits/split_v1.json.gz",
+  "manifest_sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f",
+  "mode": "legacy_contaminated",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.5",
+  "run_id": "char_cnn_legacy/20261011-033124",
+  "schema": "graphito.run_config/v1",
+  "seed": 42,
+  "split": "test",
+  "status": "complete",
+  "threshold_source": "manual",
+  "thresholds": {
+    "argmax_0.5": 0.5
+  },
+  "versions": {
+    "matplotlib": "3.11.0",
+    "numpy": "2.4.4",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "torch": "2.13.0+cu126"
+  }
+}

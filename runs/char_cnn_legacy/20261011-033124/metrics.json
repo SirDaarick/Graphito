@@ -1,0 +1,564 @@
+{
+  "artifacts_missing": [],
+  "bootstrap": {
+    "alpha": 0.05,
+    "n_boot": 1000,
+    "n_units": 4531,
+    "seed": 42,
+    "unit": "dup_group"
+  },
+  "channel": "char_cnn_legacy",
+  "contaminated": true,
+  "contamination_note": "contaminated: the legacy checkpoint was trained on a split that overlaps split_v1 test, and its preprocessing (v1) differs from preprocess v2; these numbers are not comparable to a v2 run",
+  "mode": "representatives",
+  "n": 4531,
+  "n_abstained": {
+    "rule": "legacy insufficient_length",
+    "test": {
+      "ai": 1,
+      "human": 8,
+      "n": 4531,
+      "total": 9
+    },
+    "test_all": {
+      "ai": 1,
+      "human": 18,
+      "n": 9649,
+      "total": 19
+    }
+  },
+  "n_neg": 4201,
+  "n_pos": 330,
+  "natural_prevalence": null,
+  "operating_points": {
+    "argmax_0.5": {
+      "balanced": {
+        "f1": {
+          "ci95": [
+            0.9716740313894547,
+            0.9910624482974602
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.981743751737587,
+          "view": "balanced"
+        },
+        "fn": 75.51666666666667,
+        "fp": 5.932039990478458,
+        "fpr": {
+          "ci95": [
+            0.0011913129525886982,
+            0.004286837123658196
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.002618424184717924,
+          "view": "balanced"
+        },
+        "n": 4531,
+        "n_neg": 4201,
+        "n_pos": 330,
+        "precision": {
+          "ci95": [
+            0.995585879672472,
+            0.9987676056338028
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.9972986026408205,
+          "view": "balanced"
+        },
+        "prevalence": 0.5,
+        "recall": {
+          "ci95": [
+            0.9473684210526315,
+            0.9847106455582906
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.9666666666666666,
+          "view": "balanced"
+        },
+        "tn": 2259.567960009522,
+        "tp": 2189.9833333333336,
+        "view": "balanced"
+      },
+      "low_support": false,
+      "observed": {
+        "f1": {
+          "ci95": [
+            0.9523809523809523,
+            0.979720428701541
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.9666666666666667,
+          "view": "observed"
+        },
+        "fn": 11,
+        "fp": 11,
+        "fpr": {
+          "ci95": [
+            0.001191312952588698,
+            0.004286837123658196
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.0026184241847179244,
+          "view": "observed"
+        },
+        "n": 4531,
+        "n_neg": 4201,
+        "n_pos": 330,
+        "precision": {
+          "ci95": [
+            0.9458562329390355,
+            0.984664914708963
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.9666666666666667,
+          "view": "observed"
+        },
+        "prevalence": 0.07283160450231736,
+        "recall": {
+          "ci95": [
+            0.9473684210526315,
+            0.9847106455582905
+          ],
+          "ci_reason": null,
+          "n_boot_valid": 1000,
+          "reason": null,
+          "skipped_resamples": 0,
+          "value": 0.9666666666666667,
+          "view": "observed"
+        },
+        "tn": 4190,
+        "tp": 319,
+        "view": "observed"
+      },
+      "primary": true,
+      "reason": null,
+      "rule": "prob_sintetico >= 0.5 (the legacy argmax, except at an exact 0.5 tie)",
+      "source": "manual",
+      "target_fpr": null,
+      "threshold": 0.5,
+      "unachievable": false
+    }
+  },
+  "per_generator": {
+    "comparison": "AI files of the group vs all human files of the view",
+    "model": {
+      "codestral": {
+        "low_support": true,
+        "n_neg": 4201,
+        "n_pos": 0,
+        "pr_auc": null,
+        "reason": "empty",
+        "recall": {
+          "argmax_0.5": null
+        },
+        "roc_auc": null
+      },
+      "deepseek-chat": {
+        "low_support": false,
+        "n_neg": 4201,
+        "n_pos": 227,
+        "pr_auc": 0.9905740899587923,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 0.9779735682819384
+        },
+        "roc_auc": 0.9987521326472509
+      },
+      "gemini-flash": {
+        "low_support": true,
+        "n_neg": 4201,
+        "n_pos": 1,
+        "pr_auc": 1.0,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 1.0
+        },
+        "roc_auc": 1.0
+      },
+      "kimi": {
+        "low_support": true,
+        "n_neg": 4201,
+        "n_pos": 1,
+        "pr_auc": 1.0,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 1.0
+        },
+        "roc_auc": 1.0
+      },
+      "llama4": {
+        "low_support": true,
+        "n_neg": 4201,
+        "n_pos": 1,
+        "pr_auc": 1.0,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 1.0
+        },
+        "roc_auc": 1.0
+      },
+      "mistral-small": {
+        "low_support": true,
+        "n_neg": 4201,
+        "n_pos": 0,
+        "pr_auc": null,
+        "reason": "empty",
+        "recall": {
+          "argmax_0.5": null
+        },
+        "roc_auc": null
+      },
+      "qwen3": {
+        "low_support": false,
+        "n_neg": 4201,
+        "n_pos": 100,
+        "pr_auc": 0.9813396671968753,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 0.94
+        },
+        "roc_auc": 0.9993311116400857
+      }
+    },
+    "profile": {
+      "aplicado": {
+        "low_support": false,
+        "n_neg": 4201,
+        "n_pos": 81,
+        "pr_auc": 0.9892399221593282,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 0.9753086419753086
+        },
+        "roc_auc": 0.9995503716046444
+      },
+      "comentado-basic": {
+        "low_support": true,
+        "n_neg": 4201,
+        "n_pos": 26,
+        "pr_auc": 0.9705128205128205,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 0.9615384615384616
+        },
+        "roc_auc": 0.9995971655100434
+      },
+      "comentado-bueno": {
+        "low_support": false,
+        "n_neg": 4201,
+        "n_pos": 37,
+        "pr_auc": 0.9992887624466572,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 1.0
+        },
+        "roc_auc": 0.9999935665253447
+      },
+      "comentado-malo": {
+        "low_support": false,
+        "n_neg": 4201,
+        "n_pos": 32,
+        "pr_auc": 0.9990530303030303,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 1.0
+        },
+        "roc_auc": 0.9999925612949297
+      },
+      "comentado-pro": {
+        "low_support": true,
+        "n_neg": 4201,
+        "n_pos": 1,
+        "pr_auc": 1.0,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 1.0
+        },
+        "roc_auc": 1.0
+      },
+      "descuidado": {
+        "low_support": false,
+        "n_neg": 4201,
+        "n_pos": 74,
+        "pr_auc": 0.9583828528965729,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 0.9324324324324325
+        },
+        "roc_auc": 0.9964487219902597
+      },
+      "kompaktan": {
+        "low_support": false,
+        "n_neg": 4201,
+        "n_pos": 79,
+        "pr_auc": 0.9793688516291438,
+        "reason": null,
+        "recall": {
+          "argmax_0.5": 0.9620253164556962
+        },
+        "roc_auc": 0.9994937914119303
+      }
+    }
+  },
+  "per_group": {
+    "course": {
+      "pr_auc": {
+        "A2016": {
+          "low_support": false,
+          "n": 1103,
+          "n_pos": 60,
+          "reason": null,
+          "value": 0.9986805555555556
+        },
+        "A2017": {
+          "low_support": false,
+          "n": 1033,
+          "n_pos": 80,
+          "reason": null,
+          "value": 0.9845357388261847
+        },
+        "B2016": {
+          "low_support": false,
+          "n": 1461,
+          "n_pos": 70,
+          "reason": null,
+          "value": 0.9920039569031274
+        },
+        "B2017": {
+          "low_support": false,
+          "n": 934,
+          "n_pos": 120,
+          "reason": null,
+          "value": 0.9984234234234235
+        }
+      },
+      "roc_auc": {
+        "A2016": {
+          "low_support": false,
+          "n": 1103,
+          "n_pos": 60,
+          "reason": null,
+          "value": 0.9999201022690956
+        },
+        "A2017": {
+          "low_support": false,
+          "n": 1033,
+          "n_pos": 80,
+          "reason": null,
+          "value": 0.9969307450157397
+        },
+        "B2016": {
+          "low_support": false,
+          "n": 1461,
+          "n_pos": 70,
+          "reason": null,
+          "value": 0.999337578309541
+        },
+        "B2017": {
+          "low_support": false,
+          "n": 934,
+          "n_pos": 120,
+          "reason": null,
+          "value": 0.9997133497133497
+        }
+      }
+    },
+    "lang": {
+      "pr_auc": {
+        "c": {
+          "low_support": false,
+          "n": 2136,
+          "n_pos": 140,
+          "reason": null,
+          "value": 0.9900354569175669
+        },
+        "cpp": {
+          "low_support": false,
+          "n": 2395,
+          "n_pos": 190,
+          "reason": null,
+          "value": 0.9964422870332579
+        }
+      },
+      "roc_auc": {
+        "c": {
+          "low_support": false,
+          "n": 2136,
+          "n_pos": 140,
+          "reason": null,
+          "value": 0.9977347552247352
+        },
+        "cpp": {
+          "low_support": false,
+          "n": 2395,
+          "n_pos": 190,
+          "reason": null,
+          "value": 0.9995739348370928
+        }
+      }
+    },
+    "length_bucket": {
+      "pr_auc": {
+        "1024-2047": {
+          "low_support": false,
+          "n": 1159,
+          "n_pos": 140,
+          "reason": null,
+          "value": 1.0
+        },
+        "2048-4095": {
+          "low_support": false,
+          "n": 1725,
+          "n_pos": 56,
+          "reason": null,
+          "value": 1.0
+        },
+        "512-1023": {
+          "low_support": false,
+          "n": 756,
+          "n_pos": 85,
+          "reason": null,
+          "value": 0.9849392358101434
+        },
+        "<512": {
+          "low_support": false,
+          "n": 311,
+          "n_pos": 38,
+          "reason": null,
+          "value": 0.9217828121303113
+        },
+        ">=4096": {
+          "low_support": true,
+          "n": 580,
+          "n_pos": 11,
+          "reason": null,
+          "value": 1.0
+        }
+      },
+      "roc_auc": {
+        "1024-2047": {
+          "low_support": false,
+          "n": 1159,
+          "n_pos": 140,
+          "reason": null,
+          "value": 1.0
+        },
+        "2048-4095": {
+          "low_support": false,
+          "n": 1725,
+          "n_pos": 56,
+          "reason": null,
+          "value": 1.0
+        },
+        "512-1023": {
+          "low_support": false,
+          "n": 756,
+          "n_pos": 85,
+          "reason": null,
+          "value": 0.9966161129131236
+        },
+        "<512": {
+          "low_support": false,
+          "n": 311,
+          "n_pos": 38,
+          "reason": null,
+          "value": 0.982745324850588
+        },
+        ">=4096": {
+          "low_support": true,
+          "n": 580,
+          "n_pos": 11,
+          "reason": null,
+          "value": 1.0
+        }
+      }
+    }
+  },
+  "prevalence_observed": 0.07283160450231736,
+  "schema": "graphito.metrics/v1",
+  "score": {
+    "calibrated": false,
+    "name": "prob_sintetico"
+  },
+  "split": "test",
+  "test_view": {
+    "label": "headline: test representatives (one file per dup group)",
+    "name": "test"
+  },
+  "threshold_free": {
+    "ece": {
+      "ci95": [
+        0.005534199238578656,
+        0.008711591431251362
+      ],
+      "ci_reason": null,
+      "n": 4531,
+      "n_bins": 15,
+      "n_boot_valid": 1000,
+      "n_neg": 4201,
+      "n_pos": 330,
+      "reason": null,
+      "skipped_resamples": 0,
+      "value": 0.006146856985212986,
+      "view": "observed"
+    },
+    "pr_auc": {
+      "ci95": [
+        0.9868043790695391,
+        0.997217325206248
+      ],
+      "ci_reason": null,
+      "n": 4531,
+      "n_boot_valid": 1000,
+      "n_neg": 4201,
+      "n_pos": 330,
+      "reason": null,
+      "skipped_resamples": 0,
+      "value": 0.9925828398967167,
+      "view": "observed"
+    },
+    "roc_auc": {
+      "ci95": [
+        0.9976525116647553,
+        0.999743803242962
+      ],
+      "ci_reason": null,
+      "n": 4531,
+      "n_boot_valid": 1000,
+      "n_neg": 4201,
+      "n_pos": 330,
+      "reason": null,
+      "skipped_resamples": 0,
+      "value": 0.9989389250755593,
+      "view": "observed"
+    }
+  },
+  "views": [
+    "observed",
+    "balanced"
+  ],
+  "warnings": [
+    "contaminated: the legacy checkpoint was trained on a split that overlaps split_v1 test, and its preprocessing (v1) differs from preprocess v2; these numbers are not comparable to a v2 run"
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "argv": [
+    "-m",
+    "models.char_cnn.v2.train",
+    "--device",
+    "cuda",
+    "--seed",
+    "42"
+  ],
+  "best_sha256": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+  "calibration_path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito/runs/char_cnn/20261011-015734/calibration.json",
+  "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195",
+  "channel": "char_cnn",
+  "config": {
+    "alphabet": "\n !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+    "arch_version": 2,
+    "conv_filters": [
+      64,
+      64,
+      64,
+      64
+    ],
+    "conv_kernel_sizes": [
+      3,
+      5,
+      7,
+      9
+    ],
+    "data_root": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito",
+    "device": "cuda",
+    "dropout": 0.4,
+    "embedding_dim": 128,
+    "fc_units": 1024,
+    "hyperparams": {
+      "batch_size": 128,
+      "early_stop": 7,
+      "epochs": 50,
+      "eval_batch_size": 32,
+      "limit_per_class": null,
+      "lr": 0.001,
+      "lr_factor": 0.5,
+      "lr_patience": 3,
+      "n_boot": 1000,
+      "seed": 42,
+      "weight_decay": 0.0001
+    },
+    "max_windows": 8,
+    "min_non_ws_chars": 60,
+    "norm": "layernorm_channels",
+    "num_classes": 2,
+    "pad_idx": 0,
+    "preproc_version": 2,
+    "stride": 2048,
+    "torch_version": "2.13.0+cu126",
+    "unk_idx": 1,
+    "vocab_size": 98,
+    "window": 4096
+  },
+  "created_at": "2026-10-11T01:57:34.113216+00:00",
+  "data_summary": {
+    "test": {
+      "n": 4531,
+      "n_ai": 330,
+      "n_empty_after_normalize": 0,
+      "n_human": 4201
+    },
+    "test_all": {
+      "n": 9649,
+      "n_ai": 331,
+      "n_empty_after_normalize": 0,
+      "n_human": 9318
+    },
+    "train": {
+      "n": 11562,
+      "n_ai": 874,
+      "n_empty_after_normalize": 0,
+      "n_human": 10688
+    },
+    "val": {
+      "n": 3077,
+      "n_ai": 209,
+      "n_empty_after_normalize": 0,
+      "n_human": 2868
+    }
+  },
+  "dirty": true,
+  "failure": null,
+  "git_sha": "9cce24adeacacda88d07f78564390cebef2139dd",
+  "leak_guard": {
+    "passed": true,
+    "path": "leak_guard.json",
+    "shares": {
+      "course_marker": 5.631581911358901e-05,
+      "non_alphabet": 0.0
+    }
+  },
+  "manifest_path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito/data/splits/split_v1.json.gz",
+  "manifest_sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f",
+  "mode": "representatives",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.5",
+  "run_id": "char_cnn/20261011-015734",
+  "sampling": {
+    "human_shortfall": 0,
+    "n_ai": 874,
+    "n_batches": 14,
+    "n_human": 874,
+    "n_human_available": 10688,
+    "ratio": "1:1"
+  },
+  "schema": "graphito.run_config/v1",
+  "seed": 42,
+  "selection": {
+    "checkpoint": "best.pth",
+    "epoch": 30,
+    "epochs_run": 38,
+    "rule": "max (val_roc_auc, val_pr_auc); ties -> earlier epoch; null AUC never selected",
+    "stopped_early": true,
+    "val_pr_auc": 0.9889516591405123,
+    "val_roc_auc": 0.9990524046899295
+  },
+  "split": "test",
+  "status": "complete",
+  "threshold_source": "calibration:f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195",
+  "thresholds": {},
+  "versions": {
+    "matplotlib": "3.11.0",
+    "numpy": "2.4.4",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "torch": "2.13.0+cu126"
+  }
+}
