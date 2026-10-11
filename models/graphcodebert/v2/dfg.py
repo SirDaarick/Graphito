@@ -26,11 +26,8 @@ i. parent code lists are aligned one-to-one with parent indices (upstream merges
    `list(set(...))` and repeats a single code for several leaf parents).
 """
 
-import sys
-from contextlib import contextmanager
+import threading
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import Iterator
 
 import tree_sitter as ts
 import tree_sitter_c
@@ -45,8 +42,12 @@ LANGUAGES = ("c", "cpp")
 ATOMIC_TYPES = frozenset({"string_literal", "char_literal", "raw_string_literal", "system_lib_string"})
 # Leaves that are keywords although their node type differs from their text.
 KEYWORD_LIKE_TYPES = frozenset({"primitive_type"})
-# Raised inside `extract_dfg_v2` only; deep expressions recurse once per tree level.
-RECURSION_LIMIT = 20000
+# Walker-local depth guard. The recursive walker uses at most a few Python frames per tree level,
+# so a tree deeper than this is refused up front (`dfg_error="max_depth"`) instead of touching the
+# process-wide recursion limit. Measured on 4000 sampled dataset files: median depth 16, p99.9
+# 67, max 129.
+MAX_DEPTH = 256
+MAX_DEPTH_ERROR = "max_depth"
 
 DfgNode = tuple  # (code: str, idx: int, relation: str, parent_codes: list[str], parent_idxs: list[int])
 Key = tuple[int, int]  # (start_byte, end_byte) of a token leaf
@@ -70,10 +71,18 @@ class Dataflow:
         return self.dfg
 
 
-@lru_cache(maxsize=None)
+_LOCAL = threading.local()
+
+
 def _parser(lang: str) -> ts.Parser:
-    grammar = tree_sitter_c if lang == "c" else tree_sitter_cpp
-    return ts.Parser(ts.Language(grammar.language()))
+    """One tree-sitter parser per thread and language (a `Parser` is not safe to share)."""
+    parsers = getattr(_LOCAL, "parsers", None)
+    if parsers is None:
+        parsers = _LOCAL.parsers = {}
+    if lang not in parsers:
+        grammar = tree_sitter_c if lang == "c" else tree_sitter_cpp
+        parsers[lang] = ts.Parser(ts.Language(grammar.language()))
+    return parsers[lang]
 
 
 def prepare_source(code: str | bytes) -> bytes:
@@ -386,26 +395,29 @@ def filter_dfg(dfg: list[DfgNode]) -> list[DfgNode]:
     return [d for d in dfg if d[1] in keep]
 
 
-@contextmanager
-def _recursion_limit(limit: int) -> Iterator[None]:
-    old = sys.getrecursionlimit()
-    if limit > old:
-        sys.setrecursionlimit(limit)
-    try:
-        yield
-    finally:
-        sys.setrecursionlimit(old)
+def tree_depth(root: ts.Node) -> int:
+    """Number of levels of the tree (root = 1), computed iteratively."""
+    best = 0
+    stack = [(root, 1)]
+    while stack:
+        node, depth = stack.pop()
+        best = max(best, depth)
+        stack.extend((child, depth + 1) for child in node.children)
+    return best
 
 
-def extract_dfg_v2(code: str | bytes, lang: str = "c") -> Dataflow:
+def extract_dfg_v2(code: str | bytes, lang: str = "c", max_depth: int = MAX_DEPTH) -> Dataflow:
     """Tokens and post-filtered DFG of a C/C++ file. Parse errors do not drop the DFG
-    (`parse_errors=True`); a walker failure gives `dfg=[]` with `dfg_error` and keeps tokens."""
+    (`parse_errors=True`). A tree deeper than `max_depth` gives `dfg=[]` with
+    `dfg_error="max_depth"`; any other walker failure gives `dfg=[]` with the exception recorded.
+    Tokens are kept in both cases. Thread-safe; never changes the process recursion limit."""
     source = prepare_source(code)
     root = parse_source(source, lang).root_node
     tokens, index = index_tokens(root, source)
+    if tree_depth(root) > max_depth:
+        return Dataflow(tokens, [], root.has_error, MAX_DEPTH_ERROR, 0)
     try:
-        with _recursion_limit(RECURSION_LIMIT):
-            raw = walk_dfg(root, index)
-    except Exception as exc:  # RecursionError included
+        raw = walk_dfg(root, index)
+    except Exception as exc:  # RecursionError included (caller already deep in the stack)
         return Dataflow(tokens, [], root.has_error, f"{type(exc).__name__}: {exc}", 0)
     return Dataflow(tokens, filter_dfg(raw), root.has_error, None, len(raw))

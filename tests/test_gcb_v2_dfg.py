@@ -113,14 +113,73 @@ def test_walker_failure_keeps_tokens_and_records_error(monkeypatch):
     assert "a" in r.code_tokens
 
 
-def test_deep_nesting_does_not_crash():
-    code = "int f(int a){ int b = " + "(" * 400 + "a" + ")" * 400 + "; return b; }"
-    r = v2_dfg.extract_dfg_v2(code, "c")
+def _nested(depth: int) -> str:
+    return "int f(int a){ int b = " + "(" * depth + "a" + ")" * depth + "; return b; }"
+
+
+def test_deep_nesting_within_the_guard_keeps_the_dfg():
+    r = v2_dfg.extract_dfg_v2(_nested(200), "c")
     assert r.dfg_error is None
     assert any(n[0] == "b" and n[3] == ["a"] for n in r.dfg)
 
 
-def test_recursion_limit_is_restored():
+@pytest.mark.parametrize("depth", [v2_dfg.MAX_DEPTH + 10, 5000])
+def test_nesting_beyond_the_guard_gives_max_depth_error(depth):
+    # Deterministic, walker-local guard: no RecursionError, no crash, tokens kept.
+    r = v2_dfg.extract_dfg_v2(_nested(depth), "c")
+    assert r.dfg == [] and r.n_nodes_raw == 0
+    assert r.dfg_error == "max_depth"
+    assert "a" in r.code_tokens
+
+
+def test_max_depth_is_configurable_per_call():
+    code = _nested(40)
+    assert v2_dfg.extract_dfg_v2(code, "c", max_depth=20).dfg_error == "max_depth"
+    assert v2_dfg.extract_dfg_v2(code, "c", max_depth=200).dfg_error is None
+
+
+def test_tree_depth_is_iterative_and_counts_levels():
+    root = v2_dfg.parse_source(b"int a;", "c").root_node
+    assert v2_dfg.tree_depth(root) >= 3
+    deep = v2_dfg.parse_source(_nested(5000).encode(), "c").root_node
+    assert v2_dfg.tree_depth(deep) > 5000
+
+
+def test_process_recursion_limit_is_never_changed(monkeypatch):
     before = sys.getrecursionlimit()
-    v2_dfg.extract_dfg_v2("int f(int a){ return a; }", "c")
+    calls = []
+    monkeypatch.setattr(sys, "setrecursionlimit", lambda n: calls.append(n))
+    for depth in (10, 200, v2_dfg.MAX_DEPTH + 10):
+        v2_dfg.extract_dfg_v2(_nested(depth), "c")
+    assert calls == []
     assert sys.getrecursionlimit() == before
+
+
+def test_concurrent_extraction_is_deterministic():
+    import threading
+
+    codes = [_nested(d) for d in (5, 50, 150)] + [
+        "int f(int n){ int s = 0; for (int i = 0; i < n; i++) { if (i % 2) s += i; else s -= i; } return s; }",
+        "struct P { int x; }; int g(struct P *p){ p->x = 3; return p->x; }",
+        _nested(v2_dfg.MAX_DEPTH + 10),
+    ]
+    expected = [v2_dfg.extract_dfg_v2(c, "c") for c in codes]
+    results: dict[int, list] = {0: [], 1: []}
+    errors = []
+
+    def run(slot):
+        try:
+            for _ in range(20):
+                results[slot].append([v2_dfg.extract_dfg_v2(c, "c") for c in codes])
+        except Exception as exc:  # pragma: no cover - surfaced by the assert below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=run, args=(i,)) for i in (0, 1)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    for slot in (0, 1):
+        assert len(results[slot]) == 20
+        assert all(batch == expected for batch in results[slot])
