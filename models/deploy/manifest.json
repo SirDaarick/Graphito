@@ -1,0 +1,70 @@
+{
+  "build": {
+    "dirty": false,
+    "git_sha": "dfd34dfbc539eb56f1376d3f9e23335fd1543d4b",
+    "limit_assignments": null,
+    "script": "scripts/build_deploy_artifacts.py",
+    "seed": 42,
+    "versions": {
+      "numpy": "2.4.4",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.18.1"
+    }
+  },
+  "channel_a": {
+    "achieved_fpr": 0.04592749926180223,
+    "calibration": "channel_a/calibration.json",
+    "calibration_method": "isotonic",
+    "fit_set": {
+      "files_sha256": "38e039f5e2996f5bdd8c8bd3a753270a54da400ef03d42fdde1a3625e61603d3",
+      "n_files": 5089,
+      "n_pairs": 1595275,
+      "n_pos": 174,
+      "split": "val"
+    },
+    "method": "jaccard",
+    "raw_threshold_equivalent": 0.6666666666666666,
+    "raw_val_threshold_ref": 0.6490727532097005,
+    "shingle_k": 5,
+    "source_run": "graphcodebert/20261011-082155",
+    "threshold": 0.000588235294117647,
+    "threshold_key": "fpr_0.05",
+    "tpr": 0.8448275862068966
+  },
+  "channel_b": {
+    "achieved_fpr": 0.009762900976290097,
+    "arch_version": 2,
+    "calibration": "channel_b/calibration.json",
+    "calibration_method": "platt",
+    "checkpoint": "channel_b/best.pth",
+    "method": "charcnn_v2",
+    "preproc_version": 2,
+    "source_run": "char_cnn/20261011-015734",
+    "threshold": 0.1715360690019589,
+    "threshold_key": "fpr_0.01",
+    "tpr": 0.9712918660287081
+  },
+  "files": {
+    "channel_a/calibration.json": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367",
+    "channel_b/best.pth": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+    "channel_b/calibration.json": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+  },
+  "gcb": {
+    "code_length": 384,
+    "data_flow_length": 128,
+    "dtype": "float32",
+    "fingerprint": "359032419bac72e974221801889ef6c510bcf7ddc37ad1469a5a76648fbb9037",
+    "input_version": "v2",
+    "max_windows": 16,
+    "model_name": "microsoft/graphcodebert-base",
+    "model_revision": "2b0488a7bb0eefc7041f1bb2cad1ab26b0da269d",
+    "pooling": "mean",
+    "role": "secondary_non_deciding",
+    "source_run": "graphcodebert/20261011-082155",
+    "use_dfg": true,
+    "walker_version": "c-cpp-2"
+  },
+  "label": "not validated against reference-derived plagiarism",
+  "schema": "graphito.deploy-manifest/v1",
+  "split_manifest_sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f"
+}
