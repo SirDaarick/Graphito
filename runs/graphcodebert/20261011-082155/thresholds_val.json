@@ -1,0 +1,176 @@
+{
+  "methods": {
+    "jaccard": {
+      "pooling": null,
+      "primary": "fpr_0.05",
+      "space": "raw",
+      "split": "val",
+      "thresholds": {
+        "fpr_0.01": {
+          "achieved_fpr": null,
+          "low_support": false,
+          "min_negatives": 1000,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": "no_threshold_meets_target",
+          "target_fpr": 0.01,
+          "threshold": null,
+          "tpr": null,
+          "unachievable": true
+        },
+        "fpr_0.05": {
+          "achieved_fpr": 0.04999934173447324,
+          "low_support": false,
+          "min_negatives": 200,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.05,
+          "threshold": 0.6490727532097005,
+          "tpr": 0.8448275862068966,
+          "unachievable": false
+        }
+      },
+      "view": "all"
+    },
+    "legacy": {
+      "pooling": "cls",
+      "primary": "fpr_0.05",
+      "space": "raw",
+      "split": "val",
+      "thresholds": {
+        "fpr_0.01": {
+          "achieved_fpr": 0.0088602539901862,
+          "low_support": false,
+          "min_negatives": 1000,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.01,
+          "threshold": 1.0000000000000004,
+          "tpr": 0.017241379310344827,
+          "unachievable": false
+        },
+        "fpr_0.05": {
+          "achieved_fpr": 0.04999934173447324,
+          "low_support": false,
+          "min_negatives": 200,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.05,
+          "threshold": 0.9920259610704351,
+          "tpr": 0.39655172413793105,
+          "unachievable": false
+        }
+      },
+      "view": "all"
+    },
+    "v2": {
+      "pooling": "mean",
+      "primary": "fpr_0.05",
+      "space": "raw",
+      "split": "val",
+      "thresholds": {
+        "fpr_0.01": {
+          "achieved_fpr": 0.00010406864518296961,
+          "low_support": false,
+          "min_negatives": 1000,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.01,
+          "threshold": 1.0000000000000004,
+          "tpr": 0.005747126436781609,
+          "unachievable": false
+        },
+        "fpr_0.05": {
+          "achieved_fpr": 0.04999871481492395,
+          "low_support": false,
+          "min_negatives": 200,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.05,
+          "threshold": 0.9978561196814738,
+          "tpr": 0.5,
+          "unachievable": false
+        }
+      },
+      "view": "all"
+    },
+    "v2_nodfg": {
+      "pooling": "mean",
+      "primary": "fpr_0.05",
+      "space": "raw",
+      "split": "val",
+      "thresholds": {
+        "fpr_0.01": {
+          "achieved_fpr": 0.00010406864518296961,
+          "low_support": false,
+          "min_negatives": 1000,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.01,
+          "threshold": 1.0000000000000004,
+          "tpr": 0.011494252873563218,
+          "unachievable": false
+        },
+        "fpr_0.05": {
+          "achieved_fpr": 0.04999683405627606,
+          "low_support": false,
+          "min_negatives": 200,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.05,
+          "threshold": 0.9980120060778417,
+          "tpr": 0.5114942528735632,
+          "unachievable": false
+        }
+      },
+      "view": "all"
+    },
+    "winnowing": {
+      "pooling": null,
+      "primary": "fpr_0.05",
+      "space": "raw",
+      "split": "val",
+      "thresholds": {
+        "fpr_0.01": {
+          "achieved_fpr": null,
+          "low_support": false,
+          "min_negatives": 1000,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": "no_threshold_meets_target",
+          "target_fpr": 0.01,
+          "threshold": null,
+          "tpr": null,
+          "unachievable": true
+        },
+        "fpr_0.05": {
+          "achieved_fpr": 0.049913453756219826,
+          "low_support": false,
+          "min_negatives": 200,
+          "n_neg": 1595101,
+          "n_pos": 174,
+          "reason": null,
+          "target_fpr": 0.05,
+          "threshold": 0.6222910216718266,
+          "tpr": 0.8333333333333334,
+          "unachievable": false
+        }
+      },
+      "view": "all"
+    }
+  },
+  "space": "raw",
+  "split": "val",
+  "targets": [
+    0.05,
+    0.01
+  ],
+  "view": "all"
+}

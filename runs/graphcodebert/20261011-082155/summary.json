@@ -1,0 +1,370 @@
+{
+  "methods": {
+    "jaccard": {
+      "pooling": null,
+      "reason": null,
+      "status": "ok",
+      "variant": "jaccard",
+      "views": {
+        "all": {
+          "map_at_r": {
+            "ci95": [
+              0.19535841759460204,
+              0.5325581126339928
+            ],
+            "reason": null,
+            "value": 0.3736147705974699
+          },
+          "n": 1908545,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.00078511348534659,
+              0.004839901276194386
+            ],
+            "reason": null,
+            "value": 0.0019001484840584831
+          },
+          "roc_auc": {
+            "ci95": [
+              0.929574301532858,
+              0.9641122950296371
+            ],
+            "reason": null,
+            "value": 0.9445913395208265
+          },
+          "secondary_pooling": null
+        },
+        "no_identical": {
+          "map_at_r": {
+            "ci95": [
+              0.41621687467662777,
+              0.6861659395898984
+            ],
+            "reason": null,
+            "value": 0.5492069539610955
+          },
+          "n": 1846058,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.02115586507965313,
+              0.3029411892750698
+            ],
+            "reason": null,
+            "value": 0.04657516032900694
+          },
+          "roc_auc": {
+            "ci95": [
+              0.9667370300637461,
+              0.983202112483524
+            ],
+            "reason": null,
+            "value": 0.9747175409939285
+          },
+          "secondary_pooling": null
+        }
+      }
+    },
+    "legacy": {
+      "adapter_loaded": true,
+      "pooling": "cls",
+      "reason": null,
+      "status": "ok",
+      "variant": "legacy_adapter",
+      "views": {
+        "all": {
+          "map_at_r": {
+            "ci95": [
+              0.07507294759437164,
+              0.250070651960206
+            ],
+            "reason": null,
+            "value": 0.16764895326273876
+          },
+          "n": 1908545,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.0001661045531290129,
+              0.0009702199498568949
+            ],
+            "reason": null,
+            "value": 0.0004072847310226348
+          },
+          "roc_auc": {
+            "ci95": [
+              0.6527444992613788,
+              0.7996571150929025
+            ],
+            "reason": null,
+            "value": 0.7404539387253345
+          },
+          "secondary_pooling": null
+        },
+        "no_identical": {
+          "map_at_r": {
+            "ci95": [
+              0.16461950079721951,
+              0.3403190754416245
+            ],
+            "reason": null,
+            "value": 0.25612392254159494
+          },
+          "n": 1846058,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.01767558530054132,
+              0.07597280155663355
+            ],
+            "reason": null,
+            "value": 0.03713495680219385
+          },
+          "roc_auc": {
+            "ci95": [
+              0.6660111252156938,
+              0.8299101381265209
+            ],
+            "reason": null,
+            "value": 0.7649492558635895
+          },
+          "secondary_pooling": null
+        }
+      }
+    },
+    "v2": {
+      "pooling": "mean",
+      "reason": null,
+      "status": "ok",
+      "variant": "dfg",
+      "views": {
+        "all": {
+          "map_at_r": {
+            "ci95": [
+              0.1448079099812045,
+              0.41289284155648437
+            ],
+            "reason": null,
+            "value": 0.2945673084914056
+          },
+          "n": 1908545,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.0003338757337881173,
+              0.005092642237440033
+            ],
+            "reason": null,
+            "value": 0.001533338537206573
+          },
+          "roc_auc": {
+            "ci95": [
+              0.7959916017509255,
+              0.8925273310475754
+            ],
+            "reason": null,
+            "value": 0.8558579293105918
+          },
+          "secondary_pooling": {
+            "map_at_r": 0.23291757661313903,
+            "note": "test point values only, no CI",
+            "pooling": "cls",
+            "pr_auc": 0.0006726638291803344,
+            "roc_auc": 0.8122564159434615
+          }
+        },
+        "no_identical": {
+          "map_at_r": {
+            "ci95": [
+              0.3192222064751826,
+              0.546308511588231
+            ],
+            "reason": null,
+            "value": 0.43239658395846736
+          },
+          "n": 1846058,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.043348381470077586,
+              0.21742537709716409
+            ],
+            "reason": null,
+            "value": 0.12766330578173982
+          },
+          "roc_auc": {
+            "ci95": [
+              0.8217579462543405,
+              0.9172019044410358
+            ],
+            "reason": null,
+            "value": 0.8833882597025685
+          },
+          "secondary_pooling": {
+            "map_at_r": 0.360255398872259,
+            "note": "test point values only, no CI",
+            "pooling": "cls",
+            "pr_auc": 0.11826950222971913,
+            "roc_auc": 0.8388654843503608
+          }
+        }
+      }
+    },
+    "v2_nodfg": {
+      "pooling": "mean",
+      "reason": null,
+      "status": "ok",
+      "variant": "nodfg",
+      "views": {
+        "all": {
+          "map_at_r": {
+            "ci95": [
+              0.144614879507471,
+              0.41185840152275144
+            ],
+            "reason": null,
+            "value": 0.290632041055381
+          },
+          "n": 1908545,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.0002766432987848861,
+              0.002477919495103299
+            ],
+            "reason": null,
+            "value": 0.0009399355349738168
+          },
+          "roc_auc": {
+            "ci95": [
+              0.7876491660764912,
+              0.8892140240868404
+            ],
+            "reason": null,
+            "value": 0.8513118403913996
+          },
+          "secondary_pooling": {
+            "map_at_r": 0.24304162633036933,
+            "note": "test point values only, no CI",
+            "pooling": "cls",
+            "pr_auc": 0.000617267997512049,
+            "roc_auc": 0.7629081202325615
+          }
+        },
+        "no_identical": {
+          "map_at_r": {
+            "ci95": [
+              0.32859065129136744,
+              0.5538482033604427
+            ],
+            "reason": null,
+            "value": 0.4359693902383545
+          },
+          "n": 1846058,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.04262153704722053,
+              0.21924580319877324
+            ],
+            "reason": null,
+            "value": 0.12971198220590793
+          },
+          "roc_auc": {
+            "ci95": [
+              0.8167048389795475,
+              0.9153167387365119
+            ],
+            "reason": null,
+            "value": 0.8794175589596889
+          },
+          "secondary_pooling": {
+            "map_at_r": 0.34627807970816554,
+            "note": "test point values only, no CI",
+            "pooling": "cls",
+            "pr_auc": 0.08696300415259318,
+            "roc_auc": 0.7876203776477215
+          }
+        }
+      }
+    },
+    "winnowing": {
+      "pooling": null,
+      "reason": null,
+      "status": "ok",
+      "variant": "winnowing",
+      "views": {
+        "all": {
+          "map_at_r": {
+            "ci95": [
+              0.19975310018110248,
+              0.5481023094123613
+            ],
+            "reason": null,
+            "value": 0.3845634923945924
+          },
+          "n": 1908545,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.0007810755772494444,
+              0.004751588824829205
+            ],
+            "reason": null,
+            "value": 0.0018659245590769739
+          },
+          "roc_auc": {
+            "ci95": [
+              0.9301522474491938,
+              0.9619728741727828
+            ],
+            "reason": null,
+            "value": 0.943723444800251
+          },
+          "secondary_pooling": null
+        },
+        "no_identical": {
+          "map_at_r": {
+            "ci95": [
+              0.42058546674654596,
+              0.6941234405098861
+            ],
+            "reason": null,
+            "value": 0.5568557150200948
+          },
+          "n": 1846058,
+          "n_pos": 338,
+          "pr_auc": {
+            "ci95": [
+              0.02053031973262201,
+              0.26862460732065024
+            ],
+            "reason": null,
+            "value": 0.043676564351129446
+          },
+          "roc_auc": {
+            "ci95": [
+              0.9658587261550432,
+              0.9819979645129011
+            ],
+            "reason": null,
+            "value": 0.9737701821466506
+          },
+          "secondary_pooling": null
+        }
+      }
+    }
+  },
+  "n_boot": 1000,
+  "run_id": "graphcodebert/20261011-082155",
+  "seed": 42,
+  "selection": {
+    "jaccard": null,
+    "legacy": "cls",
+    "v2": "mean",
+    "v2_nodfg": "mean",
+    "winnowing": null
+  },
+  "split": "test"
+}

@@ -1,0 +1,70 @@
+{
+  "files_sha256": "38e039f5e2996f5bdd8c8bd3a753270a54da400ef03d42fdde1a3625e61603d3",
+  "methods": {
+    "jaccard": {
+      "candidates": {
+        "set": {
+          "map_at_r": 0.37999125638956144,
+          "pr_auc": 0.0014159925480282736,
+          "roc_auc": 0.9369897374783035
+        }
+      },
+      "pooling": null
+    },
+    "legacy": {
+      "candidates": {
+        "cls": {
+          "map_at_r": 0.2882476907900637,
+          "pr_auc": 0.0004731997125513455,
+          "roc_auc": 0.8133808476380341
+        }
+      },
+      "pooling": "cls"
+    },
+    "v2": {
+      "candidates": {
+        "cls": {
+          "map_at_r": 0.2727189745954879,
+          "pr_auc": 0.000566907782625034,
+          "roc_auc": 0.7969248580065053
+        },
+        "mean": {
+          "map_at_r": 0.3340099222363145,
+          "pr_auc": 0.0007283195605392451,
+          "roc_auc": 0.8646965528871818
+        }
+      },
+      "pooling": "mean"
+    },
+    "v2_nodfg": {
+      "candidates": {
+        "cls": {
+          "map_at_r": 0.3353959286162676,
+          "pr_auc": 0.0005494268228247496,
+          "roc_auc": 0.7869970933343485
+        },
+        "mean": {
+          "map_at_r": 0.3320930537940223,
+          "pr_auc": 0.0008352362254596495,
+          "roc_auc": 0.8633701694686764
+        }
+      },
+      "pooling": "mean"
+    },
+    "winnowing": {
+      "candidates": {
+        "set": {
+          "map_at_r": 0.36433442868672894,
+          "pr_auc": 0.0014032348320196014,
+          "roc_auc": 0.9395409469513144
+        }
+      },
+      "pooling": null
+    }
+  },
+  "n_files": 5089,
+  "n_pairs": 1595275,
+  "rule": "max val PR-AUC, ties by MAP@R, then cls",
+  "split": "val",
+  "view": "all"
+}

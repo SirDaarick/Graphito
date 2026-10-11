@@ -1,0 +1,95 @@
+{
+  "embeddings": {
+    "legacy": {
+      "cache": {
+        "hits": 5708,
+        "misses": 6178
+      },
+      "cache_key": "727a87dd5976374a1cbd635f2793cc362240e1d1740413ea8490d71f1d2f9ce1",
+      "failed": 0,
+      "files": 11886,
+      "mean_windows": 4.257193336698637,
+      "parse_error_rate": null,
+      "truncation_rate": null,
+      "variant": "legacy_adapter"
+    },
+    "v2": {
+      "cache": {
+        "hits": 5708,
+        "misses": 6178
+      },
+      "cache_key": "727115c770db381f25da6d7f4e6cba1ce2eb0c40e627a2837ab0233e025dbf44",
+      "failed": 0,
+      "files": 11886,
+      "mean_windows": 4.680548544506141,
+      "parse_error_rate": 0.25096752481911494,
+      "truncation_rate": 0.11198048123843177,
+      "variant": "dfg"
+    },
+    "v2_nodfg": {
+      "cache": {
+        "hits": 5708,
+        "misses": 6178
+      },
+      "cache_key": "a1177f6596f0390c98a2d5fc519d0a363bb041fdcb5e2c3e411bbd4a44b0a7a3",
+      "failed": 0,
+      "files": 11886,
+      "mean_windows": 4.680548544506141,
+      "parse_error_rate": 0.25096752481911494,
+      "truncation_rate": 0.035756352010768974,
+      "variant": "nodfg"
+    }
+  },
+  "splits": {
+    "test": {
+      "exclusions": {
+        "ambiguous_files": 147,
+        "ambiguous_pairs": 71360,
+        "unlabeled_files": 2374,
+        "unlabeled_pairs": 499691
+      },
+      "n_assignments": 14,
+      "n_files": 6797,
+      "same_student_pairs": 0,
+      "views": {
+        "all": {
+          "dropped": 0,
+          "n_neg": 1908207,
+          "n_pairs": 1908545,
+          "n_pos": 338
+        },
+        "no_identical": {
+          "dropped": 62487,
+          "n_neg": 1845720,
+          "n_pairs": 1846058,
+          "n_pos": 338
+        }
+      }
+    },
+    "val": {
+      "exclusions": {
+        "ambiguous_files": 49,
+        "ambiguous_pairs": 32412,
+        "unlabeled_files": 1670,
+        "unlabeled_pairs": 322592
+      },
+      "n_assignments": 9,
+      "n_files": 5089,
+      "same_student_pairs": 0,
+      "views": {
+        "all": {
+          "dropped": 0,
+          "n_neg": 1595101,
+          "n_pairs": 1595275,
+          "n_pos": 174
+        },
+        "no_identical": {
+          "dropped": 49342,
+          "n_neg": 1545759,
+          "n_pairs": 1545933,
+          "n_pos": 174
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "argv": [
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito\\models\\graphcodebert\\v2\\evaluate.py",
+    "--device",
+    "cuda",
+    "--seed",
+    "42",
+    "--n-boot",
+    "1000",
+    "--local-files-only"
+  ],
+  "calibration_path": null,
+  "calibration_sha256": null,
+  "channel": "graphcodebert",
+  "config": {
+    "batch_size": 16,
+    "cache_dir": "runs/graphcodebert/_cache",
+    "curve_max_points": 2000,
+    "device": "cuda",
+    "gcb_v2": {
+      "attn_implementation": "eager",
+      "code_length": 384,
+      "data_flow_length": 128,
+      "dtype": "float32",
+      "input_version": "v2",
+      "max_windows": 16,
+      "pooling": "cls",
+      "use_dfg": true,
+      "walker_version": "c-cpp-2",
+      "window_code_tokens": 382,
+      "window_stride": 191
+    },
+    "limit_assignments": null,
+    "local_files_only": true,
+    "method_status": {
+      "legacy": {
+        "adapter_loaded": true,
+        "reason": null,
+        "status": "ok",
+        "variant": "legacy_adapter"
+      },
+      "v2": {
+        "reason": null,
+        "status": "ok",
+        "variant": "dfg"
+      },
+      "v2_nodfg": {
+        "reason": null,
+        "status": "ok",
+        "variant": "nodfg"
+      }
+    },
+    "methods": [
+      "v2",
+      "v2_nodfg",
+      "jaccard",
+      "winnowing",
+      "legacy"
+    ],
+    "model_name": "microsoft/graphcodebert-base",
+    "model_revision": "2b0488a7bb0eefc7041f1bb2cad1ab26b0da269d",
+    "n_boot": 1000,
+    "targets": [
+      0.05,
+      0.01
+    ],
+    "versions": {
+      "numpy": "2.4.4",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.18.1",
+      "torch": "2.13.0+cu126",
+      "transformers": "5.14.0",
+      "tree-sitter": "0.26.0",
+      "tree-sitter-c": "0.24.2",
+      "tree-sitter-cpp": "0.23.4"
+    }
+  },
+  "created_at": "2026-10-11T08:21:55.689054+00:00",
+  "dirty": false,
+  "failure": null,
+  "git_sha": "69a19d8a3ede60fce5247fe807e98c31657a076e",
+  "manifest_path": "data/splits/split_v1.json.gz",
+  "manifest_sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f",
+  "mode": "zero_shot",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.5",
+  "run_id": "graphcodebert/20261011-082155",
+  "schema": "graphito.run_config/v1",
+  "seed": 42,
+  "split": "test",
+  "status": "complete",
+  "threshold_source": null,
+  "thresholds": {},
+  "versions": {
+    "matplotlib": "3.11.0",
+    "numpy": "2.4.4",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "torch": "2.13.0+cu126"
+  }
+}
