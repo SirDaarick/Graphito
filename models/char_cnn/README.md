@@ -166,6 +166,18 @@ Operating points on the headline view (thresholds from val, observed prevalence 
 | 1% | 0.95% [0.69, 1.28] | 0.888 [0.858, 0.922] | 0.880 [0.840, 0.912] |
 | 5% | 4.57% [3.97, 5.18] | 0.973 [0.956, 0.989] | 0.626 [0.583, 0.669] |
 
+On the all-files view (duplicates included, observed prevalence 3.4% AI) the same val-fitted
+thresholds do **not** keep their targets everywhere: the 1% threshold gives FPR 0.93% [0.61, 1.30],
+recall 0.888, precision 0.772, but the 5% threshold gives FPR 9.28% [4.14, 14.58], recall 0.973,
+precision 0.271. The cause was not analysed here; plausible candidates are duplicate-heavy human
+groups (template or copied solutions counted many times) and very short human files that the
+deployment API would abstain on but this evaluation scores. Any operational threshold must be
+re-validated on the deployment population (SDD-4).
+
+Run provenance: `config.json` records absolute local paths and `dirty: true`; the only uncommitted
+change at run time was the user's local `models/char_cnn/best_model.pth`, which the v2 run does not
+read. The manifest and calibration are identified by their sha256.
+
 CIs are bootstrap CI95 resampled by duplicate group. Per generator (each AI group vs all test
 humans): deepseek-chat n=227, ROC-AUC 0.992, recall@1%FPR 0.88; qwen3 n=100, ROC-AUC 0.997,
 recall@1%FPR 0.90; every other generator has 0–1 test files and is `low_support`.
