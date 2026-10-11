@@ -60,16 +60,29 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      # Deploy artifacts (models/deploy/: manifest, calibrations, CharCNN v2) are read from here.
       - ./models:/models:ro
+      # Hugging Face cache for microsoft/graphcodebert-base (GraphCodeBERT v2 secondary signal).
+      - hf_cache:/hf_cache
     env_file:
       - .env
     environment:
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
       - USE_CHROMA_SERVER=true
+      - HF_HOME=/hf_cache
+      # Model integration (backend/app/config.py). Decision thresholds come only from the
+      # calibration files in models/deploy/; there are no threshold settings to tune here.
+      # ALLOW_UNCALIBRATED is a development-only switch: this profile always forces it off.
+      - ALLOW_UNCALIBRATED=false
+      # false disables the exploratory GraphCodeBERT signal (gcb_similarity is then always null);
+      # true (default) keeps REAL not ready until GraphCodeBERT loads.
+      - GCB_SECONDARY_ENABLED=${GCB_SECONDARY_ENABLED:-true}
+      - INFERENCE_WORKERS=${INFERENCE_WORKERS:-1}
     depends_on:
       - chroma
 
 volumes:
   postgres_data:
   chroma_data:
+  hf_cache:

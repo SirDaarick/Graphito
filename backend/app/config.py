@@ -21,10 +21,11 @@ class Settings(BaseSettings):
     INFERENCE_MODE: str = "STUB"
     DEMO_MODE: bool = False
 
-    # DEPRECATED legacy request defaults: only the legacy STUB decision path and the current API
-    # schema still read them. The new decision takes thresholds from the calibration artifacts
-    # (REAL) or the stub defaults (STUB) and ignores client thresholds (design D6, D9). Removed
-    # together with the API change that makes `threshold_*` optional and ignored (WU9).
+    # DEPRECATED, unused by the backend: decisions take thresholds only from the calibration
+    # artifacts (REAL) or the fixed stub defaults (STUB), and client thresholds are ignored
+    # (design D6, D9; `backend/tests/test_thresholds.py` asserts no app module reads these).
+    # Kept only because `tests/test_calibration_experiment.py` (legacy stub `compute_decision`
+    # check) still reads them; delete both together when that test is migrated.
     THRESHOLD_SEM: float = 0.85
     THRESHOLD_AI: float = 0.20
 
