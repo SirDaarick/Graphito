@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+import transformers
 from transformers import RobertaConfig, RobertaModel
 
 from models.graphcodebert.v2 import model as v2_model
@@ -23,6 +24,9 @@ from models.graphcodebert.v2.encode import encode
 REF_DIR = Path(__file__).resolve().parent / "reference" / "graphcodebert"
 CFG = GCBV2Config(code_length=48, data_flow_length=16)  # L = 64
 ATOL = 1e-6
+TRANSFORMERS_MAJOR = int(transformers.__version__.split(".")[0])
+# transformers 5.x expands a 3D mask to 5D inside `masking_utils.sdpa_mask` and fails there.
+RAW_3D_MASK_ERROR = r"expand\(.*number of sizes provided"
 
 
 def _load(name, path):
@@ -80,6 +84,39 @@ def test_additive_mask_is_4d_zero_or_finfo_min():
     assert add[0, 0, 0, 0] == 0 and add[0, 0, 0, 1] == torch.finfo(torch.float32).min
 
 
+def test_additive_mask_keeps_row_attends_column_orientation():
+    # Asymmetric mask: row 0 may attend column 1, row 1 may not attend column 0.
+    mask = torch.tensor([[[True, True, False], [False, True, False], [True, False, True]]])
+    add = v2_model.additive_mask(mask, torch.float32)
+    low = torch.finfo(torch.float32).min
+    expected = torch.tensor([[0.0, 0.0, low], [low, 0.0, low], [0.0, low, 0.0]])
+    assert torch.equal(add[0, 0], expected)
+
+
+def test_mask_honoured_is_directional(roberta):
+    # Position 0 attends position 3 but not position 4; position 4 attends everything. Perturbing 4
+    # must leave 0 unchanged in every layer while perturbing 3 must move it.
+    roberta.eval()
+    L, H = 6, roberta.config.hidden_size
+    torch.manual_seed(2)
+    emb = torch.randn(1, L, H)
+    pos = torch.arange(2, 2 + L)[None]
+    mask = torch.zeros(1, L, L, dtype=torch.bool)
+    mask[0, :4, :4] = True  # rows 0-3 attend 0-3 only
+    mask[0, 4:, :] = True  # rows 4-5 attend everything
+    with torch.no_grad():
+        out = v2_model.encoder_forward(roberta, emb, pos, mask)
+        p4 = emb.clone()
+        p4[0, 4] = torch.randn(H)
+        p3 = emb.clone()
+        p3[0, 3] = torch.randn(H)
+        out4 = v2_model.encoder_forward(roberta, p4, pos, mask)
+        out3 = v2_model.encoder_forward(roberta, p3, pos, mask)
+    assert (out4[0, :4] - out[0, :4]).abs().max() <= ATOL
+    assert (out3[0, 0] - out[0, 0]).abs().max() > 1e-3
+    assert (out3[0, 5] - out[0, 5]).abs().max() > 1e-3  # rows 4-5 see position 3
+
+
 # --- GE4.3: mask honoured -------------------------------------------------------------------
 
 
@@ -130,14 +167,19 @@ def test_3d_mask_is_rejected_or_equivalent_to_4d(roberta):
     roberta.eval()
     enc = _encoded(SNIPPET_A)
     ids, pos, mask = v2_model.batch_tensors([enc])
+    assert not bool(mask.all())  # an all-True mask is skipped by HF and would prove nothing
     with torch.no_grad():
         embeds = v2_model.node_input_embeddings(roberta.embeddings.word_embeddings, ids, pos, mask)
         out4 = v2_model.encoder_forward(roberta, embeds, pos, mask)
-        try:
-            out3 = roberta(inputs_embeds=embeds, attention_mask=mask, position_ids=pos, token_type_ids=torch.zeros_like(pos))[0]
-        except Exception:
-            return
-    assert (out3 - out4).abs().max() <= ATOL
+
+        def raw_3d():
+            return roberta(inputs_embeds=embeds, attention_mask=mask, position_ids=pos, token_type_ids=torch.zeros_like(pos))[0]
+
+        if TRANSFORMERS_MAJOR >= 5:
+            with pytest.raises(RuntimeError, match=RAW_3D_MASK_ERROR):
+                raw_3d()
+        else:
+            assert (raw_3d() - out4).abs().max() <= ATOL
 
 
 def test_bool_4d_mask_is_not_used_because_eager_adds_it(roberta):
@@ -269,9 +311,23 @@ def test_empty_batch_gives_empty_tensor():
 # --- golden: upstream model.py --------------------------------------------------------------
 
 
+def _extended_mask_4x(mask: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+    """Independent reference for transformers 4.x `get_extended_attention_mask` on a 3D mask:
+    `[B, L, L]` -> `[B, 1, L, L]`, 0.0 where row attends column, `finfo(dtype).min` elsewhere.
+    Built element by element from the documented semantics, not from `additive_mask`."""
+    b, rows, cols = mask.shape
+    low = torch.finfo(dtype).min
+    out = torch.empty(b, 1, rows, cols, dtype=dtype)
+    for i in range(b):
+        for r in range(rows):
+            for c in range(cols):
+                out[i, 0, r, c] = 0.0 if bool(mask[i, r, c]) else low
+    return out
+
+
 class _Roberta4xShim(torch.nn.Module):
     """`encoder.roberta` as upstream saw it under transformers 4.x: the 3D bool mask expanded to
-    a 4D additive mask (`get_extended_attention_mask`)."""
+    a 4D additive mask by `_extended_mask_4x` (independent of the code under test)."""
 
     def __init__(self, roberta):
         super().__init__()
@@ -279,8 +335,14 @@ class _Roberta4xShim(torch.nn.Module):
         self.embeddings = roberta.embeddings
 
     def forward(self, inputs_embeds, attention_mask, position_ids, token_type_ids):
-        extended = (1.0 - attention_mask[:, None, :, :].to(inputs_embeds.dtype)) * torch.finfo(inputs_embeds.dtype).min
+        extended = _extended_mask_4x(attention_mask, inputs_embeds.dtype).to(inputs_embeds.device)
         return self.inner(inputs_embeds=inputs_embeds, attention_mask=extended, position_ids=position_ids, token_type_ids=token_type_ids)
+
+
+def test_reference_4x_mask_matches_additive_mask():
+    gen = torch.Generator().manual_seed(7)
+    mask = torch.rand(2, 5, 5, generator=gen) > 0.5
+    assert torch.equal(_extended_mask_4x(mask, torch.float32), v2_model.additive_mask(mask, torch.float32))
 
 
 class _Capture(torch.nn.Module):
@@ -316,10 +378,11 @@ def test_upstream_model_forward_fails_loudly_with_a_raw_3d_mask_on_this_transfor
     a = _encoded(SNIPPET_A)
     ids, pos, mask = v2_model.batch_tensors([a, a])
     with torch.no_grad():
-        try:
-            upstream(ids[:1], pos[:1], mask[:1], ids[1:], pos[1:], mask[1:])
-        except RuntimeError:
+        if TRANSFORMERS_MAJOR >= 5:
+            with pytest.raises(RuntimeError, match=RAW_3D_MASK_ERROR):
+                upstream(ids[:1], pos[:1], mask[:1], ids[1:], pos[1:], mask[1:])
             return
+        upstream(ids[:1], pos[:1], mask[:1], ids[1:], pos[1:], mask[1:])
         got = v2_model.forward_hidden(roberta, ids, pos, mask)
     assert (upstream.classifier.features - got).abs().max() <= ATOL
 
