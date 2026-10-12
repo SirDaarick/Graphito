@@ -404,10 +404,18 @@ def _generate_report_markdown(
         lines.append("| **H2** | T1 acts as invariant control for Jaccard | `ΔROC-AUC_jaccard(T1)` | N/A | Not evaluated |")
 
     # H3 verdict
-    h3_key = "did__T3__v2_nodfg__v2"
-    if h3_key in contrasts and contrasts[h3_key].get("value") is not None:
-        val = contrasts[h3_key]["value"]
-        ci = contrasts[h3_key].get("ci95")
+    h3_entry = None
+    h3_sign = 1.0
+    if "did__T3__v2_nodfg__v2" in contrasts:
+        h3_entry = contrasts["did__T3__v2_nodfg__v2"]
+    elif "did__T3__v2__v2_nodfg" in contrasts:
+        h3_entry = contrasts["did__T3__v2__v2_nodfg"]
+        h3_sign = -1.0
+
+    if h3_entry is not None and h3_entry.get("value") is not None:
+        val = h3_entry["value"] * h3_sign
+        raw_ci = h3_entry.get("ci95")
+        ci = sorted([raw_ci[0] * h3_sign, raw_ci[1] * h3_sign]) if raw_ci else None
         ci_str = f"[{ci[0]:.4f}, {ci[1]:.4f}]" if ci else "N/A"
         if ci and ci[1] < 0:
             v_h3 = "**CONFIRMED** (v2_nodfg drops more than v2 under reordering)"
