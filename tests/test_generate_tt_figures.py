@@ -92,6 +92,23 @@ def test_confusion_uses_primary_operating_point(runs):
     assert (cm.tn, cm.fp, cm.fn, cm.tp) == (77, 7, 5, 11)
 
 
+def test_confusion_uses_requested_operating_point(runs):
+    charcnn, _ = runs
+    cm = figs.confusion_from_metrics(figs.load_charcnn_run(charcnn).metrics, key="fpr_0.01")
+    assert cm.key == "fpr_0.01"
+    assert (cm.tn, cm.fp, cm.fn, cm.tp) == (4, 2, 3, 1)
+
+
+def test_confusion_unknown_operating_point_is_an_error(runs):
+    charcnn, _ = runs
+    with pytest.raises(ValueError, match="fpr_0.10"):
+        figs.confusion_from_metrics(figs.load_charcnn_run(charcnn).metrics, key="fpr_0.10")
+
+
+def test_cli_defaults_to_the_deployed_operating_point(runs):
+    assert figs.parse_args(["--charcnn-run", "a", "--gcb-run", "b"]).operating_point == "fpr_0.01"
+
+
 def test_gcb_loader_reads_every_method(runs):
     _, gcb = runs
     rows = figs.load_gcb_run(gcb)

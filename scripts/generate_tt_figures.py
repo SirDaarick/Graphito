@@ -6,8 +6,8 @@ Every number drawn comes from a run directory; the script holds no metric values
 Figures (written to ``--out-dir``):
   1. ``curvas_entrenamiento_charcnn.png``: CharCNN training curves from ``history.csv``
      (train loss, val ROC-AUC and val PR-AUC per epoch, with the selected epoch marked).
-  2. ``matriz_confusion_charcnn.png``: CharCNN test confusion matrix at the primary
-     operating point of ``metrics.json``.
+  2. ``matriz_confusion_charcnn.png``: CharCNN test confusion matrix at the deployed
+     operating point (``--operating-point``, default ``fpr_0.01``) of ``metrics.json``.
   3. ``comparativa_canal_a.png``: Channel A methods (v2, v2_nodfg, jaccard, winnowing,
      legacy) on the ``__all`` view: ROC-AUC, PR-AUC and MAP@R with 95% CIs.
 
@@ -125,12 +125,18 @@ def load_gcb_run(run_dir: Path) -> list[MethodMetrics]:
     return rows
 
 
-def confusion_from_metrics(metrics: dict) -> Confusion:
+def confusion_from_metrics(metrics: dict, key: str | None = None) -> Confusion:
+    """Confusion counts at ``key`` (e.g. the deployed ``fpr_0.01``), or at the primary point."""
     points = metrics.get("operating_points") or {}
-    primary = [(k, p) for k, p in points.items() if p.get("primary")]
-    if len(primary) != 1:
-        raise ValueError(f"expected exactly one primary operating point, found {len(primary)}")
-    key, point = primary[0]
+    if key is not None:
+        if key not in points:
+            raise ValueError(f"operating point {key!r} not in metrics.json (available: {sorted(points)})")
+        point = points[key]
+    else:
+        primary = [(k, p) for k, p in points.items() if p.get("primary")]
+        if len(primary) != 1:
+            raise ValueError(f"expected exactly one primary operating point, found {len(primary)}")
+        key, point = primary[0]
     obs = point["observed"]
     return Confusion(key, point["threshold"], int(obs["tn"]), int(obs["fp"]), int(obs["fn"]), int(obs["tp"]))
 
@@ -159,8 +165,8 @@ def plot_training_curves(run: CharCNNRun, out_dir: Path) -> Path | None:
     return _save(fig, out_dir / CURVES_FIGURE)
 
 
-def plot_confusion_matrix(run: CharCNNRun, out_dir: Path) -> Path:
-    cm = confusion_from_metrics(run.metrics)
+def plot_confusion_matrix(run: CharCNNRun, out_dir: Path, key: str | None = None) -> Path:
+    cm = confusion_from_metrics(run.metrics, key)
     counts = np.array([[cm.tn, cm.fp], [cm.fn, cm.tp]])
     row_totals = counts.sum(axis=1, keepdims=True)
     pct = np.divide(counts * 100, row_totals, out=np.zeros(counts.shape, dtype=float), where=row_totals > 0)
@@ -224,6 +230,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--charcnn-run", type=Path, required=True, help="runs/char_cnn/<run> directory")
     parser.add_argument("--gcb-run", type=Path, required=True, help="runs/graphcodebert/<run> directory")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR, help="output directory for the PNGs")
+    parser.add_argument(
+        "--operating-point",
+        default="fpr_0.01",
+        help="CharCNN operating point for the confusion matrix (default: the deployed fpr_0.01)",
+    )
     return parser.parse_args(argv)
 
 
@@ -232,14 +243,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         charcnn = load_charcnn_run(args.charcnn_run)
         gcb = load_gcb_run(args.gcb_run)
-        confusion_from_metrics(charcnn.metrics)
+        confusion_from_metrics(charcnn.metrics, args.operating_point)
     except (RunNotFoundError, ValueError, KeyError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     args.out_dir.mkdir(parents=True, exist_ok=True)
     with plt.rc_context(STYLE):
         plot_training_curves(charcnn, args.out_dir)
-        plot_confusion_matrix(charcnn, args.out_dir)
+        plot_confusion_matrix(charcnn, args.out_dir, args.operating_point)
         plot_channel_a_comparison(gcb, args.out_dir)
     print(f"Figuras generadas en: {args.out_dir.resolve()}")
     return 0
