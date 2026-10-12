@@ -37,7 +37,7 @@ NULLABLE_SCORES = ("similitud_semantica", "probabilidad_ia", "discrepancia_score
 def test_split_statements_is_pure_and_keeps_enum_additions_separate():
     assert apply_migrations.split_statements(SQL) == STATEMENTS  # deterministic, no side effects
     enum_adds = [s for s in STATEMENTS if re.match(r"(?is)^ALTER\s+TYPE\s+dictamenenum\s+ADD\s+VALUE", s)]
-    assert [re.search(r"'(\w+)'", s).group(1) for s in enum_adds] == ["NO_EVALUABLE", "SIN_REFERENCIA"]
+    assert [re.search(r"'(\w+)'", s).group(1) for s in enum_adds] == [m.name for m in DictamenEnum]
     assert all(s.count(";") == 1 and s.endswith(";") for s in enum_adds)
     do_blocks = [s for s in STATEMENTS if s.startswith("DO $$")]
     assert len(do_blocks) == 1 and do_blocks[0].rstrip().endswith("END $$;")
@@ -161,6 +161,14 @@ async def test_run_migrations_disposes_only_its_own_default_engine(tmp_path, mon
     monkeypatch.setattr(session_module, "engine", own)
     assert await apply_migrations.run_migrations(sql_file) == 0
     assert own.disposed == 1
+
+
+def test_sql_adds_every_persisted_verdict_to_the_legacy_enum():
+    # SQLAlchemy persists DictamenEnum by member name; a legacy dictamenenum only holds the old
+    # INTEGRO/SOSPECHA_IA/PLAGIO_PROBABLE labels, so every canonical name must be added.
+    flat = " ".join(SQL.split()).upper()
+    for member in DictamenEnum:
+        assert f"ALTER TYPE DICTAMENENUM ADD VALUE IF NOT EXISTS '{member.name}'" in flat, member.name
 
 
 def test_sql_enum_additions_and_columns_are_idempotent():

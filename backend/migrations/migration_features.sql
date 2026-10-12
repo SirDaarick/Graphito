@@ -92,6 +92,12 @@ ALTER TABLE indicadores_integridad ADD COLUMN IF NOT EXISTS categoria VARCHAR(50
 -- 8. INTEGRACIÓN DE MODELOS (SDD-4): puntajes anulables, procedencia y dictámenes nuevos
 -- apply_migrations.py ejecuta cada sentencia sola en AUTOCOMMIT y se detiene en el primer error.
 -- ADD VALUE va fuera de un bloque de transacción (requisito de PostgreSQL).
+-- SQLAlchemy persiste DictamenEnum por nombre de miembro: una BD heredada solo tiene
+-- INTEGRO/SOSPECHA_IA/PLAGIO_PROBABLE, así que se agregan todos los nombres canónicos.
+ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'SIN_ALERTAS';
+ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'REVISION_ESTILOMETRICA';
+ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'REVISION_SEMANTICA';
+ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'DISCREPANCIA_DUAL';
 ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'NO_EVALUABLE';
 ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'SIN_REFERENCIA';
 -- NULL significa "no evaluado", nunca 0 (dictamen NULL mientras PENDIENTE/PROCESANDO/ERROR).
