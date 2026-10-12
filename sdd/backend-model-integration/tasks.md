@@ -159,3 +159,4 @@ Solo-writer rule: single writer; "parallel" means order-independent, not concurr
 - WU2 depends on a long parent-run job and on `runs/` artifacts that are gitignored; a missing run blocks WU2 and everything real-shape after it.
 - Stop-on-error migrations may expose old non-idempotent statements (6.3).
 - Docker E2E (C.1) and reindex (7.6) need Docker/HF cache and are outside pytest.
+- Evidence correction (62f9aa8 + review fixes): the figures script now draws the confusion matrix at the deployed operating point (`--operating-point`, default `fpr_0.01`; real run: tn 4161, fp 40, fn 37, tp 293, threshold 0.1715), not the primary fpr_0.05 recorded above; the test_char_cnn_v2_cleanup follow-up is resolved (the test now asserts the legacy trainer import is absent). Rollout order in models/deploy/README.md fixed: migrations before deploy.

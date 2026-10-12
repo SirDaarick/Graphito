@@ -64,7 +64,8 @@ def test_indicators_default_to_neutral_and_lookups_ignore_prototype_keys():
     assert not re.search(r"categoria\s*\?\?\s*[\"']GENERAL[\"']", _read("components/xai/EvidenceDrawer.tsx"))
     # Plain-object label maps indexed by backend strings resolve 'constructor', 'toString', ...
     for rel in ("lib/dictamen.ts", "lib/evidence.ts", "components/xai/EvidenceDrawer.tsx"):
-        text = _read(rel) if (SRC / rel).is_file() else ""
+        assert (SRC / rel).is_file(), f"contract file missing: {rel}"
+        text = _read(rel)
         assert not re.search(r"[A-Z_]{4,}\[[^\]]+\]\s*\?\?", text), rel
 
 

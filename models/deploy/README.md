@@ -64,13 +64,16 @@ After a rebuild, commit the changed files together with `manifest.json`.
 Run these in order. Each step depends on the one before it.
 
 1. **Build the artifacts** (see Rebuild) and commit them with `manifest.json`.
-2. **Deploy the backend** with `INFERENCE_MODE=REAL`. GraphCodeBERT (`microsoft/graphcodebert-base`)
+2. **Apply migrations** from `backend/`: `python apply_migrations.py`, BEFORE the new backend
+   serves traffic (new columns on existing tables are not created by `create_all`; all added
+   columns are nullable, so the previous backend keeps working on the migrated schema).
+3. **Deploy the backend** with `INFERENCE_MODE=REAL`. GraphCodeBERT (`microsoft/graphcodebert-base`)
    is read from the Hugging Face cache: keep the `hf_cache` volume (`HF_HOME=/hf_cache` in
    `docker-compose.yml`) or pre-download the model into it before the first start. Set
    `GCB_SECONDARY_ENABLED=false` to run without it. Check `GET /health`: `inference_ready` must be
    `true`. If an artifact is missing or its sha256 differs, the backend reports
    `inference_ready=false` with a reason and analysis returns 503; it never falls back to the stub.
-3. **Apply migrations** from `backend/`: `python apply_migrations.py` (new columns on existing
-   tables are not created by `create_all`).
 4. **Reindex references** into the fingerprinted collection, dry run first:
-   `python scripts/reindex_references.py --mode gcb-v2`, then the same with `--apply`.
+   `python scripts/reindex_references.py --mode gcb-v2`, then the same with `--apply`. Until it
+   completes, `gcb_similarity` (secondary, never deciding) is null; Channel A (Jaccard) reads
+   references from Postgres and is unaffected.

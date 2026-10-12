@@ -58,6 +58,7 @@ class TestLegacyTrainer:
             if isinstance(node, ast.ImportFrom) and node.module == "models.char_cnn.train"
             for alias in node.names
         ]
-        # The figures script no longer imports the legacy trainer (SDD-4 task 11.2); any
-        # remaining import from it must still resolve.
-        assert all(hasattr(legacy, name) for name in names)
+        # SDD-4 task 11.2: the figures script reads runs/*/metrics.json and must not import the
+        # legacy trainer; the legacy names stay importable for other consumers.
+        assert names == []
+        assert all(hasattr(legacy, n) for n in ("evaluate", "compute_metrics", "train_epoch"))
