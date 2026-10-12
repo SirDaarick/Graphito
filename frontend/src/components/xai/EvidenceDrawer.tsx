@@ -1,6 +1,7 @@
 import { AlertTriangle, Cpu, FileCode2, Sparkles, Binary, ArrowRight, CheckCircle } from "lucide-react";
 import { IndicadorIntegridad } from "../../lib/api";
-import { formatFlag, formatNumber } from "../../lib/dictamen";
+import { formatFlag, formatNumber, lookupLabel } from "../../lib/dictamen";
+import { channelText, indicatorBadge, isHeuristic } from "../../lib/evidence";
 
 interface EvidenceDrawerProps {
     /** Channel A raw Jaccard as a whole percentage; null when not evaluated. */
@@ -30,27 +31,7 @@ const SEVERITY_BADGES: Record<string, string> = {
     MEDIA: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
 };
 
-// Indicator categories: GENERAL and SIMILITUD_ARCHIVO come from the calibrated decision flags;
-// every other category is a rule-based heuristic, never model output (spec AR4.1).
-const CATEGORY_BADGES: Record<string, { label: string; color: string }> = {
-    GENERAL: { label: "Decisión (bandera calibrada)", color: "text-rose-400" },
-    SIMILITUD_ARCHIVO: { label: "Similitud léxica (archivo)", color: "text-purple-400" },
-    ESTILO_LLM: { label: "Heurística: patrón de documentación", color: "text-emerald-400" },
-    NIVEL_AVANZADO: { label: "Heurística: construcción avanzada", color: "text-amber-400" },
-    ISOMORFISMO_DFG: { label: "Heurística legada (DFG)", color: "text-slate-400" },
-};
-const HEURISTIC_BADGE = { label: "Heurística", color: "text-cyan-400" };
-
-function isHeuristic(ind: IndicadorIntegridad): boolean {
-    if (ind.origen) return ind.origen === "heuristica";
-    return !["GENERAL", "SIMILITUD_ARCHIVO"].includes(ind.categoria ?? "GENERAL");
-}
-
-function channelText(flag: boolean | null | undefined, estado: string | null | undefined, onFlag: string, onClear: string): string {
-    if (flag === true) return onFlag;
-    if (flag === false) return onClear;
-    return `No evaluado (${estado ?? "sin estado"}): este canal no aporta bandera.`;
-}
+const DEFAULT_SEVERITY_BADGE = "bg-cyan-500/15 text-cyan-400 border-cyan-500/30";
 
 export function EvidenceDrawer({
     semanticPct,
@@ -98,12 +79,13 @@ export function EvidenceDrawer({
                         <span className="text-sm font-bold text-purple-400">{semanticPct === null ? "—" : `${semanticPct}%`}</span>
                     </div>
                     <p className="text-[11px] text-content-secondary leading-relaxed">
-                        {channelText(
-                            flagA,
-                            estadoCanalA,
-                            "Similitud léxica con la referencia sobre el umbral calibrado.",
-                            "Similitud léxica bajo el umbral calibrado.",
-                        )}{" "}
+                        {channelText({
+                            score: semanticPct,
+                            flag: flagA,
+                            estado: estadoCanalA,
+                            onFlag: "Similitud léxica con la referencia sobre el umbral calibrado.",
+                            onClear: "Similitud léxica bajo el umbral calibrado.",
+                        })}{" "}
                         Umbral {formatNumber(umbralA)} · Bandera {formatFlag(flagA)}
                     </p>
                 </div>
@@ -121,12 +103,13 @@ export function EvidenceDrawer({
                     <p className="text-[11px] text-content-secondary leading-relaxed">
                         {estadoCanalB === "ABSTENIDO"
                             ? "Código demasiado corto: el clasificador se abstiene y no aporta bandera."
-                            : channelText(
-                                  flagB,
-                                  estadoCanalB,
-                                  "Estilo compatible con código generado sobre el umbral calibrado.",
-                                  "Estilo bajo el umbral calibrado.",
-                              )}{" "}
+                            : channelText({
+                                  score: aiPct,
+                                  flag: flagB,
+                                  estado: estadoCanalB,
+                                  onFlag: "Estilo compatible con código generado sobre el umbral calibrado.",
+                                  onClear: "Estilo bajo el umbral calibrado.",
+                              })}{" "}
                         Umbral {formatNumber(umbralB)} · Bandera {formatFlag(flagB)}
                     </p>
                 </div>
@@ -169,7 +152,7 @@ export function EvidenceDrawer({
                 ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                         {indicadores.map((ind, idx) => {
-                            const cat = CATEGORY_BADGES[ind.categoria ?? ""] ?? HEURISTIC_BADGE;
+                            const cat = indicatorBadge(ind);
                             const hasLine = typeof ind.numero_linea === "number" && ind.numero_linea > 0;
 
                             return (
@@ -186,7 +169,7 @@ export function EvidenceDrawer({
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span
                                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                                                    SEVERITY_BADGES[ind.severidad.toUpperCase()] ?? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
+                                                    lookupLabel(SEVERITY_BADGES, ind.severidad.toUpperCase()) ?? DEFAULT_SEVERITY_BADGE
                                                 }`}
                                             >
                                                 {ind.severidad}

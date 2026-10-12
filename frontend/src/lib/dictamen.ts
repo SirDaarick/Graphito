@@ -30,6 +30,14 @@ export function toComparison(report: ReporteAnalisis, title: string, grupoId?: n
     };
 }
 
+/**
+ * Own-property lookup for label maps keyed by backend strings: inherited keys such as
+ * "constructor", "toString" or "__proto__" are unknown values, never a label.
+ */
+export function lookupLabel<T>(map: Readonly<Record<string, T>>, key: string | null | undefined): T | undefined {
+    return key != null && Object.hasOwn(map, key) ? map[key] : undefined;
+}
+
 export type VerdictTone = "dual" | "semantic" | "stylometric" | "clear" | "neutral" | "pending";
 
 export interface VerdictInfo {
@@ -60,12 +68,12 @@ const PENDING_STATES: Record<string, string> = {
 
 export function describeDictamen(dictamen?: string | null, estado?: string | null): VerdictInfo {
     if (estado && estado !== "COMPLETADO") {
-        return { label: PENDING_STATES[estado] ?? "Pendiente", color: "text-slate-400", tone: "pending", flagged: false };
+        return { label: lookupLabel(PENDING_STATES, estado) ?? "Pendiente", color: "text-slate-400", tone: "pending", flagged: false };
     }
     if (dictamen === null || dictamen === undefined || dictamen === "") {
         return { label: "Pendiente", color: "text-slate-400", tone: "pending", flagged: false };
     }
-    return VERDICTS[dictamen] ?? NOT_EVALUABLE;
+    return lookupLabel(VERDICTS, dictamen) ?? NOT_EVALUABLE;
 }
 
 /** Score in [0, 1] as a whole percentage, or null when not evaluated (never 0). */
@@ -92,7 +100,7 @@ export const CHANNEL_A_METHODS: Record<string, string> = {
 };
 
 export function channelAMethod(report: ReportScoring): string {
-    if (report.canal_a_metodo) return CHANNEL_A_METHODS[report.canal_a_metodo] ?? report.canal_a_metodo;
+    if (report.canal_a_metodo) return lookupLabel(CHANNEL_A_METHODS, report.canal_a_metodo) ?? report.canal_a_metodo;
     return report.engine === "legacy" ? "Legado (GraphCodeBERT sin calibrar)" : "—";
 }
 
@@ -117,11 +125,11 @@ export const CALIBRATION_LABELS: Record<string, string> = {
 };
 
 export function calibrationLabel(state?: string | null): string {
-    return state ? CALIBRATION_LABELS[state] ?? state : "Sin evaluar";
+    return state ? lookupLabel(CALIBRATION_LABELS, state) ?? state : "Sin evaluar";
 }
 
 export function engineLabel(engine?: string | null): string {
-    return engine ? ENGINE_LABELS[engine] ?? engine : "—";
+    return engine ? lookupLabel(ENGINE_LABELS, engine) ?? engine : "—";
 }
 
 /** Channel B is abstained when the code is too short for CharCNN. */

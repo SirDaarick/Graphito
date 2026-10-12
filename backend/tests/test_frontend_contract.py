@@ -1,4 +1,4 @@
-"""Static scan of the frontend contract (spec AR2; there is no frontend test runner).
+"""Static scan of the frontend contract (spec AR2; behaviour is unit-tested with vitest in frontend/).
 
 The UI must not invent scores (62/85 fallbacks), must not send thresholds, must not show the
 deprecated discrepancy as a result, and must never map an unknown or missing verdict to
@@ -56,6 +56,16 @@ def test_verdict_mapping_never_falls_back_to_conforme():
     assert "Pendiente" in mapping
     modal = _read("pages/SimilarityReportModal.tsx")
     assert "Conforme (Sin Alertas)" not in modal and "getAuditInfo" not in modal
+
+
+def test_indicators_default_to_neutral_and_lookups_ignore_prototype_keys():
+    # A row without categoria/origen must not be promoted to a calibrated decision row.
+    assert not re.search(r"categoria\s*\?\?\s*[\"']GENERAL[\"']", _read("pages/SimilarityReportModal.tsx"))
+    assert not re.search(r"categoria\s*\?\?\s*[\"']GENERAL[\"']", _read("components/xai/EvidenceDrawer.tsx"))
+    # Plain-object label maps indexed by backend strings resolve 'constructor', 'toString', ...
+    for rel in ("lib/dictamen.ts", "lib/evidence.ts", "components/xai/EvidenceDrawer.tsx"):
+        text = _read(rel) if (SRC / rel).is_file() else ""
+        assert not re.search(r"[A-Z_]{4,}\[[^\]]+\]\s*\?\?", text), rel
 
 
 def test_ui_shows_method_engine_calibration_gcb_and_label():

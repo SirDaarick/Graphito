@@ -619,7 +619,7 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                         if (viewMode === "report") {
                                             setViewMode("code_diff");
                                             const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-                                            if (!isNaN(repId)) {
+                                            if (repId !== undefined && !isNaN(repId)) {
                                                 fetchCode(repId);
                                             }
                                         } else {
@@ -1000,7 +1000,8 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                         descripcion: ind.descripcion,
                                         severidad: (ind.severidad as "BAJA" | "MEDIA" | "ALTA" | "CRITICA") || "MEDIA",
                                         numero_linea: ind.numero_linea ?? null,
-                                        categoria: ind.categoria ?? "GENERAL",
+                                        // No default category: a row without origen "decision" is shown as a heuristic.
+                                        categoria: ind.categoria,
                                         origen: ind.origen,
                                     }))}
                                     codeMetrics={codeData?.metricas_codigo}
