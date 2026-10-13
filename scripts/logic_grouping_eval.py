@@ -265,15 +265,10 @@ def main():
         e for e in manifest_data.get("entries", [])
         if e.get("source") == "human" and not e.get("excluded", False)
     ]
-    e2_qualified = load_e2_stats(all_human_entries, stats_dir=args.stats_dir, min_pass=5, min_fail=3)
-    print(f"Found {len(e2_qualified)} qualifying assignments for E2.")
-
-    if args.smoke and len(e2_qualified) > 3:
-        e2_keys = sorted(e2_qualified.keys())[:3]
-        e2_qualified = {k: e2_qualified[k][:12] for k in e2_keys}
-
-    # 4. Evaluate E2: Correctness and reference similarity (Leave-One-Out)
+    # 4. Evaluate E2: Correctness and reference similarity across methods (Leave-One-Out)
     print("Evaluating E2: Correctness and reference similarity across methods...")
+    min_pass = 5
+    min_fail = 3
     e2_qualified = load_e2_stats(
         all_human_entries,
         stats_dir=args.stats_dir,
@@ -282,6 +277,11 @@ def main():
         seed=args.seed,
     )
     print(f"Found {len(e2_qualified)} qualifying assignments for E2.")
+
+    if args.smoke and len(e2_qualified) > 3:
+        e2_keys = sorted(e2_qualified.keys())[:3]
+        e2_qualified = {k: e2_qualified[k][:12] for k in e2_keys}
+
 
     e2_results_by_method: Dict[str, Dict[str, Any]] = {}
     correctness_points_by_method: Dict[str, List[Dict[str, Any]]] = {m: [] for m in methods}
