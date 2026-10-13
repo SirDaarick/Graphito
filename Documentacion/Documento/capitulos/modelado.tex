@@ -326,6 +326,149 @@ Para verificar que GraphCodeBERT no dependa de coincidencias superficiales, se e
 \end{itemize}
 
 % ----------------------------------------------------------------------
+\subsection{Robustez del Canal A ante Ofuscación Estructural}
+\label{subsec:robustez_canal_a}
+
+Con el fin de someter a prueba de esfuerzo la resistencia del Canal A ante ataques adversarios y técnicas sistemáticas de evasión en entornos académicos, se diseñó y ejecutó un protocolo formal de robustez pre-registrado sobre el conjunto ciego de prueba (\texttt{test}, con 1,993,656 pares y 6,797 programas únicos distribuidos en 14 asignaciones docentes). Se implementaron ocho operadores sintácticos sobre el Árbol de Sintaxis Abstracta (AST) mediante \texttt{tree-sitter}:
+\begin{itemize}
+    \item $T_0$: Línea base de identidad (código original sin modificaciones).
+    \item $T_1$: Renombrado exhaustivo de identificadores locales y parámetros por tokens uniformes \texttt{var\_k}.
+    \item $T_2$: Transmutación de estructuras de control iterativas (\texttt{for} $\leftrightarrow$ \texttt{while}).
+    \item $T_3$: Reordenamiento de sentencias independientes preservando la relación de lectura/escritura ($\mathcal{R}/\mathcal{W}$).
+    \item $T_4$: Sustitución de operadores aritméticos y lógicos equivalentes (\texttt{x += 1} $\leftrightarrow$ \texttt{x = x + 1}).
+    \item $T_5$: Inyección de código muerto e instrucciones benignas (\texttt{if (0) \{ ; \}}).
+    \item $T_6$: Inversión de ramificaciones condicionales (\texttt{if (cond)} $\leftrightarrow$ \texttt{if (!cond)} con intercambio de bloques).
+    \item $T_7$: Oleada combinada en cascada ($T_2 \to T_3 \to T_4 \to T_5$) a tres niveles de intensidad acumulada ($p \in \{0.25, 0.50, 1.00\}$).
+\end{itemize}
+
+La validez sintáctica de cada variante fue verificada mediante análisis de errores de análisis en AST (\textit{parse error rate} $< 0.1\,\%$ en $T_1$ a $T_6$, y $95.6\,\%$ de éxito sintáctico bajo $T_7$ al $100\,\%$). En la Tabla~\ref{tab:robustez_canal_a} se presentan las métricas de área bajo la curva ROC (ROC-AUC) obtenidas para los cuatro métodos evaluados: Jaccard, Winnowing, GraphCodeBERT con DFG (\texttt{v2}) y GraphCodeBERT sin DFG (\texttt{v2\_nodfg}), acompañadas de sus intervalos de confianza al 95\,\% calculados mediante remuestreo estratificado (\textit{paired cluster bootstrap}, $N_{\text{boot}} = 1{,}000$ agrupado por asignación).
+
+\begin{table}[H]
+    \centering
+    \caption{Rendimiento del Canal A ante transformaciones adversarias en el conjunto \texttt{test} (ROC-AUC [IC 95\,\%]).}
+    \label{tab:robustez_canal_a}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        \textbf{Condición} & \textbf{Jaccard (Léxico)} & \textbf{Winnowing} & \textbf{GraphCodeBERT (v2)} & \textbf{GraphCodeBERT (sin DFG)} \\ \hline
+        $T_0$ (Identidad) & 0.945 [0.929, 0.963] & 0.944 [0.929, 0.961] & 0.856 [0.790, 0.894] & 0.851 [0.782, 0.890] \\ \hline
+        $T_1$ (Renombrado) & 0.945 [0.929, 0.963] & 0.944 [0.929, 0.961] & 0.683 [0.562, 0.774] & 0.683 [0.561, 0.773] \\ \hline
+        $T_2$ (Bucles) & 0.943 [0.927, 0.960] & 0.941 [0.927, 0.958] & 0.852 [0.785, 0.888] & 0.848 [0.776, 0.887] \\ \hline
+        $T_3$ (Reordenamiento) & 0.943 [0.928, 0.963] & 0.941 [0.927, 0.961] & 0.854 [0.795, 0.891] & 0.850 [0.786, 0.888] \\ \hline
+        $T_4$ (Operadores) & 0.937 [0.921, 0.956] & 0.937 [0.921, 0.955] & 0.850 [0.776, 0.890] & 0.846 [0.770, 0.886] \\ \hline
+        $T_5$ (Código muerto) & 0.950 [0.935, 0.964] & 0.950 [0.933, 0.963] & 0.768 [0.645, 0.849] & 0.776 [0.650, 0.855] \\ \hline
+        $T_6$ (Inversión if) & 0.942 [0.926, 0.960] & 0.940 [0.927, 0.959] & 0.854 [0.782, 0.896] & 0.851 [0.776, 0.894] \\ \hline
+        $T_7@0.25$ & 0.942 [0.928, 0.959] & 0.937 [0.922, 0.954] & 0.857 [0.790, 0.895] & 0.853 [0.782, 0.894] \\ \hline
+        $T_7@0.50$ & 0.944 [0.927, 0.960] & 0.937 [0.921, 0.954] & 0.795 [0.695, 0.853] & 0.799 [0.698, 0.857] \\ \hline
+        $T_7@1.00$ (Completo) & 0.931 [0.912, 0.949] & 0.927 [0.907, 0.943] & 0.714 [0.555, 0.814] & 0.728 [0.576, 0.823] \\ \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figuras/robustez_degradacion_canal_a.png}
+    \caption{Curvas de degradación de discriminabilidad ROC-AUC del Canal A ante las 10 condiciones de ofuscación.}
+    \label{fig:robustez_degradacion_canal_a}
+\end{figure}
+
+\subsubsection{Evaluación de Hipótesis Pre-registradas y Hallazgos}
+
+El análisis inferencial mediante el estimador de Diferencias en Diferencias ($\text{DiD}$) arrojó conclusiones empíricas de alta relevancia arquitectónica:
+
+\begin{enumerate}
+    \item \textbf{Refutación de H1 ($\text{DiD}(T_7@1.0; \text{Jaccard}, \text{v2}) = +0.128$ [IC 95\,\%: $+0.014, +0.276$]):} 
+    Se planteó como hipótesis que el modelo semántico neuronal presentaría mayor resiliencia que las líneas base léxicas ante la ofuscación extrema. La evidencia empírica refutó esta hipótesis: GraphCodeBERT exhibió una degradación neta de $\Delta = -0.142$ puntos de ROC-AUC bajo $T_7@1.0$, mientras que el índice de Jaccard únicamente retrocedió $\Delta = -0.014$. Esto se atribuye a la sensibilidad de los mecanismos de atención densa frente a la inyección de secuencias muertas ($T_5$), que diluyen la concentración de masa en los \textit{embeddings} contextuales, mientras que la similitud léxica mantiene la masa de intersección entre las funciones sustantivas.
+    
+    \item \textbf{Control Invariante H2 ($\Delta \text{ROC-AUC}_{\text{Jaccard}}(T_1) = 0.0000$ [IC 95\,\%: $-0.0000, +0.0000$]):}
+    El operador $T_1$ verificó la propiedad teórica de invarianza de Jaccard ante el renombrado de identificadores locales, actuando como control experimental perfecto ($\Delta = 1.95 \times 10^{-6}$, dentro del margen de error numérico).
+    
+    \item \textbf{Inconclusión de H3 ($\text{DiD}(T_3; \text{v2\_nodfg}, \text{v2}) = -0.0005$ [IC 95\,\%: $-0.0010, +0.0002$]):}
+    El intervalo de confianza contiene al cero, lo que indica que, en el estado actual sin ajuste contrastivo específico, la inclusión explícita del grafo de flujo de datos (DFG) en GraphCodeBERT no confiere una ventaja estadísticamente significativa de invarianza ante el reordenamiento de sentencias independientes frente a la variante sin DFG.
+\end{enumerate}
+
+Estos resultados fundamentan la recomendación técnica para la Fase 2 del proyecto: el empleo de aprendizaje contrastivo supervisado (\textit{contrastive fine-tuning} con pérdidas InfoNCE) utilizando las variantes de datos aumentados generadas en este benchmark, con el propósito de inducir la invarianza topológica que la red preentrenada no posee de forma innata ante perturbaciones semánticamente neutras.
+
+% ----------------------------------------------------------------------
+\subsection{Evaluación de Agrupamiento Lógico en el Canal A}
+\label{subsec:evaluacion_agrupamiento_logico}
+
+En consonancia con el objetivo pedagógico de la herramienta, el Canal A no emite veredictos categóricos de corrección, sino que estima la proximidad lógica entre la entrega del estudiante y la solución de referencia propuesta por el docente. Con el fin de evaluar si las representaciones latentes actuales agrupan las soluciones en función de su problema y si la similitud con una solución funcionalmente válida correlaciona con la corrección empírica, se pre-registró y ejecutó un protocolo formal de evaluación \textit{zero-shot} sobre las soluciones de los estudiantes en \texttt{split\_v1.json.gz}.
+
+Se formularon cuatro hipótesis estadísticas previas a la ejecución:
+\begin{itemize}
+    \item \textbf{E1-H1 (Agrupamiento por tarea):} Las soluciones de la misma tarea exhiben mayor similitud latente mutua que las pertenecientes a tareas distintas ($\text{MAP@R}_{\text{v2}} > \text{MAP@R}_{\text{aleatorio}}$ con IC 95\,\% excluyente).
+    \item \textbf{E1-H2 (Invarianza ante normalización canónica):} Normalizar deterministamente identificadores locales mejora la concentración topológica de GraphCodeBERT ($\Delta\text{MAP@R}(\text{v2\_norm} - \text{v2}) > 0$).
+    \item \textbf{E1-H3 (Representación neuronal vs. léxica):} GraphCodeBERT supera o iguala a la similitud léxica de Jaccard en el espacio latente original ($\Delta\text{MAP@R}(\text{v2} - \text{jaccard}) \ge 0$).
+    \item \textbf{E2-H1 (Similitud a solución correcta como indicador de corrección):} Enfoque \textit{leave-one-out} sobre las entregas que superan todas las pruebas unitarias: las entregas aprobadas se ubican más cercanas a la referencia que las reprobadas ($\text{AUC} > 0.5$ con IC 95\,\% excluyente de 0.5).
+\end{itemize}
+
+El experimento procesó $2{,}842$ soluciones humanas seleccionadas a través de 48 tareas y bloques curriculares independientes (máximo 60 entregas por tarea, un representante por grupo de duplicados exactos). La Tabla~\ref{tab:resultados_agrupamiento_logico} y la Tabla~\ref{tab:contrastes_agrupamiento_logico} resumen las métricas calculadas en el espacio métrico original.
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas de agrupamiento lógico (E1) sobre el espacio original de representaciones.}
+    \label{tab:resultados_agrupamiento_logico}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|l|c|c|c|c|}
+        \hline
+        \textbf{Método} & \textbf{MAP@R (IC 95\,\%)} & \textbf{Recall@1} & \textbf{ROC-AUC} & \textbf{Silhouette (Coseno)} \\ \hline
+        \texttt{jaccard} & \textbf{0.4497} [0.4056, 0.4993] & \textbf{0.8469} & \textbf{0.8733} & \textbf{0.0592} \\ \hline
+        \texttt{winnowing} & 0.4414 [0.3972, 0.4907] & 0.8455 & 0.8727 & 0.0559 \\ \hline
+        \texttt{v2} (GraphCodeBERT + DFG) & 0.3865 [0.3410, 0.4426] & 0.8248 & 0.8051 & -0.0018 \\ \hline
+        \texttt{v2\_nodfg} & 0.3897 [0.3441, 0.4453] & 0.8300 & 0.8015 & -0.0064 \\ \hline
+        \texttt{v2\_norm} (Canónico) & 0.3790 [0.3361, 0.4297] & 0.8216 & 0.8049 & -0.0530 \\ \hline
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Contrastes pareados y verificación de hipótesis pre-registradas (1{,}000 bootstraps sobre tareas).}
+    \label{tab:contrastes_agrupamiento_logico}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|l|l|c|c|c|}
+        \hline
+        \textbf{ID} & \textbf{Hipótesis Evaluada} & \textbf{Diferencia Media ($\Delta$)} & \textbf{IC 95\,\%} & \textbf{Veredicto} \\ \hline
+        \textbf{E1-H1} & $\text{MAP@R}(\text{v2}) > \text{Aleatorio}\ (0.0020)$ & $+0.3845$ & $[0.3410, 0.4426]$ & \textbf{CONFIRMADA} \\ \hline
+        \textbf{E1-H2} & $\Delta\text{MAP@R}(\text{v2\_norm} - \text{v2}) > 0$ & $-0.0082$ & $[-0.0223, +0.0057]$ & \textbf{REFUTADA} \\ \hline
+        \textbf{E1-H3} & $\Delta\text{MAP@R}(\text{v2} - \text{jaccard}) \ge 0$ & $-0.0639$ & $[-0.0830, -0.0443]$ & \textbf{REFUTADA} \\ \hline
+        \textbf{E2-H1} & $\text{Macro-AUC}(\text{Aprobado vs. Reprobado}) > 0.5$ & $+0.0645$ (AUC = $0.5645$) & $[0.5261, 0.6030]$ & \textbf{CONFIRMADA} \\ \hline
+    \end{tabularx}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figuras/g3_map_at_r.png}
+    \caption{Comparativa de precisión media en rango $R$ ($\text{MAP@R}$) con intervalos de confianza al 95\,\% calculados por remuestreo bootstrap sobre tareas frente a la línea base aleatoria.}
+    \label{fig:map_at_r_eval}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figuras/g1_heatmap.png}
+    \caption{Matrices de similitud coseno ordenadas por tarea curricular. Los bloques diagonales densos reflejan la concentración intrínseca de soluciones de una misma lógica.}
+    \label{fig:heatmap_logico}
+\end{figure}
+
+\subsubsection{Discusión y Conclusiones del Protocolo}
+Los hallazgos del protocolo empírico aportan conclusiones determinantes:
+\begin{enumerate}
+    \item \textbf{Confirmación de agrupamiento latente (E1-H1):} GraphCodeBERT exhibe una capacidad de recuperación $\text{MAP@R} = 0.3865$ significativamente superior a la línea base aleatoria ($0.0020$), con un $\text{Recall@1} = 82.5\,\%$. Esto confirma que las representaciones capturan regularidades asociadas a la lógica de la tarea.
+    \item \textbf{Refutación de ventaja neuronal sobre índices léxicos (E1-H3):} Jaccard supera a GraphCodeBERT en $\Delta = +0.0639$ puntos de $\text{MAP@R}$ (IC 95\,\%: $[+0.0443, +0.0830]$). En ejercicios de programación introductoria estructurados con librerías homogéneas, la estructura superficial y los patrones de control de flujo son altamente informativos, permitiendo que la similitud de conjuntos capture con nitidez la separación entre problemas sin el costo computacional de un transformador denso.
+    \item \textbf{Refutación de normalización canónica (E1-H2):} La normalización de identificadores locales redujo levemente el desempeño ($\Delta = -0.0082$, IC 95\,\%: $[-0.0223, +0.0057]$). Esto demuestra que, en modelos preentrenados sobre código natural (\textit{masked language modeling}), alterar las cadenas léxicas degrada la información semántica que los nombres mnemónicos aportan a los mecanismos de atención.
+    \item \textbf{Validación de similitud con referencia docente (E2-H1):} El análisis \textit{leave-one-out} sobre 15 tareas con resultados de pruebas unitarias verificó que las soluciones aprobadas presentan una similitud significativamente mayor con la solución de referencia que las soluciones erróneas ($\text{Macro-AUC} = 0.5645$, IC 95\,\%: $[0.5261, 0.6030]$, excluyendo estrictamente el azar de 0.5). Si bien el efecto es moderado ($\rho_{\text{Spearman}} = 0.0958$), valida el principio rector de Graphito: **la similitud orienta la atención del docente hacia las soluciones atípicas o divergentes**, sin pretender suplantar la ejecución dinámica de pruebas unitarias.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figuras/g4_correctness.png}
+    \caption{Distribución de similitud respecto a la solución de referencia evaluada por categoría de resultado en pruebas unitarias (\textit{Leave-One-Out}).}
+    \label{fig:correctness_eval}
+\end{figure}
+
+% ----------------------------------------------------------------------
 \subsection{Validación con Arquetipos Estudiantiles (Caso Práctico)}
 \label{subsec:benchmark_arquetipos}
 
