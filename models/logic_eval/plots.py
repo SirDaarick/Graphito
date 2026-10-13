@@ -297,3 +297,181 @@ def plot_g5_teacher_view(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_cluster_showcase(
+    embeddings: np.ndarray,
+    labels: List[str],
+    out_path: Path,
+    json_path: Optional[Path] = None,
+    seeds: Sequence[int] = (42, 7, 123),
+    dpi: int = 300,
+) -> Dict[str, Any]:
+    """Plot showcase t-SNE clusters selected by objective inter-task cross-similarity criteria.
+
+    1. Computes mean cosine similarity between every pair of tasks.
+    2. Selects the 3 most distinct tasks (minimal pairwise cross-similarity).
+    3. Selects the 2 most similar tasks (maximal pairwise cross-similarity).
+    4. Projects 2 panels:
+       (a) 3 distinct tasks forming clear clusters, plus an outlier point from another task.
+       (b) 2 similar tasks showing partial overlap.
+    5. Saves cluster selection metadata to json_path.
+    """
+    from sklearn.manifold import TSNE
+
+    labels_arr = np.array(labels)
+    unique_tasks = sorted(list(set(labels)))
+    n_tasks = len(unique_tasks)
+
+    # Compute task centroids and mean cross-task similarities
+    task_indices: Dict[str, np.ndarray] = {
+        t: np.flatnonzero(labels_arr == t) for t in unique_tasks
+    }
+
+    # Normalize embeddings to unit sphere for cosine operations
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    normed_emb = embeddings / norms
+
+    task_cross_sim: Dict[Tuple[str, str], float] = {}
+    for i in range(n_tasks):
+        t_i = unique_tasks[i]
+        idx_i = task_indices[t_i]
+        if len(idx_i) == 0:
+            continue
+        vecs_i = normed_emb[idx_i]
+        for j in range(i + 1, n_tasks):
+            t_j = unique_tasks[j]
+            idx_j = task_indices[t_j]
+            if len(idx_j) == 0:
+                continue
+            vecs_j = normed_emb[idx_j]
+            # Mean cross similarity
+            cross_sim = float(np.mean(vecs_i @ vecs_j.T))
+            task_cross_sim[(t_i, t_j)] = cross_sim
+
+    if not task_cross_sim:
+        return {}
+
+    # Find pair with maximum similarity (most similar pair)
+    most_similar_pair, max_sim = max(task_cross_sim.items(), key=lambda x: x[1])
+
+    # Find triplet with minimum average cross similarity among tasks with sufficient samples (>= 20)
+    eligible_tasks = [t for t in unique_tasks if len(task_indices[t]) >= 20]
+    if len(eligible_tasks) < 3:
+        eligible_tasks = unique_tasks
+
+    best_triplet = None
+    min_triplet_sim = float("inf")
+    for i in range(len(eligible_tasks)):
+        for j in range(i + 1, len(eligible_tasks)):
+            for k in range(j + 1, len(eligible_tasks)):
+                t1, t2, t3 = eligible_tasks[i], eligible_tasks[j], eligible_tasks[k]
+                s12 = task_cross_sim.get((t1, t2)) or task_cross_sim.get((t2, t1), 0.0)
+                s13 = task_cross_sim.get((t1, t3)) or task_cross_sim.get((t3, t1), 0.0)
+                s23 = task_cross_sim.get((t2, t3)) or task_cross_sim.get((t3, t2), 0.0)
+                avg_sim = (s12 + s13 + s23) / 3.0
+                if avg_sim < min_triplet_sim:
+                    min_triplet_sim = avg_sim
+                    best_triplet = (t1, t2, t3)
+
+    if best_triplet is None:
+        best_triplet = tuple(eligible_tasks[:3])
+
+    # Pick an outlier task not in the triplet
+    remaining_tasks = [t for t in eligible_tasks if t not in best_triplet]
+    outlier_task = remaining_tasks[0] if remaining_tasks else unique_tasks[0]
+
+    showcase_info = {
+        "distinct_triplet": {
+            "tasks": list(best_triplet),
+            "mean_cross_similarity": min_triplet_sim,
+        },
+        "similar_pair": {
+            "tasks": list(most_similar_pair),
+            "cross_similarity": max_sim,
+        },
+        "outlier_task": outlier_task,
+    }
+
+    if json_path is not None:
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(showcase_info, f, indent=2)
+
+    # Project with primary seed (42) and check stability across seeds
+    panel_a_tasks = list(best_triplet)
+    panel_b_tasks = list(most_similar_pair)
+
+    # Subsample up to 40 per task
+    rng = np.random.default_rng(42)
+    def _sample_indices(task_list: List[str], max_n: int = 40) -> np.ndarray:
+        sel = []
+        for t in task_list:
+            idxs = task_indices[t]
+            if len(idxs) > max_n:
+                chosen = rng.choice(idxs, size=max_n, replace=False)
+            else:
+                chosen = idxs
+            sel.extend(chosen)
+        return np.array(sel, dtype=np.int64)
+
+    sel_a = _sample_indices(panel_a_tasks, max_n=40)
+    # Add 1 point from outlier task
+    outlier_idx = rng.choice(task_indices[outlier_task], size=1)[0]
+    sel_a_with_outlier = np.append(sel_a, outlier_idx)
+
+    sel_b = _sample_indices(panel_b_tasks, max_n=40)
+
+    # Plot figure with primary seed 42
+    primary_seed = seeds[0] if seeds else 42
+    tsne_a = TSNE(n_components=2, metric="cosine", perplexity=25, init="pca", random_state=primary_seed)
+    coords_a = tsne_a.fit_transform(normed_emb[sel_a_with_outlier])
+
+    tsne_b = TSNE(n_components=2, metric="cosine", perplexity=25, init="pca", random_state=primary_seed)
+    coords_b = tsne_b.fit_transform(normed_emb[sel_b])
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.5))
+
+    # Panel (a): 3 distinct tasks + outlier
+    palette_a = ["#1f77b4", "#2ca02c", "#d62728"]
+    for idx_t, t in enumerate(panel_a_tasks):
+        mask = (labels_arr[sel_a_with_outlier] == t)
+        coords_t = coords_a[mask]
+        ax1.scatter(coords_t[:, 0], coords_t[:, 1], c=palette_a[idx_t], label=f"Problema {t}", alpha=0.75, s=40, edgecolors="none")
+        # Reference star on first point
+        if len(coords_t) > 0:
+            ax1.scatter(coords_t[0, 0], coords_t[0, 1], c="gold", edgecolors="black", marker="*", s=220, linewidths=1.2, label="Referencia docente" if idx_t == 0 else None)
+
+    # Plot outlier point
+    outlier_coord = coords_a[-1]
+    ax1.scatter([outlier_coord[0]], [outlier_coord[1]], c="#9467bd", marker="X", s=130, edgecolors="black", linewidths=1.0, label=f"Otro problema ({outlier_task})")
+
+    ax1.set_title("(a) Tres problemas con lógica distinta", fontsize=11, fontweight="bold")
+    ax1.set_xlabel("t-SNE Dimensión 1")
+    ax1.set_ylabel("t-SNE Dimensión 2")
+    ax1.legend(loc="best", fontsize=8.5, framealpha=0.9)
+    ax1.grid(True, linestyle=":", alpha=0.5)
+
+    # Panel (b): 2 similar tasks
+    palette_b = ["#ff7f0e", "#17becf"]
+    for idx_t, t in enumerate(panel_b_tasks):
+        mask = (labels_arr[sel_b] == t)
+        coords_t = coords_b[mask]
+        ax2.scatter(coords_t[:, 0], coords_t[:, 1], c=palette_b[idx_t], label=f"Problema {t}", alpha=0.75, s=40, edgecolors="none")
+        if len(coords_t) > 0:
+            ax2.scatter(coords_t[0, 0], coords_t[0, 1], c="gold", edgecolors="black", marker="*", s=220, linewidths=1.2, label="Referencia docente" if idx_t == 0 else None)
+
+    ax2.set_title("(b) Dos problemas con lógica similar (superposición)", fontsize=11, fontweight="bold")
+    ax2.set_xlabel("t-SNE Dimensión 1")
+    ax2.set_ylabel("t-SNE Dimensión 2")
+    ax2.legend(loc="best", fontsize=8.5, framealpha=0.9)
+    ax2.grid(True, linestyle=":", alpha=0.5)
+
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(out_path, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+
+    return showcase_info
+

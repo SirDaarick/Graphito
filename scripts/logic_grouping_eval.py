@@ -39,6 +39,7 @@ from models.logic_eval.grouping import (
     random_baseline_map_at_r,
 )
 from models.logic_eval.plots import (
+    plot_cluster_showcase,
     plot_g1_heatmap,
     plot_g2_projection,
     plot_g3_map_at_r,
@@ -408,13 +409,24 @@ def main():
                 "ci95": [ci_low, ci_high],
             }
 
-    # 5. Generate Plots (G1 to G5)
-    print("Generating plots (G1 - G5)...")
+    # 5. Generate Plots (G1 to G5 + Showcase)
+    print("Generating plots (G1 - G5 + Cluster Showcase)...")
     plot_g1_heatmap(sim_matrices, labels, plots_dir / "g1_heatmap.png")
     plot_g2_projection(embeddings_by_method, labels, plots_dir / "g2_projection.png", seed=args.seed)
     plot_g3_map_at_r(e1_metrics, rnd_baseline, plots_dir / "g3_map_at_r.png")
     plot_g4_correctness(correctness_points_by_method, plots_dir / "g4_correctness.png")
     plot_g5_teacher_view(first_assignment_ranking_for_g5, first_assignment_name or "A2016/Z1/Z1", plots_dir / "g5_teacher_view.png")
+
+    if "v2" in embeddings_by_method:
+        print("Generating cluster showcase (t-SNE based on cross-task objective criteria)...")
+        plot_cluster_showcase(
+            embeddings=embeddings_by_method["v2"],
+            labels=labels,
+            out_path=plots_dir / "clusters_canal_a.png",
+            json_path=run_dir / "cluster_showcase.json",
+            seeds=(42, 7, 123),
+            dpi=300,
+        )
 
     # 6. Save Artifacts and Results
     print("Writing result files...")
@@ -547,6 +559,39 @@ def main():
         sp_ci = mres.get("spearman_ci95")
         sp_ci_str = f"[{sp_ci[0]:.4f}, {sp_ci[1]:.4f}]" if sp_ci and sp_ci[0] is not None else "N/A"
         report_md += f"| `{m}` | {auc_str} {auc_ci_str} | {sp_str} {sp_ci_str} |\n"
+
+    report_md += """
+### Resultados E2 por Tarea
+
+| Tarea | Total (N) | Aprobadas | Reprobadas | AUC (jaccard) | AUC (v2) | AUC (v2_norm) | Spearman (v2) |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+"""
+    # Build per-task map across methods
+    all_methods_per_task: Dict[str, Dict[str, Any]] = {}
+    for m, mres in e2_results_by_method.items():
+        for item in mres.get("per_assignment", []):
+            assign = item["assignment"]
+            if assign not in all_methods_per_task:
+                all_methods_per_task[assign] = {
+                    "n_total": item.get("n_pass", 0) + item.get("n_fail", 0),
+                    "n_pass": item.get("n_pass", 0),
+                    "n_fail": item.get("n_fail", 0),
+                    "aucs": {},
+                    "spearmans": {},
+                }
+            all_methods_per_task[assign]["aucs"][m] = item.get("auc")
+            all_methods_per_task[assign]["spearmans"][m] = item.get("spearman")
+
+    for assign in sorted(all_methods_per_task.keys()):
+        tinfo = all_methods_per_task[assign]
+        tot = tinfo["n_total"]
+        npas = tinfo["n_pass"]
+        nfai = tinfo["n_fail"]
+        j_auc = f"{tinfo['aucs'].get('jaccard', 0.0):.4f}" if tinfo['aucs'].get('jaccard') is not None else "N/A"
+        v2_auc = f"{tinfo['aucs'].get('v2', 0.0):.4f}" if tinfo['aucs'].get('v2') is not None else "N/A"
+        v2norm_auc = f"{tinfo['aucs'].get('v2_norm', 0.0):.4f}" if tinfo['aucs'].get('v2_norm') is not None else "N/A"
+        v2_sp = f"{tinfo['spearmans'].get('v2', 0.0):.4f}" if tinfo['spearmans'].get('v2') is not None else "N/A"
+        report_md += f"| `{assign}` | {tot} | {npas} | {nfai} | {j_auc} | {v2_auc} | {v2norm_auc} | {v2_sp} |\n"
 
     report_md += """
 ### Contrastes Pareados E2 (Macro-AUC sobre tareas)
