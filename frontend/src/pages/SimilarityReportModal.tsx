@@ -435,17 +435,17 @@ int main() {
 
     // Typewriter effect description (built only from the report's fields and flags)
     const fullInterpretationText = comparison?.dictamen
-        ? `Diagnóstico de Soporte Docente: ${auditInfo.label}
+        ? `Resumen de Soporte Docente: ${auditInfo.label}
 
 Canal A (${methodA}): ${channelAText}
 Canal B (CharCNN v2): ${channelBText}
-GraphCodeBERT (${GCB_LABEL}): ${formatNumber(comparison.gcb_similarity)}.
+GraphCodeBERT: similitud estimada ${formatNumber(comparison.gcb_similarity)}.
 
 ${auditInfo.flagged
-    ? 'Recomendación: al menos un canal superó su umbral calibrado. Es una guía orientativa; se sugiere formular preguntas conceptuales al estudiante sobre sus decisiones de implementación.'
+    ? 'Información: al menos un canal superó su umbral calibrado. Esta información apoya la revisión; la evaluación final corresponde al docente.'
     : auditInfo.tone === 'clear'
-    ? 'Recomendación: ningún canal superó su umbral calibrado. La resolución final corresponde al docente.'
-    : 'Recomendación: el sistema no emite dictamen automático para esta entrega; revise el código directamente.'}
+    ? 'Información: ningún canal superó su umbral calibrado. Esta información apoya la revisión; la evaluación final corresponde al docente.'
+    : 'Información: el sistema no emite resumen automático para esta entrega; revise el código directamente.'}
 
 ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
         : `Este informe técnico proporciona evidencia cuantitativa para asistir la evaluación académica del docente. La resolución pedagógica final es potestad exclusiva de la cátedra.`;
@@ -645,7 +645,7 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                         {viewMode === "code_diff" && (
                             <div className="px-5 sm:px-8 py-3 bg-slate-100/90 dark:bg-[#0a0f1d] border-b border-slate-200 dark:border-[#1a2337] flex items-center justify-between gap-4 overflow-x-auto shrink-0 scrollbar-none">
                                 <div className="flex items-center gap-5 sm:gap-8 lg:gap-10">
-                                    {/* Metric 1: Dictamen (no "global similarity" exists: each channel decides with its own flag) */}
+                                    {/* Metric 1: Resumen de similitud (cada canal decide con su propia bandera) */}
                                     <div className="flex items-center gap-3">
                                         <div className="flex flex-col">
                                             <div className="flex items-baseline gap-2">
@@ -665,7 +665,7 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                                 )}
                                             </div>
                                             <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                                Dictamen (banderas calibradas)
+                                                Resumen de similitud (banderas calibradas)
                                             </span>
                                         </div>
                                     </div>

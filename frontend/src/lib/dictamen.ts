@@ -24,7 +24,7 @@ export function toComparison(report: ReporteAnalisis, title: string, grupoId?: n
         ...report,
         id: String(report.id),
         title,
-        subtitle: `Dictamen: ${describeDictamen(report.dictamen, report.estado).label}`,
+        subtitle: `Resumen de similitud: ${describeDictamen(report.dictamen, report.estado).label}`,
         similarity: toPct(report.similitud_semantica),
         grupo_id: grupoId,
     };
@@ -50,10 +50,10 @@ export interface VerdictInfo {
 }
 
 const VERDICTS: Record<string, VerdictInfo> = {
-    DISCREPANCIA_DUAL: { label: "Alerta dual (Canal A + Canal B)", color: "text-rose-400", tone: "dual", flagged: true },
-    REVISION_SEMANTICA: { label: "Revisión: similitud léxica (Canal A)", color: "text-purple-400", tone: "semantic", flagged: true },
-    REVISION_ESTILOMETRICA: { label: "Revisión: estilo (Canal B)", color: "text-amber-400", tone: "stylometric", flagged: true },
-    SIN_ALERTAS: { label: "Sin alertas", color: "text-emerald-400", tone: "clear", flagged: false },
+    DISCREPANCIA_DUAL: { label: "Similitud alta y estilo atípico", color: "text-rose-400", tone: "dual", flagged: true },
+    REVISION_SEMANTICA: { label: "Similitud alta con la referencia", color: "text-purple-400", tone: "semantic", flagged: true },
+    REVISION_ESTILOMETRICA: { label: "Estilo atípico", color: "text-amber-400", tone: "stylometric", flagged: true },
+    SIN_ALERTAS: { label: "Similitud dentro de lo habitual", color: "text-emerald-400", tone: "clear", flagged: false },
     NO_EVALUABLE: { label: "No evaluable", color: "text-slate-400", tone: "neutral", flagged: false },
     SIN_REFERENCIA: { label: "Sin referencia", color: "text-slate-400", tone: "neutral", flagged: false },
 };

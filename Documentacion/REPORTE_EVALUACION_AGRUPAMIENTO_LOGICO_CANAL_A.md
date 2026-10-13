@@ -137,6 +137,8 @@ En esta versión corregida, se evaluaron los **5 métodos** bajo el mismo esquem
 
 ## 7. Conclusiones para la Tesis
 
-1. **La similitud complementa y prioriza:** Se demostró experimentalmente que la similitud aporta una señal positiva para orientar la atención del docente hacia códigos atípicos o fallidos.
-2. **Utilidad de las líneas base léxicas:** Jaccard no solo es competitivo sino ligeramente superior a los encoders neuronales *zero-shot* en este dataset, lo que aconseja ofrecerlo en la plataforma como métrica complementaria de bajo coste computacional.
-3. **Fundamentación del entrenamiento contrastivo:** Los resultados demuestran que los encoders preentrenados como GraphCodeBERT requieren un ajuste supervisado con pérdidas contrastivas (InfoNCE) para inducir invariancias semánticas genuinas y superar la dependencia de similitudes superficiales.
+1. **La similitud complementa y prioriza:** Los resultados sugieren una señal débil pero positiva ($\text{Macro-AUC} = 0.5598$, Spearman $\approx 0.077 - 0.107$) para orientar la atención del docente hacia códigos atípicos o fallidos; la similitud complementa a las pruebas dinámicas, no las sustituye.
+2. **Diferenciación entre agrupamiento general y corrección funcional:**
+   - En **E1 (agrupamiento por tarea)**, la representación léxica (`jaccard`) agrupó mejor las soluciones que GraphCodeBERT $v2$ con una diferencia estadísticamente significativa ($\Delta\text{MAP@R} = -0.0639$, IC 95%: $[-0.0830, -0.0443]$).
+   - En **E2 (proximidad a la referencia y corrección)**, se observó un empate práctico entre métodos (`jaccard` AUC 0.5631 vs. `v2` AUC 0.5598; contraste pareado con $\Delta = -0.0033$, cuyo intervalo de confianza incluye el cero $[-0.0516, +0.0358]$).
+3. **Motivación para el entrenamiento contrastivo:** Los hallazgos motivan explorar el entrenamiento contrastivo supervisado (pérdidas InfoNCE / SimCLR con aumentaciones de preservación semántica) para inducir invariancias genuinas en los encoders preentrenados y superar la dependencia de rasgos léxicos superficiales.

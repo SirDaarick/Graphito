@@ -83,7 +83,7 @@ export function Biblioteca({
                                     const view = toComparison(rep, `${s.autor}`, s.grupo_id);
                                     return { ...view, subtitle: `${view.subtitle} (${s.lenguaje})` };
                                 }
-                                // Sin reporte todavía: sin puntaje (nunca 0%) y sin dictamen.
+                                // Sin reporte todavía: sin puntaje (nunca 0%) y sin estado de similitud.
                                 return {
                                     id: String(s.id),
                                     title: `${s.autor}`,

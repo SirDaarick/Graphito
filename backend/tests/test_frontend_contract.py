@@ -57,6 +57,16 @@ def test_verdict_mapping_never_falls_back_to_conforme():
     modal = _read("pages/SimilarityReportModal.tsx")
     assert "Conforme (Sin Alertas)" not in modal and "getAuditInfo" not in modal
 
+    # Non-judgment contract: the word 'dictamen' is forbidden in visible text/JSX in all .tsx UI files
+    for rel, text in _all_sources().items():
+        if rel.endswith(".tsx"):
+            # Strip import statements and object property access like .dictamen
+            sanitized = re.sub(r'import\s+[\s\S]*?from\s+[\'"][^\'"]+[\'"];?', '', text)
+            sanitized = re.sub(r'\.\s*dictamen\b', '', sanitized)
+            sanitized = re.sub(r'dictamen\s*:', '', sanitized)  # object keys in props
+            assert not re.search(r"\bdictamen\b", sanitized, re.IGNORECASE), f"Forbidden word 'dictamen' found in UI rendered content: {rel}"
+
+
 
 def test_indicators_default_to_neutral_and_lookups_ignore_prototype_keys():
     # A row without categoria/origen must not be promoted to a calibrated decision row.

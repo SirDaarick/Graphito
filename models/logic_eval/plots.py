@@ -1,5 +1,6 @@
 """Plotting functions for logic grouping evaluation (G1 to G5)."""
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 import matplotlib

@@ -126,7 +126,7 @@ export function EvidenceDrawer({
                     </div>
                     <p className="text-[11px] text-content-secondary leading-relaxed">
                         {codeMetrics
-                            ? `${codeMetrics.lineas_codigo} líneas efectivas, ${codeMetrics.densidad_comentarios} comentarios (heurística, no interviene en el dictamen).`
+                            ? `${codeMetrics.lineas_codigo} líneas efectivas, ${codeMetrics.densidad_comentarios} comentarios (heurística, no interviene en el resumen de similitud).`
                             : "Métricas no cargadas; abre el cotejo de código para calcularlas."}
                     </p>
                 </div>

@@ -3,10 +3,10 @@ import { calibrationLabel, channelAMethod, describeDictamen, engineLabel } from 
 import type { ReportScoring } from "./api";
 
 const KNOWN: Array<[string, string, string, boolean]> = [
-    ["DISCREPANCIA_DUAL", "Alerta dual (Canal A + Canal B)", "dual", true],
-    ["REVISION_SEMANTICA", "Revisión: similitud léxica (Canal A)", "semantic", true],
-    ["REVISION_ESTILOMETRICA", "Revisión: estilo (Canal B)", "stylometric", true],
-    ["SIN_ALERTAS", "Sin alertas", "clear", false],
+    ["DISCREPANCIA_DUAL", "Similitud alta y estilo atípico", "dual", true],
+    ["REVISION_SEMANTICA", "Similitud alta con la referencia", "semantic", true],
+    ["REVISION_ESTILOMETRICA", "Estilo atípico", "stylometric", true],
+    ["SIN_ALERTAS", "Similitud dentro de lo habitual", "clear", false],
     ["NO_EVALUABLE", "No evaluable", "neutral", false],
     ["SIN_REFERENCIA", "Sin referencia", "neutral", false],
 ];
@@ -59,7 +59,7 @@ describe("describeDictamen", () => {
     });
 
     it("treats a missing state as completed", () => {
-        expect(describeDictamen("SIN_ALERTAS", null).label).toBe("Sin alertas");
+        expect(describeDictamen("SIN_ALERTAS", null).label).toBe("Similitud dentro de lo habitual");
     });
 });
 
