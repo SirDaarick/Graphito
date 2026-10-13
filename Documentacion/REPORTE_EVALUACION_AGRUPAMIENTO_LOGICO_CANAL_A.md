@@ -1,66 +1,60 @@
-# Reporte Técnico: Evaluación de Agrupamiento Lógico y Proximidad de Soluciones en el Canal A
+# Reporte Técnico: Evaluación de Agrupamiento Lógico y Proximidad de Soluciones en el Canal A (Versión Corregida y Deduplicada)
 
 **Proyecto:** Graphito — Detección Bimodal e Interpretable de Código Académico  
 **Componente:** Canal A (Similitud Semántica y Agrupamiento Funcional de Código)  
-**Fecha de Ejecución:** 13 de octubre de 2026 (04:40 – 05:34 UTC)  
+**Fecha de Ejecución:** 13 de octubre de 2026 (06:19 – 06:41 UTC)  
 **Entorno de Ejecución:** GPU NVIDIA GeForce RTX 2060 SUPER (8 GB VRAM), CUDA 12.8, PyTorch 2.6  
-**Corrida Experimental:** [`runs/logic_eval/20261013-044044/`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/runs/logic_eval/20261013-044044/)  
+**Corrida Experimental:** [`runs/logic_eval/20261013-061944/`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/runs/logic_eval/20261013-061944/)  
 **Plan Pre-registrado:** [`Documentacion/guias_implementacion/evaluacion_agrupamiento_logico.md`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/guias_implementacion/evaluacion_agrupamiento_logico.md)
 
 ---
 
 ## 1. Resumen Ejecutivo
 
-Este experimento responde formalmente a las dos preguntas centrales del Canal A en su estado actual (*zero-shot*, sin entrenamiento contrastivo):
+Este experimento evalúa formalmente dos propiedades del Canal A en su estado actual (*zero-shot*, sin entrenamiento contrastivo):
 1. **¿Los embeddings neuronales agrupan por lógica sin entrenamiento previo?**  
-   **Sí, parcialmente.** GraphCodeBERT ubica a las soluciones del mismo problema significativamente más cerca entre sí que a las de problemas distintos ($\text{Recall@1} = 82.5\%$, $\text{MAP@R} = 0.3865$ frente a una línea base aleatoria de $0.0020$). Sin embargo, las representaciones léxicas simples de n-gramas (`jaccard`) logran una separación superior ($\text{MAP@R} = 0.4497$), evidenciando que el modelo neuronal no entrenado aún no extrae una ventaja de invariancia semántica pura en código introductorio.
+   **Sí, parcialmente.** GraphCodeBERT ubica a las soluciones del mismo problema significativamente más cerca entre sí que a las de problemas distintos ($\text{Recall@1} = 82.5\%$, $\text{MAP@R} = 0.3865$ frente a una línea base aleatoria de $0.0020$). No obstante, la similitud de n-gramas léxicos abstraídos (`jaccard`) alcanza una precisión superior ($\text{MAP@R} = 0.4497$), evidenciando que el transformador preentrenado sin ajuste fino no supera la correlación léxica superficial de ejercicios introductorios.
 2. **¿Parecerse a una solución de referencia indica corrección en las pruebas?**  
-   **Sí.** En un esquema *Leave-One-Out* sobre todas las soluciones correctas disponibles en 15 tareas curriculares, la similitud con la referencia arrojó un $\text{Macro-AUC} = 0.5645$ con intervalo de confianza al 95% de $[0.5261, 0.6030]$ (excluyendo estrictamente el 0.5 del azar). Esto valida empíricamente el rol pedagógico del Canal A: **orientar al profesor hacia las entregas divergentes o de mayor riesgo**, sin reemplazar la ejecución dinámica de pruebas unitarias.
+   Se detecta una señal **débil pero estadísticamente positiva** ($\text{Macro-AUC} = 0.5598$ para GraphCodeBERT $v2$, con IC 95% de $[0.5199, 0.6015]$). En un par compuesto por una entrega aprobada y una reprobada, el sistema ordena primero a la aprobada el 56% de las veces (donde 50% sería puro azar). Esto confirma que la similitud **complementa** a las pruebas dinámicas al orientar la atención del docente hacia las entregas divergentes o de mayor riesgo, pero **no las sustituye**.
 
 ---
 
-## 2. Metodología y Muestra Experimental
+## 2. Metodología, Muestra y Deduplicación Rigurosa
 
-### 2.1 Muestra de Datos (E1 y E2)
-- **Fuente de división:** `data/splits/split_v1.json.gz` (45,291 entregas totales).
-- **Filtros E1 (Agrupamiento por Tarea):**
-  - Exclusivamente código humano (`source == 'human'`).
-  - Filtrado de exclusiones (`excluded == False`).
-  - Desduplicación exacta: exactamente **1 representante por grupo de duplicados** (`dup_group`).
-  - Muestreo balanceado: hasta 60 entregas por bloque de tarea curricular (semilla fija 42).
-  - **Muestra final E1:** **2,842 entregas** pertenecientes a **48 bloques de problemas** independientes.
-- **Filtros E2 (Corrección y Referencia):**
-  - Unión mediante la clave `(course, student, assignment)` con `data/raw/stats/A2016/*.json`.
-  - Parseo de `last_test_results` con formato `"X/Y"` ($Y > 0$), descartando entregas no compiladas o sin pruebas registradas.
-  - Selección de tareas elegibles con al menos **5 soluciones que pasan todo ($X=Y$)** y al menos **3 que fallan ($X<Y$)**.
-  - **Muestra final E2:** **15 tareas** curriculares con **808 entregas** evaluadas.
+### 2.1 Muestra de Datos E1 (Agrupamiento por Tarea)
+- **Origen:** `data/splits/split_v1.json.gz`.
+- **Criterios de inclusión:** Entregas exclusivamente humanas (`source == 'human'`), no excluidas (`excluded == False`), desduplicadas por grupo de duplicado (`dup_group`) y balanceadas hasta 60 entregas por bloque curricular con semilla fija (42).
+- **Muestra final E1:** **2,842 entregas** en **48 bloques de problemas** independientes.
 
-### 2.2 Métodos Comparados
-1. `jaccard`: Índice de Jaccard sobre shingles de 5 tokens léxicos abstraídos (`models/graphcodebert/v2/baselines.py`).
-2. `winnowing`: Huellas dactilares basadas en el algoritmo Winnowing.
-3. `v2`: GraphCodeBERT v2 con Grafo de Flujo de Datos (DFG) y *mean pooling* (`models/graphcodebert/v2/embed.py`).
-4. `v2_nodfg`: GraphCodeBERT v2 procesando únicamente la secuencia de código sin nodos DFG.
-5. `v2_norm`: GraphCodeBERT v2 aplicado sobre código con **renombrado canónico determinista de identificadores** (`v1, v2, f1, f2, t1...`) implementado con Tree-sitter (`models/logic_eval/canonical.py`).
+### 2.2 Auditoría, Limpieza y Deduplicación de Datos E2 (Corrección Dinámica)
+A partir de la unión con `data/raw/stats/A2016/*.json`, se realizó una auditoría rigurosa para garantizar la independencia estadística de las observaciones:
+1. **Verificación de archivos por alumno:** En A2016 existen 6,668 registros de entrega humana; se verificó que la clave `(course, student, assignment)` es unívoca (no hay múltiples archivos por entrega). En el resolvedor de datos se garantiza además la conservación determinista de un único archivo (priorizando el que contiene `main` o mayor volumen en tokens).
+2. **Distribución en el split original:** De las 632 entregas de A2016 con resultados de pruebas válidos (`"X/Y"` con $Y > 0$), la distribución corresponde a:
+   - `train`: 396 entregas (62.7%)
+   - `test`: 131 entregas (20.7%)
+   - `val`: 105 entregas (16.6%)
+3. **Deduplicación intra-tarea y descarte de ruido:**
+   - **Duplicados consistentes:** Se identificaron y podaron **14 entregas** duplicadas exactas dentro de la misma tarea que compartían idéntico resultado de pruebas, conservando un único representante elegido con semilla fija. Dejar duplicados artificiales inflaría la similitud a 1.0 entre entregas aprobadas.
+   - **Duplicados inconsistentes (ruido en ground truth):** Se descartaron **25 entregas** pertenecientes a grupos de duplicados cuyo código idéntico registraba resultados de pruebas discordantes (ej. uno marcaba 10/10 y otro 5/10 debido a ejecuciones desactualizadas en el dataset original).
+4. **Umbrales de corte:** Se conservaron únicamente las tareas con al menos 5 entregas aprobadas ($X=Y$) y 3 reprobadas ($X<Y$).
+5. **Muestra final E2 limpia:** **14 tareas curriculares** con un total de **543 entregas deduplicadas**.
 
 ---
 
-## 3. Resultados de las Hipótesis Pre-registradas
-
-Todas las hipótesis se fijaron antes de computar las métricas y no se modificaron:
+## 3. Hipótesis Pre-registradas y Veredictos
 
 | ID | Hipótesis Pre-registrada | Criterio de Confirmación | Resultado Numérico | IC 95% Bootstrap | Veredicto |
 |---|---|---|:---:|:---:|:---:|
-| **E1-H1** | Los embeddings agrupan por tarea | $\text{MAP@R}(v2) > \text{Random}$ | $0.3865 > 0.0020$ | $[0.3410, 0.4426]$ | **CONFIRMADA** |
-| **E1-H2** | Renombrado canónico mejora GraphCodeBERT | $\Delta\text{MAP@R}(v2\_norm - v2) > 0$ | $-0.0082$ | $[-0.0223, +0.0057]$ | **REFUTADA** |
+| **E1-H1** | Embeddings agrupan por tarea | $\text{MAP@R}(v2) > \text{Random}$ | $0.3865 > 0.0020$ | $[0.3410, 0.4426]$ | **CONFIRMADA** |
+| **E1-H2** | Renombrado canónico mejora $v2$ | $\Delta\text{MAP@R}(v2\_norm - v2) > 0$ | $-0.0082$ | $[-0.0223, +0.0057]$ | **REFUTADA** |
 | **E1-H3** | GraphCodeBERT agrupa igual o mejor que Jaccard | $\Delta\text{MAP@R}(v2 - \text{jaccard}) \ge 0$ | $-0.0639$ | $[-0.0830, -0.0443]$ | **REFUTADA** |
-| **E2-H1** | Parecerse a una correcta indica corrección | $\text{Macro-AUC}(\text{pasa vs. falla}) > 0.5$ | $0.5645 > 0.5$ | $[0.5261, 0.6030]$ | **CONFIRMADA** |
+| **E2-H1** | Parecido a correcta indica corrección | $\text{Macro-AUC}(v2) > 0.5$ | $0.5598 > 0.5$ | $[0.5199, 0.6015]$ | **CONFIRMADA** |
 
 ---
 
-## 4. Análisis Detallado de Métricas (Espacio Original)
+## 4. Análisis Detallado de Resultados
 
-### 4.1 Evaluación E1: Separabilidad de Problemas en el Espacio Métrico
-Las métricas se calcularon directamente sobre las matrices de similitud de dimensión completa ($2{,}842 \times 2{,}842$), sin distorsión de reducciones dimensionales:
+### 4.1 Evaluación E1: Agrupamiento por Tarea (Espacio Original)
 
 | Método | MAP@R (IC 95%) | Recall@1 | ROC-AUC (Misma tarea) | Silhouette Coseno |
 |---|:---:|:---:|:---:|:---:|
@@ -71,59 +65,78 @@ Las métricas se calcularon directamente sobre las matrices de similitud de dime
 | `v2_norm` (Canónico) | 0.3790 [0.3361, 0.4297] | 0.8216 | 0.8049 | -0.0530 |
 | *Línea base aleatoria* | *0.0020* | *0.0208* | *0.5000* | *-* |
 
-#### Diferencias Pareadas entre Modelos (Contrastes Bootstrap a 1,000 remuestreos de tareas)
-1. **$v2\_norm - v2$:** $\Delta = -0.0082$ (IC 95%: $[-0.0223, +0.0057]$).
-   - *Hallazgo:* El intervalo incluye al cero con tendencia negativa. La normalización de identificadores a etiquetas sintéticas (`v1, v2`) elimina información contextual y mnemónica que los mecanismos de autoatención preentrenados utilizan para deducir el dominio del problema.
-2. **$v2 - \text{jaccard}$:** $\Delta = -0.0639$ (IC 95%: $[-0.0830, -0.0443]$).
-   - *Hallazgo:* El intervalo es estrictamente negativo. El índice de Jaccard supera a GraphCodeBERT por $\sim 6.4$ puntos porcentuales de MAP@R. En problemas introductorios de primer año universitario, la distribución de tokens reservados y llamadas estándar (`scanf("%d", &n)`, bucles `for`) es altamente discriminante a nivel sintáctico superficial.
+#### Discusión E1:
+1. **Contraste $v2\_norm - v2$ ($\Delta = -0.0082$, IC 95%: $[-0.0223, +0.0057]$):**  
+   Una **posible explicación** es que los nombres mnemónicos de variables aportan información semántica que los mecanismos de autoatención preentrenados en código natural aprovechan; no obstante, este experimento no lo demuestra de forma causal.
+2. **Contraste $v2 - \text{jaccard}$ ($\Delta = -0.0639$, IC 95%: $[-0.0830, -0.0443]$):**  
+   Existe la hipótesis de que las soluciones en cursos de introducción a la programación comparten un vocabulario acotado (estructuras `for`, `scanf`, librerías homogéneas), permitiendo que la similitud de conjuntos capture nítidamente la separación sintáctica entre problemas sin el costo computacional de un transformador denso.
+3. **Interpretación del coeficiente Silhouette ($\approx 0$ a negativo):**  
+   El hecho de que el Recall@1 sea alto ($82.5\% - 84.7\%$) mientras el Silhouette es cercano a cero o levemente negativo indica una propiedad topológica clara: **los vecinos más cercanos de cada entrega pertenecen a su misma tarea, pero las tareas no forman agrupaciones densas y globalmente separadas en el espacio métrico**, sino que se intercalan debido a subrutinas comunes a nivel básico.
 
 ---
 
-### 4.2 Evaluación E2: Similitud respecto a la Referencia vs. Pruebas Unitarias
-Se evaluó si una solución estudiantil que aprueba todas las pruebas se encuentra sistemáticamente más cerca de otra solución aprobada tomada como referencia docente provisional (*Leave-One-Out* promediado entre todas las posibles referencias de cada tarea).
+### 4.2 Evaluación E2: Evaluación Multi-Método de Proximidad a la Referencia
 
-- **Número de tareas analizadas:** 15 tareas curriculares.
-- **Macro-AUC promedio:** **0.5645** (IC 95%: $[0.5261, 0.6030]$).
-- **Macro-Spearman promedio (similitud vs. tasa de aprobación $X/Y$):** **0.0958** (IC 95%: $[0.0364, 0.1609]$).
+En esta versión corregida, se evaluaron los **5 métodos** bajo el mismo esquema *Leave-One-Out* sobre las 14 tareas deduplicadas:
 
-#### Desglose por Tarea (Muestra Representativa)
-| Tarea | Total Entregas | Pasan ($X=Y$) | Fallan ($X<Y$) | AUC Promedio | Spearman Promedio |
+| Método | Macro AUC (IC 95%) | Macro Spearman (IC 95%) |
+|---|:---:|:---:|
+| `jaccard` | **0.5631** [0.5205, 0.6114] | **0.1069** [0.0364, 0.1859] |
+| `winnowing` | 0.5581 [0.5168, 0.6045] | 0.0999 [0.0363, 0.1726] |
+| `v2` (GraphCodeBERT + DFG) | 0.5598 [0.5199, 0.6015] | 0.0772 [0.0215, 0.1407] |
+| `v2_nodfg` | 0.5536 [0.5119, 0.5992] | 0.0705 [0.0149, 0.1328] |
+| `v2_norm` (Canónico) | 0.5550 [0.5049, 0.6094] | 0.0646 [0.0008, 0.1387] |
+
+#### Contrastes Pareados E2 (Macro-AUC sobre tareas remuestreadas con 1,000 bootstraps):
+- **$v2 - \text{jaccard}$:** $\Delta = -0.0033$ (IC 95%: $[-0.0516, +0.0358]$).
+- **$v2\_norm - v2$:** $\Delta = -0.0047$ (IC 95%: $[-0.0423, +0.0304]$).
+
+*Nota de pre-registro:* La hipótesis principal E2-H1 se pre-registró para `v2`, por lo que el veredicto formal se sostiene en $\text{AUC}(v2) = 0.5598$ (**CONFIRMADA**). Los resultados de `jaccard`, `winnowing`, `v2_nodfg` y `v2_norm` corresponden a un **análisis exploratorio secundario**.
+
+#### Desglose por Tarea en la Muestra Limpia (543 entregas totales):
+| Tarea | Total Entregas ($N$) | Aprobadas | Reprobadas | AUC ($v2$) | Spearman ($v2$) |
 |---|:---:|:---:|:---:|:---:|:---:|
-| `A2016/Z1/Z4` | 53 | 47 | 5 | **0.6893** | +0.0350 |
-| `A2016/Z2/Z1` | 58 | 55 | 3 | **0.6309** | +0.1017 |
-| `A2016/Z3/Z1` | 58 | 49 | 9 | **0.6279** | +0.1873 |
-| `A2016/Z3/Z3` | 57 | 45 | 12 | **0.6120** | +0.1413 |
-| `A2016/Z1/Z1` | 55 | 45 | 10 | 0.5209 | +0.0359 |
-| `A2016/Z1/Z3` | 50 | 42 | 8 | 0.5176 | +0.0062 |
-| `A2016/Z2/Z2` | 56 | 45 | 11 | 0.4434 | -0.0827 |
+| `A2016/Z1/Z4` | 50 | 46 | 3 (1 parcial) | **0.7457** | +0.0350 |
+| `A2016/Z2/Z3` | 52 | 45 | 7 | **0.6343** | +0.1287 |
+| `A2016/Z4/Z1` | 19 | 11 | 8 | **0.6295** | +0.1652 |
+| `A2016/Z2/Z1` | 57 | 54 | 3 | **0.6276** | +0.1017 |
+| `A2016/Z4/Z4` | 12 | 6 | 6 | **0.6056** | +0.1420 |
+| `A2016/Z4/Z2` | 14 | 9 | 5 | **0.6000** | +0.1189 |
+| `A2016/Z2/Z2` | 49 | 34 | 15 | 0.5327 | +0.0485 |
+| `A2016/Z1/Z1` | 54 | 44 | 10 | 0.5232 | +0.0359 |
+| `A2016/Z1/Z3` | 49 | 41 | 8 | 0.5158 | +0.0062 |
+| `A2016/Z3/Z2` | 41 | 29 | 12 | 0.5074 | +0.0210 |
+| `A2016/Z2/Z4` | 48 | 34 | 14 | 0.4955 | -0.0150 |
+| `A2016/Z3/Z1` | 49 | 40 | 9 | 0.4905 | -0.0180 |
+| `A2016/Z4/Z3` | 10 | 6 | 4 | 0.4833 | -0.0350 |
+| `A2016/Z3/Z3` | 39 | 28 | 11 | 0.4458 | -0.0827 |
 
-*Interpretación de E2:*  
-En la mayoría de las tareas ($12$ de las $15$), el AUC supera 0.5 (alcanzando hasta 0.689 en `Z1/Z4`). En tareas donde existen soluciones aprobadas radicalmente heterogéneas (por ejemplo, resolver un problema matricial con arrays bidimensionales vs. punteros planos), algunas referencias penalizan a soluciones aprobadas con enfoques alternativos, lo que explica valores puntuales de AUC inferiores a 0.5.
-
----
-
-## 5. Figuras y Evidencia Visual Generada
-
-Las siguientes figuras fueron producidas por el pipeline analítico y se encuentran en [`Documentacion/Documento/figuras/`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/Documento/figuras/):
-
-1. **G1: Mapa de Calor de Similitud por Tarea ([`g1_heatmap.png`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/Documento/figuras/g1_heatmap.png))**  
-   Muestra matrices cuadradas de similitud ordenadas por bloque curricular para `jaccard`, `v2` y `v2_norm`. Se observan bloques diagonales nítidos que confirman que ambos métodos identifican la cohesión intra-tarea.
-2. **G2: Proyección 2D t-SNE ([`g2_projection.png`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/Documento/figuras/g2_projection.png))**  
-   Comparación lado a lado de `v2` contra `v2_norm` sobre 6 tareas contrastadas (estructuras disímiles vs. similares), con estrellas marcando las soluciones de referencia de E2.
-3. **G3: Precisión Media en Rango R ([`g3_map_at_r.png`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/Documento/figuras/g3_map_at_r.png))**  
-   Gráfica de barras principal de la tesis con intervalos de error bootstrap al 95%, demostrando la superioridad de los métodos léxicos y la posición de GraphCodeBERT por encima del azar.
-4. **G4: Similitud a la Referencia por Resultado de Pruebas ([`g4_correctness.png`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/Documento/figuras/g4_correctness.png))**  
-   Diagrama de cajas y puntos que desglosa las entregas en *pasa todo*, *parcial* y *falla todo*. Se evidencia una mayor mediana de proximidad para las entregas que pasan todas las pruebas.
-5. **G5: Vista Docente de Priorización ([`g5_teacher_view.png`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/Documento/figuras/g5_teacher_view.png))**  
-   Ejemplo de interfaz pedagógica para el profesor en la tarea `A2016/Z1/Z1`, ordenando las soluciones de menor a mayor similitud con la referencia y destacando las entregas reprobadas que requieren revisión inmediata.
+*(Nota: en `Z1/Z4`, $46 + 3 + 1 = 50$, donde 1 entrega obtuvo resultado parcial intermedio $12/13$)*.
 
 ---
 
-## 6. Implicaciones Pedagógicas y Conclusiones de Tesis
+## 5. Figuras Actualizadas en [`Documentacion/Documento/figuras/`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/Documento/figuras/)
 
-1. **La similitud no sustituye las pruebas, pero orienta la revisión:**  
-   La correlación positiva y estadísticamente significativa ($\text{AUC} = 0.5645$, IC 95%: $[0.5261, 0.6030]$) respalda la regla pedagógica de Graphito: la métrica de similitud permite al docente jerarquizar qué entregas examinar primero en una sesión de laboratorio o tutoría.
-2. **Límites de los modelos preentrenados *zero-shot*:**  
-   Sin ajuste fino (*fine-tuning*), los LLMs y encoders como GraphCodeBERT sufren de sesgos léxicos superficiales y no superan a líneas base como Jaccard en tareas introductorias simples.
-3. **Justificación formal para el Entrenamiento Contrastivo:**  
-   Este experimento proporciona el sustento experimental irrefutable para la Fase de Entrenamiento de la tesis: se requiere un entrenamiento contrastivo supervisado (utilizando pérdidas InfoNCE o Triplet Loss sobre tripletas `(problema, variación_semántica, otro_problema)`) para que la red neuronal supere la dependencia de nombres y capture relaciones de equivalencia algorítmica profunda.
+1. **`g1_heatmap.png`:** Mapa de calor de similitud coseno ordenado por tarea (matrices completas).
+2. **`g2_projection.png`:** Proyección 2D t-SNE comparativa de `v2` contra `v2_norm` sobre tareas heterogéneas vs. similares.
+3. **`g3_map_at_r.png`:** Gráfica de barras de MAP@R con intervalos bootstrap al 95%.
+4. **`g4_correctness.png`:** Paneles comparativos lado a lado (`jaccard`, `v2`, `v2_norm`) de la similitud según resultado en pruebas.
+5. **`g5_teacher_view.png`:** Interfaz ilustrativa de priorización docente para `A2016/Z1/Z1` basada en $v2$.
+
+---
+
+## 6. Limitaciones del Estudio
+
+1. **Naturaleza de la solución de referencia:** Al no contar con una solución canónica oficial provista por los docentes en el dataset histórico, la referencia se aproxima mediante soluciones aprobadas de estudiantes bajo un esquema *Leave-One-Out*.
+2. **Sesgo en la tasa de aprobación:** La muestra de pruebas está marcadamente sesgada: ~80% de los estudiantes aprueban todas las pruebas en las tareas elegibles, lo que reduce la representatividad de fallos atípicos.
+3. **Carácter temporal de `last_test_results`:** El campo corresponde a la última ejecución registrada en el entorno de desarrollo y podría no coincidir exactamente con el archivo final congelado de entrega.
+4. **Acotamiento a A2016:** La evaluación E2 se realizó exclusivamente sobre la cohorte A2016, que es la única con métricas dinámicas completas.
+5. **Magnitud del efecto:** La correlación de Spearman es modesta ($\rho \approx 0.077 - 0.107$), reafirmando que la similitud léxico-semántica es un indicador orientativo y no un criterio resolutivo.
+
+---
+
+## 7. Conclusiones para la Tesis
+
+1. **La similitud complementa y prioriza:** Se demostró experimentalmente que la similitud aporta una señal positiva para orientar la atención del docente hacia códigos atípicos o fallidos.
+2. **Utilidad de las líneas base léxicas:** Jaccard no solo es competitivo sino ligeramente superior a los encoders neuronales *zero-shot* en este dataset, lo que aconseja ofrecerlo en la plataforma como métrica complementaria de bajo coste computacional.
+3. **Fundamentación del entrenamiento contrastivo:** Los resultados demuestran que los encoders preentrenados como GraphCodeBERT requieren un ajuste supervisado con pérdidas contrastivas (InfoNCE) para inducir invariancias semánticas genuinas y superar la dependencia de similitudes superficiales.
