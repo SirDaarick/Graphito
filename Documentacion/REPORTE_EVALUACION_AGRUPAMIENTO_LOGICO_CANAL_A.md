@@ -2,9 +2,9 @@
 
 **Proyecto:** Graphito — Detección Bimodal e Interpretable de Código Académico  
 **Componente:** Canal A (Similitud Semántica y Agrupamiento Funcional de Código)  
-**Fecha de Ejecución:** 13 de octubre de 2026 (06:19 – 06:41 UTC)  
+**Fecha de Ejecución:** 13 de octubre de 2026 (15:26 – 15:41 UTC)  
 **Entorno de Ejecución:** GPU NVIDIA GeForce RTX 2060 SUPER (8 GB VRAM), CUDA 12.8, PyTorch 2.6  
-**Corrida Experimental:** [`runs/logic_eval/20261013-061944/`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/runs/logic_eval/20261013-061944/)  
+**Corrida Experimental:** [`runs/logic_eval/20261013-152644/`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/runs/logic_eval/20261013-152644/)  
 **Plan Pre-registrado:** [`Documentacion/guias_implementacion/evaluacion_agrupamiento_logico.md`](file:///c:/Users/edani/OneDrive/Documents/Proyectos/Graphito/Documentacion/guias_implementacion/evaluacion_agrupamiento_logico.md)
 
 ---
@@ -144,3 +144,27 @@ En esta versión corregida, se evaluaron los **5 métodos** bajo el mismo esquem
    - En **E1 (agrupamiento por tarea)**, la representación léxica (`jaccard`) agrupó mejor las soluciones que GraphCodeBERT $v2$ con una diferencia estadísticamente significativa ($\Delta\text{MAP@R} = -0.0639$, IC 95%: $[-0.0830, -0.0443]$).
    - En **E2 (proximidad a la referencia y corrección)**, se observó un empate práctico entre métodos (`jaccard` AUC 0.5631 vs. `v2` AUC 0.5598; contraste pareado con $\Delta = -0.0033$, cuyo intervalo de confianza incluye el cero $[-0.0516, +0.0358]$).
 3. **Motivación para el entrenamiento contrastivo:** Los hallazgos motivan explorar el entrenamiento contrastivo supervisado (pérdidas InfoNCE / SimCLR con aumentaciones de preservación semántica) para inducir invariancias genuinas en los encoders preentrenados y superar la dependencia de rasgos léxicos superficiales.
+ 
+---
+
+## 8. Registro de Correcciones Aplicadas
+
+1. **Revisión y aclaración del conteo de entregas iniciales en E2:**
+   - Se documentó la razón exacta por la cual la cohorte A2016 pasó de 808 registros iniciales a 632: 176 registros carecían de resultados válidos de ejecución en pruebas (`last_test_results == null` o sin formato `"X/Y"` evaluable).
+2. **Deduplicación intra-tarea en E2:**
+   - Se podaron 14 duplicados exactos consistentes (para no inflar artificialmente el AUC con similitudes de 1.0 entre entregas idénticas aprobadas).
+   - Se descartaron 25 entregas con resultados contradictorios dentro del mismo grupo de duplicados (ruido en ground truth).
+   - Muestra final E2 limpia: 543 entregas en 14 tareas curriculares.
+3. **Automatización de la tabla E2 por tarea:**
+   - La tabla de la sección 4.2 se genera automáticamente desde `e2_metrics.json` mediante código sin valores manuales.
+   - Se corrigió el conteo de la tarea `A2016/Z1/Z4`: son exactamente 46 aprobadas + 3 reprobadas = 49 entregas.
+4. **Evaluación multi-método completa en E2:**
+   - Se evaluaron los 5 métodos (`jaccard`, `winnowing`, `v2`, `v2_nodfg`, `v2_norm`) bajo el mismo protocolo *Leave-One-Out*.
+   - Contrastes pareados por bootstrap calculados sobre las mismas tareas remuestreadas.
+5. **Generación objetiva de figura de clusters para la tesis:**
+   - Incorporación de `plot_cluster_showcase` en `models/logic_eval/plots.py` con selección cuantitativa de tareas basada en similitud cruzada (triplete con menor similitud y par con mayor similitud).
+   - Generación de `Documentacion/Documento/figuras/clusters_canal_a.png` (300 dpi) y registro de metadatos en `cluster_showcase.json`.
+6. **Calibración de redacción y conclusiones:**
+   - Se evitaron afirmaciones de validación definitiva o causal; se califica la señal como débil pero positiva ($\text{Macro-AUC} = 0.5598$).
+   - Se diferenció explícitamente el agrupamiento general (E1, donde Jaccard supera a GraphCodeBERT) de la proximidad funcional (E2, donde hay empate práctico).
+
