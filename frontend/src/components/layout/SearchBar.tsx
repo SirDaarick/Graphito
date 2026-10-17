@@ -6,9 +6,14 @@ import { cn } from "../../lib/utils"
 interface SearchBarProps {
     searchTerm: string;
     onSearchChange: (value: string) => void;
+    placeholder?: string;
 }
 
-export function SearchBar({ searchTerm, onSearchChange }: SearchBarProps) {
+export function SearchBar({
+    searchTerm,
+    onSearchChange,
+    placeholder = "Buscar en la librería de códigos...",
+}: SearchBarProps) {
     return (
         <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full mb-8">
             <div className="relative flex-1 w-full max-w-xl group">
@@ -17,7 +22,7 @@ export function SearchBar({ searchTerm, onSearchChange }: SearchBarProps) {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Buscar en la librería de códigos..."
+                    placeholder={placeholder}
                     className={cn(
                         "w-full pl-10 pr-4 py-2.5 rounded-xl font-body text-sm transition-all",
                         "bg-white dark:bg-graphito-dark border border-slate-200 dark:border-graphito-border text-slate-900 dark:text-white",

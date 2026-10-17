@@ -95,7 +95,11 @@ export function Catalogo({ onCompare, onBulkUpload }: CatalogoProps) {
                 </p>
             </div>
 
-            <SearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} />
+            <SearchBar
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                placeholder="Buscar por programa, unidad o materia..."
+            />
 
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
