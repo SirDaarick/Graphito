@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS lotes_analisis (
 );
 CREATE INDEX IF NOT EXISTS ix_lotes_docente_id ON lotes_analisis(docente_id);
 CREATE INDEX IF NOT EXISTS ix_lotes_problema_id ON lotes_analisis(problema_id);
+ALTER TABLE lotes_analisis ADD COLUMN IF NOT EXISTS grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS ix_lotes_grupo_id ON lotes_analisis(grupo_id);
 
 ALTER TABLE reportes_analisis ADD COLUMN IF NOT EXISTS lote_id UUID REFERENCES lotes_analisis(id) ON DELETE SET NULL;
@@ -88,6 +89,11 @@ CREATE INDEX IF NOT EXISTS ix_comentarios_docente_id ON comentarios_revision(doc
 -- 7. INTERPRETABILIDAD Y EXPLICABILIDAD (XAI)
 ALTER TABLE indicadores_integridad ADD COLUMN IF NOT EXISTS numero_linea INTEGER;
 ALTER TABLE indicadores_integridad ADD COLUMN IF NOT EXISTS categoria VARCHAR(50) DEFAULT 'GENERAL';
+
+-- 7b. CATÁLOGO DE PROGRAMAS ESCOM: problema creado a partir de un programa precargado
+-- (antes de la sección 8: test_migration exige que su UPDATE de procedencia sea la última sentencia)
+ALTER TABLE problemas ADD COLUMN IF NOT EXISTS catalogo_id VARCHAR(255);
+CREATE INDEX IF NOT EXISTS ix_problemas_catalogo_id ON problemas(catalogo_id);
 
 -- 8. INTEGRACIÓN DE MODELOS (SDD-4): puntajes anulables, procedencia y dictámenes nuevos
 -- apply_migrations.py ejecuta cada sentencia sola en AUTOCOMMIT y se detiene en el primer error.

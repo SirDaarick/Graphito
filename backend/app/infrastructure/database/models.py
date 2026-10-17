@@ -102,6 +102,7 @@ class Problema(Base):
     titulo = Column(String(255), nullable=False)
     enunciado = Column(Text, nullable=False)
     lenguaje = Column(String(50), default="c", nullable=False)  # "c" o "cpp"
+    catalogo_id = Column(String(255), nullable=True, index=True)  # id del programa del catálogo ESCOM
     fecha_creacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     docente = relationship("Docente", back_populates="problemas")
