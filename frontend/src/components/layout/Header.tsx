@@ -23,9 +23,25 @@ interface HeaderProps {
     onNewCode?: () => void;
     onLogout?: () => void;
     onViewComparison?: (comparison: Comparison) => void;
+    activeSection?: AppSection;
+    onNavigate?: (section: AppSection) => void;
 }
 
-export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: HeaderProps) {
+export type AppSection = "biblioteca" | "catalogo";
+
+const NAV_SECTIONS: { key: AppSection; label: string }[] = [
+    { key: "biblioteca", label: "Biblioteca" },
+    { key: "catalogo", label: "Catálogo" },
+];
+
+export function Header({
+    currentUser,
+    onNewCode,
+    onLogout,
+    onViewComparison,
+    activeSection = "biblioteca",
+    onNavigate,
+}: HeaderProps) {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -86,9 +102,24 @@ export function Header({ currentUser, onNewCode, onLogout, onViewComparison }: H
                     </div>
 
                     <nav className="hidden md:flex items-center gap-6">
-                        <a href="#" className="font-body text-sm font-semibold text-slate-800 dark:text-white border-b-2 border-graphito-blue pb-1">
-                            Biblioteca
-                        </a>
+                        {NAV_SECTIONS.map((item) => {
+                            const isActive = activeSection === item.key;
+                            return (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    onClick={() => onNavigate?.(item.key)}
+                                    aria-current={isActive ? "page" : undefined}
+                                    className={`font-body text-sm font-semibold pb-1 border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/50 rounded-sm ${
+                                        isActive
+                                            ? "text-slate-800 dark:text-white border-graphito-blue"
+                                            : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white"
+                                    }`}
+                                >
+                                    {item.label}
+                                </button>
+                            );
+                        })}
                         <a
                             href="https://github.com/SirDaarick/Graphito"
                             target="_blank"

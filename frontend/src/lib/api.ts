@@ -10,6 +10,8 @@ import {
     DEMO_CODE_COMPARISONS,
     DEMO_COMMENTS,
     DEMO_GRUPOS,
+    DEMO_CATALOG,
+    DEMO_CATALOG_DETAILS,
 } from "./demoData";
 import {
     GCB_LABEL,
@@ -244,6 +246,34 @@ export interface ComentarioRevision {
     contenido: string;
     created_at: string;
     autor_nombre?: string;
+}
+
+export interface CatalogProgram {
+    id: string;
+    titulo: string;
+    lenguaje: string;
+    nombre_archivo: string;
+}
+
+export interface CatalogUnit {
+    unidad: string;
+    unidad_nombre: string;
+    programas: CatalogProgram[];
+}
+
+export interface CatalogSubject {
+    materia: string;
+    materia_nombre: string;
+    total: number;
+    unidades: CatalogUnit[];
+}
+
+export interface CatalogProgramDetail extends CatalogProgram {
+    materia: string;
+    materia_nombre: string;
+    unidad: string;
+    unidad_nombre: string;
+    codigo: string;
 }
 
 // In-memory comments store for demo mode
@@ -630,6 +660,32 @@ export const api = {
             }
             return request<void>(`/groups/${groupId}`, {
                 method: "DELETE",
+            });
+        },
+    },
+
+    catalog: {
+        async list(): Promise<CatalogSubject[]> {
+            if (IS_DEMO_MODE) {
+                return DEMO_CATALOG;
+            }
+            return request<CatalogSubject[]>("/catalog/");
+        },
+        async get(id: string): Promise<CatalogProgramDetail> {
+            if (IS_DEMO_MODE) {
+                const found = DEMO_CATALOG_DETAILS[id];
+                if (!found) throw new ApiError(404, "Programa no encontrado en el catálogo.");
+                return found;
+            }
+            return request<CatalogProgramDetail>(`/catalog/${encodeURIComponent(id)}`);
+        },
+        /** Adopts a catalog program as a reference problem (idempotent per teacher). */
+        async use(id: string): Promise<Problema> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, "El modo demo no permite adoptar programas del catálogo (solo lectura).");
+            }
+            return request<Problema>(`/catalog/${encodeURIComponent(id)}/use`, {
+                method: "POST",
             });
         },
     },

@@ -1,4 +1,4 @@
-import { Docente, Problema, CodigoFuente, ReporteAnalisis, ReportCodeComparison, ComentarioRevision } from "./api";
+import { Docente, Problema, CodigoFuente, ReporteAnalisis, ReportCodeComparison, ComentarioRevision, CatalogSubject, CatalogProgramDetail } from "./api";
 
 export const DEMO_DOCENTE: Docente = {
     id: 1,
@@ -569,3 +569,182 @@ export const DEMO_GRUPOS: DemoGrupo[] = [
     },
 ];
 
+const demoCatalogEntry = (
+    id: string,
+    titulo: string,
+    lenguaje: "c" | "cpp",
+    nombre_archivo: string,
+    materia: string,
+    materia_nombre: string,
+    unidad: string,
+    unidad_nombre: string,
+    codigo: string,
+): CatalogProgramDetail => ({
+    id, titulo, lenguaje, nombre_archivo, materia, materia_nombre, unidad, unidad_nombre, codigo,
+});
+
+const DEMO_CATALOG_ENTRIES: CatalogProgramDetail[] = [
+    demoCatalogEntry("demo-ed-u1-pila", "Pila con arreglo", "c", "pila_arreglo.c",
+        "estructuras_de_datos", "Estructuras de Datos", "unidad_1", "Unidad 1: Pilas y colas",
+        `#include <stdio.h>
+
+#define MAX 100
+
+int pila[MAX];
+int tope = -1;
+
+void push(int x) {
+    if (tope < MAX - 1) pila[++tope] = x;
+}
+
+int pop(void) {
+    return tope >= 0 ? pila[tope--] : -1;
+}
+
+int main(void) {
+    push(3);
+    push(7);
+    printf("%d\\n", pop());
+    return 0;
+}
+`),
+    demoCatalogEntry("demo-ed-u1-cola", "Cola circular", "c", "cola_circular.c",
+        "estructuras_de_datos", "Estructuras de Datos", "unidad_1", "Unidad 1: Pilas y colas",
+        `#include <stdio.h>
+
+#define N 5
+
+int cola[N];
+int frente = 0, tam = 0;
+
+void encolar(int x) {
+    if (tam < N) cola[(frente + tam++) % N] = x;
+}
+
+int desencolar(void) {
+    if (tam == 0) return -1;
+    int v = cola[frente];
+    frente = (frente + 1) % N;
+    tam--;
+    return v;
+}
+
+int main(void) {
+    encolar(1);
+    encolar(2);
+    printf("%d\\n", desencolar());
+    return 0;
+}
+`),
+    demoCatalogEntry("demo-ed-u2-lista", "Lista enlazada simple", "c", "lista_simple.c",
+        "estructuras_de_datos", "Estructuras de Datos", "unidad_2", "Unidad 2: Listas",
+        `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Nodo {
+    int dato;
+    struct Nodo *sig;
+} Nodo;
+
+Nodo *insertar(Nodo *cabeza, int dato) {
+    Nodo *n = malloc(sizeof(Nodo));
+    n->dato = dato;
+    n->sig = cabeza;
+    return n;
+}
+
+int main(void) {
+    Nodo *l = insertar(insertar(NULL, 2), 1);
+    for (Nodo *p = l; p; p = p->sig) printf("%d ", p->dato);
+    return 0;
+}
+`),
+    demoCatalogEntry("demo-ed-u2-busqueda", "Busqueda binaria", "c", "busqueda_binaria.c",
+        "estructuras_de_datos", "Estructuras de Datos", "unidad_2", "Unidad 2: Listas",
+        `#include <stdio.h>
+
+int busqueda_binaria(int a[], int n, int x) {
+    int lo = 0, hi = n - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (a[mid] == x) return mid;
+        if (a[mid] < x) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return -1;
+}
+
+int main(void) {
+    int a[] = {1, 3, 5, 7, 9};
+    printf("%d\\n", busqueda_binaria(a, 5, 7));
+    return 0;
+}
+`),
+    demoCatalogEntry("demo-pa-u1-fib", "Fibonacci con memoizacion", "cpp", "fibonacci_memo.cpp",
+        "programacion_avanzada", "Programación Avanzada", "unidad_1", "Unidad 1: Programación dinámica",
+        `#include <iostream>
+#include <vector>
+
+long long fib(int n, std::vector<long long>& memo) {
+    if (n < 2) return n;
+    if (memo[n] != -1) return memo[n];
+    return memo[n] = fib(n - 1, memo) + fib(n - 2, memo);
+}
+
+int main() {
+    std::vector<long long> memo(51, -1);
+    std::cout << fib(50, memo) << std::endl;
+    return 0;
+}
+`),
+    demoCatalogEntry("demo-pa-u2-bfs", "Recorrido BFS", "cpp", "bfs.cpp",
+        "programacion_avanzada", "Programación Avanzada", "unidad_2", "Unidad 2: Grafos",
+        `#include <iostream>
+#include <queue>
+#include <vector>
+
+void bfs(const std::vector<std::vector<int>>& g, int s) {
+    std::vector<bool> vis(g.size(), false);
+    std::queue<int> q;
+    q.push(s);
+    vis[s] = true;
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+        std::cout << u << " ";
+        for (int v : g[u]) {
+            if (!vis[v]) {
+                vis[v] = true;
+                q.push(v);
+            }
+        }
+    }
+}
+
+int main() {
+    bfs({{1, 2}, {3}, {3}, {}}, 0);
+    return 0;
+}
+`),
+];
+
+export const DEMO_CATALOG_DETAILS: Record<string, CatalogProgramDetail> = Object.fromEntries(
+    DEMO_CATALOG_ENTRIES.map((e) => [e.id, e]),
+);
+
+/** Builds the grouped catalog list (no code) from the flat demo entries. */
+export const DEMO_CATALOG: CatalogSubject[] = DEMO_CATALOG_ENTRIES.reduce<CatalogSubject[]>((subjects, e) => {
+    let subject = subjects.find((s) => s.materia === e.materia);
+    if (!subject) {
+        subject = { materia: e.materia, materia_nombre: e.materia_nombre, total: 0, unidades: [] };
+        subjects.push(subject);
+    }
+    let unit = subject.unidades.find((u) => u.unidad === e.unidad);
+    if (!unit) {
+        unit = { unidad: e.unidad, unidad_nombre: e.unidad_nombre, programas: [] };
+        subject.unidades.push(unit);
+    }
+    unit.programas.push({ id: e.id, titulo: e.titulo, lenguaje: e.lenguaje, nombre_archivo: e.nombre_archivo });
+    subject.total += 1;
+    return subjects;
+}, []);
