@@ -232,7 +232,7 @@ export function BulkUploadModal({
 
             <div
                 ref={contentRef}
-                className="relative w-full max-w-3xl z-10 max-h-[90vh] flex flex-col"
+                className="relative w-full max-w-5xl z-10 max-h-[92vh] flex flex-col"
             >
                 <AuthCard className="w-full p-0 overflow-hidden flex flex-col max-h-[90vh] bg-white dark:bg-graphito-card border border-slate-200 dark:border-[#2b3346]/60 shadow-2xl rounded-2xl transition-colors">
                     {/* Encabezado */}
@@ -367,7 +367,7 @@ export function BulkUploadModal({
                                     }}
                                     onDragLeave={() => setIsDragging(false)}
                                     onDrop={handleDrop}
-                                    className={`p-6 rounded-2xl border-2 border-dashed text-center transition-colors ${
+                                    className={`p-12 min-h-[240px] flex flex-col items-center justify-center rounded-2xl border-2 border-dashed text-center transition-colors ${
                                         isDragging
                                             ? "border-graphito-blue bg-graphito-blue/10"
                                             : "border-slate-200 dark:border-[#2b3346] bg-slate-50 dark:bg-[#121827]/30 hover:bg-slate-100 dark:hover:bg-[#121827]/50"

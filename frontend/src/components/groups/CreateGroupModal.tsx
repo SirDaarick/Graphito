@@ -97,7 +97,7 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }: CreateGrou
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
 
-            <div ref={contentRef} className="relative w-full max-w-lg z-10 max-h-[90vh] flex flex-col">
+            <div ref={contentRef} className="relative w-full max-w-2xl z-10 max-h-[92vh] flex flex-col">
                 <AuthCard className="w-full p-0 overflow-hidden flex flex-col max-h-[90vh] bg-white dark:bg-graphito-card border border-slate-200 dark:border-[#2b3346]/60 shadow-2xl rounded-2xl transition-colors">
                     <div className="flex items-center justify-between px-8 py-6 border-b border-slate-200 dark:border-[#2b3346]/40 shrink-0">
                         <div className="flex items-center gap-3">
@@ -131,7 +131,7 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }: CreateGrou
                             </div>
                         )}
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-3 items-end gap-3">
                             <div className="col-span-2 space-y-1.5">
                                 <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                                     <BookOpen size={13} className="text-graphito-blue" />
@@ -186,7 +186,7 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }: CreateGrou
                                 value={descripcion}
                                 onChange={(e) => setDescripcion(e.target.value)}
                                 placeholder="Horario matutino, criterios de entrega, laboratorio asignado..."
-                                rows={3}
+                                rows={4}
                                 className="w-full bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-graphito-blue transition-colors resize-none"
                                 disabled={isLoading}
                             />
