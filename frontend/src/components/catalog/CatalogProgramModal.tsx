@@ -172,18 +172,6 @@ export function CatalogProgramModal({
                                     </p>
                                 )}
 
-                                <div className="rounded-xl border border-graphito-blue/20 bg-graphito-blue/5 px-4 py-3">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-graphito-blue mb-1">
-                                        Parte del temario
-                                    </p>
-                                    <p className="text-sm font-semibold text-slate-800 dark:text-white">
-                                        {program.tema}
-                                    </p>
-                                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                        {program.unidad_nombre} · {program.materia_nombre}
-                                    </p>
-                                </div>
-
                                 <div className="max-h-[360px] overflow-auto rounded-xl border border-slate-200 dark:border-[#2b3346] bg-slate-50 dark:bg-[#0b1020] py-3">
                                     <pre className="text-xs font-mono leading-relaxed text-slate-800 dark:text-slate-200">
                                         {lines.map((line, idx) => (

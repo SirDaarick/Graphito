@@ -123,17 +123,13 @@ async def test_use_creates_problem_and_reference(client: AsyncClient, vector_sto
 
 
 @pytest.mark.asyncio
-async def test_use_builds_statement_from_description_and_syllabus(client: AsyncClient):
+async def test_use_builds_statement_from_description(client: AsyncClient):
     headers = await _headers(client)
     entry_id = await _find_id(client, headers, C_FILE)
     detail = (await client.get(f"{CATALOG}{entry_id}", headers=headers)).json()
 
     problem = (await client.post(f"{CATALOG}{entry_id}/use", headers=headers)).json()
-    assert problem["enunciado"].startswith(detail["descripcion"])
-    assert "Parte del temario" in problem["enunciado"]
-    assert detail["tema"] in problem["enunciado"]
-    assert detail["unidad_nombre"] in problem["enunciado"]
-    assert detail["materia_nombre"] in problem["enunciado"]
+    assert problem["enunciado"] == detail["descripcion"]
 
 
 @pytest.mark.asyncio

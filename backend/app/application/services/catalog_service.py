@@ -98,10 +98,7 @@ class CatalogService:
         problema = Problema(
             docente_id=docente_id,
             titulo=entry.titulo,
-            enunciado=(
-                f"{entry.descripcion}\n\n"
-                f"Parte del temario: {entry.unidad_nombre} — {entry.tema} ({entry.materia_nombre})."
-            ),
+            enunciado=entry.descripcion,
             lenguaje=entry.lenguaje,
             catalogo_id=entry.id,
         )
