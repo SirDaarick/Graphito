@@ -223,29 +223,29 @@ export function BulkUploadModal({
     if (!shouldRender) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div
                 ref={backdropRef}
                 onClick={isUploading ? undefined : onClose}
-                className="absolute inset-0 bg-background/80 backdrop-blur-md"
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
 
             <div
                 ref={contentRef}
                 className="relative w-full max-w-3xl z-10 max-h-[90vh] flex flex-col"
             >
-                <AuthCard>
+                <AuthCard className="w-full p-0 overflow-hidden flex flex-col max-h-[90vh] bg-white dark:bg-graphito-card border border-slate-200 dark:border-[#2b3346]/60 shadow-2xl rounded-2xl transition-colors">
                     {/* Encabezado */}
-                    <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
+                    <div className="flex items-center justify-between px-8 py-6 border-b border-slate-200 dark:border-[#2b3346]/40 shrink-0">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                            <div className="w-10 h-10 rounded-xl bg-graphito-violet/10 border border-graphito-violet/20 flex items-center justify-center text-graphito-violet">
                                 <UploadCloud size={20} />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-content-primary">
-                                    Carga Masiva de Entregas
+                                <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white">
+                                    Carga masiva de entregas
                                 </h2>
-                                <p className="text-xs text-content-secondary">
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                     Sube carpetas o grupos enteros de alumnos para análisis bimodal asíncrono.
                                 </p>
                             </div>
@@ -254,17 +254,18 @@ export function BulkUploadModal({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-elevated transition-colors"
+                                aria-label="Cerrar"
+                                className="p-1 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-md transition-all"
                             >
-                                <X size={18} />
+                                <X size={20} />
                             </button>
                         )}
                     </div>
 
                     {/* Cuerpo del Modal */}
-                    <div className="space-y-4 pt-4 overflow-y-auto max-h-[calc(80vh-140px)] custom-scrollbar pr-1">
+                    <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
                         {error && (
-                            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 flex items-center gap-2">
+                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 dark:text-red-300 text-xs font-medium flex items-center gap-2">
                                 <AlertCircle size={16} className="shrink-0" />
                                 <span>{error}</span>
                             </div>
@@ -273,21 +274,21 @@ export function BulkUploadModal({
                         {/* Estado en Progreso o Completado */}
                         {isUploading || isCompleted ? (
                             <div className="py-8 space-y-6 text-center">
-                                <div className="inline-flex p-4 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                                <div className="inline-flex p-4 rounded-full bg-graphito-blue/10 text-graphito-blue border border-graphito-blue/30">
                                     {isCompleted ? (
-                                        <CheckCircle2 size={40} className="text-emerald-400 animate-in zoom-in" />
+                                        <CheckCircle2 size={40} className="text-emerald-500 dark:text-emerald-400 animate-in zoom-in" />
                                     ) : (
-                                        <Loader2 size={40} className="animate-spin text-cyan-400" />
+                                        <Loader2 size={40} className="animate-spin text-graphito-blue" />
                                     )}
                                 </div>
 
                                 <div className="space-y-1">
-                                    <h3 className="text-base font-bold text-content-primary">
+                                    <h3 className="text-base font-display font-bold text-slate-900 dark:text-white">
                                         {isCompleted
                                             ? "¡Análisis Masivo Completado!"
                                             : `Procesando entrega ${processedCount} de ${totalCount}...`}
                                     </h3>
-                                    <p className="text-xs text-content-secondary max-w-md mx-auto">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                                         {isCompleted
                                             ? "Todas las entregas han sido evaluadas e indexadas en la biblioteca con sus dictámenes e indicadores de integridad."
                                             : "Ejecutando inferencia bimodal concurrente (Canal A GraphCodeBERT + Canal B CharCNN) en segundo plano."}
@@ -296,13 +297,13 @@ export function BulkUploadModal({
 
                                 {/* Barra de Progreso */}
                                 <div className="max-w-md mx-auto space-y-2">
-                                    <div className="h-3 w-full bg-surface-elevated rounded-full overflow-hidden border border-line-subtle p-0.5">
+                                    <div className="h-3 w-full bg-slate-100 dark:bg-[#121827] rounded-full overflow-hidden border border-slate-200 dark:border-[#2b3346] p-0.5">
                                         <div
-                                            className="h-full bg-gradient-to-r from-cyan-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-300"
+                                            className="h-full bg-gradient-to-r from-graphito-blue to-graphito-violet rounded-full transition-all duration-300"
                                             style={{ width: `${progressPercent}%` }}
                                         />
                                     </div>
-                                    <div className="flex justify-between text-[11px] font-mono text-content-muted">
+                                    <div className="flex justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400">
                                         <span>Progreso: {progressPercent}%</span>
                                         <span>{processedCount} / {totalCount} completados</span>
                                     </div>
@@ -310,8 +311,8 @@ export function BulkUploadModal({
 
                                 {isCompleted && (
                                     <div className="pt-4">
-                                        <GradientButton onClick={onClose} className="text-xs px-6 py-2.5">
-                                            Volver a la Biblioteca
+                                        <GradientButton onClick={onClose} className="!py-3 !px-8">
+                                            Volver a la biblioteca
                                         </GradientButton>
                                     </div>
                                 )}
@@ -321,17 +322,17 @@ export function BulkUploadModal({
                                 {/* Selectores de Problema y Curso */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-content-secondary flex items-center gap-1.5">
-                                            <FileCode2 size={13} className="text-cyan-400" />
+                                        <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                            <FileCode2 size={13} className="text-graphito-blue" />
                                             Problema de Referencia *
                                         </label>
                                         <select
                                             value={selectedProblemId || ""}
                                             onChange={(e) => setSelectedProblemId(Number(e.target.value))}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-surface border border-line-subtle text-content-primary text-xs focus:outline-none focus:border-cyan-500 transition-colors"
+                                            className="w-full bg-slate-50 dark:bg-[#121827] border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-xl py-3 px-4 focus:outline-none focus:border-graphito-blue text-sm cursor-pointer transition-colors"
                                         >
                                             {problems.map((p) => (
-                                                <option key={p.id} value={p.id}>
+                                                <option key={p.id} value={p.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                                                     {p.titulo} ({p.lenguaje.toUpperCase()})
                                                 </option>
                                             ))}
@@ -339,18 +340,18 @@ export function BulkUploadModal({
                                     </div>
 
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-content-secondary flex items-center gap-1.5">
-                                            <Users size={13} className="text-purple-400" />
+                                        <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                            <Users size={13} className="text-graphito-violet" />
                                             Asignar a Grupo (Opcional)
                                         </label>
                                         <select
                                             value={selectedGroupId || ""}
                                             onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-surface border border-line-subtle text-content-primary text-xs focus:outline-none focus:border-cyan-500 transition-colors"
+                                            className="w-full bg-slate-50 dark:bg-[#121827] border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-xl py-3 px-4 focus:outline-none focus:border-graphito-blue text-sm cursor-pointer transition-colors"
                                         >
-                                            <option value="">Sin grupo (Entrega libre)</option>
+                                            <option value="" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Sin grupo (Entrega libre)</option>
                                             {groups.map((g) => (
-                                                <option key={g.id} value={g.id}>
+                                                <option key={g.id} value={g.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                                                     [{g.codigo_grupo}] {g.nombre}
                                                 </option>
                                             ))}
@@ -366,10 +367,10 @@ export function BulkUploadModal({
                                     }}
                                     onDragLeave={() => setIsDragging(false)}
                                     onDrop={handleDrop}
-                                    className={`p-6 rounded-2xl border-2 border-dashed text-center transition-all duration-200 ${
+                                    className={`p-6 rounded-2xl border-2 border-dashed text-center transition-colors ${
                                         isDragging
-                                            ? "border-cyan-400 bg-cyan-500/10"
-                                            : "border-line-subtle hover:border-line-strong bg-surface/50"
+                                            ? "border-graphito-blue bg-graphito-blue/10"
+                                            : "border-slate-200 dark:border-[#2b3346] bg-slate-50 dark:bg-[#121827]/30 hover:bg-slate-100 dark:hover:bg-[#121827]/50"
                                     }`}
                                 >
                                     <input
@@ -393,14 +394,14 @@ export function BulkUploadModal({
                                     />
 
                                     <div className="flex flex-col items-center justify-center space-y-3">
-                                        <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                                            <UploadCloud size={24} />
+                                        <div className="w-10 h-10 rounded-xl bg-graphito-blue/10 flex items-center justify-center text-graphito-blue">
+                                            <UploadCloud size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-semibold text-content-primary">
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
                                                 Arrastra aquí las entregas de tus estudiantes
                                             </p>
-                                            <p className="text-xs text-content-muted mt-1">
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
                                                 Archivos de C/C++ (.c, .cpp, .cc). Puedes seleccionar múltiples archivos o carpetas completas.
                                             </p>
                                         </div>
@@ -408,17 +409,17 @@ export function BulkUploadModal({
                                             <button
                                                 type="button"
                                                 onClick={() => filesInputRef.current?.click()}
-                                                className="px-3.5 py-1.5 rounded-xl bg-surface-elevated border border-line-subtle text-xs font-semibold text-content-secondary hover:text-content-primary transition-colors"
+                                                className="px-4 py-2 rounded-xl bg-white dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346] text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/50 transition-all"
                                             >
-                                                Seleccionar Archivos
+                                                Seleccionar archivos
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => folderInputRef.current?.click()}
-                                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-semibold text-purple-400 hover:text-purple-300 transition-colors"
+                                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-graphito-violet/10 border border-graphito-violet/30 text-xs font-bold text-graphito-violet hover:bg-graphito-violet/20 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-violet/50 transition-all"
                                             >
                                                 <Folder size={13} />
-                                                Subir Carpeta de Salón
+                                                Subir carpeta de salón
                                             </button>
                                         </div>
                                     </div>
@@ -428,42 +429,42 @@ export function BulkUploadModal({
                                 {files.length > 0 && (
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="font-bold text-content-secondary flex items-center gap-1.5">
-                                                <Sparkles size={14} className="text-cyan-400" />
+                                            <span className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                                <Sparkles size={14} className="text-graphito-blue" />
                                                 Entregas detectadas ({files.length} archivos)
                                             </span>
-                                            <span className="text-[11px] text-content-muted">
+                                            <span className="text-[11px] text-slate-500">
                                                 Puedes editar los nombres de los alumnos si el archivo no coincide.
                                             </span>
                                         </div>
 
-                                        <div className="max-h-48 overflow-y-auto rounded-xl border border-line-subtle divide-y divide-line-subtle custom-scrollbar bg-surface/30">
+                                        <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#2b3346] divide-y divide-slate-200 dark:divide-[#2b3346] custom-scrollbar bg-slate-50 dark:bg-[#121827]/30">
                                             {files.map((item, idx) => (
                                                 <div
                                                     key={idx}
-                                                    className="p-2.5 flex items-center gap-3 hover:bg-surface-elevated/40 transition-colors text-xs"
+                                                    className="p-2.5 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-xs"
                                                 >
-                                                    <FileCode2 size={16} className="text-cyan-400 shrink-0" />
-                                                    <div className="w-1/3 truncate text-content-muted font-mono text-[11px]" title={item.filename}>
+                                                    <FileCode2 size={16} className="text-graphito-blue shrink-0" />
+                                                    <div className="w-1/3 truncate text-slate-500 dark:text-slate-400 font-mono text-[11px]" title={item.filename}>
                                                         {item.filename}
                                                     </div>
                                                     <div className="flex-1 flex items-center gap-1.5">
-                                                        <Edit3 size={12} className="text-content-muted" />
+                                                        <Edit3 size={12} className="text-slate-400" />
                                                         <input
                                                             type="text"
                                                             value={item.authorName}
                                                             onChange={(e) => handleAuthorChange(idx, e.target.value)}
                                                             placeholder="Nombre del alumno"
-                                                            className="w-full px-2 py-1 rounded-lg bg-surface border border-line-subtle text-content-primary text-xs focus:outline-none focus:border-cyan-500"
+                                                            className="w-full px-2 py-1 rounded-lg bg-white dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white text-xs focus:outline-none focus:border-graphito-blue"
                                                         />
                                                     </div>
-                                                    <span className="text-[10px] text-content-muted shrink-0 w-14 text-right">
+                                                    <span className="text-[10px] text-slate-500 shrink-0 w-14 text-right">
                                                         {item.sizeFormatted}
                                                     </span>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRemoveFile(idx)}
-                                                        className="p-1 rounded-lg text-content-muted hover:text-rose-400 transition-colors"
+                                                        className="p-1 rounded-lg text-slate-400 hover:text-red-500 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 transition-all"
                                                         title="Quitar archivo"
                                                     >
                                                         <Trash2 size={14} />
@@ -479,29 +480,28 @@ export function BulkUploadModal({
 
                     {/* Acciones */}
                     {!isUploading && !isCompleted && (
-                        <div className="flex items-center justify-between pt-4 border-t border-line-subtle mt-4">
-                            <span className="text-xs text-content-muted">
+                        <div className="flex items-center justify-between gap-6 px-8 py-6 border-t border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-black/10 shrink-0 transition-colors">
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
                                 {files.length > 0 ? `${files.length} entregas listas para encolar.` : "Selecciona archivos para continuar."}
                             </span>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-6">
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="px-4 py-2 rounded-xl text-xs font-semibold text-content-secondary hover:text-content-primary transition-colors"
+                                    className="text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded-lg px-4 py-2 transition-all"
                                 >
                                     Cancelar
                                 </button>
                                 <GradientButton
                                     onClick={handleStartBatch}
                                     disabled={files.length === 0}
-                                    className="text-xs px-5 py-2"
+                                    className="!py-3 !px-8 disabled:opacity-50"
                                 >
-                                    Iniciar Análisis ({files.length})
+                                    Iniciar análisis ({files.length})
                                 </GradientButton>
                             </div>
                         </div>
-                    )}
-                </AuthCard>
+                    )}                </AuthCard>
             </div>
         </div>
     );
