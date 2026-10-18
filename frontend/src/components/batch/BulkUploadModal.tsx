@@ -68,9 +68,7 @@ export function BulkUploadModal({
                 .then(([probList, grpList]) => {
                     setProblems(probList);
                     setGroups(grpList);
-                    if (preselectedProblemId && probList.some((p) => p.id === preselectedProblemId)) {
-                        setSelectedProblemId(preselectedProblemId);
-                    } else if (!selectedProblemId && probList.length > 0) {
+                    if (!selectedProblemId && probList.length > 0) {
                         setSelectedProblemId(probList[0].id);
                     }
                 })

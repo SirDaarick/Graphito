@@ -4,7 +4,7 @@ import { PaginationControls } from "../components/ui/PaginationControls";
 import { SearchBar } from "../components/layout/SearchBar";
 import { api, Problema, Grupo, CodigoFuente } from "../lib/api";
 import { toComparison } from "../lib/dictamen";
-import { Loader2, UploadCloud } from "lucide-react";
+import { Loader2, UploadCloud, BookOpen } from "lucide-react";
 import { GroupFilterDropdown } from "../components/groups/GroupFilterDropdown";
 import { CreateGroupModal } from "../components/groups/CreateGroupModal";
 import { BulkUploadModal } from "../components/batch/BulkUploadModal";
@@ -23,10 +23,12 @@ interface Reference {
 export function Biblioteca({
     refreshTrigger = 0,
     onCompare,
-    onComparisonClick
+    onComparisonClick,
+    onGoToCatalog
 }: {
     refreshTrigger?: number,
     onCompare?: () => void,
+    onGoToCatalog?: () => void,
     onComparisonClick?: (comparison: Comparison, allComparisons?: Comparison[]) => void
 }) {
     const [currentPage, setCurrentPage] = useState(1);
@@ -197,6 +199,26 @@ export function Biblioteca({
                 <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
                     <Loader2 className="w-8 h-8 animate-spin text-graphito-blue mb-3" />
                     <p className="text-sm font-medium">Cargando soluciones de referencia...</p>
+                </div>
+            ) : references.length === 0 ? (
+                <div className="flex flex-col items-center justify-center border border-graphito-blue/30 rounded-2xl p-10 text-center my-4 bg-gradient-to-br from-graphito-blue/10 to-graphito-violet/10 transition-colors">
+                    <div className="w-12 h-12 rounded-2xl bg-graphito-blue/15 text-graphito-blue flex items-center justify-center mb-4">
+                        <BookOpen size={24} />
+                    </div>
+                    <p className="text-slate-900 dark:text-white font-display font-bold text-xl mb-2">
+                        ¿No sabes por dónde empezar?
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-400 text-sm max-w-md mb-6">
+                        Agrega un código precargado del catálogo y empieza a comparar entregas sin subir tu propio código.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => onGoToCatalog?.()}
+                        className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-graphito-blue to-graphito-violet hover:opacity-95 shadow-md shadow-graphito-blue/20 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/50 transition-all"
+                    >
+                        <BookOpen size={16} />
+                        <span>Ir al catálogo</span>
+                    </button>
                 </div>
             ) : filteredReferences.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-300 dark:border-[#2b3346] rounded-2xl p-8 text-center my-4 bg-white/60 dark:bg-[#121827]/20 transition-colors">

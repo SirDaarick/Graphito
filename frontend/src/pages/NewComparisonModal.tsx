@@ -11,11 +11,9 @@ interface NewComparisonModalProps {
     isOpen: boolean;
     onClose: () => void;
     onAnalysisComplete?: (report: any) => void;
-    /** Problem to preselect when the modal opens (e.g. one adopted from the catalog). */
-    initialProblemId?: number | null;
 }
 
-export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, initialProblemId }: NewComparisonModalProps) {
+export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete }: NewComparisonModalProps) {
     const [problems, setProblems] = useState<Problema[]>([]);
     const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
     const [author, setAuthor] = useState("");
@@ -37,9 +35,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, initia
             // Cargar lista de problemas disponibles
             api.problems.list().then((res) => {
                 setProblems(res);
-                if (initialProblemId && res.some((p) => p.id === initialProblemId)) {
-                    setSelectedProblemId(initialProblemId);
-                } else if (res.length > 0 && !selectedProblemId) {
+                if (res.length > 0 && !selectedProblemId) {
                     setSelectedProblemId(res[0].id);
                 }
             }).catch(() => {});

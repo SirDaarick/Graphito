@@ -93,6 +93,8 @@ export interface Problema {
     enunciado: string;
     lenguaje: string;
     fecha_creacion: string;
+    /** Set when the problem was adopted from the ESCOM catalog. */
+    catalogo_id?: string | null;
 }
 
 export interface Grupo {
@@ -253,6 +255,8 @@ export interface CatalogProgram {
     titulo: string;
     lenguaje: string;
     nombre_archivo: string;
+    /** Syllabus topic the program covers. */
+    tema: string;
 }
 
 export interface CatalogUnit {
@@ -269,6 +273,7 @@ export interface CatalogSubject {
 }
 
 export interface CatalogProgramDetail extends CatalogProgram {
+    descripcion: string;
     materia: string;
     materia_nombre: string;
     unidad: string;

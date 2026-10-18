@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 import { Header, AppSection } from "./components/layout/Header";
 import { Biblioteca } from "./pages/Biblioteca";
 import { Catalogo } from "./pages/Catalogo";
-import { BulkUploadModal } from "./components/batch/BulkUploadModal";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { MouseGlowBackground } from "./components/layout/MouseGlowBackground";
 import { NewReferenceModal } from "./pages/NewReferenceModal";
 import { NewComparisonModal } from "./pages/NewComparisonModal";
 import { SimilarityReportModal } from "./pages/SimilarityReportModal";
-import { api, Docente, Problema, IS_DEMO_MODE } from "./lib/api";
+import { api, Docente, IS_DEMO_MODE } from "./lib/api";
 
 type View = "login" | "register" | "app";
 
@@ -24,9 +23,6 @@ function App() {
     const [isSimilarityReportOpen, setIsSimilarityReportOpen] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [section, setSection] = useState<AppSection>("biblioteca");
-    const [comparisonProblemId, setComparisonProblemId] = useState<number | null>(null);
-    const [isCatalogBulkOpen, setIsCatalogBulkOpen] = useState(false);
-    const [catalogBulkProblemId, setCatalogBulkProblemId] = useState<number | null>(null);
 
     useEffect(() => {
         const verifySession = async () => {
@@ -79,19 +75,6 @@ function App() {
         await handleLogin();
     };
 
-    // Catalog flow: the program was adopted as a problem; open the chosen action on it.
-    const handleCatalogCompare = (problem: Problema) => {
-        setRefreshTrigger((prev) => prev + 1);
-        setComparisonProblemId(problem.id);
-        setIsNewComparisonModalOpen(true);
-    };
-
-    const handleCatalogBulkUpload = (problem: Problema) => {
-        setRefreshTrigger((prev) => prev + 1);
-        setCatalogBulkProblemId(problem.id);
-        setIsCatalogBulkOpen(true);
-    };
-
     const navigateToRegister = () => setView("register");
     const navigateToLogin = () => setView("login");
 
@@ -133,10 +116,8 @@ function App() {
                         {section === "biblioteca" ? (
                             <Biblioteca
                                 refreshTrigger={refreshTrigger}
-                                onCompare={() => {
-                                    setComparisonProblemId(null);
-                                    setIsNewComparisonModalOpen(true);
-                                }}
+                                onCompare={() => setIsNewComparisonModalOpen(true)}
+                                onGoToCatalog={() => setSection("catalogo")}
                                 onComparisonClick={(comp, allComps) => {
                                     setSelectedComparison(comp);
                                     setComparisonList(allComps && allComps.length > 0 ? allComps : [comp]);
@@ -145,8 +126,8 @@ function App() {
                             />
                         ) : (
                             <Catalogo
-                                onCompare={handleCatalogCompare}
-                                onBulkUpload={handleCatalogBulkUpload}
+                                onProgramAdded={() => setRefreshTrigger((prev) => prev + 1)}
+                                onGoToBiblioteca={() => setSection("biblioteca")}
                             />
                         )}
                         <NewReferenceModal
@@ -156,7 +137,6 @@ function App() {
                         />
                         <NewComparisonModal
                             isOpen={isNewComparisonModalOpen}
-                            initialProblemId={comparisonProblemId}
                             onClose={() => setIsNewComparisonModalOpen(false)}
                             onAnalysisComplete={(report) => {
                                 setSelectedComparison(report);
@@ -164,12 +144,6 @@ function App() {
                                 setIsSimilarityReportOpen(true);
                                 setRefreshTrigger((prev) => prev + 1);
                             }}
-                        />
-                        <BulkUploadModal
-                            isOpen={isCatalogBulkOpen}
-                            onClose={() => setIsCatalogBulkOpen(false)}
-                            onBatchComplete={() => setRefreshTrigger((prev) => prev + 1)}
-                            preselectedProblemId={catalogBulkProblemId}
                         />
                         <SimilarityReportModal
                             isOpen={isSimilarityReportOpen}

@@ -574,17 +574,21 @@ const demoCatalogEntry = (
     titulo: string,
     lenguaje: "c" | "cpp",
     nombre_archivo: string,
+    tema: string,
+    descripcion: string,
     materia: string,
     materia_nombre: string,
     unidad: string,
     unidad_nombre: string,
     codigo: string,
 ): CatalogProgramDetail => ({
-    id, titulo, lenguaje, nombre_archivo, materia, materia_nombre, unidad, unidad_nombre, codigo,
+    id, titulo, lenguaje, nombre_archivo, tema, descripcion, materia, materia_nombre, unidad, unidad_nombre, codigo,
 });
 
 const DEMO_CATALOG_ENTRIES: CatalogProgramDetail[] = [
     demoCatalogEntry("demo-ed-u1-pila", "Pila con arreglo", "c", "pila_arreglo.c",
+        "Pilas: operaciones push y pop",
+        "Implementa una pila de enteros con un arreglo de tamaño fijo, con las operaciones push y pop y control de desbordamiento.",
         "estructuras_de_datos", "Estructuras de Datos", "unidad_1", "Unidad 1: Pilas y colas",
         `#include <stdio.h>
 
@@ -609,6 +613,8 @@ int main(void) {
 }
 `),
     demoCatalogEntry("demo-ed-u1-cola", "Cola circular", "c", "cola_circular.c",
+        "Colas circulares",
+        "Implementa una cola circular sobre un arreglo, reutilizando posiciones con aritmética modular para encolar y desencolar.",
         "estructuras_de_datos", "Estructuras de Datos", "unidad_1", "Unidad 1: Pilas y colas",
         `#include <stdio.h>
 
@@ -637,6 +643,8 @@ int main(void) {
 }
 `),
     demoCatalogEntry("demo-ed-u2-lista", "Lista enlazada simple", "c", "lista_simple.c",
+        "Listas enlazadas simples",
+        "Construye una lista enlazada simple con memoria dinámica, insertando nodos al inicio y recorriéndola para imprimir sus datos.",
         "estructuras_de_datos", "Estructuras de Datos", "unidad_2", "Unidad 2: Listas",
         `#include <stdio.h>
 #include <stdlib.h>
@@ -660,6 +668,8 @@ int main(void) {
 }
 `),
     demoCatalogEntry("demo-ed-u2-busqueda", "Busqueda binaria", "c", "busqueda_binaria.c",
+        "Búsqueda sobre estructuras ordenadas",
+        "Busca un elemento en un arreglo ordenado dividiendo el intervalo a la mitad en cada paso.",
         "estructuras_de_datos", "Estructuras de Datos", "unidad_2", "Unidad 2: Listas",
         `#include <stdio.h>
 
@@ -681,6 +691,8 @@ int main(void) {
 }
 `),
     demoCatalogEntry("demo-pa-u1-fib", "Fibonacci con memoizacion", "cpp", "fibonacci_memo.cpp",
+        "Memoización y programación dinámica",
+        "Calcula números de Fibonacci evitando recálculos mediante una tabla de memoización con std::vector.",
         "programacion_avanzada", "Programación Avanzada", "unidad_1", "Unidad 1: Programación dinámica",
         `#include <iostream>
 #include <vector>
@@ -698,6 +710,8 @@ int main() {
 }
 `),
     demoCatalogEntry("demo-pa-u2-bfs", "Recorrido BFS", "cpp", "bfs.cpp",
+        "Recorrido de grafos en anchura",
+        "Recorre un grafo representado con listas de adyacencia usando una cola y un arreglo de visitados.",
         "programacion_avanzada", "Programación Avanzada", "unidad_2", "Unidad 2: Grafos",
         `#include <iostream>
 #include <queue>
@@ -744,7 +758,7 @@ export const DEMO_CATALOG: CatalogSubject[] = DEMO_CATALOG_ENTRIES.reduce<Catalo
         unit = { unidad: e.unidad, unidad_nombre: e.unidad_nombre, programas: [] };
         subject.unidades.push(unit);
     }
-    unit.programas.push({ id: e.id, titulo: e.titulo, lenguaje: e.lenguaje, nombre_archivo: e.nombre_archivo });
+    unit.programas.push({ id: e.id, titulo: e.titulo, lenguaje: e.lenguaje, nombre_archivo: e.nombre_archivo, tema: e.tema });
     subject.total += 1;
     return subjects;
 }, []);
