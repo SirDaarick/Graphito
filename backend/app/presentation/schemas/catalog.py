@@ -7,6 +7,7 @@ class CatalogEntrySummary(BaseModel):
     titulo: str
     lenguaje: str
     nombre_archivo: str
+    tema: str
 
 
 class CatalogUnit(BaseModel):
@@ -28,3 +29,4 @@ class CatalogEntryDetail(CatalogEntrySummary):
     unidad: str
     unidad_nombre: str
     codigo: str
+    descripcion: str

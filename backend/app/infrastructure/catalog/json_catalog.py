@@ -13,7 +13,6 @@ MATERIA_NAMES = {
     "algoritmos_estructuras_datos": "Algoritmos y Estructuras de Datos",
     "analisis_diseño_algoritmos": "Análisis y Diseño de Algoritmos",
     "fundamentos_programación": "Fundamentos de Programación",
-    "paradigmas_programación": "Paradigmas de Programación",
 }
 
 _UNIT_RE = re.compile(r"^Unidad_([IVXLC]+)_(.+)$")
@@ -46,6 +45,8 @@ class CatalogEntry:
     lenguaje: str
     nombre_archivo: str
     codigo: str
+    descripcion: str
+    tema: str
 
 
 def _slug(text: str) -> str:
@@ -92,6 +93,8 @@ def load_catalog() -> Tuple[CatalogEntry, ...]:
                 lenguaje=item["lenguaje"],
                 nombre_archivo=item["nombre_archivo"],
                 codigo=item["codigo"],
+                descripcion=item["descripcion"],
+                tema=item["tema"],
             )
         )
     return tuple(entries)

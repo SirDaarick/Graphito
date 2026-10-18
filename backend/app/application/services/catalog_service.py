@@ -47,7 +47,11 @@ class CatalogService:
                 subject.unidades.append(unit)
             unit.programas.append(
                 CatalogEntrySummary(
-                    id=entry.id, titulo=entry.titulo, lenguaje=entry.lenguaje, nombre_archivo=entry.nombre_archivo
+                    id=entry.id,
+                    titulo=entry.titulo,
+                    lenguaje=entry.lenguaje,
+                    nombre_archivo=entry.nombre_archivo,
+                    tema=entry.tema,
                 )
             )
             subject.total += 1
@@ -73,6 +77,8 @@ class CatalogService:
             unidad=entry.unidad,
             unidad_nombre=entry.unidad_nombre,
             codigo=entry.codigo,
+            descripcion=entry.descripcion,
+            tema=entry.tema,
         )
 
     async def use_entry(self, docente_id: int, entry_id: str) -> ProblemaResponse:
@@ -92,7 +98,10 @@ class CatalogService:
         problema = Problema(
             docente_id=docente_id,
             titulo=entry.titulo,
-            enunciado=f"Programa del catálogo ESCOM — {entry.materia_nombre} / {entry.unidad_nombre}",
+            enunciado=(
+                f"{entry.descripcion}\n\n"
+                f"Parte del temario: {entry.unidad_nombre} — {entry.tema} ({entry.materia_nombre})."
+            ),
             lenguaje=entry.lenguaje,
             catalogo_id=entry.id,
         )

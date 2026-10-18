@@ -33,8 +33,9 @@ async def test_list_catalog_grouped_without_code(client: AsyncClient):
     res = await client.get(CATALOG, headers=headers)
     assert res.status_code == 200, res.text
     subjects = res.json()
-    assert len(subjects) == 4
-    assert sum(s["total"] for s in subjects) == 124
+    assert len(subjects) == 3
+    assert sum(s["total"] for s in subjects) == 84
+    assert not any("paradigmas" in s["materia"] for s in subjects)
 
     ids = []
     for subject in subjects:
@@ -43,11 +44,13 @@ async def test_list_catalog_grouped_without_code(client: AsyncClient):
             assert unit["unidad_nombre"]
             for program in unit["programas"]:
                 assert "codigo" not in program
+                assert "descripcion" not in program
+                assert program["tema"].strip()
                 ids.append(program["id"])
                 count += 1
         assert count == subject["total"]
-    assert len(ids) == 124
-    assert len(set(ids)) == 124
+    assert len(ids) == 84
+    assert len(set(ids)) == 84
 
 
 @pytest.mark.asyncio
@@ -73,6 +76,7 @@ async def test_get_entry_returns_code_and_language(client: AsyncClient):
     assert body["codigo"].strip()
     assert body["titulo"] == "Arbol binario inorden iterativo"
     assert body["materia_nombre"] and body["unidad_nombre"]
+    assert body["descripcion"].strip() and body["tema"].strip()
 
     c = await client.get(f"{CATALOG}{c_id}", headers=headers)
     assert c.status_code == 200
@@ -116,6 +120,39 @@ async def test_use_creates_problem_and_reference(client: AsyncClient, vector_sto
     assert metadata["tipo"] == "REFERENCIA"
     assert metadata["lenguaje"] == "cpp"
     assert metadata["autor"] == "Catálogo ESCOM"
+
+
+@pytest.mark.asyncio
+async def test_use_builds_statement_from_description_and_syllabus(client: AsyncClient):
+    headers = await _headers(client)
+    entry_id = await _find_id(client, headers, C_FILE)
+    detail = (await client.get(f"{CATALOG}{entry_id}", headers=headers)).json()
+
+    problem = (await client.post(f"{CATALOG}{entry_id}/use", headers=headers)).json()
+    assert problem["enunciado"].startswith(detail["descripcion"])
+    assert "Parte del temario" in problem["enunciado"]
+    assert detail["tema"] in problem["enunciado"]
+    assert detail["unidad_nombre"] in problem["enunciado"]
+    assert detail["materia_nombre"] in problem["enunciado"]
+
+
+@pytest.mark.asyncio
+async def test_problems_list_exposes_catalog_id_only_for_adopted(client: AsyncClient):
+    headers = await _headers(client)
+    entry_id = await _find_id(client, headers, C_FILE)
+    await client.post(f"{CATALOG}{entry_id}/use", headers=headers)
+    created = await client.post(
+        "/api/v1/problems/",
+        headers=headers,
+        json={"titulo": "Normal", "enunciado": "Un problema normal", "lenguaje": "c"},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["catalogo_id"] is None
+
+    listed = (await client.get("/api/v1/problems/", headers=headers)).json()
+    by_title = {p["titulo"]: p for p in listed}
+    assert by_title["Arbol binario recorridos recursivo"]["catalogo_id"] == entry_id
+    assert by_title["Normal"]["catalogo_id"] is None
 
 
 @pytest.mark.asyncio

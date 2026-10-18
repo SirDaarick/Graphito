@@ -24,3 +24,4 @@ class ProblemaResponse(BaseModel):
     enunciado: str
     lenguaje: str
     fecha_creacion: datetime
+    catalogo_id: Optional[str] = None
