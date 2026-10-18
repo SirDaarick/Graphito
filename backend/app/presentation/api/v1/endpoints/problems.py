@@ -27,11 +27,41 @@ async def create_problem(
 
 @router.get("/", response_model=List[ProblemaResponse])
 async def list_problems(
+    include_archived: bool = False,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
     service = ProblemService(db)
-    return await service.list_problems(current_user.id)
+    return await service.list_problems(current_user.id, include_archived)
+
+
+@router.post("/{problem_id}/archive", response_model=ProblemaResponse)
+async def archive_problem(
+    problem_id: int,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+):
+    return await ProblemService(db).set_archived(current_user.id, problem_id, True)
+
+
+@router.post("/{problem_id}/unarchive", response_model=ProblemaResponse)
+async def unarchive_problem(
+    problem_id: int,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+):
+    return await ProblemService(db).set_archived(current_user.id, problem_id, False)
+
+
+@router.delete("/{problem_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_problem(
+    problem_id: int,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+    vector_store: VectorStorePort = Depends(get_vector_store),
+):
+    await ProblemService(db, vector_store=vector_store).delete_problem(current_user.id, problem_id)
+    return None
 
 
 @router.get("/{problem_id}", response_model=ProblemaResponse)

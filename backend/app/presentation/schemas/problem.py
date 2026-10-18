@@ -25,3 +25,4 @@ class ProblemaResponse(BaseModel):
     lenguaje: str
     fecha_creacion: datetime
     catalogo_id: Optional[str] = None
+    archivado: bool = False

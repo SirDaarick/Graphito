@@ -1,11 +1,20 @@
 import logging
 from typing import List, Optional
 import uuid
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-from app.infrastructure.database.models import Problema, CodigoFuente, ReporteAnalisis, TipoCodigoEnum
+from app.infrastructure.database.models import (
+    CodigoFuente,
+    ComentarioRevision,
+    GrupoProblema,
+    IndicadorIntegridad,
+    LoteAnalisis,
+    Problema,
+    ReporteAnalisis,
+    TipoCodigoEnum,
+)
 from app.domain.errors import InferenceError, VectorStoreError
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
@@ -40,10 +49,80 @@ class ProblemService:
         await self.db.refresh(problema)
         return ProblemaResponse.model_validate(problema)
 
-    async def list_problems(self, docente_id: int) -> List[ProblemaResponse]:
-        result = await self.db.execute(select(Problema).where(Problema.docente_id == docente_id))
+    async def list_problems(
+        self, docente_id: int, include_archived: bool = False
+    ) -> List[ProblemaResponse]:
+        stmt = select(Problema).where(Problema.docente_id == docente_id)
+        if not include_archived:
+            stmt = stmt.where(Problema.archivado.is_(False))
+        result = await self.db.execute(stmt)
         problemas = result.scalars().all()
         return [ProblemaResponse.model_validate(p) for p in problemas]
+
+    async def set_archived(self, docente_id: int, problema_id: int, archived: bool) -> ProblemaResponse:
+        problema = await self.get_problem(docente_id, problema_id)
+        problema.archivado = archived
+        await self.db.commit()
+        await self.db.refresh(problema)
+        return ProblemaResponse.model_validate(problema)
+
+    async def delete_problem(self, docente_id: int, problema_id: int) -> None:
+        """Delete a problem with its submissions, reports, batches, assignments and reference vectors.
+
+        Vectors go first: if the store fails nothing is deleted (`VectorStoreError`, 503) and the
+        teacher can retry. A failure after that leaves rows without vectors, which is harmless
+        because queries are scoped by `problema_id`.
+        """
+        await self.get_problem(docente_id, problema_id)
+
+        code_ids = (
+            await self.db.execute(select(CodigoFuente.id).where(CodigoFuente.problema_id == problema_id))
+        ).scalars().all()
+        reference_ids = (
+            await self.db.execute(
+                select(CodigoFuente.id).where(
+                    CodigoFuente.problema_id == problema_id,
+                    CodigoFuente.tipo == TipoCodigoEnum.REFERENCIA,
+                )
+            )
+        ).scalars().all()
+
+        if reference_ids:
+            if self.vector_store is None:
+                raise VectorStoreError("vector_store_unavailable", "no vector store configured")
+            for reference_id in reference_ids:
+                try:
+                    await self.vector_store.delete_reference(str(reference_id))
+                except VectorStoreError:
+                    raise
+                except Exception as exc:
+                    raise VectorStoreError(
+                        "vector_store_delete_failed", f"{type(exc).__name__}: {exc}"
+                    ) from exc
+
+        # Explicit deletes: they do not depend on the DB enforcing ON DELETE (SQLite does not).
+        if code_ids:
+            report_ids = select(ReporteAnalisis.id).where(
+                or_(
+                    ReporteAnalisis.entrega_id.in_(code_ids),
+                    ReporteAnalisis.referencia_id.in_(code_ids),
+                )
+            )
+            await self.db.execute(delete(IndicadorIntegridad).where(IndicadorIntegridad.reporte_id.in_(report_ids)))
+            await self.db.execute(delete(ComentarioRevision).where(ComentarioRevision.reporte_id.in_(report_ids)))
+            await self.db.execute(
+                delete(ReporteAnalisis).where(
+                    or_(
+                        ReporteAnalisis.entrega_id.in_(code_ids),
+                        ReporteAnalisis.referencia_id.in_(code_ids),
+                    )
+                )
+            )
+            await self.db.execute(delete(CodigoFuente).where(CodigoFuente.id.in_(code_ids)))
+        await self.db.execute(delete(LoteAnalisis).where(LoteAnalisis.problema_id == problema_id))
+        await self.db.execute(delete(GrupoProblema).where(GrupoProblema.problema_id == problema_id))
+        await self.db.execute(delete(Problema).where(Problema.id == problema_id))
+        await self.db.commit()
 
     async def get_problem(self, docente_id: int, problema_id: int) -> Problema:
         result = await self.db.execute(

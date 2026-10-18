@@ -45,6 +45,7 @@ class GrupoResponse(BaseModel):
     periodo: str
     descripcion: Optional[str] = None
     created_at: datetime
+    archivado: bool = False
     total_problemas: Optional[int] = 0
     total_entregas: Optional[int] = 0
 

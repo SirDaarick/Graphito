@@ -93,6 +93,10 @@ class CatalogService:
         )
         problema = existing.scalars().first()
         if problema is not None:
+            if problema.archivado:
+                problema.archivado = False
+                await self.db.commit()
+                await self.db.refresh(problema)
             return ProblemaResponse.model_validate(problema)
 
         problema = Problema(

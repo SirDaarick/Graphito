@@ -40,11 +40,39 @@ async def create_group(
 
 @router.get("/", response_model=List[GrupoResponse])
 async def list_groups(
+    include_archived: bool = False,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
     service = GroupService(db)
-    return await service.list_groups(current_user.id)
+    return await service.list_groups(current_user.id, include_archived)
+
+
+async def _group_response(service: GroupService, docente_id: int, group_id: int) -> GrupoResponse:
+    grupos = await service.list_groups(docente_id, include_archived=True)
+    return next(g for g in grupos if g.id == group_id)
+
+
+@router.post("/{group_id}/archive", response_model=GrupoResponse)
+async def archive_group(
+    group_id: int,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GroupService(db)
+    await service.set_archived(current_user.id, group_id, True)
+    return await _group_response(service, current_user.id, group_id)
+
+
+@router.post("/{group_id}/unarchive", response_model=GrupoResponse)
+async def unarchive_group(
+    group_id: int,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+):
+    service = GroupService(db)
+    await service.set_archived(current_user.id, group_id, False)
+    return await _group_response(service, current_user.id, group_id)
 
 
 @router.get("/{group_id}", response_model=GrupoDetailResponse)

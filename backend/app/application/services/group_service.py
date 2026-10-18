@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
@@ -9,6 +9,7 @@ from app.infrastructure.database.models import (
     GrupoProblema,
     Problema,
     CodigoFuente,
+    LoteAnalisis,
     TipoCodigoEnum,
 )
 from app.presentation.schemas.group import GrupoCreate, GrupoUpdate, GrupoResponse
@@ -46,7 +47,9 @@ class GroupService:
         await self.db.refresh(nuevo_grupo)
         return nuevo_grupo
 
-    async def list_groups(self, docente_id: int) -> List[GrupoResponse]:
+    async def list_groups(
+        self, docente_id: int, include_archived: bool = False
+    ) -> List[GrupoResponse]:
         stmt = (
             select(Grupo)
             .options(
@@ -56,6 +59,8 @@ class GroupService:
             .where(Grupo.docente_id == docente_id)
             .order_by(Grupo.created_at.desc())
         )
+        if not include_archived:
+            stmt = stmt.where(Grupo.archivado.is_(False))
         res = await self.db.execute(stmt)
         grupos = res.scalars().all()
 
@@ -77,6 +82,7 @@ class GroupService:
                     periodo=g.periodo,
                     descripcion=g.descripcion,
                     created_at=g.created_at,
+                    archivado=g.archivado,
                     total_problemas=total_problemas,
                     total_entregas=total_entregas,
                 )
@@ -116,8 +122,17 @@ class GroupService:
         await self.db.refresh(grupo)
         return grupo
 
+    async def set_archived(self, docente_id: int, group_id: int, archived: bool) -> Grupo:
+        grupo = await self.get_group(docente_id, group_id)
+        grupo.archivado = archived
+        await self.db.commit()
+        await self.db.refresh(grupo)
+        return grupo
+
     async def delete_group(self, docente_id: int, group_id: int) -> bool:
         grupo = await self.get_group(docente_id, group_id)
+        # Detach batches explicitly; submissions are nullified by the ORM and the DB (SET NULL).
+        await self.db.execute(update(LoteAnalisis).where(LoteAnalisis.grupo_id == group_id).values(grupo_id=None))
         await self.db.delete(grupo)
         await self.db.commit()
         return True
@@ -142,6 +157,11 @@ class GroupService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Problema con ID {problema_id} no encontrado en tu biblioteca.",
+            )
+        if problema.archivado:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El problema está archivado. Desarchívalo para asignarlo a un grupo.",
             )
 
         # 3. Validar si ya está asignado

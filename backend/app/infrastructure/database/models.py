@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     Uuid,
     Boolean,
+    false,
 )
 from sqlalchemy.orm import relationship
 from app.infrastructure.database.session import Base
@@ -73,6 +74,7 @@ class Grupo(Base):
     codigo_grupo = Column(String(50), nullable=False)
     periodo = Column(String(50), nullable=False)
     descripcion = Column(Text, nullable=True)
+    archivado = Column(Boolean, default=False, nullable=False, server_default=false())
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     docente = relationship("Docente", back_populates="grupos")
@@ -103,6 +105,7 @@ class Problema(Base):
     enunciado = Column(Text, nullable=False)
     lenguaje = Column(String(50), default="c", nullable=False)  # "c" o "cpp"
     catalogo_id = Column(String(255), nullable=True, index=True)  # id del programa del catálogo ESCOM
+    archivado = Column(Boolean, default=False, nullable=False, server_default=false())
     fecha_creacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     docente = relationship("Docente", back_populates="problemas")

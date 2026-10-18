@@ -95,6 +95,10 @@ ALTER TABLE indicadores_integridad ADD COLUMN IF NOT EXISTS categoria VARCHAR(50
 ALTER TABLE problemas ADD COLUMN IF NOT EXISTS catalogo_id VARCHAR(255);
 CREATE INDEX IF NOT EXISTS ix_problemas_catalogo_id ON problemas(catalogo_id);
 
+-- 7c. ARCHIVADO DE PROBLEMAS Y GRUPOS (ocultos por defecto, reversible)
+ALTER TABLE problemas ADD COLUMN IF NOT EXISTS archivado BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS archivado BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- 8. INTEGRACIÓN DE MODELOS (SDD-4): puntajes anulables, procedencia y dictámenes nuevos
 -- apply_migrations.py ejecuta cada sentencia sola en AUTOCOMMIT y se detiene en el primer error.
 -- ADD VALUE va fuera de un bloque de transacción (requisito de PostgreSQL).
