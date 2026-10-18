@@ -69,7 +69,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         let errorMessage = `HTTP Error ${response.status}`;
         try {
             const errData = await response.json();
-            errorMessage = errData.detail || errorMessage;
+            errorMessage = typeof errData.detail === "string" && errData.detail ? errData.detail : errorMessage;
         } catch {
             // fallback
         }
@@ -357,19 +357,19 @@ export const api = {
             if (IS_DEMO_MODE) {
                 throw new ApiError(403, DEMO_READ_ONLY);
             }
-            return request<Problema>("/problems/${id}/archive", { method: "POST" });
+            return request<Problema>(`/problems/${id}/archive`, { method: "POST" });
         },
         async unarchive(id: number): Promise<Problema> {
             if (IS_DEMO_MODE) {
                 throw new ApiError(403, DEMO_READ_ONLY);
             }
-            return request<Problema>("/problems/${id}/unarchive", { method: "POST" });
+            return request<Problema>(`/problems/${id}/unarchive`, { method: "POST" });
         },
         async delete(id: number): Promise<void> {
             if (IS_DEMO_MODE) {
                 throw new ApiError(403, DEMO_READ_ONLY);
             }
-            return request<void>("/problems/${id}", { method: "DELETE" });
+            return request<void>(`/problems/${id}`, { method: "DELETE" });
         },
         async create(titulo: string, enunciado: string, lenguaje = "c"): Promise<Problema> {
             if (IS_DEMO_MODE) {
@@ -627,13 +627,13 @@ export const api = {
             if (IS_DEMO_MODE) {
                 throw new ApiError(403, DEMO_READ_ONLY);
             }
-            return request<Grupo>("/groups/${groupId}/archive", { method: "POST" });
+            return request<Grupo>(`/groups/${groupId}/archive`, { method: "POST" });
         },
         async unarchive(groupId: number): Promise<Grupo> {
             if (IS_DEMO_MODE) {
                 throw new ApiError(403, DEMO_READ_ONLY);
             }
-            return request<Grupo>("/groups/${groupId}/unarchive", { method: "POST" });
+            return request<Grupo>(`/groups/${groupId}/unarchive`, { method: "POST" });
         },
         async create(data: {
             nombre: string;

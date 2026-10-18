@@ -106,7 +106,7 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }: CreateGrou
                             </div>
                             <div>
                                 <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white">
-                                    Nuevo curso / grupo académico
+                                    Nuevo curso o grupo
                                 </h2>
                                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                     Organiza tus entregas por semestre y salón escolar.
