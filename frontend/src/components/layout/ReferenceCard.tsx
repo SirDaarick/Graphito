@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react"
-import { Calendar, GitCompare, ChevronDown, Plus, ShieldCheck, HelpCircle } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Calendar, GitCompare, ChevronDown, Plus, ShieldCheck, HelpCircle, MoreVertical, Users, Archive, ArchiveRestore, Trash2 } from "lucide-react"
 import { GradientButton } from "../ui/GradientButton"
 import { cn } from "../../lib/utils";
 import { getSavedVerdicts, VerdictType } from "../../lib/verdicts";
@@ -27,6 +27,10 @@ interface ReferenceCardProps {
     comparisons: Comparison[]
     onCompare?: () => void
     onComparisonClick?: (comparison: Comparison, allComparisons?: Comparison[]) => void
+    archived?: boolean
+    onAssignToGroup?: () => void
+    onToggleArchive?: () => void
+    onDelete?: () => void
 }
 
 // Mapeamos los colores de categoría a tu paleta
@@ -46,8 +50,38 @@ export function ReferenceCard({
     comparisons,
     onCompare,
     onComparisonClick,
+    archived = false,
+    onAssignToGroup,
+    onToggleArchive,
+    onDelete,
 }: ReferenceCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const hasActions = Boolean(onAssignToGroup || onToggleArchive || onDelete);
+
+    useEffect(() => {
+        if (!isMenuOpen) return;
+        const onDown = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setIsMenuOpen(false);
+        };
+        document.addEventListener("mousedown", onDown);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onDown);
+            document.removeEventListener("keydown", onKey);
+        };
+    }, [isMenuOpen]);
+
+    const runAction = (action?: () => void) => {
+        setIsMenuOpen(false);
+        action?.();
+    };
     const [verdicts, setVerdicts] = useState<Record<string, VerdictType>>(() => getSavedVerdicts());
 
     useEffect(() => {
@@ -59,7 +93,10 @@ export function ReferenceCard({
     }, []);
 
     return (
-        <div className="mb-6 bg-white dark:bg-graphito-card border border-slate-200 dark:border-graphito-border rounded-2xl overflow-hidden transition-all hover:shadow-lg hover:shadow-graphito-blue/5">
+        <div className={cn(
+            "mb-6 bg-white dark:bg-graphito-card border border-slate-200 dark:border-graphito-border rounded-2xl transition-all hover:shadow-lg hover:shadow-graphito-blue/5",
+            archived && "opacity-70"
+        )}>
             <div className="p-6">
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-3">
@@ -71,6 +108,11 @@ export function ReferenceCard({
                             )}>
                                 {category}
                             </span>
+                            {archived && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/30">
+                                    Archivado
+                                </span>
+                            )}
                         </div>
                         <p className="font-body text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl">
                             {description}
@@ -93,6 +135,65 @@ export function ReferenceCard({
                             <Plus className="h-4 w-4" />
                             <span>Comparar</span>
                         </GradientButton>
+
+                        {hasActions && (
+                            <div className="relative" ref={menuRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                    className="p-2.5 min-w-11 min-h-11 bg-slate-100 hover:bg-slate-200 dark:bg-graphito-dark dark:hover:bg-graphito-border text-slate-600 dark:text-slate-400 rounded-xl transition-all duration-300 focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                                    aria-label="Más acciones"
+                                    aria-haspopup="menu"
+                                    aria-expanded={isMenuOpen}
+                                >
+                                    <MoreVertical className="h-5 w-5" />
+                                </button>
+                                {isMenuOpen && (
+                                    <div
+                                        role="menu"
+                                        className="absolute right-0 z-30 mt-2 w-56 rounded-xl bg-white dark:bg-graphito-card border border-slate-200 dark:border-graphito-border shadow-xl p-1.5"
+                                    >
+                                        {onAssignToGroup && !archived && (
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => runAction(onAssignToGroup)}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-graphito-dark transition-colors text-left"
+                                            >
+                                                <Users className="h-4 w-4 text-graphito-blue" />
+                                                Asignar a grupo
+                                            </button>
+                                        )}
+                                        {onToggleArchive && (
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => runAction(onToggleArchive)}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-graphito-dark transition-colors text-left"
+                                            >
+                                                {archived ? (
+                                                    <ArchiveRestore className="h-4 w-4 text-graphito-violet" />
+                                                ) : (
+                                                    <Archive className="h-4 w-4 text-graphito-violet" />
+                                                )}
+                                                {archived ? "Desarchivar" : "Archivar"}
+                                            </button>
+                                        )}
+                                        {onDelete && (
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => runAction(onDelete)}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                Eliminar
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Users, ChevronDown, Check, Plus, FolderKanban } from "lucide-react";
+import { Users, ChevronDown, Check, Plus, FolderKanban, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { Grupo } from "../../lib/api";
 
 interface GroupFilterDropdownProps {
@@ -7,6 +7,10 @@ interface GroupFilterDropdownProps {
     selectedGroupId: number | null; // null = Todos los grupos
     onSelectGroup: (groupId: number | null) => void;
     onCreateGroupClick: () => void;
+    /** Archive, unarchive and delete are offered only when the matching handler is given. */
+    onArchiveGroup?: (group: Grupo) => void;
+    onUnarchiveGroup?: (group: Grupo) => void;
+    onDeleteGroup?: (group: Grupo) => void;
 }
 
 export function GroupFilterDropdown({
@@ -14,6 +18,9 @@ export function GroupFilterDropdown({
     selectedGroupId,
     onSelectGroup,
     onCreateGroupClick,
+    onArchiveGroup,
+    onUnarchiveGroup,
+    onDeleteGroup,
 }: GroupFilterDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -92,33 +99,82 @@ export function GroupFilterDropdown({
                         ) : (
                             groups.map((group) => {
                                 const isSelected = group.id === selectedGroupId;
+                                const archived = Boolean(group.archivado);
                                 return (
-                                    <button
+                                    <div
                                         key={group.id}
-                                        type="button"
-                                        onClick={() => {
-                                            onSelectGroup(group.id);
-                                            setIsOpen(false);
-                                        }}
-                                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left ${
+                                        className={`group/row flex items-center rounded-xl transition-colors ${
                                             isSelected
-                                                ? "bg-cyan-500/15 text-cyan-400 font-semibold"
-                                                : "text-content-secondary hover:text-content-primary hover:bg-surface-elevated"
-                                        }`}
+                                                ? "bg-cyan-500/15"
+                                                : "hover:bg-surface-elevated"
+                                        } ${archived ? "opacity-70" : ""}`}
                                     >
-                                        <div className="truncate pr-2">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="font-mono font-bold text-[11px] text-cyan-400">
-                                                    [{group.codigo_grupo}]
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                onSelectGroup(group.id);
+                                                setIsOpen(false);
+                                            }}
+                                            className={`flex-1 min-w-0 flex items-center justify-between px-3 py-2 text-xs text-left ${
+                                                isSelected
+                                                    ? "text-cyan-400 font-semibold"
+                                                    : "text-content-secondary hover:text-content-primary"
+                                            }`}
+                                        >
+                                            <div className="truncate pr-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-mono font-bold text-[11px] text-cyan-400">
+                                                        [{group.codigo_grupo}]
+                                                    </span>
+                                                    <span className="truncate font-medium">{group.nombre}</span>
+                                                    {archived && (
+                                                        <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border bg-slate-500/10 text-content-muted border-slate-500/30">
+                                                            Archivado
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-[10px] text-content-muted block mt-0.5">
+                                                    Periodo: {group.periodo} • {group.total_entregas || 0} entregas
                                                 </span>
-                                                <span className="truncate font-medium">{group.nombre}</span>
                                             </div>
-                                            <span className="text-[10px] text-content-muted block mt-0.5">
-                                                Periodo: {group.periodo} • {group.total_entregas || 0} entregas
-                                            </span>
+                                            {isSelected && <Check size={14} className="text-cyan-400 shrink-0" />}
+                                        </button>
+                                        <div className="flex items-center gap-0.5 pr-1.5 shrink-0">
+                                            {archived && onUnarchiveGroup && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onUnarchiveGroup(group)}
+                                                    title="Desarchivar grupo"
+                                                    aria-label={`Desarchivar ${group.nombre}`}
+                                                    className="p-1.5 rounded-lg text-content-muted hover:text-cyan-400 transition-colors"
+                                                >
+                                                    <ArchiveRestore size={14} />
+                                                </button>
+                                            )}
+                                            {!archived && onArchiveGroup && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onArchiveGroup(group)}
+                                                    title="Archivar grupo"
+                                                    aria-label={`Archivar ${group.nombre}`}
+                                                    className="p-1.5 rounded-lg text-content-muted hover:text-cyan-400 transition-colors"
+                                                >
+                                                    <Archive size={14} />
+                                                </button>
+                                            )}
+                                            {onDeleteGroup && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onDeleteGroup(group)}
+                                                    title="Eliminar grupo"
+                                                    aria-label={`Eliminar ${group.nombre}`}
+                                                    className="p-1.5 rounded-lg text-content-muted hover:text-rose-400 transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
                                         </div>
-                                        {isSelected && <Check size={14} className="text-cyan-400 shrink-0" />}
-                                    </button>
+                                    </div>
                                 );
                             })
                         )}

@@ -76,6 +76,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         throw new ApiError(response.status, errorMessage);
     }
 
+    if (response.status === 204) {
+        return undefined as T;
+    }
+
     return response.json();
 }
 
@@ -95,6 +99,8 @@ export interface Problema {
     fecha_creacion: string;
     /** Set when the problem was adopted from the ESCOM catalog. */
     catalogo_id?: string | null;
+    /** Hidden from the default lists; reversible. */
+    archivado?: boolean;
 }
 
 export interface Grupo {
@@ -107,6 +113,7 @@ export interface Grupo {
     created_at: string;
     total_problemas?: number;
     total_entregas?: number;
+    archivado?: boolean;
 }
 
 export interface GrupoProblema {
@@ -281,6 +288,8 @@ export interface CatalogProgramDetail extends CatalogProgram {
     codigo: string;
 }
 
+const DEMO_READ_ONLY = "El modo demo está configurado en solo lectura para exhibición.";
+
 // In-memory comments store for demo mode
 const demoCommentsStore: Record<number, ComentarioRevision[]> = JSON.parse(JSON.stringify(DEMO_COMMENTS));
 const demoGruposStore: Grupo[] = JSON.parse(JSON.stringify(DEMO_GRUPOS));
@@ -338,11 +347,29 @@ export const api = {
     },
 
     problems: {
-        async list(): Promise<Problema[]> {
+        async list(includeArchived = false): Promise<Problema[]> {
             if (IS_DEMO_MODE) {
                 return DEMO_PROBLEMAS;
             }
-            return request<Problema[]>("/problems/");
+            return request<Problema[]>(includeArchived ? "/problems/?include_archived=true" : "/problems/");
+        },
+        async archive(id: number): Promise<Problema> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, DEMO_READ_ONLY);
+            }
+            return request<Problema>("/problems/${id}/archive", { method: "POST" });
+        },
+        async unarchive(id: number): Promise<Problema> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, DEMO_READ_ONLY);
+            }
+            return request<Problema>("/problems/${id}/unarchive", { method: "POST" });
+        },
+        async delete(id: number): Promise<void> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, DEMO_READ_ONLY);
+            }
+            return request<void>("/problems/${id}", { method: "DELETE" });
         },
         async create(titulo: string, enunciado: string, lenguaje = "c"): Promise<Problema> {
             if (IS_DEMO_MODE) {
@@ -590,11 +617,23 @@ export const api = {
     },
 
     groups: {
-        async list(): Promise<Grupo[]> {
+        async list(includeArchived = false): Promise<Grupo[]> {
             if (IS_DEMO_MODE) {
                 return demoGruposStore;
             }
-            return request<Grupo[]>("/groups/");
+            return request<Grupo[]>(includeArchived ? "/groups/?include_archived=true" : "/groups/");
+        },
+        async archive(groupId: number): Promise<Grupo> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, DEMO_READ_ONLY);
+            }
+            return request<Grupo>("/groups/${groupId}/archive", { method: "POST" });
+        },
+        async unarchive(groupId: number): Promise<Grupo> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, DEMO_READ_ONLY);
+            }
+            return request<Grupo>("/groups/${groupId}/unarchive", { method: "POST" });
         },
         async create(data: {
             nombre: string;
@@ -659,9 +698,7 @@ export const api = {
         },
         async delete(groupId: number): Promise<void> {
             if (IS_DEMO_MODE) {
-                const idx = demoGruposStore.findIndex((g) => g.id === groupId);
-                if (idx >= 0) demoGruposStore.splice(idx, 1);
-                return;
+                throw new ApiError(403, DEMO_READ_ONLY);
             }
             return request<void>(`/groups/${groupId}`, {
                 method: "DELETE",
