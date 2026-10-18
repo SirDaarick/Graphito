@@ -51,6 +51,16 @@ async def test_list_catalog_grouped_without_code(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_units_are_listed_in_natural_order(client: AsyncClient):
+    headers = await _headers(client)
+    subjects = (await client.get(CATALOG, headers=headers)).json()
+    romans = {"I": 1, "II": 2, "III": 3, "IV": 4}
+    for subject in subjects:
+        numbers = [romans[unit["unidad"].split("_")[1]] for unit in subject["unidades"]]
+        assert numbers == sorted(numbers), subject["materia"]
+
+
+@pytest.mark.asyncio
 async def test_get_entry_returns_code_and_language(client: AsyncClient):
     headers = await _headers(client)
     cpp_id = await _find_id(client, headers, CPP_FILE)

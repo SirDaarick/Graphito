@@ -20,6 +20,21 @@ _UNIT_RE = re.compile(r"^Unidad_([IVXLC]+)_(.+)$")
 _LEADING_NUMBER_RE = re.compile(r"^\d+[_-]*")
 
 
+_ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
+
+
+def unit_sort_key(unidad: str) -> int:
+    """Roman numeral of "Unidad_<N>_..." as an int; units without one sort last (sorted() is stable)."""
+    match = _UNIT_RE.match(unidad)
+    if not match:
+        return 10**6
+    total = 0
+    values = [_ROMAN_VALUES[ch] for ch in match.group(1) if ch in _ROMAN_VALUES]
+    for value, following in zip(values, values[1:] + [0]):
+        total += -value if value < following else value
+    return total
+
+
 @dataclass(frozen=True)
 class CatalogEntry:
     id: str

@@ -7,6 +7,7 @@ from app.application.services.problem_service import ProblemService
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.infrastructure.catalog import CatalogEntry, get_catalog_entry, load_catalog
+from app.infrastructure.catalog.json_catalog import unit_sort_key
 from app.infrastructure.database.models import Problema
 from app.presentation.schemas.catalog import (
     CatalogEntryDetail,
@@ -33,7 +34,7 @@ class CatalogService:
         self.vector_store = vector_store
 
     def list_catalog(self) -> List[CatalogSubject]:
-        """Programs grouped by subject then unit, in file order; code is never included."""
+        """Programs grouped by subject then unit (units in numeral order); code is never included."""
         subjects: dict = {}
         for entry in load_catalog():
             subject = subjects.setdefault(
@@ -50,6 +51,8 @@ class CatalogService:
                 )
             )
             subject.total += 1
+        for subject in subjects.values():
+            subject.unidades.sort(key=lambda u: unit_sort_key(u.unidad))
         return list(subjects.values())
 
     def _require_entry(self, entry_id: str) -> CatalogEntry:
