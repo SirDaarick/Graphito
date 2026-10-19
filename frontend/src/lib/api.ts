@@ -476,7 +476,7 @@ export const api = {
                     "",
                     `Problema: ${codeComp.problem_title}`,
                     `Estudiante Evaluado: ${codeComp.student_author}`,
-                    `Dictamen: ${describeDictamen(rep.dictamen, rep.estado).label}`,
+                    `Resumen de similitud: ${describeDictamen(rep.dictamen, rep.estado).label}`,
                     `Canal A (${channelAMethod(rep)}): ${formatPct(rep.similitud_semantica)}`,
                     `Canal B (CharCNN v2, calibrado): ${formatPct(rep.probabilidad_ia)}`,
                     `GraphCodeBERT (${GCB_LABEL}): ${formatNumber(rep.gcb_similarity)}`,
@@ -486,7 +486,7 @@ export const api = {
                     "Indicadores de Integridad:",
                     ...(rep.indicadores.length > 0
                         ? rep.indicadores.map(i => `  • [${i.severidad}] ${i.tipo_alerta}: ${i.descripcion}`)
-                        : ["  • Sin alertas críticas detectadas."]),
+                        : ["  • Sin indicadores destacados."]),
                     "",
                     "Docente Evaluador: Dr. Alan Turing",
                     "Plataforma: Graphito In-Memory Demonstration",

@@ -250,12 +250,12 @@ export function ReferenceCard({
                                                         </span>
                                                         {v === "CONFORME" && (
                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0 font-sans">
-                                                                <ShieldCheck size={11} /> Conforme
+                                                                <ShieldCheck size={11} /> Sin observaciones
                                                             </span>
                                                         )}
                                                         {v === "DUDA" && (
                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 font-sans">
-                                                                <HelpCircle size={11} /> Duda
+                                                                <HelpCircle size={11} /> Por aclarar
                                                             </span>
                                                         )}
                                                     </div>

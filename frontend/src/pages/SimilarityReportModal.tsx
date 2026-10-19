@@ -153,8 +153,8 @@ export function SimilarityReportModal({
     const handleVerdictAndAdvance = (type: "conforme" | "aclaracion") => {
         const isConforme = type === "conforme";
         const msg = isConforme
-            ? "Entrega validada como Conforme por el docente."
-            : "Entrega citada para entrevista y aclaración con el estudiante.";
+            ? "Entrega marcada por el docente como revisada, sin observaciones."
+            : "Entrega marcada por el docente para aclarar con el estudiante.";
 
         if (comparison?.id) {
             saveVerdict(comparison.id, isConforme ? "CONFORME" : "DUDA");
@@ -777,7 +777,7 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                     {/* DSS Institutional Banner */}
                                     <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-700 dark:text-blue-200">
                                         <Info size={18} className="shrink-0 text-blue-500 dark:text-blue-400" />
-                                        <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee métricas periciales automatizadas sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
+                                        <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee indicadores de similitud automatizados sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
                                     </div>
 
                                     {/* Procedencia: motor, calibración y etiqueta de validación (spec AR2.3) */}
@@ -1035,13 +1035,13 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                 {/* Validar Conforme */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("conforme")}
-                                    aria-label="Validar Conforme: Autoría legítima (Atajo: A)"
+                                    aria-label="Marcar sin observaciones (Atajo: A)"
                                     className="group relative p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center"
                                 >
                                     <ShieldCheck size={19} />
                                     <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-mono font-bold bg-emerald-500/30 text-emerald-700 dark:text-emerald-200 border border-emerald-500/50 rounded">A</span>
                                     <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-emerald-500/40 text-emerald-100 text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
-                                        <span>Validar Conforme: Autoría legítima</span>
+                                        <span>Marcar sin observaciones</span>
                                         <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-emerald-500/30 text-emerald-200 rounded border border-emerald-500/40">A</kbd>
                                     </div>
                                 </button>
@@ -1049,13 +1049,13 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                 {/* Citar a Aclaración */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("aclaracion")}
-                                    aria-label="Citar a Aclaración: Defensa oral (Atajo: R)"
+                                    aria-label="Marcar para aclaración con el estudiante (Atajo: R)"
                                     className="group relative p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center"
                                 >
                                     <UserCheck size={19} />
                                     <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-mono font-bold bg-amber-500/30 text-amber-700 dark:text-amber-200 border border-amber-500/50 rounded">R</span>
                                     <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-amber-500/40 text-amber-100 text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
-                                        <span>Citar a Aclaración: Programar defensa oral</span>
+                                        <span>Marcar para aclaración con el estudiante</span>
                                         <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-amber-500/30 text-amber-200 rounded border border-amber-500/40">R</kbd>
                                     </div>
                                 </button>
@@ -1073,7 +1073,7 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                         <Download size={19} />
                                     )}
                                     <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
-                                        <span>Descargar Informe Pericial en PDF</span>
+                                        <span>Descargar informe de similitud en PDF</span>
                                     </div>
                                 </button>
 
