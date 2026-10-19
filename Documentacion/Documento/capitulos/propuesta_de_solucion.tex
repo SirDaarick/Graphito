@@ -18,6 +18,12 @@ Para realizar la comparación de código fuente, Graphito se articula a través 
 	\label{fig:diagrama_bloques} % Esta es la ``etiqueta'' para referenciarlo
 \end{figure}
 
+La Figura~\ref{fig:diagrama_bloques} representa la arquitectura funcional de Graphito, un sistema de apoyo a la evaluación docente que integra el procesamiento del código fuente, el análisis semántico, el análisis estilométrico y la generación de reportes interpretables. Graphito actúa como la capa de orquestación que recibe las solicitudes del docente, coordina la ejecución de los módulos de análisis y consolida sus resultados para su consulta posterior.
+
+La arquitectura contempla dos canales de procesamiento complementarios. El primero utiliza GraphCodeBERT para obtener representaciones vectoriales relacionadas con la semántica del código, mientras que el segundo utiliza una red neuronal convolucional a nivel de caracteres (CharCNN) para identificar patrones estilométricos. Los resultados se integran en una etapa de fusión de características, cuya salida se utiliza para calcular indicadores de similitud y construir el reporte que se presenta al docente. Las bases de datos relacional y vectorial permiten, respectivamente, conservar los registros y recuperar las representaciones de referencia.
+
+Las entradas principales del sistema son el código de referencia, el código entregado por el estudiante y los metadatos del ejercicio. Las salidas comprenden los indicadores numéricos de similitud, la estimación estilométrica, los datos de la comparación y un reporte de apoyo a la revisión docente. Ninguna de estas salidas constituye, de manera aislada, una determinación automática de plagio o de autoría.
+
 A continuación, se describen los componentes principales que integran la solución:
 
 
@@ -44,6 +50,14 @@ Una vez ingresados los archivos, el \textbf{Módulo de Preprocesamiento} genera 
 \end{enumerate}
 
 Una vez terminados ambos procesos, el flujo sigue hacia los canales de comparación semántica y análisis estilométrico.
+
+La normalización del código fuente consiste en aplicar transformaciones controladas para preparar el programa para su procesamiento automático. En Graphito, estas transformaciones se diferencian de acuerdo con el objetivo de cada canal y no implican modificar el significado del programa original ni sustituir su contenido por una solución generada.
+
+Para el canal semántico, el preprocesamiento contempla la validación del archivo, la identificación de tokens y la preparación de la representación necesaria para GraphCodeBERT y la extracción del grafo de flujo de datos. Las transformaciones deberán conservar los elementos necesarios para representar las relaciones lógicas del programa. Por este motivo, cualquier eliminación o sustitución de tokens deberá justificarse y verificarse antes de su aplicación.
+
+En el canal estilométrico, se parte del código original sin renombrar identificadores ni reorganizar su estructura. Las únicas transformaciones permitidas serán aquellas necesarias para codificar la secuencia, controlar su longitud y adaptarla a las dimensiones de entrada de CharCNN. Estas operaciones deberán documentarse y aplicarse con el mismo criterio a las muestras de ambas clases, para evitar que el preprocesamiento elimine sistemáticamente los rasgos que el modelo pretende analizar o introduzca atajos de clasificación (Sección~\ref{subsec:prep_estilometria}).
+
+La implementación conservará una copia inalterada del archivo original y mantendrá separadas las representaciones utilizadas por cada canal. Esta separación permitirá reproducir los análisis, rastrear las transformaciones realizadas y consultar el código original cuando el docente necesite revisar los resultados.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 7.2 CANAL A: COMPARACIÓN SEMÁNTICA
@@ -111,6 +125,24 @@ El procedimiento estructurado para transformar el código fuente en un identific
 	\item \textbf{Reducción de Dimensionalidad (Pooling):} Se seleccionan las características más relevantes detectadas por los filtros, consolidando los rasgos estilísticos más distintivos de la muestra analizada en una representación compacta.
 \end{enumerate}
 
+\subsubsection{Flujo de procesamiento de la red CharCNN}
+
+La red CharCNN procesa el código fuente a nivel de caracteres con el propósito de aprender patrones locales que puedan contribuir a la caracterización estilométrica de una solución. A diferencia del canal semántico, que busca representar la lógica del programa, este canal conserva características de escritura como la distribución de espacios, la indentación, la disposición de símbolos, los comentarios y las convenciones de nomenclatura.
+
+El procesamiento inicia con la recepción del código fuente y la aplicación de las transformaciones necesarias para representarlo mediante una secuencia de caracteres. Cada carácter se asocia con un identificador dentro de un vocabulario definido durante la preparación del conjunto de datos. Posteriormente, la secuencia se ajusta a una longitud máxima establecida para el modelo, mediante truncamiento o relleno, de manera que las entradas puedan organizarse en lotes de tamaño compatible con la arquitectura.
+
+La secuencia codificada se procesa mediante capas convolucionales unidimensionales, cuyos filtros identifican patrones locales de caracteres. Las activaciones resultantes pasan por funciones no lineales y operaciones de agrupamiento, que permiten reducir la longitud de las representaciones y conservar las características relevantes. La información obtenida se transforma en un vector de características y se proporciona a una capa de clasificación que genera una puntuación para las clases contempladas en el entrenamiento.
+
+La salida debe interpretarse como una estimación condicionada por los datos, las etiquetas y el entrenamiento del modelo. Por tanto, una puntuación elevada para la clase asociada a generación artificial no demuestra que el código haya sido producido por una herramienta de inteligencia artificial, del mismo modo que una puntuación baja no demuestra autoría humana.
+
+\subsubsection{Codificación de entrada y capacidad computacional}
+
+La representación de entrada de CharCNN depende del esquema de codificación seleccionado para transformar los caracteres en datos numéricos. En una codificación mediante índices, cada carácter se representa mediante un identificador entero y posteriormente puede transformarse en un vector de características. Si se utiliza una representación \textit{one-hot}, cada carácter se expresa mediante un vector cuya dimensionalidad corresponde al tamaño del vocabulario definido.
+
+Esta decisión afecta las dimensiones del tensor de entrada y el consumo de memoria durante el procesamiento. Sin embargo, el número de filtros convolucionales y sus dimensiones constituyen parámetros independientes de la codificación inicial. Cada filtro aprende patrones locales sobre la secuencia y produce un mapa de activaciones; el conjunto de mapas generados determina la cantidad de canales de salida de la capa convolucional.
+
+En consecuencia, la capacidad computacional requerida no puede determinarse únicamente a partir de la cantidad de caracteres del código o del número de dimensiones del embedding semántico. También depende de la longitud máxima de secuencia, el tamaño del vocabulario, la cantidad de filtros, el tamaño de los \textit{kernels}, el número de capas, el tamaño de lote, la precisión numérica y el volumen de muestras procesadas. Estos parámetros se documentan y evalúan experimentalmente en la Sección~\ref{subsec:modelado_charcnn} para establecer la viabilidad de ejecución de la arquitectura propuesta.
+
 \subsubsection{Cálculo de probabilidad de generación por IA}
 
 Al finalizar la extracción de patrones locales mediante los filtros convolucionales, la red CharCNN genera una métrica escalar que determina la \textbf{probabilidad de generación por inteligencia artificial}.
@@ -118,18 +150,45 @@ Al finalizar la extracción de patrones locales mediante los filtros convolucion
 Esta métrica complementa directamente al Canal A: mientras que el módulo semántico analiza la lógica interna del código para compararla con la solución ideal del profesor, este escalar actúa como un indicador cuantitativo de los patrones estilísticos. Su función es proporcionar al docente evidencia objetiva sobre la homogeneidad sintética del texto y la ausencia de variaciones típicas de la escritura humana, dotándolo de los elementos técnicos necesarios para que tome la decisión de evaluación final bajo su propio criterio.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Fusión de Características}
+\label{subsec:fusion_caracteristicas}
 
 La fusión de características \cite{MartinezGil2026Improving} representa el proceso de integración donde las salidas de los canales semántico y estilométrico convergen para formar una representación única de la entrega.
 
 Este bloque técnico es fundamental para el sistema Graphito, ya que permite consolidar dos dimensiones de análisis distintas en un solo espacio vectorial:
 
 \begin{itemize}
-	\item \textbf{Mecanismo de Integración:} El sistema toma el \textbf{Embedding Semántico} (que encapsula la lógica extraída por GraphCodeBERT) y la probabilidad de generación por IA (que representa los rasgos estructurales detectados por CharCNN) y los combina mediante una operación de concatenación. En el caso de las soluciones de referencia, se aplica un relleno con ceros (\textit{zero-padding}) en la dimension correspondiente al canal estilométrico, garantizando la homogeneidad dimensional necesaria para el cálculo de similitud.
+	\item \textbf{Mecanismo de Integración:} El sistema toma el \textbf{Embedding Semántico} (que encapsula la lógica extraída por GraphCodeBERT) y la probabilidad de generación por IA (que representa los rasgos estructurales detectados por CharCNN) y los combina mediante una operación de concatenación. En la configuración planteada se obtiene una representación de 769 dimensiones (768 semánticas y una estilométrica), cuyas implicaciones se discuten a continuación.
 
 	\item \textbf{Generación de la representación:} El resultado de esta fusión es un vector de características unificado que actúa como una representación del código. Esta no solo describe qué funciones realiza el programa, sino que también preserva los hábitos de escritura y formato del autor del código.
 \end{itemize}
 
 Al integrar los resultados de ambos canales, el sistema genera un perfil completo del código fuente. Esta unión permite cruzar dos datos clave: qué hace el programa (su lógica) y cómo fue escrito (su estilo). Esto facilita la identificación de casos inusuales; por ejemplo, un código que resuelve el problema de forma idéntica a la referencia, pero que tiene el formato uniforme típico de una inteligencia artificial. Así, el sistema entrega al docente información clara y medible para respaldar su decisión final de evaluación.
+
+\subsubsection{Consideraciones sobre la dimensionalidad y la integración de características}
+
+La representación híbrida propuesta para Graphito contempla la integración de dos fuentes de información: el embedding semántico producido por GraphCodeBERT y la puntuación escalar obtenida mediante CharCNN. En la configuración planteada, el embedding semántico posee 768 componentes, mientras que la salida estilométrica se representa mediante un único valor, dando lugar a una representación concatenada de 769 dimensiones.
+
+Las 768 dimensiones del componente semántico constituyen una representación distribuida del código y no corresponden a 768 características interpretables de manera independiente. En conjunto, codifican información aprendida por el modelo sobre las relaciones presentes en la secuencia de código. La dimensión restante incorpora la puntuación estilométrica y permite conservar esta señal dentro de la representación combinada.
+
+Sin embargo, la diferencia entre la dimensionalidad de ambos componentes introduce una consideración metodológica: la concatenación directa no asegura una contribución equilibrada de las señales. En particular, la similitud del coseno sobre el vector concatenado puede estar dominada por la orientación y magnitud del embedding semántico, mientras que la contribución del valor estilométrico depende de su escala y de la normalización aplicada.
+
+Por este motivo, la arquitectura deberá evaluar una estrategia de integración que permita controlar la contribución de ambos canales. Entre las alternativas se encuentran la normalización independiente de las representaciones, la aplicación de ponderaciones definidas experimentalmente o la conservación de las puntuaciones semántica y estilométrica como indicadores separados. La selección deberá sustentarse en pruebas que comparen la coherencia de los resultados con el juicio experto y el desempeño observado sobre un conjunto de validación.
+
+En consecuencia, las 769 dimensiones constituyen una decisión de representación dentro de la arquitectura propuesta y no una garantía de que ambas señales tengan la misma relevancia. Su conveniencia deberá verificarse durante la experimentación, documentando el efecto de las decisiones de normalización y ponderación sobre los resultados de similitud. En el Capítulo~\ref{cap:modelado} se reporta que una fusión con pesos elegidos manualmente obtuvo un desempeño inferior al del Canal B por separado (Tabla~\ref{tab:evolucion_versiones}), por lo que el sistema final mantiene ambos canales como indicadores independientes con umbrales calibrados.
+
+El empleo de relleno con ceros (\textit{zero-padding}) en el componente estilométrico de las referencias deberá evaluarse de manera específica. Si la puntuación de CharCNN representa una probabilidad, asignar cero a todas las referencias no equivale necesariamente a representar su estilo real; además, puede introducir un efecto artificial en el cálculo de similitud. Por ello, se considerará la posibilidad de comparar la similitud semántica y la puntuación estilométrica de manera independiente, o de establecer una representación de referencia compatible con ambos canales cuando existan datos adecuados para hacerlo.
+
+La decisión final se fundamentará en la evaluación de alternativas de integración y en la interpretación de los resultados obtenidos, evitando asumir que la concatenación y el relleno con ceros garantizan por sí mismos una comparación equilibrada.
+
+\subsubsection{Tratamiento del desbalance entre canales}
+
+La integración de los componentes semántico y estilométrico requiere distinguir entre la compatibilidad dimensional de las representaciones y la importancia relativa que cada señal aporta al análisis. Aunque ambos componentes pueden combinarse en una estructura de dimensiones compatibles, esto no implica que su contribución a la similitud resultante sea equivalente.
+
+Para abordar esta situación, se propone evaluar alternativas de normalización y ponderación que permitan controlar la influencia de cada componente. Una posibilidad consiste en normalizar las representaciones semánticas y estandarizar la salida estilométrica con parámetros calculados exclusivamente a partir del conjunto de entrenamiento. Posteriormente, pueden compararse configuraciones en las que las señales se analicen por separado y otras en las que se integren mediante pesos seleccionados con el conjunto de validación.
+
+La evaluación deberá determinar si la integración aporta información adicional respecto del análisis semántico aislado. Para ello, se compararán los resultados de ambas configuraciones frente a las valoraciones de un conjunto de referencia revisado por docentes. Esta estrategia permitirá evitar que la incorporación del canal estilométrico se justifique únicamente por su presencia en la arquitectura, sin comprobar su utilidad efectiva.
+
+En el caso del desbalance entre clases del conjunto de datos, se aplicarán medidas diferentes, tales como la construcción de particiones representativas, la revisión de la distribución de las etiquetas y el uso de métricas como precisión, exhaustividad y F1-score. Si se utilizan técnicas de ponderación de clases o sobremuestreo, estas se aplicarán exclusivamente sobre los datos de entrenamiento para evitar fugas de información.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 7.5 SIMILITUD DEL COSENO
@@ -169,6 +228,33 @@ La pertinencia de utilizar este enfoque radica en su comportamiento geométrico 
 
 En conclusión, la similitud del coseno permite a Graphito entregar un indicador numérico robusto. En lugar de limitarse a una verificación funcional o textual, el sistema evalúa simultáneamente la topología algorítmica y la huella estilométrica, brindando al docente evidencia cuantitativa clara para agilizar y fundamentar su proceso de evaluación.
 
+
+\subsection{Componentes funcionales, entradas y salidas}
+
+La Tabla~\ref{tab:componentes_io} resume los componentes funcionales de Graphito, los datos que recibe cada uno, su función dentro del sistema y los datos que produce.
+
+{\small
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+    \caption{Componentes funcionales de Graphito, entradas y salidas.}\label{tab:componentes_io}\\
+    \hline
+    \textbf{Componente o herramienta} & \textbf{Entrada} & \textbf{Función dentro de Graphito} & \textbf{Salida} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Componente o herramienta} & \textbf{Entrada} & \textbf{Función dentro de Graphito} & \textbf{Salida} \\ \hline
+    \endhead
+    Interfaz web & Archivos de código y parámetros del ejercicio & Permite al docente configurar y ejecutar comparaciones. & Solicitud de análisis y archivos cargados. \\ \hline
+    Backend de Graphito & Solicitud del docente, código y metadatos & Valida los archivos y coordina el flujo de procesamiento. & Datos validados y resultados consolidados. \\ \hline
+    Preprocesamiento & Código fuente original & Verifica el formato y genera representaciones adecuadas para cada canal. & Código preparado para análisis semántico y estilométrico. \\ \hline
+    GraphCodeBERT & Código tokenizado y representación de flujo de datos cuando corresponda & Extrae representaciones semánticas del programa. & Embedding semántico. \\ \hline
+    CharCNN & Secuencia de caracteres codificada & Aprende patrones locales de escritura y produce una estimación estilométrica. & Probabilidad o puntuación de la clase definida por el modelo. \\ \hline
+    Módulo de fusión & Embedding semántico y salida estilométrica & Integra las señales conforme a una estrategia definida. & Representación combinada, si se conserva la arquitectura híbrida propuesta. \\ \hline
+    ChromaDB & Embeddings de referencia y consulta compatible & Recupera representaciones cercanas mediante búsqueda vectorial. & Referencias similares y puntuaciones de distancia o similitud. \\ \hline
+    PostgreSQL & Usuarios, ejercicios, archivos y metadatos de análisis & Mantiene los registros estructurados y el historial. & Registros persistidos y datos para los reportes. \\ \hline
+    Generador de reportes & Resultados de los dos canales y metadatos & Organiza los indicadores para facilitar su interpretación. & Reporte para el docente. \\ \hline
+    LLM externo, opcional & Instrucciones y código de referencia & Genera variantes candidatas para ampliar las referencias de comparación. & Variantes que deben validarse antes de incorporarse. \\ \hline
+\end{xltabular}
+}
 
 \section{Conclusión}
 

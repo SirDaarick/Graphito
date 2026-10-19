@@ -1,74 +1,72 @@
 \chapter{Ingeniería de Datos}
 \label{cap:ingenieria_datos}
 
-En el desarrollo de sistemas de aprendizaje automático aplicados al análisis de código fuente, la calidad y el balance de los datos utilizados es fundamental. Los modelos prodrían aprender patrones erróneos que afectarán su desempeño en casos reales si el conjunto de datos contiene información inconsistente o sesgos.
+Un modelo de aprendizaje automático se parece a un estudiante que prepara un examen: aprende de los ejemplos que se le muestran. Si esos ejemplos son pocos, están sesgados o repiten las preguntas del examen, el resultado final puede parecer bueno sin serlo. Por eso, antes de describir los modelos, este capítulo explica de dónde salen los datos de Graphito y cómo se prepararon para que la evaluación sea justa.
 
-Siguiendo la metodología \textbf{Komorebi} para la gestión de proyectos de Inteligencia Artificial \cite{verges_como_2023}, las fases iniciales de \textbf{Adquisición de Datos} y \textbf{Preparación de Datos} establecen las bases del sistema \textbf{Graphito}. En este capítulo se documenta cómo se obtuvó el código escrito por estudiantes, cómo se reconstruyeron los enunciados de las prácticas mediante ingeniería inversa utilizando modelos de lenguaje, el método utilizado para generar código equivalente generado con inteligencia artificial y el proceso de preparación y normalización para entrenar el modelo predictivo.
+Siguiendo la metodología \textbf{Komorebi} para proyectos de Inteligencia Artificial \cite{verges_como_2023}, el capítulo cubre dos fases. La \textbf{Adquisición de Datos} (Sección~\ref{sec:adquisicion_datos}) responde a tres preguntas: qué código se necesitaba, cómo se obtuvo la contraparte generada por inteligencia artificial (IA) sobre los mismos problemas y cuántos ejemplos de IA bastan. La \textbf{Preparación de Datos} (Sección~\ref{sec:preparacion_datos}) explica cómo se limpiaron los archivos, cómo se retiraron los duplicados, cómo se dividió el conjunto sin fuga de información y cómo se adaptó el texto para cada uno de los dos canales de análisis. La Figura~\ref{fig:pipeline_adquisicion} resume el recorrido completo.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.6cm and 0cm,
+        box/.style={rectangle, draw=black!60, fill=blue!6, rounded corners=3pt, text width=10.5cm, align=center, inner sep=6pt, font=\small},
+        proc/.style={rectangle, draw=black!60, fill=cyan!8, rounded corners=3pt, text width=10.5cm, align=center, inner sep=6pt, font=\small},
+        data/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=10.5cm, align=center, inner sep=6pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[box, fill=gray!12] (ieee) {\textbf{Código real de estudiantes}\\Conjunto público de la Universidad de Sarajevo (2016--2017), 43,771 entregas en C y C++};
+        \node[proc, below=of ieee] (enun) {\textbf{Reconstrucción de enunciados}\\Un modelo de lenguaje deduce, a partir de varias soluciones, qué pedía cada tarea};
+        \node[proc, below=of enun] (gen) {\textbf{Generación de la contraparte de IA}\\Mismo problema, mismo idioma, perfiles de estudiante: 1,520 archivos};
+        \node[data, below=of gen] (limp) {\textbf{Limpieza y eliminación de duplicados}\\Mismo criterio para código humano y de IA};
+        \node[data, below=of limp] (split) {\textbf{Partición \texttt{split\_v1}}\\Entrenamiento, validación y prueba, separadas por tarea};
+        \node[box, fill=green!12, below=of split] (conj) {\textbf{Conjunto de datos de Graphito}\\42,389 archivos: 40,936 humanos y 1,453 de IA};
+
+        \draw[arrow] (ieee.south) -- (enun.north);
+        \draw[arrow] (enun.south) -- (gen.north);
+        \draw[arrow] (gen.south) -- (limp.north);
+        \draw[arrow] (limp.south) -- (split.north);
+        \draw[arrow] (split.south) -- (conj.north);
+    \end{tikzpicture}
+    \caption{Flujo general de adquisición y preparación de los datos de Graphito, desde el código real de estudiantes hasta el conjunto particionado.}
+    \label{fig:pipeline_adquisicion}
+\end{figure}
 
 % ======================================================================
 \section{Adquisición de Datos}
 \label{sec:adquisicion_datos}
 % ======================================================================
 
-El objetivo de la adquisición de datos fue conformar un conjunto balanceado y representativo de cursos introductorios de programación en univerdades. El problema requiere comparar dos grupos de código: programas escritos por estudiantes y programas generados por inteligencia artificial, asegurando que ambos resolvieran exactamente los mismos problemas algorítmicos y con el mismo contexto de lenguaje.
-
-En la Figura~\ref{fig:pipeline_adquisicion} se muestra el flujo general de adquisición de datos e ingeniería inversa diseñado para construir este conjunto de datos.
-
-\begin{figure}[H]
-    \centering
-    \begin{tikzpicture}[
-        node distance=0.85cm and 0cm,
-        box/.style={rectangle, draw=black!60, fill=blue!6, rounded corners=3pt, text width=11.5cm, align=center, inner sep=7pt, font=\small},
-        proc/.style={rectangle, draw=black!60, fill=cyan!8, rounded corners=3pt, text width=11.5cm, align=center, inner sep=7pt, font=\small},
-        data/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=11.5cm, align=center, inner sep=7pt, font=\small},
-        arrow/.style={->, >=stealth, thick, draw=black!75}
-    ]
-        \node[box, fill=gray!12] (ieee) {\textbf{IEEE Plagiarism Dataset (Universidad de Sarajevo)}\\Entregas reales en C y C++ de estudiantes (2016--2017) en serbocroata};
-        \node[proc, below=of ieee] (extraer) {\textbf{Paso 1: Inferencia de Enunciados (\texttt{extraer\_enunciados.py})}\\Análisis cruzado de soluciones con modelos de lenguaje};
-        \node[data, below=of extraer] (csv) {\textbf{Catálogo de Tareas (\texttt{enunciados\_srb.csv} / \texttt{enunciados.csv})}\\72 problemas algorítmicos documentados en serbocroata y español};
-        \node[proc, below=of csv] (generar) {\textbf{Paso 2: Generación Sintética (\texttt{generar\_referencias.py})}\\Generación con LLMs usando 4 perfiles de estilo estudiantil};
-        \node[box, fill=green!12, below=of generar] (Conjunto) {\textbf{Conjunto de datos de Graphito}\\20,000 códigos (50\,\% humano / 50\,\% IA) sobre los 72 problemas};
-
-        \draw[arrow] (ieee.south) -- (extraer.north);
-        \draw[arrow] (extraer.south) -- (csv.north);
-        \draw[arrow] (csv.south) -- (generar.north);
-        \draw[arrow] (generar.south) -- (Conjunto.north);
-    \end{tikzpicture}
-    \caption{Flujo general de adquisición e ingeniería inversa de datos.}
-    \label{fig:pipeline_adquisicion}
-\end{figure}
+El objetivo fue reunir dos grupos de programas: los escritos por estudiantes y los generados por IA. La condición clave es que ambos grupos resuelvan los mismos problemas. Así, las dos clases difieren en su \textbf{origen} y no en el tema, de modo que un modelo no puede distinguirlas solo por el problema que resuelven.
 
 % ----------------------------------------------------------------------
 \subsection{Requerimientos del Conjunto de Datos}
 \label{subsec:requerimientos_dataset}
 
-Para que los datos fueran útiles en el contexto de las asignaciones de programación en la Escuela Superior de Cómputo (ESCOM-IPN), se definieron dos condiciones indispensables:
+Para que los datos fueran útiles en las unidades de aprendizaje de programación introductorias de la Escuela Superior de Cómputo (ESCOM-IPN), se definieron dos condiciones:
 
 \begin{enumerate}
-    \item \textbf{Autoría humana verificada:} 
-    Actualmente, recolectar código reciente de repositorios abiertos como GitHub implica dos riesgos metodológicos severos documentados en la literatura. Por un lado, Lopes et al. \cite{Lopes2017DejaVu} demostraron mediante el estudio DéjàVu que más del 70\,\% del código en GitHub corresponde a duplicados o variantes triviales de archivos existentes, lo que introduce una alta contaminación al conjunto de datos. Por otro lado, como advierten Zhou et al. \cite{Zhou2023Contamination}, los modelos generativos contemporáneos han sido preentrenados sobre estos repositorios masivos, existiendo el peligro latente de contaminar los conjuntos evaluativos o de incluir código autocompletado por IA. Si un clasificador se entrena con código supuestamente humano que contiene trazas sintéticas, aprenderá fronteras de decisión difusas. Por ello, fue indispensable utilizar un conjunto de datos recolectado con anterioridad a la popularización masiva de los modelos de lenguaje a finales de 2022.
-    
-    \item \textbf{Nivel académico introductorio:} 
-    Graphito apoya la revisión en materias como Fundamentos de Programación y Estructuras de Datos. Por lo tanto, no se requería código profesional con patrones de diseño avanzados o características complejas de C++ moderno, sino código típico de estudiantes: variables con nombres sencillos, estructuras de control básicas (\texttt{if}, \texttt{for}, \texttt{while}), funciones modulares, arreglos y punteros elementales, incluyendo los errores de formato comunes en principiantes.
+    \item \textbf{Autoría humana verificable.}
+    Tomar código reciente de repositorios abiertos como GitHub tiene dos riesgos. Primero, Lopes et al. \cite{Lopes2017DejaVu} encontraron que más del 70\,\% del código en GitHub son copias o variantes de otros archivos. Segundo, como advierten Zhou et al. \cite{Zhou2023Contamination}, los modelos generativos actuales se entrenaron con esos repositorios y es posible que parte del código ``humano'' reciente ya contenga algún origen de IA. Si el código etiquetado como humano no lo es, el clasificador aprende fronteras difusas. Por ello se buscó un conjunto de códigos generado antes de la popularización de los modelos de lenguaje, a finales de 2022.
+
+    \item \textbf{Nivel académico introductorio.}
+    El proposito de Graphito es apoyar la revisión de código en unidades de aprendizaje como Fundamentos de Programación y Estructuras de Datos. Se buscó código típico de principiantes: variables sencillas, estructuras de control básicas (\texttt{if}, \texttt{for}, \texttt{while}), funciones, arreglos y punteros elementales, con los errores de formato habituales.
 \end{enumerate}
 
 % ----------------------------------------------------------------------
 \subsection{Selección del Dataset Base: IEEE Programming Homework Dataset}
 \label{subsec:seleccion_dataset_ieee}
 
-Cumpliendo con estas condiciones, se seleccionó el conjunto de datos \textit{Programming Homework Dataset for Plagiarism Detection}, publicado por Vedran Ljubovic y Elma Pajic en IEEE Dataport \cite{Ljubovic2020}. 
-
-Este dataset fue recolectado en la Facultad de Ingeniería Eléctrica de la \textbf{Universidad de Sarajevo} (Bosnia y Herzegovina) y ofrece ventajas clave para este trabajo:
+Se seleccionó el conjunto \textit{Programming Homework Dataset for Plagiarism Detection}, publicado por Ljubovic y Pajic en IEEE Dataport \cite{Ljubovic2020}. Fue recolectado en la Facultad de Ingeniería Eléctrica de la \textbf{Universidad de Sarajevo} (Bosnia y Herzegovina) y ofrece tres ventajas:
 
 \begin{itemize}
-    \item \textbf{Fecha de recolección (2016--2017):} Al ser anterior a la salida de los modelos de lenguaje modernos, garantiza que el código fue escrito enteramente por humanos.
-    
-    \item \textbf{Validación con defensas orales:} Incluye registros de casos de plagio no solo por similitud estática, sino también mediante entrevistas y exámenes orales individuales (registrados en el archivo \texttt{ground-truth-}\allowbreak\texttt{dynamic-}\allowbreak\texttt{anon.txt}), donde los profesores confirmaron si el alumno entendía realmente el código entregado.
-    
-    \item \textbf{Registros de actividad del IDE (\textit{stats}):} Contiene archivos JSON con métricas de trabajo del estudiante: tiempo total invertido (\texttt{total\_time}), número de compilaciones (\texttt{builds}) y pruebas realizadas (\texttt{testings}), lo que demuestra el proceso real de desarrollo.
+    \item \textbf{Fecha de recolección (2016--2017).} Es anterior a los modelos de lenguaje modernos, por lo que el código fue escrito por personas.
+
+    \item \textbf{Casos revisados por docentes.} Incluye registros de casos de plagio, algunos contrastados mediante entrevistas orales (archivo \texttt{ground-truth-}\allowbreak\texttt{dynamic-}\allowbreak\texttt{anon.txt}).
+
+    \item \textbf{Registros de actividad del IDE.} Contiene archivos JSON con el tiempo invertido, el número de compilaciones y de pruebas por estudiante.
 \end{itemize}
 
-El dataset abarca cuatro cohortes académicas, cuyas características se resumen en la Tabla~\ref{tab:dimensiones_dataset_ieee}.
+El conjunto abarca cuatro cursos, resumidas en la Tabla~\ref{tab:dimensiones_dataset_ieee}. En total se registraron 43,771 entregas humanas, de las cuales 40,936 sobrevivieron a la limpieza descrita en la Sección~\ref{sec:preparacion_datos}.
 
 \begin{table}[H]
     \centering
@@ -77,60 +75,85 @@ El dataset abarca cuatro cohortes académicas, cuyas características se resumen
     \begin{tabularx}{\textwidth}{|l|X|}
         \hline
         \textbf{Aspecto} & \textbf{Detalle} \\ \hline
-        Cursos evaluados & 4 cohortes: A2016 (C), A2017 (C), B2016 (C++), B2017 (C++) \\ \hline
-        Lenguajes & C (estándar C11) y C++ (estándar C++17) \\ \hline
-        Estudiantes & Entre 100 y 150 por cada cohorte académica \\ \hline
-        Tareas y problemas & 16 a 22 asignaciones por curso, con un total de 72 problemas únicos \\ \hline
+        Cursos evaluados & A2016 (C), A2017 (C), B2016 (C++), B2017 (C++) \\ \hline
+        Lenguajes & C y C++ \\ \hline
+        Estudiantes & 607 a 1,001 identificadores distintos por curso \\ \hline
+        Tareas & 89 tareas por curso, que se agrupan en 48 bloques al unir los años 2016 y 2017 (Sección~\ref{subsec:particion_datos}) \\ \hline
+        Entregas humanas originales & 43,771 \\ \hline
         Registros de desarrollo & Archivos JSON con eventos de edición, compilación y pruebas \\ \hline
         Anonimización & Nombres sustituidos por identificadores como \texttt{student\{id\}} \\ \hline
     \end{tabularx}
 \end{table}
 
 % ----------------------------------------------------------------------
-\subsection{Limitaciones del Dataset: Idioma Serbocroata y Falta de Enunciados}
+\subsection{Limitaciones del Dataset}
 \label{subsec:limitaciones_dataset}
 
-Durante la exploración de los archivos en \texttt{data/raw/IEEE\_plagiarism/}, se identificaron dos retos importantes:
+Al explorar los archivos se identificaron tres limitaciones:
 
 \begin{enumerate}
-    \item \textbf{Código escrito en serbocroata:} 
-    Al provenir de la Universidad de Sarajevo, los estudiantes escribieron sus variables, mensajes en pantalla y comentarios en serbocroata con caracteres latinos (por ejemplo: \texttt{unos} para entrada, \texttt{broj} para número, \texttt{suma} para adición y \texttt{niz} para arreglo). Si este aspecto no se consideraba al generar el código con IA, los modelos aprenderían a distinguir entre idiomas (inglés frente a serbocroata) en lugar de aprender el estilo de programación.
-    
-    \item \textbf{Ausencia de los enunciados de las tareas:} 
-    Las carpetas contenían los códigos de los alumnos clasificados por códigos de tarea (como \texttt{src/A2016/Z1/Z1/student2956.c}), pero los autores no incluyeron las descripciones de los problemas. Sin el enunciado exacto, no era posible pedirle a una inteligencia artificial que resolviera el mismo ejercicio.
+    \item \textbf{Código en serbocroata.}
+    Los estudiantes escribieron variables, mensajes y comentarios en serbocroata con caracteres latinos (por ejemplo, \texttt{unos} para entrada, \texttt{broj} para número o \texttt{niz} para arreglo). Si el código de IA se generara en inglés, un modelo podría aprender a distinguir idiomas en lugar de estilos de programación. Es como separar dos grupos de alumnos solo porque unos escriben en inglés y otros en español.
+
+    \item \textbf{Ausencia de enunciados.}
+    Las carpetas contienen las soluciones, organizadas por tarea (por ejemplo, \texttt{A2016/Z1/Z1}), pero no la descripción de los problemas. Sin el enunciado no era posible pedir a una IA que resolviera el mismo ejercicio.
+
+    \item \textbf{Ausencia de soluciones oficiales del docente.}
+    Tampoco se incluye una solución de referencia por tarea. Esta carencia se retoma en el Capítulo~\ref{cap:modelado}, donde se explica cómo se compensa en la evaluación sin referencias oficiales.
 \end{enumerate}
 
 % ----------------------------------------------------------------------
-\subsection{Ingeniería Inversa y Reconstrucción de Enunciados}
+\subsection{Reconstrucción de Enunciados}
 \label{subsec:ingenieria_inversa}
 
-Para recuperar los enunciados de forma sistemática, se desarrolló un script en Python denominado \texttt{extraer\_}\allowbreak\texttt{enunciados.py}, el cual deduce la tarea original analizando el código de estudiantes con soluciones correctas:
+Para recuperar los enunciados se aplicó una especie de ingeniería inversa: a partir de varias soluciones correctas de una misma tarea, un modelo de lenguaje deduce qué se pedía. La Figura~\ref{fig:reconstruccion_enunciado} ilustra la idea. Es como inferir la pregunta de un examen leyendo varias respuestas bien resueltas.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.3cm,
+        sol/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=2.3cm, align=center, inner sep=5pt, font=\small},
+        llm/.style={rectangle, draw=black!60, fill=cyan!8, rounded corners=3pt, text width=3.0cm, align=center, inner sep=6pt, font=\small},
+        salida/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=3.0cm, align=center, inner sep=6pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[sol] (s2) {Solución de estudiante 2};
+        \node[sol, above=of s2] (s1) {Solución de estudiante 1};
+        \node[sol, below=of s2] (s3) {Solución de estudiante 3};
+        \node[llm, right=1.1cm of s2] (llm) {Modelo de lenguaje\\compara las soluciones y redacta el problema};
+        \node[salida, right=1.1cm of llm, yshift=0.9cm] (es) {Enunciado en español\\(para revisión docente)};
+        \node[salida, right=1.1cm of llm, yshift=-0.9cm] (srb) {Enunciado en serbocroata\\(entrada para generar código de IA)};
+
+        \draw[arrow] (s1.east) -- (llm.west);
+        \draw[arrow] (s2.east) -- (llm.west);
+        \draw[arrow] (s3.east) -- (llm.west);
+        \draw[arrow] (llm.east) -- (es.west);
+        \draw[arrow] (llm.east) -- (srb.west);
+    \end{tikzpicture}
+    \caption{Reconstrucción de enunciados: de varias soluciones correctas de una misma tarea a un enunciado en dos idiomas.}
+    \label{fig:reconstruccion_enunciado}
+\end{figure}
+
+El procedimiento fue el siguiente:
 
 \begin{enumerate}
-    \item \textbf{Muestreo por problema:} Para cada uno de los 72 problemas, el script toma de 2 a 3 códigos de estudiantes distintos que compilaron correctamente y pasaron las pruebas unitarias del curso.
-    
-    \item \textbf{Análisis con LLM:} El script envía estos códigos a \textit{GPT-4o-mini} mediante una consulta estructurada, pidiéndole comparar las soluciones, identificar los elementos comunes y redactar el enunciado del problema junto con las reglas de validación de entradas y salidas.
-    
-    \item \textbf{Generación de dos versiones del catálogo:}
-    \begin{itemize}
-        \item \texttt{enunciados.csv}: Enunciados traducidos al español para que los profesores y evaluadores de ESCOM puedan auditar y entender los ejercicios fácilmente.
-        \item \texttt{enunciados\_srb.csv}: Enunciados redactados en serbocroata para usarlos como entrada en la generación de código con IA, asegurando la paridad con el código original de los alumnos.
-    \end{itemize}
-    
-    \item \textbf{Mecanismos de control:} El script guarda puntos de control en el archivo \texttt{extraer\_}\allowbreak\texttt{enunciados\_}\allowbreak\texttt{checkpoint.json} para retomar el proceso si ocurre alguna falla de red o límite de peticiones de la API.
+    \item \textbf{Muestreo por tarea.} Para cada tarea se tomaron de 2 a 3 códigos de estudiantes distintos que compilaban y pasaban las pruebas del curso.
+    \item \textbf{Análisis con un modelo de lenguaje.} Se envió ese grupo de códigos a un modelo de lenguaje (por defecto, \textit{GPT-4o-mini}) con la instrucción de comparar las soluciones y redactar el enunciado, con sus reglas de entrada y salida.
+    \item \textbf{Dos versiones del catálogo.} Una versión en español, para que docentes y evaluadores comprendan cada ejercicio, y otra en serbocroata, usada como entrada para generar el código de IA y mantener la paridad de idioma con el código original.
+    \item \textbf{Puntos de control.} El proceso guarda su avance para retomarse ante fallas de red o límites de la API.\footnote{Implementado en \texttt{data/extraer\_enunciados.py}.}
 \end{enumerate}
 
-En la Tabla~\ref{tab:ejemplos_enunciados_inferidos} se presentan ejemplos de los requerimientos obtenidos mediante este método.
+La Tabla~\ref{tab:ejemplos_enunciados_inferidos} muestra ejemplos de los enunciados obtenidos.
 
 \begin{table}[H]
     \centering
-    \caption{Ejemplos de requerimientos algorítmicos recuperados por ingeniería inversa.}
+    \caption{Ejemplos de enunciados recuperados por reconstrucción.}
     \label{tab:ejemplos_enunciados_inferidos}
     \renewcommand{\arraystretch}{1.3}
     \small
     \begin{tabularx}{\textwidth}{|c|c|c|c|X|}
         \hline
-        \textbf{Curso} & \textbf{Asig.} & \textbf{Prob.} & \textbf{Leng.} & \textbf{Enunciado Algorítmico Deducido} \\ \hline
+        \textbf{Curso} & \textbf{Asig.} & \textbf{Prob.} & \textbf{Leng.} & \textbf{Enunciado Deducido} \\ \hline
         A2016 & Z1 & Z1 & C & Calcular la suma de puntos de tres estudiantes (Tarik, Bojan y Mirza) en una materia con cinco rubros: primer parcial (máx. 20 pts), segundo parcial (máx. 20 pts), asistencia (máx. 10 pts), tareas (máx. 10 pts) y examen final (máx. 40 pts). Validar que los datos estén en los rangos correctos y mostrar error si algún valor no es válido. \\ \hline
         A2016 & Z1 & Z2 & C & Con los coeficientes de dos rectas en la forma $y = a_1x + b_1$ y $y = a_2x + b_2$, indicar si son paralelas, coincidentes o secantes. Si se cruzan, calcular el punto $(x, y)$ donde se cortan. \\ \hline
         A2016 & Z1 & Z3 & C & Leer una serie de letras que representan colores de autos (\texttt{c}: negro, \texttt{b}: blanco, \texttt{s}: gris, \texttt{v}: rojo, \texttt{p}: azul), terminando con la letra \texttt{'k'}. Calcular el total de autos, el porcentaje de cada color y determinar el color más frecuente. \\ \hline
@@ -139,49 +162,52 @@ En la Tabla~\ref{tab:ejemplos_enunciados_inferidos} se presentan ejemplos de los
 \end{table}
 
 % ----------------------------------------------------------------------
-\subsection{Generación de Código con IA en Serbocroata y Perfiles de Estudiante}
+\subsection{Generación de la Contraparte de IA}
 \label{subsec:generacion_ia}
 
-Para entrenar el modelo estilométrico (CharCNN) y evaluar el modelo semántico (GraphCodeBERT), se requería un conjunto de datos balanceado con 50\,\% de código humano y 50\,\% de código generado por IA sobre los mismos 72 problemas. Esta estrategia de curación dirigida se fundamenta en los hallazgos de Gunasekar et al. \cite{Gunasekar2023Textbooks} en su trabajo \textit{Textbooks Are All You Need}, donde demostraron empíricamente que un conjunto de datos sintético curado con alta densidad pedagógica y perfiles controlados permite a los modelos de lenguaje capturar y generalizar conceptos algorítmicos con mayor efectividad que colecciones masivas no filtradas.
-
-La generación se realizó mediante el script \texttt{generar\_referencias.py}, aplicando soluciones a los desafíos identificados:
+Con los enunciados disponibles, se pidió a modelos de lenguaje que resolvieran cada tarea como lo haría un estudiante. En total se generaron 1,520 archivos, de los cuales 1,453 permanecieron tras la limpieza.\footnote{Implementado en \texttt{data/generar\_referencias.py}.} Se tomaron tres decisiones para evitar atajos.
 
 \subsubsection{Control del Sesgo de Idioma}
-Si las respuestas de la IA se generaban en inglés, el clasificador aprendería a distinguir entre palabras en inglés y serbocroata en lugar de reconocer el estilo de escritura. Para evitarlo, los prompts se redactaron en serbocroata, indicando de forma explícita que las variables, funciones y mensajes al usuario debían escribirse en serbocroata (usando nombres como \texttt{broj}, \texttt{zbir}, \texttt{unos}, \texttt{temp}).
+Las instrucciones se redactaron en serbocroata y pedían que variables, funciones y mensajes también lo estuvieran (nombres como \texttt{broj}, \texttt{zbir} o \texttt{unos}). Así, el idioma deja de ser una pista para distinguir las clases.
 
 \subsubsection{Perfiles de Estudiante y Cuota de Comentarios}
-Al revisar los archivos del dataset de Sarajevo, se observó un dato relevante: \textbf{solo el 38\,\% de los códigos reales entregados por los estudiantes contiene comentarios}. En cambio, los modelos de IA suelen incluir comentarios largos y explicaciones por defecto. Para que la presencia de comentarios no fuera un atajo de clasificación, el script \texttt{generar\_}\allowbreak\texttt{referencias.py} utilizó cuatro perfiles de generación que se turnan de forma rotativa, descritos en la Tabla~\ref{tab:perfiles_generacion}.
+Las IA suelen escribir comentarios extensos por defecto, mientras que muchos estudiantes no comentan. Se observó que alrededor del 38\,\% de los códigos humanos del conjunto base incluía comentarios. % TODO verificar: cifra heredada del texto anterior y del comentario en generar_referencias.py; no reproducida con una medición propia.
+Para no dejar la presencia de comentarios como pista fácil, se definieron seis perfiles de generación que se turnan, resumidos en la Tabla~\ref{tab:perfiles_generacion}. En el conjunto final, los perfiles con comentarios suman 433 de los 1,453 archivos (cerca del 30\,\%), algo por debajo de la cuota objetivo.
 
 \begin{table}[H]
     \centering
-    \caption{Perfiles de simulación de estudiantes en la generación sintética.}
+    \caption{Perfiles de simulación de estudiantes usados en la generación de código de IA.}
     \label{tab:perfiles_generacion}
     \begin{tabularx}{\textwidth}{|l|c|X|}
         \hline
         \textbf{Perfil} & \textbf{Temp. ($T$)} & \textbf{Comportamiento Estilístico} \\ \hline
-        \texttt{descuidado} & $0.85$ & Simula un estudiante promedio: variables cortas (\texttt{i, j, temp, a, b}), código simple y \textbf{sin comentarios}. \\ \hline
-        \texttt{aplicado} & $0.40$ & Simula un estudiante dedicado: variables descriptivas (\texttt{brojacKaraktera, sumaBodova}), código ordenado y \textbf{sin comentarios}. \\ \hline
-        \texttt{kompaktan} & $0.70$ & Simula un estudiante que escribe poco: variables de una sola letra, todo dentro de \texttt{main()}, \textbf{sin comentarios}. \\ \hline
-        \texttt{comentado-bueno} & $0.40$ & Simula un estudiante que documenta su solución: comentarios explicativos en serbocroata, calibrado para cubrir el 38\,\% de códigos comentados. \\ \hline
+        \texttt{descuidado} & $0.85$ & Estudiante promedio: variables cortas (\texttt{i, j, temp, a, b}), código simple y sin comentarios. \\ \hline
+        \texttt{aplicado} & $0.40$ & Estudiante dedicado: variables descriptivas (\texttt{brojacKaraktera, sumaBodova}), código ordenado y sin comentarios. \\ \hline
+        \texttt{kompaktan} & $0.70$ & Estudiante que escribe poco: nombres mínimos, código muy directo y sin comentarios. \\ \hline
+        \texttt{comentado-bueno} & $0.40$ & Estudiante sobresaliente: comentarios detallados en serbocroata y código ordenado. \\ \hline
+        \texttt{comentado-basic} & $0.70$ & Estudiante promedio: algún comentario breve, estilo informal. \\ \hline
+        \texttt{comentado-malo} & $0.85$ & Estudiante apresurado: comentarios obvios agregados a última hora y errores ocasionales. \\ \hline
     \end{tabularx}
 \end{table}
 
-\subsubsection{Variedad de Modelos de Lenguaje}
-Para que el sistema no se ajuste al estilo de una sola empresa, se generaron muestras con modelos comerciales vía API (\textit{GPT-4o, Claude 3.5, Gemini 1.5}) y con modelos abiertos ejecutados localmente mediante \textbf{Ollama} (\textit{CodeLlama 7B, DeepSeek-Coder, Qwen2.5-Coder}).
+La temperatura ($T$) es un parámetro del modelo de lenguaje: valores altos producen respuestas más variadas y valores bajos, más conservadoras.
+
+\subsubsection{Variedad de Generadores}
+El código de IA no proviene de un solo modelo, pero sí está muy concentrado. De los 1,453 archivos finales, 1,021 provienen de \textit{DeepSeek-Chat} y 424 de \textit{Qwen3}; los 8 restantes provienen de otros cinco modelos (Codestral, Gemini Flash, Llama 4, Kimi y Mistral Small). Es decir, más del 99\,\% del código de IA viene de dos generadores. Esto es una limitación importante: aún no se sabe qué tan bien se reconocerá código de IA producido por otros modelos. Se retoma en los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
 
 % ----------------------------------------------------------------------
-\subsection{Ejemplo Comparativo: Código Humano vs. Código de IA}
+\subsection{Ejemplo Comparativo: Código Humano frente a Código de IA}
 \label{subsec:caso_estudio_comparativo}
 
-Para apreciar las diferencias que procesa Graphito, los Listados~\ref{lst:codigo_humano_srb} y~\ref{lst:codigo_ia_srb} muestran dos soluciones en C para el problema A2016/Z1/Z1 (cálculo de notas de estudiantes). Ambos programas resuelven el mismo problema y están en serbocroata.
+Los Listados~\ref{lst:codigo_humano_srb} y~\ref{lst:codigo_ia_srb} muestran dos soluciones en C del problema A2016/Z1/Z1 (cálculo de notas de estudiantes). Ambas resuelven el mismo problema y están en serbocroata.
 
-\begin{lstlisting}[language=C, caption={Código humano: Estudiante real del curso A2016.}, label={lst:codigo_humano_srb}]
+\begin{lstlisting}[language=C, caption={Código humano: estudiante real del curso A2016.}, label={lst:codigo_humano_srb}]
 #include <stdio.h>
 
 int main() {
     float p1, p2, prisustvo, zadace, zavrsni;
     float ukupno;
-    
+
     printf("Unesite bodove za Tarika: \n");
     printf("I parcijalni ispit: ");
     scanf("%f", &p1);
@@ -201,13 +227,13 @@ int main() {
         printf("Neispravan broj bodova");
         return 0;
     }
-    
+
     ukupno = p1 + p2 + prisustvo;
     return 0;
 }
 \end{lstlisting}
 
-\begin{lstlisting}[language=C, caption={Código sintético: Generado por IA en serbocroata (perfil aplicado).}, label={lst:codigo_ia_srb}]
+\begin{lstlisting}[language=C, caption={Código sintético: generado por IA en serbocroata (perfil aplicado).}, label={lst:codigo_ia_srb}]
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -221,155 +247,308 @@ bool validirajUnos(float p1, float p2, float pris) {
 int main(void) {
     float parcijalni1, parcijalni2, prisustvoBodovi;
     float ukupnaOcjena;
-    
+
     printf("Unesite bodove za prvog studenta:\n");
     scanf("%f %f %f", &parcijalni1, &parcijalni2, &prisustvoBodovi);
-    
+
     if (!validirajUnos(parcijalni1, parcijalni2, prisustvoBodovi)) {
         printf("Neispravan broj bodova\n");
         return 0;
     }
-    
+
     ukupnaOcjena = parcijalni1 + parcijalni2 + prisustvoBodovi;
     return 0;
 }
 \end{lstlisting}
 
-En este escenario donde el enunciado del problema y las condiciones de ejecución son idénticas, se hacen evidentes las divergencias estructurales y de superficie que fundamentan la necesidad del enfoque bimodal. En la Tabla~\ref{tab:caso_estudio_humano_ia} se sintetiza el contraste entre ambas implementaciones a través de cinco dimensiones analíticas clave.
+Con el mismo enunciado y las mismas condiciones, aparecen diferencias de estructura y de superficie. La Tabla~\ref{tab:caso_estudio_humano_ia} las resume en cinco dimensiones. Este ejemplo ilustra por qué Graphito usa dos canales que miran cosas distintas: uno la lógica del programa y otro la forma en que está escrito.
 
 \begin{table}[H]
     \centering
-    \caption{Contraste de características entre implementación humana y sintética (Caso de Estudio).}
+    \caption{Contraste entre una implementación humana y una de IA para el mismo problema.}
     \label{tab:caso_estudio_humano_ia}
     \renewcommand{\arraystretch}{1.25}
     \small
     \begin{tabularx}{\textwidth}{|l|X|X|X|}
         \hline
-        \textbf{Dimensión} & \textbf{Implementación Humana} & \textbf{Implementación Sintética (IA)} & \textbf{Implicación para el Modelo} \\ \hline
-        Modularidad & Monolítica (\texttt{main}), lógica y control integrados en un bloque único. & Modular (\texttt{validirajUnos}), separación explícita de responsabilidades. & El canal semántico debe abstraer funciones auxiliares sin alterar el flujo de datos. \\ \hline
-        Identificadores & Nombres abreviados y concisos (\texttt{p1}, \texttt{p2}, \texttt{pris}). & Nombres auto-descriptivos (\texttt{parcijalni1}, \texttt{prisustvoBodovi}). & Requiere normalización semántica e invariancia léxica en GraphCodeBERT. \\ \hline
-        Tipado y Literales & Conversión implícita de tipos enteros (\texttt{0}, \texttt{10}, \texttt{20}). & Constantes de punto flotante explícitas (\texttt{0.0f}, \texttt{20.0f}). & Patrón estilométrico detectable a nivel de flujo de caracteres por CharCNN. \\ \hline
-        Estilo y Formato & Espaciado compacto, indentación irregular y flujo lineal. & Formato canónico, sangría regular y saltos de línea estructurados. & Justifica la normalización selectiva para evitar atajos espurios (\textit{shortcuts}). \\ \hline
-        Equivalencia Lógica & Resuelve el cálculo de notas con validación en cascada. & Idéntica cobertura de requisitos y rangos de validez algorítmica. & Demuestra la necesidad de grafos DFG para capturar similitud funcional. \\ \hline
+        \textbf{Dimensión} & \textbf{Implementación Humana} & \textbf{Implementación de IA} & \textbf{Qué sugiere para el análisis} \\ \hline
+        Modularidad & Todo dentro de \texttt{main}, con la lógica mezclada. & Función auxiliar (\texttt{validirajUnos}) que separa responsabilidades. & La lógica puede reorganizarse sin cambiar lo que el programa hace. \\ \hline
+        Identificadores & Nombres abreviados (\texttt{p1}, \texttt{p2}, \texttt{pris}). & Nombres descriptivos (\texttt{parcijalni1}, \texttt{prisustvoBodovi}). & Los nombres son una pista de estilo, pero también pueden cambiarse sin alterar la lógica. \\ \hline
+        Tipado y literales & Constantes enteras (\texttt{0}, \texttt{10}, \texttt{20}). & Constantes de punto flotante explícitas (\texttt{0.0f}, \texttt{20.0f}). & Es un rasgo visible a nivel de caracteres, que el canal de estilo puede captar. \\ \hline
+        Estilo y formato & Espaciado compacto y sangría irregular. & Formato regular y saltos de línea ordenados. & Si no se neutraliza, el formato puede ser un atajo (Sección~\ref{subsec:limpieza_simetrica}). \\ \hline
+        Equivalencia lógica & Valida los rangos uno por uno. & Cubre los mismos requisitos y rangos. & Dos programas con lógica equivalente pueden verse muy distintos por fuera. \\ \hline
     \end{tabularx}
 \end{table}
 
-Como se desprende de la Tabla~\ref{tab:caso_estudio_humano_ia}, evaluar la originalidad de un código no puede depender de una sola dimensión: mientras que la lógica algorítmica de ambos códigos converge hacia un mismo objetivo funcional (requiriendo una abstracción profunda de grafos de flujo de datos), la microestructura de caracteres y los hábitos de escritura revelan patrones estilométricos marcadamente dispares.
+Como indica la Tabla~\ref{tab:caso_estudio_humano_ia}, un solo rasgo no basta para valorar un código: la lógica de ambos programas converge, mientras que los hábitos de escritura son claramente distintos.
+
+% ----------------------------------------------------------------------
+\subsection{¿Cuántos Ejemplos de IA Bastan? Curva de Aprendizaje}
+\label{subsec:justificacion_tamano_sintetico}
+
+Generar código con modelos de lenguaje cuesta tiempo y dinero. La pregunta práctica fue: ¿conviene seguir generando ejemplos de IA o ya se alcanzó una zona de rendimientos decrecientes? Es como estudiar para un examen: los primeros ejemplos enseñan mucho, pero cada ejemplo parecido adicional enseña menos. La planeación inicial contemplaba un corpus de 20,000 códigos (10,000 por clase); se diseñó un experimento pre-registrado para decidir si era necesario llegar a esa meta.
+
+Antes de describir el experimento conviene aclarar por qué la curva llega a 874 ejemplos de IA y no a los 1,520 que se generaron. La diferencia no se debe a que se descartara código de forma arbitraria, sino a tres pasos que se explican con detalle en la Sección~\ref{sec:preparacion_datos} y que se resumen en la Tabla~\ref{tab:conteo_ia}:
+
+\begin{enumerate}
+    \item \textbf{Limpieza (1,520 $\rightarrow$ 1,453).} Se excluyeron 67 archivos: 55 generaciones fallidas o casi vacías y 12 duplicados que habrían quedado repartidos entre entrenamiento y prueba. Se aplicó el mismo criterio que al código humano.
+    \item \textbf{Partición (1,453 $\rightarrow$ 897).} Los 1,453 archivos se reparten por tarea entre entrenamiento (897), validación (225) y prueba (331). Solo el entrenamiento puede usarse para enseñar al modelo; la validación sirve para medir la curva y la prueba se reserva intacta para la evaluación final del Capítulo~\ref{cap:modelado}. Usar esos archivos aquí sería como dejar que el alumno vea las preguntas del examen.
+    \item \textbf{Duplicados internos (897 $\rightarrow$ 874).} Algunos de los 897 archivos de entrenamiento son prácticamente iguales entre sí. Cada familia de casi-copias cuenta como un solo ejemplo, porque repetir el mismo código no enseña nada nuevo. Quedan 874 ejemplos únicos.
+\end{enumerate}
+
+\begin{table}[H]
+    \centering
+    \caption{De los archivos de IA generados a los ejemplos usados en la curva de aprendizaje.}
+    \label{tab:conteo_ia}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\textwidth}{|l|c|X|}
+        \hline
+        \textbf{Etapa} & \textbf{Archivos de IA} & \textbf{Motivo} \\ \hline
+        Generados & 1,520 & Total producido por los modelos de lenguaje. \\ \hline
+        Tras la limpieza & 1,453 & Se excluyen 67: generaciones fallidas o casi vacías (55) y duplicados entre particiones (12). \\ \hline
+        En entrenamiento & 897 & El resto (225 en validación y 331 en prueba) no se usa para entrenar. \\ \hline
+        Ejemplos únicos en entrenamiento & 874 & Las casi-copias cuentan como un solo ejemplo. \\ \hline
+    \end{tabularx}
+\end{table}
+
+Así, cuando la curva habla del 100\,\% se refiere al 100\,\% de los ejemplos de IA \emph{disponibles para entrenar} (874), no al total generado.
+
+El experimento usó la red convolucional de caracteres \textit{MultiScaleCharCNN} (Capítulo~\ref{cap:modelado}). Se mantuvo intacto el código humano de entrenamiento (10,688 ejemplos únicos, uno por familia de casi-copias, de los 24,810 archivos humanos de entrenamiento) y se varió la cantidad de código de IA de entrenamiento en 12 fracciones: 5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90 y 100\,\%. Eso corresponde a entre 55 y 874 grupos únicos de IA, tomados de los 897 archivos de IA de entrenamiento. Para controlar la variabilidad:
+
+\begin{enumerate}
+    \item \textbf{Submuestras anidadas por grupo.} Los archivos se eligieron por grupo de duplicados (\texttt{dup\_group}, Sección~\ref{subsec:deduplicacion}) y por tarea. Con una misma semilla, cada subconjunto contiene al anterior, así los cambios no se deben a un reparto distinto de los datos.
+    \item \textbf{Repeticiones.} Cada fracción se entrenó con 5 semillas independientes \cite{Bouthillier2021Variance}, es decir, 60 entrenamientos en total.
+    \item \textbf{Evaluación en validación.} Las métricas se calcularon en el conjunto de validación completo (6,808 archivos humanos y 225 de IA); el conjunto de prueba no se tocó. Como las clases están muy desbalanceadas, la métrica principal fue PR-AUC, elegida por el uso previsto (encontrar pocos casos de IA con pocas falsas alarmas) y no solo por el desbalance \cite{McDermott2024AUROC}; resume qué tan bien el modelo encuentra los casos de IA sin generar demasiadas falsas alarmas (1 es perfecto; vale más cuanto más cerca de 1).
+\end{enumerate}
+
+La Figura~\ref{fig:curva_aprendizaje_charcnn} muestra la curva observada.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figuras/curva_aprendizaje_charcnn.png}
+    \caption{Curva de aprendizaje de MultiScaleCharCNN según la cantidad de grupos únicos de IA de entrenamiento. La línea sólida es la media de 5 semillas (banda sombreada: $\pm 1\,\sigma$) y los puntos semitransparentes son corridas individuales. El 100\,\% equivale a 874 grupos únicos, tomados de los 897 archivos de IA de entrenamiento.}
+    \label{fig:curva_aprendizaje_charcnn}
+\end{figure}
+
+El criterio de saturación pre-registrado consideraba la curva saturada si la ganancia media de PR-AUC entre el 50\,\% ($n=439$) y el 100\,\% ($n=874$) era menor que $0.01$ y menor que la desviación estándar del 100\,\%. Los resultados fueron:
+
+\begin{itemize}
+    \item Con el 5\,\% de los datos ($n=55$), el resultado es muy inestable (PR-AUC $= 0.5546 \pm 0.2988$).
+    \item Con el 20\,\% ($n=182$) y el 30\,\% ($n=256$) el modelo se estabiliza: PR-AUC de $0.9240 \pm 0.0108$ y $0.9522 \pm 0.0113$.
+    \item Entre el 50\,\% ($0.9667 \pm 0.0074$) y el 100\,\% ($0.9816 \pm 0.0038$), la ganancia es de $0.0148$, con una desviación del 100\,\% de $0.0038$.
+\end{itemize}
+
+Como $0.0148 > 0.01$, el criterio clasifica la curva como \textit{aún no saturada en sentido estricto}: el modelo sigue mejorando un poco con más ejemplos. Aun así, el avance se vuelve pequeño. Del 30\,\% al 100\,\% se agregan 618 grupos y PR-AUC mejora solo $0.0294$. La Figura~\ref{fig:mejora_marginal_charcnn} muestra la ganancia en cada paso: es grande al principio y pequeña después, lo que sugiere que triplicar los datos de IA aportaría poco.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figuras/mejora_marginal_charcnn_lc.png}
+    \caption{Mejora marginal de PR-AUC en validación entre fracciones consecutivas de datos de IA. Las tres primeras transiciones superan el ruido promedio entre semillas (línea punteada); las siguientes quedan por debajo de él.}
+    \label{fig:mejora_marginal_charcnn}
+\end{figure}
+
+Dos advertencias acompañan estos resultados. Primero, el conjunto de validación también se usó para decidir cuándo detener cada entrenamiento, así que los valores absolutos pueden ser algo optimistas; el sesgo afecta por igual a todos los puntos de la curva. Segundo, el experimento solo cambia la \emph{cantidad} de código de un mismo generador. En este conjunto, el límite parece ser la \textbf{diversidad} de generadores y no el volumen. Con esta evidencia se decidió no seguir generando código de IA y conservar los 1,520 archivos ya generados (874 ejemplos únicos de entrenamiento, Tabla~\ref{tab:conteo_ia}) en lugar de perseguir la meta planificada de 10,000; se remite la pregunta de la generalización a otros modelos a los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
 
 % ======================================================================
 \section{Preparación y Preprocesamiento de Datos}
 \label{sec:preparacion_datos}
 % ======================================================================
 
-Una vez reunido el conjunto de datos, los archivos deben transformarse para que los modelos neuronales puedan procesarlos adecuadamente. A diferencia de los flujos convencionales, Graphito divide el procesamiento en dos canales independientes.
+Antes de enseñar a los modelos, hay que asegurarse de que el examen sea justo. Esta sección describe cuatro pasos: limpiar los archivos, retirar duplicados, dividir el conjunto sin fuga de información y adaptar el texto a cada canal. La Figura~\ref{fig:embudo_datos} anticipa el efecto de los dos primeros pasos sobre el número de archivos.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={rectangle, draw=black!60, fill=blue!6, rounded corners=3pt, text width=3.6cm, align=center, inner sep=6pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[box, fill=gray!12] (orig) {\textbf{Archivos originales}\\43,771 humanos\\1,520 de IA};
+        \node[box, fill=orange!15, right=1.1cm of orig] (excl) {\textbf{Se excluyen}\\2,835 humanos\\67 de IA};
+        \node[box, fill=green!12, right=1.1cm of excl] (final) {\textbf{Conjunto final}\\40,936 humanos\\1,453 de IA\\Total: 42,389};
+        \draw[arrow] (orig.east) -- (excl.west);
+        \draw[arrow] (excl.east) -- (final.west);
+    \end{tikzpicture}
+    \caption{Efecto de la limpieza y de la eliminación de duplicados que cruzarían particiones sobre el número de archivos.}
+    \label{fig:embudo_datos}
+\end{figure}
 
 % ----------------------------------------------------------------------
-\subsection{Bifurcación del Pipeline de Datos}
+\subsection{Limpieza Simétrica y Aprendizaje de Atajos}
+\label{subsec:limpieza_simetrica}
+
+La limpieza se aplica con el mismo criterio al código humano y al de IA. Se descartan los archivos vacíos, los demasiado cortos (menos de 50 caracteres efectivos), los que son copias por nombre de archivo y las generaciones fallidas. En total se excluyeron 2,835 archivos humanos y 67 de IA, incluidos los duplicados que se describen en la Sección~\ref{subsec:deduplicacion}.
+
+Además se eliminan las pistas que no tienen que ver con el estilo de programación. El ejemplo principal es la cabecera del curso: líneas como ``Zadaca 6'' o ``Tutorijal 13'' aparecían en cerca de la mitad de los archivos humanos de una muestra revisada y en casi ninguno de los de IA. Si se dejaran, un modelo podría clasificar mirando esa línea. Este fenómeno se conoce como \textit{aprendizaje de atajos} (\textit{shortcut learning}) \cite{Geirhos2020Shortcut}: es el alumno que aprueba reconociendo la letra del examen en lugar de entender la materia. Lo mismo ocurre con los comentarios y con la sangría, que dependen del editor que se use y no del autor. Por eso estos elementos se neutralizan para ambas clases, como se detalla en la Sección~\ref{subsec:prep_estilometria}.
+
+% ----------------------------------------------------------------------
+\subsection{Eliminación de Duplicados}
+\label{subsec:deduplicacion}
+
+En cursos introductorios muchas entregas son idénticas o casi idénticas. Si una misma solución aparece en entrenamiento y en prueba, el modelo parece acertar cuando en realidad solo la recuerda. Se aplican dos detecciones:
+
+\begin{itemize}
+    \item \textbf{Duplicados exactos.} Dos archivos que tienen la misma secuencia de elementos del programa, sin contar comentarios ni espacios, se consideran el mismo.
+    \item \textbf{Duplicados casi exactos.} Dentro de cada tarea se comparan los archivos por fragmentos de cinco elementos consecutivos, ignorando los nombres de variables. Si comparten al menos el 85\,\% de sus fragmentos (similitud de Jaccard sobre fragmentos \cite{Broder1997Resemblance}), se agrupan, práctica habitual para evitar que los duplicados distorsionen la evaluación \cite{Lee2022Dedup}.\footnote{La búsqueda emplea MinHash con bandas (LSH) \cite{Broder1997Resemblance} para evitarse comparar todos los pares de archivos (\texttt{models/evaluation/dedup.py}). Se midió la sensibilidad con los umbrales 0.80, 0.85 y 0.90.}
+\end{itemize}
+
+Cada conjunto de archivos equivalentes forma un \textbf{grupo de duplicados} (\texttt{dup\_group}), que es como una ``familia'' de entregas. Una familia nunca se reparte entre particiones. Si una familia aparece en tareas asignadas a particiones distintas, se conserva en la partición más reservada (prueba antes que validación y esta antes que entrenamiento) y se excluyen sus demás miembros. En total se excluyeron 236 archivos por esta causa (224 humanos y 12 de IA).
+
+% ----------------------------------------------------------------------
+\subsection{Partición \texttt{split\_v1} para Evitar Fuga de Información}
+\label{subsec:particion_datos}
+
+Dividir los archivos al azar es un error habitual. Allamanis \cite{Allamanis2019Adverse} mostró que la duplicación entre entrenamiento y prueba puede inflar de forma artificial las métricas de modelos de código, porque el modelo ya vio versiones casi idénticas de lo que se le pide evaluar. Esa situación se llama \textbf{fuga de información} \cite{Kapoor2023Leakage}. Equivale a estudiar con las mismas preguntas del examen.
+
+Para evitarla, la partición \texttt{split\_v1} se hace por \textbf{tarea} y no por archivo (Figura~\ref{fig:esquema_particion}):
+
+\begin{itemize}
+    \item Una tarea se identifica por la letra del curso y los códigos \texttt{Zx/Zy}; así, las entregas de 2016 y de 2017 de una misma tarea forman un solo \textbf{bloque}. Se obtienen 48 bloques.
+    \item Cada bloque, con todo su código humano y de IA, se asigna completo a entrenamiento (30 bloques), validación (8) o prueba (10).
+    \item Las proporciones objetivo son 20\,\% de los bloques para prueba y 15\,\% para validación, por letra de curso, con semilla 42.
+    \item El resultado se guarda en un archivo con huella digital (sha256) para que cualquiera pueda comprobar que se usa la misma partición.\footnote{Construida con \texttt{scripts/build\_split.py} y registrada en \texttt{data/splits/split\_v1.json.gz}.}
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        top/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=8.4cm, align=center, inner sep=6pt, font=\small},
+        col/.style={rectangle, draw=black!60, rounded corners=3pt, text width=3.7cm, align=center, inner sep=6pt, font=\small},
+        note/.style={rectangle, draw=black!60, dashed, rounded corners=3pt, text width=3.7cm, align=center, inner sep=4pt, font=\footnotesize},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[top] (blocks) {\textbf{48 bloques (una tarea cada uno)}\\Las entregas de 2016 y 2017 de una tarea viajan juntas};
+        \node[col, fill=blue!8, below=1.1cm of blocks, xshift=-4.1cm] (tr) {\textbf{Entrenamiento}\\30 bloques\\p.\,ej., A/Z1/Z3\\Los modelos aprenden aquí};
+        \node[col, fill=cyan!10, below=1.1cm of blocks] (va) {\textbf{Validación}\\8 bloques\\p.\,ej., A/Z1/Z2\\Ajuste de umbrales y paro anticipado};
+        \node[col, fill=orange!15, below=1.1cm of blocks, xshift=4.1cm] (te) {\textbf{Prueba}\\10 bloques\\p.\,ej., A/Z1/Z1\\Evaluación final};
+        \node[note, below=0.5cm of te] (lock) {Nunca se usa para tomar decisiones de diseño};
+        \draw[arrow] (blocks.south) -- (tr.north);
+        \draw[arrow] (blocks.south) -- (va.north);
+        \draw[arrow] (blocks.south) -- (te.north);
+        \draw[arrow] (te.south) -- (lock.north);
+    \end{tikzpicture}
+    \caption{Esquema de la partición \texttt{split\_v1}: cada tarea, con sus dos años y sus dos clases, pertenece a una sola partición.}
+    \label{fig:esquema_particion}
+\end{figure}
+
+La partición por tarea evita que el mismo problema aparezca en dos particiones, pero no impide que un mismo estudiante tenga entregas en varias. Esta limitación se tiene en cuenta al interpretar los resultados del Capítulo~\ref{cap:modelado}.
+
+% ----------------------------------------------------------------------
+\subsection{Preparación para Cada Canal}
 \label{subsec:bifurcacion_pipeline}
 
-El principio rector de Graphito reside en que ningún modelo individual puede resolver simultáneamente la comprensión de lógica algorítmica y la detección de huellas de autoría sin comprometer su precisión. En consecuencia, cada archivo fuente se somete a una bifurcación de preprocesamiento especializada: el canal semántico requiere maximizar la invariancia ante variaciones léxicas, mientras que el canal estilométrico exige preservar con fidelidad la microestructura del texto. En la Tabla~\ref{tab:pipeline_dual_preprocesamiento} se comparan las transformaciones aplicadas a cada componente del código fuente en ambos canales.
+Graphito analiza cada archivo con dos canales que miran cosas distintas: el \textbf{Canal A} compara la similitud semántica (qué hace el programa) y el \textbf{Canal B} produce un indicador estilométrico (cómo está escrito). Cada uno lee el código a su manera, como dos lectores: uno busca la idea del texto y otro, la caligrafía. La Figura~\ref{fig:bifurcacion_preprocesamiento} muestra cómo se bifurca la preparación y la Tabla~\ref{tab:pipeline_dual_preprocesamiento} compara ambos tratamientos.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        file/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=1.7cm, align=center, inner sep=5pt, font=\footnotesize},
+        stepb/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=2.2cm, minimum height=1.3cm, align=center, inner sep=4pt, font=\footnotesize},
+        stepa/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=2.2cm, minimum height=1.3cm, align=center, inner sep=4pt, font=\footnotesize},
+        lab/.style={font=\footnotesize\bfseries, anchor=west},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[file] (f) at (0,0) {Archivo fuente en C o C++};
+        \node[stepb] (b1) at (3.0,1.1) {Texto normalizado (5 pasos)};
+        \node[stepb] (b2) at (5.7,1.1) {Ventanas de 4,096 caracteres};
+        \node[stepb] (b3) at (8.4,1.1) {Índices numéricos};
+        \node[stepa] (a1) at (3.0,-1.1) {Sin comentarios};
+        \node[stepa] (a2) at (5.7,-1.1) {Árbol sintáctico (Tree-sitter)};
+        \node[stepa] (a3) at (8.4,-1.1) {Grafo de flujo de datos};
+        \node[stepa] (a4) at (11.1,-1.1) {Ventanas de subtokens};
+        \node[lab] at (2.0,2.1) {Canal B (estilo)};
+        \node[lab] at (2.0,-2.1) {Canal A (semántica)};
+        \draw[arrow] (f.east) -- (b1.west);
+        \draw[arrow] (f.east) -- (a1.west);
+        \draw[arrow] (b1.east) -- (b2.west);
+        \draw[arrow] (b2.east) -- (b3.west);
+        \draw[arrow] (a1.east) -- (a2.west);
+        \draw[arrow] (a2.east) -- (a3.west);
+        \draw[arrow] (a3.east) -- (a4.west);
+    \end{tikzpicture}
+    \caption{Bifurcación del preprocesamiento: un mismo archivo se prepara de forma distinta para el Canal B (texto de caracteres) y para el Canal A (estructura y flujo de datos).}
+    \label{fig:bifurcacion_preprocesamiento}
+\end{figure}
 
 \begin{table}[H]
     \centering
-    \caption{Tratamiento diferencial en el pipeline dual de preprocesamiento.}
+    \caption{Tratamiento de cada componente del código en los dos canales.}
     \label{tab:pipeline_dual_preprocesamiento}
     \renewcommand{\arraystretch}{1.25}
     \small
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
-        \textbf{Componente} & \textbf{Canal Semántico (GraphCodeBERT)} & \textbf{Canal Estilométrico (CharCNN)} \\ \hline
-        Comentarios & Removidos en su totalidad (no aportan a la semántica ejecutable). & Conservados íntegramente (reflejan hábitos de documentación y estilo). \\ \hline
-        Nombres de Variables & Mapeados a nodos de flujo de datos (DFG); tokens normalizados. & Preservados carácter por carácter (capturan patrones de nomenclatura). \\ \hline
-        Indentación & Normalizada a profundidad sintáctica para evitar sesgos espurios. & Normalizada selectivamente (llaves), preservando espacios periféricos. \\ \hline
-        Espacios y Saltos & Condensados o ignorados por el tokenizador BPE. & Conservados como caracteres literales (densidad y espaciado de operadores). \\ \hline
-        Representación Final & Secuencia de tokens BPE + Aristas DFG (longitud máx. 512). & Matriz de índices de caracteres (vocabulario 97, longitud 4096). \\ \hline
-        Objetivo Analítico & Abstraer el propósito y equivalencia lógica del algoritmo. & Capturar la huella estilométrica y distribución visual del autor. \\ \hline
+        \textbf{Componente} & \textbf{Canal A (GraphCodeBERT)} & \textbf{Canal B (CharCNN)} \\ \hline
+        Comentarios & Eliminados antes de analizar el código. & Eliminados, igual que en el Canal A. \\ \hline
+        Nombres de variables & Se conservan; los nombres se parten en subtokens y también se usan en el grafo de flujo de datos. & Se conservan carácter por carácter. \\ \hline
+        Espacios y sangría & No influyen: el analizador sintáctico lee elementos del programa. & Tabuladores a espacios, espacios repetidos reducidos a uno, sangría y líneas vacías eliminadas; se conservan los saltos de línea. \\ \hline
+        Representación final & Subtokens del código más nodos del grafo, hasta 512 posiciones por ventana (384 de código y 128 de grafo). & Índices numéricos de 98 posibles valores (relleno, desconocido y 96 caracteres). \\ \hline
+        Archivos largos & Ventanas de 382 subtokens que avanzan de 191 en 191, hasta 16 ventanas. & Ventanas de 4,096 caracteres que avanzan de 2,048 en 2,048, hasta 8 ventanas. \\ \hline
+        Objetivo & Capturar qué hace el programa y qué relaciones de datos contiene. & Capturar rasgos de escritura que no dependen de la lógica. \\ \hline
     \end{tabularx}
 \end{table}
 
-Esta bifurcación garantiza que cada modelo reciba la representación matemática óptima para su tarea: GraphCodeBERT razona sobre dependencias y semántica formal, mientras que MultiScaleCharCNN inspecciona las sutiles marcas tipográficas y morfológicas dejadas por el programador o el generador de IA.
-
-
-% ----------------------------------------------------------------------
-\subsection{Normalización Selectiva de Indentación}
-\label{subsec:normalizacion_indentacion}
-
-Durante el análisis del dataset base de 2016, se detectó un factor importante: muchos estudiantes de esa época escribían código sin indentar o con sangrías irregulares. En contraste, los estudiantes actuales trabajan habitualmente con editores de código modernos (como Visual Studio Code, CLion o Code::Blocks) que aplican auto-indentación de manera automática al escribir o guardar los archivos.
-
-Si los códigos generados por inteligencia artificial presentan siempre una indentación uniforme y los códigos de alumnos antiguos conservan sangrías desalineadas o nulas, la red neuronal podría aprender un atajo engañoso: clasificar como humano todo código mal indentado y como IA todo código bien indentado. Este comportamiento responde al fenómeno formalizado por Geirhos et al. \cite{Geirhos2020Shortcut} como \textit{aprendizaje de atajos} (\textit{shortcut learning}), en el cual las redes neuronales profundas explotan correlaciones estadísticas superficiales y espurias (en este caso, los patrones de espaciado impuestos por los entornos de desarrollo) en lugar de abstraer las características semánticas o estilométricas subyacentes. Esto provocaría una fuga de información (\textit{data leakage}) que invalidaría el desempeño del clasificador frente a entregas de alumnos actuales.
-
-Para mitigar este riesgo, se desarrolló la herramienta \texttt{indent\_}\allowbreak\texttt{only.py} (ubicada en \texttt{data/}). Este script aplica una \textbf{normalización selectiva de indentación} sobre la totalidad de los archivos (tanto humanos como sintéticos), simulando el comportamiento de un editor actual:
-
-\begin{itemize}
-    \item Ajusta únicamente la profundidad de sangría según los niveles de anidamiento de llaves (\texttt{\{} y \texttt{\}}).
-    \item Deja completamente intacto el resto del estilo del autor: espacios alrededor de operadores, posición de apertura de llaves, estilo y contenido de comentarios, y saltos de línea.
-\end{itemize}
-
-De esta manera, la indentación queda estandarizada en ambos grupos, obligando a los modelos a aprender patrones de autoría reales y no la simple presencia de auto-formateo en el editor.
-
-% ----------------------------------------------------------------------
-\subsection{Preprocesamiento para el Canal Semántico (GraphCodeBERT)}
-\label{subsec:prep_semantica}
-
-El procesamiento del canal semántico, implementado en el script \texttt{parser.py} (módulo \texttt{models/}\allowbreak\texttt{graphcodebert/}), comprende cuatro pasos:
-
-\begin{enumerate}
-    \item \textbf{Limpieza de comentarios:} Se eliminan los comentarios simples (\texttt{//}) y multilínea (\texttt{/* ... */}) protegiendo el contenido de las cadenas de texto. Se reducen los espacios múltiples a un solo espacio.
-    \item \textbf{Normalización de variables:} Los identificadores definidos por el usuario se convierten a nombres estandarizados (\texttt{VAR\_0}, \texttt{VAR\_1}, \texttt{FUNC\_0}), evitando que el renombre de variables altere la comparación.
-    \item \textbf{Generación del AST con Tree-sitter:} Se procesa el código fuente mediante el analizador sintáctico incremental \textbf{Tree-sitter} \cite{Brunsfeld2021Treesitter} para C y C++. Basado en algoritmos de análisis sintáctico GLR (\textit{Generalized Left-to-right Rightmost}) tolerantes a fallos, Tree-sitter permite derivar árboles de sintaxis abstracta consistentes incluso ante código estudiantil incompleto o con errores de sintaxis locales.
-    \item \textbf{Construcción del Grafo de Flujo de Datos (DFG):} Se recorren las variables en el AST y se crean aristas dirigidas desde donde una variable recibe su valor hacia donde ese valor se utiliza, conectando la secuencia de tokens con las relaciones de datos.
-\end{enumerate}
-
-% ----------------------------------------------------------------------
-\subsection{Preprocesamiento para el Canal Estilométrico (CharCNN)}
+\subsubsection{Canal B: Normalización Simétrica para CharCNN}
 \label{subsec:prep_estilometria}
 
-El procesamiento estilométrico, desarrollado en la clase \texttt{CharPreprocessor} (módulo \texttt{models/}\allowbreak\texttt{char\_cnn/}\allowbreak\texttt{preprocess.py}), trata el código como una secuencia continua de caracteres:
+El Canal B trata el código como una secuencia de caracteres. Antes de leerlo se aplican cinco pasos, iguales para código humano y de IA (de ahí el nombre ``simétrica''):
 
 \begin{enumerate}
-    \item \textbf{Preservación de formato original:} Se conserva la distribución del archivo una vez normalizada la indentación: espacios junto a operadores, ubicación de llaves y comentarios.
-    \item \textbf{Mapeo a vocabulario de caracteres:} Se define un conjunto de $96$ caracteres ASCII imprimibles (letras, dígitos, signos de puntuación de C/C++ y espacios controlados). El índice $0$ se reserva para caracteres no reconocidos o relleno, conformando un vocabulario de $97$ dimensiones.
-    \item \textbf{Ajuste a longitud fija ($L = 4096$):} Para procesar el código en lotes de tamaño uniforme en la red convolucional, se utiliza la estrategia \textit{Head-Tail}:
-    \begin{equation}
-        \text{Texto}_{ajustado} = \text{Texto}[0 : 1024] + \text{Texto}[-(L - 1024) : ]
-    \end{equation}
-    Esto conserva los primeros $1024$ caracteres (cabecera con directivas \texttt{\#include} y declaraciones) y los últimos $3072$ caracteres (donde suele estar la lógica de la función principal y el cierre del programa). Si el archivo tiene menos de $4096$ caracteres, se completa con ceros a la derecha (\textit{zero-padding}).
+    \item Se unifican los saltos de línea y se retiran caracteres de control invisibles.
+    \item Se convierten a ASCII las comillas, guiones y espacios especiales, y las letras con diacríticos del serbocroata (por ejemplo, \texttt{č} pasa a \texttt{c}).
+    \item Se eliminan los comentarios.
+    \item Se eliminan las cabeceras y marcas del curso (Sección~\ref{subsec:limpieza_simetrica}).
+    \item Se normaliza el espacio en blanco, como se indica en la Tabla~\ref{tab:pipeline_dual_preprocesamiento}.
 \end{enumerate}
 
+El texto resultante se convierte en números. El alfabeto contiene el salto de línea y los 95 caracteres ASCII imprimibles; el valor 0 se reserva para el relleno (\textit{padding}) y el 1 para cualquier carácter desconocido, de modo que no se confunden. Como la red necesita entradas de tamaño fijo, los archivos largos se leen por \textbf{ventanas} de 4,096 caracteres que se traslapan a la mitad (hasta 8). Es como leer un documento largo por páginas que repiten la mitad de la anterior. Los archivos cortos se completan con relleno.\footnote{Implementado en \texttt{models/char\_cnn/v2/preprocess.py} y \texttt{config.py}. Una comprobación adicional verifica que no sobreviva ninguna marca del curso ni caracteres fuera del alfabeto.}
+
+\subsubsection{Canal A: Estructura y Flujo de Datos para GraphCodeBERT}
+\label{subsec:prep_semantica}
+
+El Canal A busca qué hace el programa, no cómo está escrito. Los pasos son:
+
+\begin{enumerate}
+    \item \textbf{Eliminación de comentarios,} respetando el contenido de las cadenas de texto.
+    \item \textbf{Árbol sintáctico.} El analizador \textbf{Tree-sitter} \cite{Brunsfeld2021Treesitter} reconoce la estructura del programa (funciones, ciclos, condiciones). Tolera código incompleto o con errores locales, algo común en trabajos de estudiantes.
+    \item \textbf{Grafo de flujo de datos (DFG).} Es un esquema que indica ``qué variable le pasa su valor a cuál''. Se construye una sola vez sobre el archivo completo.
+    \item \textbf{Subtokens y ventanas.} El código se divide en subtokens, es decir, trozos de palabra. Si no cabe en una sola entrada, se corta en ventanas de 382 subtokens que se traslapan a la mitad, hasta 16 ventanas. Cada ventana conserva los nodos del grafo que quedan dentro de ella.
+\end{enumerate}
+
+En esta versión los identificadores \textbf{no se renombran} (no se sustituyen por nombres genéricos). Por eso el Canal A es sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}.\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+
 % ----------------------------------------------------------------------
-\subsection{Partición por Problema para Evitar Fuga de Información}
-\label{subsec:particion_datos}
+\subsection{Composición Final del Conjunto}
+\label{subsec:composicion_final}
 
-En el entrenamiento de modelos de aprendizaje automático orientados a código fuente, realizar una división aleatoria convencional a nivel de archivo introduce severas distorsiones empíricas. Como demostró formalmente Allamanis \cite{Allamanis2019Adverse} al estudiar los efectos adversos de la duplicación en modelos de código, la superposición de soluciones o fragmentos sintácticos similares entre los conjuntos de entrenamiento y prueba infla artificialmente las métricas de rendimiento ($F_1$-score y exactitud) hasta en un 100\,\%, enmascarando una incapacidad real del modelo para generalizar ante problemas no observados.
-
-Para evitar esta fuga de información (\textit{data leakage}) y garantizar una evaluación genuinamente ciega, la división del corpus en Graphito se realiza \textbf{estrictamente agrupada por problema} (\textit{grouped split}):
-
-\begin{itemize}
-    \item Todas las soluciones asociadas a un mismo problema algorítmico (tanto las escritas por estudiantes como las generadas por los distintos modelos de IA) se asignan en bloque a un único conjunto (entrenamiento, validación o prueba).
-\end{itemize}
-
-El conjunto consolidado contiene $20,000$ muestras divididas de forma equitativa (50\,\% humano y 50\,\% IA), distribuidas como se indica en la Tabla~\ref{tab:particion_corpus}.
+Tras la limpieza, la eliminación de duplicados y la partición, el conjunto contiene 42,389 archivos: 40,936 humanos y 1,453 de IA. La Tabla~\ref{tab:particion_corpus} muestra su reparto.
 
 \begin{table}[H]
     \centering
-    \caption{Distribución y partición del conjunto de datos consolidado.}
+    \caption{Composición del conjunto de datos particionado por tarea (\texttt{split\_v1}).}
     \label{tab:particion_corpus}
-    \begin{tabularx}{\textwidth}{|l|c|c|X|}
+    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
         \hline
-        \textbf{Subconjunto} & \textbf{Porcentaje} & \textbf{Muestras} & \textbf{Uso en el Proyecto} \\ \hline
-        Entrenamiento (\textit{Train}) & 70\,\% & 14,000 & Ajuste de pesos de la red convolucional 1D. \\ \hline
-        Validación (\textit{Val}) & 15\,\% & 3,000 & Ajuste de hiperparámetros y paro anticipado (\textit{early stopping}). \\ \hline
-        Prueba (\textit{Test}) & 15\,\% & 3,000 & Evaluación final del modelo con datos no vistos. \\ \hline
+        \textbf{Subconjunto} & \textbf{Humanos} & \textbf{IA} & \textbf{Total} & \textbf{Uso en el Proyecto} \\ \hline
+        Entrenamiento (\textit{Train}) & 24,810 & 897 & 25,707 & Ajuste de pesos del modelo. \\ \hline
+        Validación (\textit{Val}) & 6,808 & 225 & 7,033 & Ajuste de hiperparámetros, umbrales y paro anticipado. \\ \hline
+        Prueba (\textit{Test}) & 9,318 & 331 & 9,649 & Evaluación final con tareas no vistas. \\ \hline
         \hline
-        \textbf{Total} & \textbf{100\,\%} & \textbf{20,000} & \textbf{Conjunto balanceado y agrupado por problema.} \\ \hline
+        \textbf{Total} & \textbf{40,936} & \textbf{1,453} & \textbf{42,389} & \textbf{Conjunto consolidado.} \\ \hline
     \end{tabularx}
 \end{table}
+
+En el conjunto, solo cerca del 3\,\% de los archivos son de IA. Este desbalance no se corrigió eliminando código humano, sino que se maneja de forma distinta según el momento:
+
+\begin{itemize}
+    \item \textbf{Durante el entrenamiento, los datos se balancean.} Si el modelo aprendiera con 97 ejemplos humanos por cada 3 de IA, le bastaría con responder casi siempre ``humano'' para acertar la mayoría de las veces, sin aprender a reconocer el código de IA. Para evitarlo, en cada época (cada pasada completa de entrenamiento) el modelo ve todos los ejemplos de IA de entrenamiento y la misma cantidad de códigos humanos, elegidos al azar. En la siguiente época se eligen otros códigos humanos. Así, cada época está balanceada (mitad y mitad) y, a lo largo del entrenamiento, el modelo recorre la variedad de los 10,688 ejemplos humanos únicos de entrenamiento (uno por familia de casi-copias) en lugar de descartarlos.
+    \item \textbf{Durante la validación y la prueba, se conserva el desbalance.} Estos conjuntos no se modifican, porque deben parecerse a un aula real, donde la gran mayoría del código es de autoría humana. Medir con datos balanceados haría que el modelo pareciera mejor de lo que sería en la práctica. Por eso, en los capítulos siguientes, además de ROC-AUC, se reporta PR-AUC, que se enfoca en qué tan bien se encuentran los pocos casos de IA sin generar muchas falsas alarmas.
+\end{itemize}
 
 % ======================================================================
 \section{Conclusión del capítulo}
 \label{sec:conclusion_ingenieria_datos}
 % ======================================================================
 
-Las etapas de Adquisición y Preparación de datos permitieron construir una base experimental sólida para Graphito. Se resolvió la falta de enunciados del dataset de Sarajevo mediante ingeniería inversa con modelos de lenguaje, se controló el sesgo lingüístico generando código sintético directamente en serbocroata con perfiles de alumnos, se previno la fuga de información por formateadores modernos mediante una normalización selectiva de indentación y se dividió el procesamiento en dos canales independientes para satisfacer los requerimientos de los modelos.
+Este capítulo describió cómo se construyó la base de datos de Graphito. Se partió de código humano anterior a la IA generativa, se reconstruyeron los enunciados que faltaban y se generó una contraparte de IA sobre los mismos problemas, en el mismo idioma y con perfiles de estudiante. Un experimento de curva de aprendizaje sugiere que más ejemplos del mismo generador aportarían poco, y que la limitación principal es la diversidad de generadores. Después se limpiaron los archivos con el mismo criterio para ambas clases, se retiraron duplicados, se dividió el conjunto por tarea para evitar la fuga de información y se preparó el texto para cada canal. El resultado es un conjunto de 42,389 archivos, con muchos más archivos humanos que de IA, a propósito.
 
-Con este conjunto de datos preparado, en el siguiente capítulo se aborda la fase de **Modelado y Experimentación**, detallando la arquitectura de la red CharCNN, el uso de GraphCodeBERT con adaptadores LoRA y la evaluación de los resultados obtenidos.
+El Capítulo~\ref{cap:modelado} usa estos datos para describir el Canal B (CharCNN entrenado sobre este conjunto), el Canal A (GraphCodeBERT aplicado sin entrenamiento adicional) y una línea base léxica, y presenta los resultados de su evaluación.

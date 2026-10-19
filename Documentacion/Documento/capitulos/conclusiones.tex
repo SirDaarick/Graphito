@@ -16,7 +16,7 @@ Siguiendo de forma rigurosa el ciclo de vida de la metodología \textbf{Komorebi
 El desarrollo del proyecto permitió alcanzar los siguientes hitos de ingeniería:
 
 \begin{enumerate}
-    \item \textbf{Ingeniería de Datos y Paridad Lingüística (Capítulo 7):} Se conformó un corpus balanceado de 20,000 muestras sobre 72 problemas algorítmicos. Se resolvió la carencia de especificaciones del dataset de Sarajevo mediante ingeniería inversa con LLMs, se neutralizó el sesgo lingüístico generando soluciones sintéticas en serbocroata con cuatro perfiles de estudiante, y se mitigó la fuga de información (*data leakage*) por auto-formateo moderno aplicando una normalización selectiva de indentación (\texttt{indent\_only.py}).
+    \item \textbf{Ingeniería de Datos y Paridad Lingüística (Capítulo 7):} Se conformó un corpus consolidado de 42,389 muestras (40,936 humanas y 1,453 sintéticas) sobre 72 problemas algorítmicos. Se resolvió la carencia de especificaciones del dataset de Sarajevo mediante ingeniería inversa con LLMs, se neutralizó el sesgo lingüístico generando soluciones sintéticas en serbocroata con cuatro perfiles de estudiante, y se mitigó la fuga de información (*data leakage*) por auto-formateo moderno aplicando una normalización selectiva de indentación (\texttt{indent\_only.py}).
     
     \item \textbf{Modelado Bimodal y Adaptación Eficiente (Capítulo 8):} Se implementó una arquitectura de doble canal:
     \begin{itemize}
@@ -28,6 +28,14 @@ El desarrollo del proyecto permitió alcanzar los siguientes hitos de ingenierí
     
     \item \textbf{Despliegue y Persistencia Híbrida (Capítulo 9):} Se construyó un backend modular bajo \textit{Clean Architecture} con FastAPI y Uvicorn, implementando persistencia dual en PostgreSQL (datos relacionales) y ChromaDB (búsquedas vectoriales k-NN en sub-segundos). La interfaz en React y Tailwind CSS garantizó una visualización bimodal clara y respetuosa del principio \textit{Human-in-the-loop} (RN-04).
 \end{enumerate}
+
+El resultado de Graphito es un sistema de apoyo a la evaluación docente que integra la comparación semántica de código y el análisis estilométrico para generar indicadores interpretables sobre las entregas de programación en C/C++. La solución no tiene como finalidad asignar automáticamente una calificación ni determinar de manera concluyente la autoría de un programa.
+
+El componente semántico permite cuantificar la proximidad entre la representación de una entrega y las referencias asociadas con un ejercicio. El componente estilométrico proporciona una estimación basada en los patrones aprendidos por CharCNN. La integración de estas señales busca ofrecer una perspectiva complementaria del código analizado y facilitar la identificación de casos que ameriten una revisión más detallada.
+
+La aportación principal de Graphito consiste en organizar los resultados de estos análisis en un reporte que permita al docente priorizar revisiones, consultar indicadores y contrastarlos con el contexto pedagógico de la actividad. La decisión final permanece bajo responsabilidad del evaluador, quien podrá complementar la información del sistema con explicaciones del estudiante, ejercicios adicionales u otros mecanismos de verificación.
+
+Los resultados experimentales permiten establecer con mayor precisión los alcances y las limitaciones del prototipo. La profundización en el desempeño de CharCNN, la estrategia de integración de características, los tiempos de procesamiento y la confiabilidad de los indicadores en distintos escenarios se plantea como parte del trabajo futuro descrito a continuación.
 
 % ======================================================================
 \section{Trabajo Futuro y Líneas de Investigación}

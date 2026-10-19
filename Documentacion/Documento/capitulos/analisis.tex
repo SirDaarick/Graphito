@@ -84,7 +84,11 @@ Las reglas de negocio definen los criterios que guían el funcionamiento y uso �
 	\item \textbf{RN-05:} Se permite el uso de múltiples soluciones generadas por LLM para ampliar el espectro de comparación lógica, siempre que el docente las valide inicialmente.
 
 	\item \textbf{RN-06:} Preservación de referencias: Los archivos cargados en calidad de entregas a analizar no podrán ser catalogados ni reutilizados por el sistema como códigos de referencia para futuras comparaciones, garantizando que el estándar de comparación se mantenga basado exclusivamente en soluciones validadas o generadas por el docente.
+
+	\item \textbf{RN-07:} Límite de generación de variantes: Graphito deberá establecer un límite máximo configurable de variantes por solicitud. Para la versión inicial del prototipo se propone un máximo de cinco variantes por ejercicio y solicitud. El sistema deberá validar el parámetro antes de invocar al modelo externo y rechazar solicitudes que excedan el límite establecido. La modificación de este parámetro dependerá de la disponibilidad de recursos, los tiempos de respuesta y los resultados de las pruebas de validación.
 \end{itemize}
+
+El límite de la regla RN-07 se establece para controlar el costo de las consultas externas, el tiempo de procesamiento y el crecimiento del conjunto de referencias. No representa una garantía de cobertura de todas las soluciones posibles, ni implica que cada variante generada sea funcionalmente equivalente. Las variantes deberán conservar su estado de validación y no podrán considerarse referencias confirmadas únicamente por haber sido producidas por un modelo generativo.
 
 % =========================================================
 \section{Identificación y descripción de actores}
@@ -92,7 +96,13 @@ Las reglas de negocio definen los criterios que guían el funcionamiento y uso �
 
 En el contexto del sistema propuesto (Graphito), los actores representan las entidades externas que interactúan con la plataforma y que participan en el flujo de configuración, análisis y auditoría del código fuente. La correcta identificación de estos actores permite definir los casos de uso, delimitar responsabilidades y establecer las fronteras del sistema.
 
-A partir de la arquitectura funcional, se identifican exclusivamente dos actores que interactúan de forma directa con la plataforma:
+A partir de la arquitectura funcional, se identifican exclusivamente dos actores que interactúan de forma directa con la plataforma, descritos más adelante en esta sección.
+
+Desde la perspectiva de uso, Graphito está dirigido principalmente a docentes e instructores responsables de cursos introductorios de programación en C/C++. Este grupo constituye el usuario principal, debido a que administra los ejercicios, establece las soluciones de referencia, carga las entregas y consulta los reportes generados por la plataforma.
+
+Como usuarios beneficiarios indirectos se identifican los estudiantes, quienes pueden verse favorecidos por procesos de revisión más consistentes y por la posibilidad de recibir retroalimentación fundamentada en características observables de sus soluciones. No obstante, el prototipo se orienta principalmente al trabajo del docente y no contempla, como función central, la calificación autónoma de estudiantes ni la emisión de sanciones académicas.
+
+Los modelos de inteligencia artificial y los sistemas de almacenamiento constituyen componentes técnicos de la solución. Aunque intervienen en el flujo de procesamiento, no sustituyen al usuario responsable de interpretar los resultados y determinar las acciones posteriores. El motor de IA externo (LLM) se considera un servicio externo con el que el sistema interactúa, no un usuario de la plataforma en el mismo sentido que el docente.
 
 % ---------------------------------------------------------
 \subsection{Docente / Evaluador}
@@ -167,14 +177,18 @@ La Figura \ref{fig:flujo-analisis} ilustra la trayectoria principal del sistema 
 
 Las trayectorias alternativas describen variaciones del flujo principal, orquestadas por \textit{LangGraph} ante condiciones específicas.
 
-\textbf{A1. Robustecimiento de referencias mediante LLM}
+\textbf{A1. Ampliación controlada del conjunto de referencias mediante un LLM}
 
 \begin{enumerate}
-	\item Durante la configuración de un problema, el docente solicita la generación de variantes de su solución.
-	\item El sistema envía el código de referencia al LLM externo.
-	\item El modelo externo retorna múltiples soluciones equivalentes.
-	\item El sistema calcula los embeddings semánticos de estas variantes y los indexa en la base vectorial de forma asíncrona.
+	\item Durante la configuración de un ejercicio, el docente podrá solicitar la generación de variantes de una solución de referencia.
+	\item Graphito enviará al modelo de lenguaje externo la descripción del problema y el código de referencia, junto con las restricciones necesarias para mantener el alcance funcional del ejercicio.
+	\item El modelo externo generará un número limitado de soluciones candidatas que podrán utilizar estructuras de control, descomposiciones o convenciones de escritura diferentes.
+	\item Las variantes recibidas serán sometidas a validaciones de formato y, cuando el entorno de ejecución lo permita, a pruebas funcionales diseñadas para el ejercicio. Estas comprobaciones permitirán descartar candidatos que incumplan las condiciones definidas.
+	\item Las soluciones que superen las validaciones se procesarán mediante el canal semántico y podrán incorporarse al conjunto de referencias de Graphito. Cuando una variante no pueda verificarse suficientemente, deberá identificarse como pendiente de validación y no utilizarse como referencia confirmada.
+	\item El sistema conservará la relación entre cada variante y el ejercicio de origen, junto con los metadatos necesarios para su trazabilidad.
 \end{enumerate}
+
+La generación de variantes tiene como finalidad ampliar la diversidad de las referencias de comparación, no garantizar que se cubran todas las soluciones posibles del problema. La cantidad de variantes y las condiciones para aceptarlas deberán establecerse mediante parámetros configurables y restricciones de recursos computacionales (RN-07).
 
 \textbf{A2. Código con errores críticos de formato}
 
@@ -474,6 +488,12 @@ El ciclo operativo de \textit{Graphito} se desglosa en tres fases críticas:
 	\label{fig:bpmn_proceso}
 \end{figure}
 
+En el flujo BPMN, la generación de variantes corresponde a una trayectoria alternativa y opcional del proceso de preparación de referencias. Esta trayectoria se activa cuando el docente solicita ampliar el conjunto de soluciones de comparación. El flujo contempla la generación de candidatos mediante un servicio externo, su validación y la incorporación de aquellos que cumplan las condiciones definidas.
+
+La compuerta de decisión debe permitir distinguir entre variantes aceptadas, variantes que requieren revisión y variantes descartadas. Si ninguna solución generada supera las validaciones, el sistema conservará la referencia original y notificará que no se incorporaron variantes adicionales. De esta manera, la continuidad del proceso de análisis no dependerá de que el modelo externo produzca necesariamente soluciones válidas.
+
+La representación BPMN describe los caminos de ejecución previstos en la aplicación y sus condiciones de control; no pretende enumerar todas las soluciones algorítmicas posibles para cada ejercicio. La diversidad de variantes obtenidas dependerá de la descripción del problema, las instrucciones utilizadas, el modelo generativo y los mecanismos de validación implementados.
+
 % ---------------------------------------------------------
 \section{Características semánticas del código}
 % ---------------------------------------------------------
@@ -601,11 +621,26 @@ En la Tabla~\ref{tab:resumen_metricas} se presenta un resumen de las métricas e
 		                       & Precision            & Medir exactitud en alertas de autoría.            \\
 		                       & Recall               & Evaluar detección de anomalías sintéticas.        \\
 		                       & F1-score             & Balancear rendimiento ante clases desbalanceadas. \\
+		\midrule
+		Desempeño operativo    & Tiempos de carga, preprocesamiento, inferencia y análisis total & Caracterizar la rapidez del prototipo y sus cuellos de botella. \\
+		                       & Consumo máximo de memoria & Establecer los límites operativos bajo carga. \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Métricas de validación de modelos utilizadas en el sistema.}
 	\label{tab:resumen_metricas}
 \end{table}
+
+\subsection{Métricas de desempeño operativo}
+
+Además del desempeño de los modelos, la evaluación de Graphito requiere medir el tiempo y los recursos empleados durante la ejecución de los análisis. Estas métricas permiten determinar si el sistema proporciona resultados en un tiempo adecuado para el contexto educativo y ayudan a identificar posibles cuellos de botella en el procesamiento de los archivos.
+
+El tiempo de carga corresponde al intervalo transcurrido entre el inicio de la transferencia de un archivo desde la interfaz y la confirmación de que se encuentra disponible para su procesamiento. Esta medida deberá distinguirse del tiempo de respuesta de la interfaz, que comprende el intervalo entre una acción del usuario y la actualización visible de la aplicación.
+
+El tiempo de preprocesamiento mide la duración de las operaciones de validación, limpieza, tokenización y codificación necesarias para preparar la entrada de cada modelo. El tiempo de inferencia semántica corresponde a la ejecución de GraphCodeBERT, mientras que el tiempo de inferencia estilométrica registra la ejecución de CharCNN. El tiempo total de análisis comprende el intervalo desde el inicio de una solicitud válida hasta la disponibilidad del reporte final.
+
+También se registrará el consumo máximo de memoria durante las pruebas, debido a que los modelos y los lotes de procesamiento pueden incrementar los requerimientos de recursos conforme aumenta el volumen de datos. Para analizar el comportamiento bajo carga, se realizarán experimentos con diferentes cantidades de archivos y tamaños de lote, documentando los tiempos obtenidos y las posibles fallas.
+
+Los resultados se utilizarán para caracterizar el desempeño del prototipo y establecer sus límites operativos. Las mediciones deberán realizarse en un entorno documentado, manteniendo constantes, cuando sea posible, el hardware, las versiones de software y las condiciones de prueba. Se reportarán tanto los resultados individuales como estadísticas agregadas que permitan comparar escenarios.
 
 % ---------------------------------------------------------
 \subsection{Criterios de interpretación de resultados}
@@ -640,6 +675,20 @@ Para el análisis estilométrico, la interpretación técnica se basa en el comp
 	\item Un F1-score elevado refleja un modelo confiable que no sesga sus clasificaciones hacia la clase mayoritaria.
 	\item Diferencias significativas entre precisión y exhaustividad requerirán ajustes en el orquestador para evitar falsos positivos que afecten la transparencia de la auditoría.
 \end{itemize}
+
+\subsection{Responsabilidad docente e interpretación del reporte de Graphito}
+
+Los indicadores generados por Graphito tienen como finalidad facilitar la identificación de entregas que requieren una revisión académica más detallada. El sistema proporciona evidencia cuantitativa relacionada con la proximidad semántica de las soluciones y con los patrones estilométricos identificados por el modelo entrenado. La interpretación de estos indicadores debe considerar el ejercicio evaluado, las características del código de referencia y las limitaciones de los modelos utilizados.
+
+La similitud semántica del coseno expresa el grado de proximidad entre las representaciones vectoriales comparadas. Un valor elevado indica que los embeddings presentan una orientación semejante dentro del espacio vectorial del modelo. Sin embargo, este resultado no demuestra por sí mismo que exista copia, dependencia indebida o identidad de autoría. En ejercicios introductorios, diferentes estudiantes pueden producir soluciones similares debido a las restricciones del problema, al uso de algoritmos conocidos o a las convenciones de enseñanza.
+
+Por su parte, la puntuación estilométrica representa la salida del clasificador CharCNN para la clase correspondiente. Su interpretación depende de la codificación de las etiquetas, del procedimiento de entrenamiento y de la calibración del modelo. La puntuación no debe considerarse una probabilidad fiable de autoría sin una evaluación de calibración y de desempeño sobre datos independientes.
+
+Para apoyar una revisión responsable, el reporte deberá mostrar los indicadores de ambos canales, el ejercicio asociado, las referencias utilizadas y las advertencias necesarias cuando existan limitaciones en los datos de entrada. Cuando se identifique una similitud elevada o una discrepancia entre los canales, Graphito podrá destacar la entrega para priorizar su revisión.
+
+La responsabilidad de interpretar el reporte y determinar las acciones académicas corresponde al docente. Ante un resultado que amerite revisión, podrán utilizarse mecanismos complementarios, como solicitar al estudiante que explique la lógica implementada, modifique una parte del programa, justifique las decisiones algorítmicas o resuelva una actividad breve relacionada con el ejercicio original. Estas acciones permiten contrastar los indicadores automatizados con evidencia directa de comprensión.
+
+Por tanto, Graphito no constituye un sistema de calificación automática ni un mecanismo definitivo de detección de plagio. Su resultado final es un reporte de apoyo a la decisión que organiza indicadores técnicos para facilitar la revisión, reducir la carga operativa y promover una evaluación sustentada en evidencia.
 
 % ---------------------------------------------------------
 \subsection{Consideraciones para la experimentación}
@@ -852,3 +901,178 @@ El corpus final se construye con clases estrictamente balanceadas (50\% humano, 
 \end{table}
 
 En conclusión, la estructuración de este corpus híbrido permite calibrar con precisión el canal estilométrico del sistema \textbf{Graphito}. El diseño metodológico empleado fuerza a la arquitectura CharCNN a desarrollar una alta sensibilidad a las micro-estructuras de estilo que diferencian el código orgánico del sintético. El uso de $N = 20,000$ muestras asegura una base estadística robusta para generalizar características más allá de las palabras clave, capturando la huella digital del código fuente en entornos académicos iniciales.
+
+Para reducir los efectos del desbalance de clases en el entrenamiento de CharCNN, se propone construir un conjunto de datos que contenga muestras de ambas clases y documentar su distribución antes y después del preprocesamiento. La clase humana estará integrada por soluciones provenientes de fuentes académicas identificadas, mientras que la clase sintética estará constituida por programas generados mediante herramientas de inteligencia artificial bajo condiciones de generación documentadas.
+
+El balance cuantitativo entre clases constituye una medida inicial, pero no garantiza por sí mismo que el conjunto de datos sea representativo. También es necesario considerar la diversidad de ejercicios, la complejidad de las soluciones, los lenguajes, las convenciones de escritura y los modelos generativos utilizados. De lo contrario, el clasificador podría aprender diferencias asociadas con una fuente, un ejercicio o una herramienta específica, en lugar de identificar patrones que generalicen a nuevos programas.
+
+Para evitar la fuga de información, las particiones de entrenamiento, validación y prueba deberán establecerse antes de realizar las transformaciones que impliquen aprendizaje de parámetros. Cuando existan múltiples variantes de una misma solución, estas deberán agruparse de manera que las soluciones relacionadas no aparezcan simultáneamente en entrenamiento y prueba. De esta forma, se reduce el riesgo de obtener métricas artificialmente elevadas debido a la presencia de ejemplos muy similares en distintos subconjuntos.
+
+El desempeño se evaluará mediante precisión, \textit{recall} y F1-score, complementados por la matriz de confusión y el análisis de falsos positivos y falsos negativos. Si persisten diferencias relevantes en la distribución de las clases, podrán evaluarse estrategias como ponderación de la función de pérdida o sobremuestreo exclusivo del conjunto de entrenamiento. La selección de estas medidas se realizará con base en los resultados de validación, sin modificar el conjunto de prueba para mejorar artificialmente el desempeño.
+
+Finalmente, deberá reconocerse que el modelo aprende a distinguir las clases definidas en el conjunto experimental, no la autoría real de cualquier programa. La generalización a código escrito con asistencia de IA, código humano posteriormente refactorizado y soluciones producidas por modelos no incluidos en el entrenamiento constituye una limitación que deberá analizarse mediante experimentos adicionales. La composición final del conjunto y su partición se detallan en el Capítulo~\ref{cap:ingenieria_datos}.
+
+% ---------------------------------------------------------
+\section{Estimación de costos del proyecto}
+\label{sec:costos}
+% ---------------------------------------------------------
+
+La estimación de costos de Graphito permite identificar y cuantificar los recursos humanos, tecnológicos y materiales necesarios para el desarrollo, implementación y evaluación del sistema. Esta estimación considera las actividades realizadas durante el proyecto, las herramientas de software utilizadas, los recursos computacionales requeridos y los servicios externos relacionados con su funcionamiento.
+
+El presupuesto se organiza en costos de recursos humanos, infraestructura tecnológica, herramientas de software y servicios, así como costos indirectos. Para mantener la transparencia de la estimación, cada importe se determina a partir de información verificable, como registros de horas de trabajo, cotizaciones, tarifas publicadas, comprobantes de pago o registros de consumo, según corresponda.
+
+Asimismo, se distingue entre los costos que representan un desembolso económico real y los costos imputados, que corresponden al valor estimado de recursos existentes utilizados durante el desarrollo del proyecto. Esta distinción permite presentar una estimación económica acorde con las condiciones reales en las que se desarrolló Graphito.
+
+\subsection{Costos de recursos humanos}
+
+El desarrollo de Graphito comprende actividades de análisis, diseño, programación, integración de componentes, preparación de datos, experimentación y documentación. Estas actividades representan un esfuerzo de trabajo que se registra mediante las horas dedicadas por cada perfil participante.
+
+La estimación de los costos de recursos humanos se presenta en la Tabla~\ref{tab:costos_rh}, considerando las actividades realizadas, las horas de trabajo correspondientes y la tarifa utilizada para la valoración económica de cada actividad. La tarifa se determina a partir de una referencia documentada o de un costo real, cuando existe una contratación asociada. En los casos en los que el trabajo es realizado por los integrantes del proyecto como parte de su formación académica, las horas se registran como esfuerzo de desarrollo y no se consideran automáticamente un desembolso económico.
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.60\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|>{\raggedright\arraybackslash\hsize=0.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|}
+    \caption{Estimación de costos de recursos humanos de Graphito.}\label{tab:costos_rh}\\
+    \hline
+    \textbf{Actividad} & \textbf{Perfil responsable} & \textbf{Horas dedicadas} & \textbf{Tarifa por hora (MXN)} & \textbf{Fuente de la tarifa} & \textbf{Costo estimado (MXN)} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Actividad} & \textbf{Perfil responsable} & \textbf{Horas dedicadas} & \textbf{Tarifa por hora (MXN)} & \textbf{Fuente de la tarifa} & \textbf{Costo estimado (MXN)} \\ \hline
+    \endhead
+    Análisis de requerimientos & Ingeniero de IA junior (2 integrantes) & 120 & 181.25 & JobRise (2026) & 21,750.00 \\ \hline
+    Diseño de la arquitectura del sistema & Ingeniero de IA junior (2 integrantes) & 100 & 181.25 & JobRise (2026) & 18,125.00 \\ \hline
+    Desarrollo del backend y frontend & Ingeniero de IA junior (2 integrantes) & 280 & 181.25 & JobRise (2026) & 50,750.00 \\ \hline
+    Preparación y procesamiento de datos & Ingeniero de IA junior (2 integrantes) & 140 & 181.25 & JobRise (2026) & 25,375.00 \\ \hline
+    Implementación de GraphCodeBERT y CharCNN & Ingeniero de IA junior (2 integrantes) & 120 & 181.25 & JobRise (2026) & 21,750.00 \\ \hline
+    Entrenamiento, pruebas y evaluación de modelos & Ingeniero de IA junior (2 integrantes) & 140 & 181.25 & JobRise (2026) & 25,375.00 \\ \hline
+    Integración y generación de reportes & Ingeniero de IA junior (2 integrantes) & 72 & 181.25 & JobRise (2026) & 13,050.00 \\ \hline
+    Documentación técnica y académica & Ingeniero de IA junior (2 integrantes) & 100 & 181.25 & JobRise (2026) & 18,125.00 \\ \hline
+    \textbf{Total} & & 1\,072 & & & 194,300.00 \\ \hline
+\end{xltabular}
+}
+
+Las horas se estimaron a partir de una dedicación promedio por integrante de 10 horas semanales durante TT1 (20 semanas) y 14 horas semanales durante TT2 (24 semanas), incluyendo el periodo vacacional en el que se continuó el trabajo, lo que da 536 horas por integrante y 1\,072 horas en total. La tarifa de 181.25~MXN por hora se obtuvo del punto medio del rango salarial de un ingeniero junior en México (20\,000 a 38\,000~MXN mensuales brutos)\footnote{JobRise, `Salarios Ingenieros México vs España 2026'', \url{https://jobrise.io/es/blog/salarios-ingenieros-mexico-vs-espana/}.}, dividido entre 160 horas laborales al mes. Dado que el trabajo fue realizado por los propios integrantes como parte de su formación académica, este importe constituye un costo imputado y no un desembolso económico.
+
+La Tabla~\ref{tab:costos_rh} permite identificar el esfuerzo de trabajo requerido para desarrollar Graphito y establecer su valoración económica a partir de referencias justificadas. El costo total de recursos humanos corresponde a la suma de las actividades cuya valoración monetaria se encuentra documentada. Las horas dedicadas al proyecto también se consideran un indicador del esfuerzo académico y técnico invertido, independientemente de que representen o no un desembolso económico.
+
+\subsection{Costos de infraestructura tecnológica}
+
+La infraestructura tecnológica comprende los equipos de cómputo y los recursos de procesamiento, almacenamiento y conectividad empleados durante el desarrollo y evaluación de Graphito. Estos recursos permiten ejecutar los módulos de procesamiento de código fuente, realizar los experimentos con los modelos de aprendizaje automático y almacenar la información necesaria para el funcionamiento del sistema.
+
+La Tabla~\ref{tab:costos_infra} presenta los recursos tecnológicos utilizados, sus características, la modalidad de uso y el costo asociado. Para los equipos que ya se encontraban disponibles, se distingue entre su adquisición previa y el costo atribuible a su utilización durante el proyecto. Cuando no existe un desembolso adicional por el uso de un recurso, este se registra de acuerdo con su condición real, sin atribuirle un costo de adquisición inexistente.
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.20\hsize}X|>{\raggedright\arraybackslash\hsize=1.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
+    \caption{Estimación de costos de infraestructura tecnológica.}\label{tab:costos_infra}\\
+    \hline
+    \textbf{Recurso tecnológico} & \textbf{Características o especificaciones} & \textbf{Cantidad} & \textbf{Modalidad de uso} & \textbf{Periodo de utilización} & \textbf{Costo unitario (MXN)} & \textbf{Costo estimado (MXN)} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Recurso tecnológico} & \textbf{Características o especificaciones} & \textbf{Cantidad} & \textbf{Modalidad de uso} & \textbf{Periodo de utilización} & \textbf{Costo unitario (MXN)} & \textbf{Costo estimado (MXN)} \\ \hline
+    \endhead
+    Laptop Huawei MateBook D15 & Configuración base del modelo [confirmar procesador, RAM y almacenamiento] & 1 & Propio (2022) & 12 meses (feb--ene) & 10\,500.00 & 3\,150.00 \\ \hline
+    Computadora de escritorio para entrenamiento de modelos & AMD Ryzen 5 3600 (6 núcleos), 24 GB de RAM, NVIDIA GeForce RTX 2060 SUPER & 1 & Propio, local (2020) & 12 meses (feb--ene) & 22\,000.00 & 6\,600.00 \\ \hline
+    Almacenamiento de datos & SSD de 512 GB y HDD de 1 TB (en la computadora de escritorio) & 2 & Propio, local & 12 meses (feb--ene) & Incluido en el equipo & 0.00 \\ \hline
+    Servicio de procesamiento en la nube & No se utilizó; el entrenamiento y las pruebas se ejecutaron en equipo local & 0 & No aplica & No aplica & 0.00 & 0.00 \\ \hline
+    \textbf{Total} & & & & & & 9\,750.00 \\ \hline
+\end{xltabular}
+}
+
+Los equipos de cómputo son propiedad de los integrantes, por lo que su uso no generó un desembolso adicional y el importe se clasifica como costo imputado. La columna de costo unitario muestra el precio de adquisición estimado (22\,000~MXN para el equipo de escritorio, que incluye la ampliación posterior de memoria RAM, y 10\,500~MXN para la laptop, tomando como referencia los precios de oferta publicados en México para ese modelo). El costo estimado corresponde al cargo atribuible a los 12 meses de uso, calculado con la tasa anual de depreciación del 30\% establecida para equipo de cómputo en el artículo 34 de la Ley del Impuesto sobre la Renta. Se emplea como criterio de asignación del costo de uso durante el proyecto y no como valor en libros de los equipos.
+
+El costo de infraestructura tecnológica representa el valor de los recursos empleados para desarrollar y evaluar Graphito. Su cálculo considera las condiciones de disponibilidad y utilización de cada recurso, evitando contabilizar como gasto nuevo aquellos equipos o servicios que ya forman parte de la infraestructura existente. En los casos en los que se utilizan servicios de pago, el importe se determina a partir de las tarifas correspondientes al periodo y al consumo registrado o estimado.
+
+\subsection{Costos de herramientas de software y servicios externos}
+
+Graphito requiere herramientas de desarrollo, bibliotecas de aprendizaje automático, componentes de procesamiento de lenguaje natural y mecanismos de almacenamiento para implementar sus funcionalidades. Entre los componentes tecnológicos considerados se encuentran Python, las bibliotecas para redes neuronales, GraphCodeBERT, el modelo CharCNN, PostgreSQL y ChromaDB, además de las herramientas complementarias utilizadas durante el desarrollo.
+
+La Tabla~\ref{tab:costos_software} presenta las herramientas y los servicios relacionados con la implementación del sistema, especificando su función, modalidad de acceso y costo. Se distingue entre el software de uso gratuito o de código abierto, las herramientas cubiertas por licencias institucionales y los servicios externos que generan un cargo por suscripción, procesamiento o consumo.
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
+    \caption{Estimación de costos de herramientas de software y servicios externos.}\label{tab:costos_software}\\
+    \hline
+    \textbf{Herramienta o servicio} & \textbf{Función dentro de Graphito} & \textbf{Modalidad de acceso o licencia} & \textbf{Unidad de cálculo} & \textbf{Cantidad o consumo} & \textbf{Costo unitario (MXN)} & \textbf{Costo estimado (MXN)} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Herramienta o servicio} & \textbf{Función dentro de Graphito} & \textbf{Modalidad de acceso o licencia} & \textbf{Unidad de cálculo} & \textbf{Cantidad o consumo} & \textbf{Costo unitario (MXN)} & \textbf{Costo estimado (MXN)} \\ \hline
+    \endhead
+    Python & Lenguaje de programación utilizado en el desarrollo & Código abierto (licencia PSF) & Licencia & 1 & 0.00 & 0.00 \\ \hline
+    Bibliotecas de aprendizaje automático & Implementación y entrenamiento de modelos & Código abierto & Licencia & 1 & 0.00 & 0.00 \\ \hline
+    GraphCodeBERT & Extracción de representaciones semánticas del código fuente & Modelo preentrenado de acceso libre & Licencia & 1 & 0.00 & 0.00 \\ \hline
+    Framework para CharCNN & Procesamiento de secuencias de caracteres y extracción de patrones estilométricos & Código abierto & Licencia & 1 & 0.00 & 0.00 \\ \hline
+    PostgreSQL & Almacenamiento de información estructurada & Código abierto (licencia PostgreSQL) & Licencia & 1 & 0.00 & 0.00 \\ \hline
+    ChromaDB & Almacenamiento y consulta de representaciones vectoriales & Código abierto (Apache 2.0) & Licencia & 1 & 0.00 & 0.00 \\ \hline
+    Herramientas de desarrollo y control de versiones & Edición de código, integración y administración del proyecto & Gratuita o de código abierto & Licencia & 1 & 0.00 & 0.00 \\ \hline
+    OpenRouter (modelos de lenguaje externos) & Generación o transformación de variantes de código & Prepago por consumo & USD recargados & 10 & 18.49 & 184.93 \\ \hline
+    Overleaf (plan Standard) & Redacción colaborativa del documento en LaTeX & Suscripción anual & Año & 1 & 2\,899.00 & 2\,899.00 \\ \hline
+    \textbf{Total} & & & & & & 3\,083.93 \\ \hline
+\end{xltabular}
+}
+
+Los dos únicos conceptos con desembolso real fueron la suscripción anual de Overleaf, a la tarifa publicada del plan Standard en pesos mexicanos, y la recarga de 10~USD en OpenRouter, convertida con el tipo de cambio FIX de Banxico del 16 de octubre de 2026 (18.4930~MXN/USD) como referencia. El resto de los componentes se distribuye bajo licencias de código abierto o de acceso libre, por lo que su costo es nulo.
+
+El costo total de software y servicios externos corresponde a los importes asociados con las herramientas efectivamente utilizadas durante el desarrollo de Graphito. Las herramientas gratuitas o de código abierto se registran conforme a sus condiciones de licencia, mientras que los servicios de pago se cuantifican de acuerdo con su tarifa y consumo. En el caso de los servicios de modelos de lenguaje externos, el importe considera el uso realizado durante las pruebas y la generación de variantes, cuando esta funcionalidad forma parte de la implementación evaluada.
+
+\subsection{Costos indirectos}
+
+Los costos indirectos corresponden a los recursos auxiliares que intervienen en el desarrollo de Graphito, pero que no se asignan exclusivamente a una actividad específica. Entre ellos se encuentran el consumo de energía eléctrica, la conectividad a internet, las copias de seguridad y otros recursos necesarios para mantener las condiciones de trabajo.
+
+La Tabla~\ref{tab:costos_indirectos} presenta los conceptos indirectos considerados en la estimación. La asignación económica se basa en información disponible sobre el costo del servicio, el periodo de utilización y la proporción atribuible al proyecto. Cuando no existe información suficiente para determinar una proporción verificable, el concepto se identifica sin asignarle un importe arbitrario.
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.00\hsize}X|>{\raggedright\arraybackslash\hsize=1.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=1.00\hsize}X|}
+    \caption{Estimación de costos indirectos del proyecto.}\label{tab:costos_indirectos}\\
+    \hline
+    \textbf{Concepto} & \textbf{Descripción} & \textbf{Periodo considerado} & \textbf{Costo total de referencia (MXN)} & \textbf{Proporción atribuible a Graphito} & \textbf{Costo asignado al proyecto (MXN)} & \textbf{Fuente de información} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Concepto} & \textbf{Descripción} & \textbf{Periodo considerado} & \textbf{Costo total de referencia (MXN)} & \textbf{Proporción atribuible a Graphito} & \textbf{Costo asignado al proyecto (MXN)} & \textbf{Fuente de información} \\ \hline
+    \endhead
+    Energía eléctrica & Consumo estimado de 76.32~kWh (50~h de entrenamiento a 0.30~kW y 1\,022~h de desarrollo a 0.06~kW) & 12 meses & 85.86 & 100\% & 85.86 & Tarifa doméstica 1 de la CFE (1.125~MXN/kWh, bloque básico) y potencia nominal de los componentes \\ \hline
+    Conectividad a internet & Acceso a servicios y recursos en línea (700~MXN mensuales por integrante, 2 conexiones) & 12 meses & 16\,800.00 & 9.3\% & 1\,563.33 & Tarifa mensual contratada por cada integrante \\ \hline
+    Almacenamiento y copias de seguridad & Respaldo del código en GitHub (plan gratuito) y sincronización en OneDrive & 12 meses & 0.00 & 100\% & 0.00 & Planes gratuitos de los servicios \\ \hline
+    \textbf{Total} & & & & & 1\,649.19 & \\ \hline
+\end{xltabular}
+}
+
+La estimación de costos indirectos complementa el presupuesto de Graphito mediante la identificación de los recursos auxiliares utilizados durante su desarrollo. Los importes asignados corresponden únicamente a la parte justificable de cada concepto, con el propósito de evitar la sobreestimación del presupuesto y mantener la relación entre los costos reportados y los recursos realmente utilizados.
+
+\subsection{Concentrado general de costos}
+
+El concentrado general integra los resultados obtenidos en las estimaciones de recursos humanos, infraestructura tecnológica, herramientas de software, servicios externos y costos indirectos. Esta integración permite identificar el costo total del proyecto y distinguir los desembolsos económicos reales del valor imputado a los recursos existentes utilizados durante su desarrollo.
+
+La Tabla~\ref{tab:costos_concentrado} presenta el resumen presupuestal de Graphito. Los importes se incorporan a partir de los resultados de las tablas anteriores, manteniendo los mismos criterios de cálculo para evitar duplicidades en la contabilización de los recursos.
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
+    \caption{Concentrado general de costos de Graphito.}\label{tab:costos_concentrado}\\
+    \hline
+    \textbf{Categoría} & \textbf{Costos directos (MXN)} & \textbf{Costos imputados (MXN)} & \textbf{Costo total por categoría (MXN)} & \textbf{Observaciones} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Categoría} & \textbf{Costos directos (MXN)} & \textbf{Costos imputados (MXN)} & \textbf{Costo total por categoría (MXN)} & \textbf{Observaciones} \\ \hline
+    \endhead
+    Recursos humanos & 0.00 & 194\,300.00 & 194\,300.00 & 1\,072 horas valoradas a 181.25~MXN/h \\ \hline
+    Infraestructura tecnológica & 0.00 & 9\,750.00 & 9\,750.00 & Equipos propios; cargo por uso \\ \hline
+    Herramientas de software y servicios externos & 3\,083.93 & 0.00 & 3\,083.93 & Overleaf y OpenRouter \\ \hline
+    Costos indirectos & 0.00 & 1\,649.19 & 1\,649.19 & Internet y energía eléctrica \\ \hline
+    \textbf{Total general} & 3\,083.93 & 205\,699.19 & 208\,783.12 & \\ \hline
+\end{xltabular}
+}
+
+El costo total estimado de Graphito asciende a \$208\,783.12~MXN, de los cuales \$3\,083.93~MXN corresponden a costos directos y \$205\,699.19~MXN a costos imputados. Esta distribución permite diferenciar el desembolso económico asociado con el proyecto del valor atribuido a los recursos disponibles que fueron utilizados durante su desarrollo.
+
+El resultado del concentrado general constituye la base para analizar la distribución de los recursos económicos y determinar cuáles categorías representan la mayor proporción del costo total. Asimismo, proporciona una referencia para valorar los recursos necesarios para reproducir los experimentos y mantener el funcionamiento del sistema en un entorno de uso académico.
+
+\subsection{Análisis de viabilidad económica}
+
+La viabilidad económica de Graphito se analiza a partir de los recursos necesarios para su desarrollo, implementación y evaluación, considerando tanto los costos directos como los recursos existentes aprovechados durante el proyecto. La utilización de herramientas de código abierto y de componentes tecnológicos disponibles reduce la necesidad de adquirir licencias comerciales, mientras que el aprovechamiento de infraestructura existente limita los desembolsos adicionales asociados con el procesamiento y almacenamiento de información.
+
+La estimación económica permite identificar los recursos que generan costos durante el desarrollo y aquellos que podrían representar gastos adicionales en una implementación futura. En particular, el uso de servicios externos de procesamiento o modelos de lenguaje queda sujeto a las condiciones de licencia, las tarifas vigentes y el volumen de solicitudes realizadas.
+
+En consecuencia, el presupuesto de Graphito proporciona una referencia para dimensionar los recursos requeridos para su desarrollo y evaluar las condiciones económicas de su posible implementación en un entorno académico. La viabilidad del sistema se determina considerando la disponibilidad de infraestructura, el acceso a las herramientas tecnológicas y la relación entre los recursos invertidos y las funcionalidades implementadas.

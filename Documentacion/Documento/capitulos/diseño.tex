@@ -132,6 +132,12 @@ Sin embargo, como argumenta Díaz Vergés \cite{verges_como_2023}, los proyectos
 
 En el sistema \textbf{Graphito}, la metodología Komorebi actúa como el marco metodológico rector que gobierna el pipeline de procesamiento bimodal (semántico y estilométrico). En la Figura~\ref{fig:pipeline_komorebi} se ilustra la arquitectura global de este flujo operativo.
 
+El pipeline de modelos representa el flujo de procesamiento de datos y la secuencia de actividades necesarias para obtener los indicadores de Graphito. A diferencia del diagrama de bloques funcional, que presenta los componentes principales del sistema y sus relaciones, el pipeline se centra en la preparación de los datos, la generación de representaciones, el entrenamiento o configuración de los modelos, su evaluación y su integración en el entorno de ejecución.
+
+Graphito coordina estas actividades mediante su backend, que recibe las solicitudes, valida las entradas, administra la ejecución de los modelos y consolida los resultados. GraphCodeBERT se utiliza como extractor de características semánticas y CharCNN como clasificador estilométrico. Las representaciones de referencia pueden almacenarse en ChromaDB para su recuperación, mientras que PostgreSQL conserva la información estructurada necesaria para relacionar las comparaciones con los ejercicios y sus resultados.
+
+La separación entre el pipeline experimental y el flujo operativo permite distinguir las actividades de preparación y evaluación de modelos de las operaciones que se ejecutan cuando un docente solicita analizar una entrega. Esta distinción facilita la reproducibilidad de los experimentos y la identificación de las responsabilidades de cada componente.
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figuras/pipeline.png} 
@@ -207,6 +213,8 @@ La colección \texttt{codigos\_referencia} se articula bajo tres pilares fundame
 
     \item \textbf{Metadatos JSON:} Almacenan atributos clave como el \texttt{problema\_id} y el \texttt{lenguaje}. Esto permite que el sistema realice un pre-filtrado lógico, asegurando que la búsqueda de vecinos más cercanos se ejecute únicamente sobre el conjunto de soluciones de referencia que pertenecen al mismo ejercicio académico.
 \end{enumerate}
+
+Cabe precisar que las 768 dimensiones semánticas constituyen una representación distribuida y no características interpretables de forma independiente, y que la concatenación con un único valor estilométrico no garantiza una contribución equilibrada de ambas señales. Estas consideraciones, junto con el efecto del relleno con ceros en las referencias, se discuten en la Sección~\ref{subsec:fusion_caracteristicas}.
 
 Esta arquitectura híbrida asegura que \textbf{Graphito} no solo sea preciso en la identificación de similitudes, sino también eficiente en términos computacionales al segmentar el espacio de búsqueda.
 % ---------------------------------------------------------

@@ -1,535 +1,803 @@
-\chapter{Modelado y Experimentación}
+\chapter{Modelización}
 \label{cap:modelado}
 
-Una vez construido y preparado el conjunto de datos de 20,000 muestras, el ciclo de vida de la metodología \textbf{Komorebi} \cite{verges_como_2023} avanza hacia las fases operativas de \textbf{Entrenamiento de Modelos} y \textbf{Evaluación Experimental}.
+Con los datos listos (Capítulo~\ref{cap:ingenieria_datos}), la metodología \textbf{Komorebi} \cite{verges_como_2023} pasa a la fase de \textbf{Modelización}: construir los modelos y ponerlos a prueba. La Sección~\ref{sec:entrenamiento_modelos} explica qué se construyó; la Sección~\ref{sec:evaluacion_modelos} mide qué tan bien funciona y qué límites tiene.
 
-El objetivo central de esta etapa es configurar, entrenar y validar los dos componentes neuronales del sistema \textbf{Graphito}: el canal semántico basado en \textit{GraphCodeBERT} con adaptadores LoRA para la extracción de lógica algorítmica, y el canal estilométrico basado en una red convolucional multiescala sobre caracteres (\textit{MultiScaleCharCNN}) para la detección de patrones de autoría. Asimismo, se formaliza el algoritmo de fusión de características (\textit{Feature Fusion}) y se presentan los resultados experimentales obtenidos en el conjunto de prueba y en el benchmark de arquetipos estudiantiles.
+Graphito usa dos ``lectores'' del código que miran cosas distintas, más una regla simple de comparación como vara de medir (Figura~\ref{fig:panorama_modelos}). El \textbf{Canal A} mide qué tan parecida es una entrega a la solución de referencia en lo que hace el programa. El \textbf{Canal B} estima si la forma de escribir se parece más a la de código generado por IA. La \textbf{línea base léxica} compara fragmentos de texto y no usa aprendizaje automático. Ninguna salida es un veredicto: son datos para que el docente decida qué revisar primero.
 
-% ======================================================================
-\section{Configuración y Entrenamiento de Modelos}
-\label{sec:configuracion_modelos}
-% ======================================================================
-
-La arquitectura de Graphito se fundamenta en un principio de especialización: en lugar de exigir a un único modelo que aprenda simultáneamente la lógica profunda del algoritmo y las sutilezas visuales de la redacción, se implementan dos modelos independientes cuyas salidas se combinan de forma controlada.
-
-% ----------------------------------------------------------------------
-\subsection{Canal Semántico: GraphCodeBERT y Adaptadores LoRA}
-\label{subsec:modelado_graphcodebert}
-
-El canal semántico tiene como propósito generar representaciones vectoriales densas (embeddings) que capturen la funcionalidad de las soluciones de código, independientemente de variaciones sintácticas superficiales o renombramiento de variables.
-
-\subsubsection{Modelo Base y Grafo de Flujo de Datos}
-Se utiliza como base el modelo preentrenado \texttt{microsoft/graphcodebert-base}, compuesto por 12 capas de Transformer bidireccional y 12 cabezas de atención, con una dimensionalidad oculta base de $d = 768$. La particularidad de GraphCodeBERT reside en su mecanismo de autoatención restringido: además de procesar la secuencia lineal de tokens del programa (hasta un límite de 480 tokens de código), incorpora la matriz de adyacencia del Grafo de Flujo de Datos (DFG) extraído con Tree-sitter. De esta manera, el cálculo de atención entre dos variables $v_i$ y $v_j$ queda guiado por la dependencia real de datos calculada en el análisis estático.
-
-\subsubsection{Adaptación Eficiente mediante LoRA}
-El ajuste fino (\textit{fine-tuning}) completo de los 125 millones de parámetros de GraphCodeBERT presenta dos inconvenientes graves: demanda una infraestructura de cómputo desproporcionada y puede provocar olvido catastrófico (\textit{catastrophic forgetting}) de las reglas sintácticas generales de C/C++ aprendidas durante su preentrenamiento masivo.
-
-Para superar esta limitación, en Graphito se implementó la técnica de adaptación de bajo rango \textbf{LoRA} (\textit{Low-Rank Adaptation}), formulada por Hu et al. \cite{Hu2022LoRA}. Como sistematizan Ding et al. \cite{Ding2023PEFT} en su taxonomía de ajuste eficiente de parámetros (\textit{Parameter-Efficient Fine-Tuning}, PEFT), los modelos de lenguaje masivos operan bajo la hipótesis de una dimensión intrínseca baja: las actualizaciones de pesos necesarias para especializar un modelo a una tarea específica residen en un subespacio de rango muy reducido. En lugar de reentrenar los pesos preentrenados originales $W_0 \in \mathbb{R}^{d \times d}$, LoRA congela $W_0$ y añade matrices entrenables de bajo rango:
-\begin{equation}
-    W = W_0 + \Delta W = W_0 + \frac{\alpha}{r} (B \cdot A)
-\end{equation}
-donde $A \in \mathbb{R}^{r \times d}$, $B \in \mathbb{R}^{d \times r}$, con un rango $r = 8$ y un factor de escalamiento $\alpha = 16$. Estas matrices se inyectan exclusivamente en las proyecciones de consulta ($W_q$) y valor ($W_v$) de las capas de autoatención.
-
-Esta estrategia redujo los parámetros entrenables a menos del 1\,\% del modelo total, permitiendo calibrar la sensibilidad del espacio vectorial sobre los ejercicios académicos del corpus sin degradar el conocimiento base. La salida del canal semántico es un vector denso de dimensión $d_{\text{sem}} = 768$ obtenido mediante el promedio ponderado (\textit{mean pooling}) de los tokens de código.
-
-% ----------------------------------------------------------------------
-\subsection{Canal Estilométrico: Red Convolucional Multiescala (MultiScaleCharCNN)}
-\label{subsec:modelado_charcnn}
-
-El canal estilométrico se encarga de inspeccionar la superficie del archivo fuente para estimar la probabilidad de que haya sido generado por una herramienta de inteligencia artificial.
-
-\subsubsection{Arquitectura Neuronal y Fundamentación Estilométrica}
-La estilometría clásica de software, ejemplificada en los trabajos seminales de Caliskan-Islam et al. \cite{Caliskan2015Stylometry}, dependía de la extracción artesanal de métricas léxicas y patrones de nodos de AST para la atribución de autoría. Sin embargo, como demostraron Abuhamad et al. \cite{Abuhamad2020Authorship}, las representaciones morfológicas profundas a nivel de caracteres ofrecen una robustez superior frente a la ofuscación y el re-formateo en comparación con los árboles sintácticos rígidos. 
-
-Siguiendo el principio fundacional de Zhang et al. \cite{Zhang2015CharCNN} sobre redes convolucionales a nivel de caracteres para clasificación sin requerir tokenización de palabras, la red convolucional de Graphito opera directamente sobre secuencias discretas de caracteres crudos. Para superar la rigidez de las capas secuenciales convencionales, la arquitectura implementada en el módulo \texttt{models/}\allowbreak\texttt{char\_cnn/}\allowbreak\texttt{model.py} (\texttt{MultiScaleCharCNN}) adopta el enfoque de convoluciones multiescala paralelas formulado por Kim \cite{Kim2014CNN}, estructurándose en los siguientes bloques:
-
-\begin{enumerate}
-    \item \textbf{Capa de Embedding de Caracteres:} Mapea cada índice del texto (secuencias de longitud fija $L = 4096$, sobre el vocabulario de 97 caracteres) a un vector continuo de dimensión $d_{\text{char}} = 64$.
-    
-    \item \textbf{Convoluciones 1D Multiescala en Paralelo:} Para capturar hábitos de escritura de diferente alcance (desde operadores simples hasta palabras clave y estructuras de bucles), se configuran cuatro ramas convolucionales en paralelo con distintos tamaños de kernel adaptando el diseño multiescala de Kim \cite{Kim2014CNN}:
-    \begin{equation}
-        k \in \{3, 5, 7, 9\}
-    \end{equation}
-    Cada rama cuenta con 128 filtros convolucionales, seguidos de una capa de normalización por lotes (\textit{Batch Normalization 1D}) y activación no lineal ReLU.
-    
-    \item \textbf{Agrupamiento Global Adaptativo (\textit{Global Pooling}):} En lugar de capas rígidas de reducción que dependen de posiciones absolutas, cada rama aplica un agrupamiento combinado de máximo y promedio global (\textit{Adaptive Max + Avg Pooling}):
-    \begin{equation}
-        h_k = [\text{MaxPool1d}(C_k) \,;\, \text{AvgPool1d}(C_k)]
-    \end{equation}
-    Esto genera una representación de estilo compacta de dimensión $d_{\text{est}} = 1024$ que resume las texturas más sobresalientes del código.
-    
-    \item \textbf{Cabeza de Clasificación y Regularización:} El vector de estilo pasa por dos capas densas con desconexión aleatoria de neuronas (\textit{Dropout} con $p = 0.5$) para evitar sobreajuste, finalizando en una neurona con función de activación sigmoide que emite la probabilidad sintética escalar:
-    \begin{equation}
-        p_{\text{IA}} = \sigma(W_c \cdot h + b_c) \in [0, 1]
-    \end{equation}
-\end{enumerate}
-
-En la Tabla~\ref{tab:flujo_tensorial_charcnn} se resume la arquitectura interna, las dimensiones de entrada y salida tensoriales en cada etapa y la configuración de hiperparámetros de la red MultiScaleCharCNN, donde $B$ representa el tamaño del lote (\textit{batch size}).
-
-\begin{table}[H]
-    \centering
-    \caption{Arquitectura por capas y flujo tensorial de la red MultiScaleCharCNN.}
-    \label{tab:flujo_tensorial_charcnn}
-    \renewcommand{\arraystretch}{1.25}
-    \small
-    \begin{tabularx}{\textwidth}{|l|c|X|c|}
-        \hline
-        \textbf{Bloque / Capa} & \textbf{Entrada} & \textbf{Operación y Configuración} & \textbf{Salida} \\ \hline
-        Embedding de Caracteres & $[B, 4096]$ & Proyección densa ($V = 97$, $d_{\text{char}} = 64$) & $[B, 64, 4096]$ \\ \hline
-        Convolución Multiescala & $[B, 64, 4096]$ & 4 ramas paralelas Conv1D ($k \in \{3, 5, 7, 9\}$, 128 filtros c/u) & $4 \times [B, 128, 4096]$ \\ \hline
-        Normalización y Activación & $4 \times [B, 128, 4096]$ & BatchNorm1d + Activación no lineal ReLU & $4 \times [B, 128, 4096]$ \\ \hline
-        Agrupamiento Global & $4 \times [B, 128, 4096]$ & Adaptive MaxPool1d + AvgPool1d & $4 \times [B, 256]$ \\ \hline
-        Fusión de Ramas & $4 \times [B, 256]$ & Concatenación horizontal multiescala & $[B, 1024]$ \\ \hline
-        Capa Densa y Regularización & $[B, 1024]$ & Linear ($1024 \to 256$) + ReLU + Dropout ($p = 0.5$) & $[B, 256]$ \\ \hline
-        Cabeza de Clasificación & $[B, 256]$ & Linear ($256 \to 1$) + Activación Sigmoide $\sigma(z)$ & $[B, 1]$ \\ \hline
-    \end{tabularx}
-\end{table}
-
-\subsubsection{Hiperparámetros y Entrenamiento}
-El entrenamiento de la red CharCNN (script \texttt{train.py} en \texttt{models/}\allowbreak\texttt{char\_cnn/}) se ejecutó sobre las 14,000 muestras del subconjunto de entrenamiento, empleando las 3,000 muestras de validación para el ajuste de hiperparámetros. Los valores utilizados se detallan en la Tabla~\ref{tab:hiperparametros_charcnn}.
-
-\begin{table}[H]
-    \centering
-    \caption{Hiperparámetros de entrenamiento de la red MultiScaleCharCNN.}
-    \label{tab:hiperparametros_charcnn}
-    \begin{tabularx}{\textwidth}{|l|c|X|}
-        \hline
-        \textbf{Parámetro} & \textbf{Valor} & \textbf{Propósito / Descripción} \\ \hline
-        Longitud de secuencia ($L$) & 4096 & Longitud estandarizada con estrategia \textit{Head-Tail}. \\ \hline
-        Dimensión de embedding & 64 & Proyección densa inicial de cada carácter. \\ \hline
-        Tamaños de kernel ($k$) & 3, 5, 7, 9 & Captura de n-gramas locales de caracteres. \\ \hline
-        Filtros por convolución & 128 por rama & 512 canales de extracción simultáneos. \\ \hline
-        Tasa de aprendizaje ($\eta$) & $5 \times 10^{-4}$ & Optimizador AdamW con decaimiento de peso $1 \times 10^{-2}$. \\ \hline
-        Tamaño de lote (\textit{batch size}) & 32 & Balance entre estabilidad de gradiente y memoria. \\ \hline
-        Tasa de Dropout & 0.5 & Prevención de coadaptación en capas densas. \\ \hline
-        Criterio de paro anticipado & 5 épocas & Detención automática al estancarse la pérdida de validación. \\ \hline
-    \end{tabularx}
-\end{table}
-
-El modelo entrenado con el menor valor de pérdida en validación se almacenó en el archivo \texttt{best\_}\allowbreak\texttt{model.pth} (directorio \texttt{models/}\allowbreak\texttt{char\_cnn/}, con un tamaño de 8.95\,MB), listo para integrarse al pipeline de inferencia en tiempo real.
-
-% ----------------------------------------------------------------------
-\subsection{Fusión de Características (BimodalFusion)}
-\label{subsec:algoritmo_fusion}
-
-El módulo \texttt{BimodalFusion} (\texttt{models/}\allowbreak\texttt{fusion.py}) articula la integración entre la señal semántica y la señal estilométrica. Bajo la taxonomía del aprendizaje automático multimodal propuesta por Baltrušaitis et al. \cite{Baltrusaitis2019Multimodal}, la estrategia de Graphito se cataloga formalmente como una \textit{fusión intermedia a nivel de características} (\textit{intermediate feature-level fusion}). A diferencia de los esquemas tardíos que promedian decisiones aisladas o los esquemas tempranos que mezclan entradas incompatibles, se concatenan las representaciones vectoriales densas generadas por ramas neuronales especializadas. En la Figura~\ref{fig:pipeline_bimodal_inferencia} se ilustra el flujo de inferencia bimodal.
+La pregunta guía del Canal A es: \emph{¿qué tan semántica es la similitud?}, es decir, si el modelo capta qué hace el programa o solo cómo se ve. La evidencia indica que capta bien la estructura general, pero depende de los nombres de las variables y no supera a la línea base léxica. Se reporta tal cual: un resultado negativo bien medido también es un resultado.
 
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}[
-        root/.style={rectangle, draw=black!70, fill=gray!12, rounded corners=3pt, text width=13cm, align=center, inner sep=7pt, font=\small},
-        sem/.style={rectangle, draw=blue!70!black, fill=blue!6, rounded corners=3pt, text width=6.1cm, align=center, inner sep=8pt, font=\small},
-        est/.style={rectangle, draw=cyan!70!black, fill=cyan!6, rounded corners=3pt, text width=6.1cm, align=center, inner sep=8pt, font=\small},
-        fuse/.style={rectangle, draw=violet!70!black, fill=violet!6, rounded corners=3pt, text width=13cm, align=center, inner sep=7pt, font=\small},
-        decision/.style={rectangle, draw=green!60!black, fill=green!8, rounded corners=3pt, text width=13cm, align=center, inner sep=7pt, font=\small},
+        inp/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=5.2cm, align=center, inner sep=6pt, font=\small},
+        ca/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=4.3cm, align=center, inner sep=6pt, font=\small},
+        cb/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=4.3cm, align=center, inner sep=6pt, font=\small},
+        cl/.style={rectangle, draw=black!60, fill=blue!6, rounded corners=3pt, text width=4.3cm, align=center, inner sep=6pt, font=\small},
+        outp/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=4.3cm, align=center, inner sep=6pt, font=\small},
+        fin/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=9.5cm, align=center, inner sep=6pt, font=\small},
         arrow/.style={->, >=stealth, thick, draw=black!75}
     ]
-        % Nivel 1: Entrada
-        \node[root] (input) at (0, 0) {\textbf{Entrega de Código del Estudiante ($A$)}\\Código fuente en C / C++ (analizado frente a referencia docente $R$)};
-
-        % Nivel 2: Canales en Paralelo (con amplio espacio)
-        \node[sem] (sem_block) at (-3.4, -2.1) {\textbf{Canal Semántico (Lógica)}\\Extracción DFG con Tree-sitter\\+ GraphCodeBERT con LoRA\\$\rightarrow$ Vector lógico $v_{\text{sem}} \in \mathbb{R}^{768}$\\$\rightarrow$ Similitud lógica: $\text{Sim}_{\text{sem}}(A, R)$};
-        
-        \node[est] (est_block) at (3.4, -2.1) {\textbf{Canal Estilométrico (Autoría)}\\Mapeo de caracteres 1D crudos\\+ MultiScaleCharCNN ($k \in \{3,5,7,9\}$)\\$\rightarrow$ Vector de estilo $v_{\text{est}} \in \mathbb{R}^{1024}$\\$\rightarrow$ Probabilidad de IA: $p_{\text{IA}} \in [0, 1]$};
-
-        % Nivel 3: Fusión Bimodal
-        \node[fuse] (fusion) at (0, -4.6) {\textbf{Capa de Fusión Bimodal (\texttt{BimodalFusion})}\\Concatenación de características: $v_{\text{fused}} = [v_{\text{sem}} \,;\, v_{\text{est}}] \in \mathbb{R}^{1792}$};
-
-        % Nivel 4: Dictamen
-        \node[decision] (dictamen) at (0, -6.1) {\textbf{Dictamen Heurístico de Integridad Académica}\\Clasificación: \texttt{INTEGRO} \;$|$\; \texttt{SOSPECHA\_IA} \;$|$\; \texttt{DISCREPANCIA}};
-
-        % Conexiones limpias con holgura vertical
-        \draw[arrow] (-3.4, -0.55) -- (sem_block.north);
-        \draw[arrow] (3.4, -0.55) -- (est_block.north);
-        \draw[arrow] (sem_block.south) -- (-3.4, -4.15);
-        \draw[arrow] (est_block.south) -- (3.4, -4.15);
-        \draw[arrow] (fusion.south) -- (dictamen.north);
+        \node[inp] (in) at (0,0) {\textbf{Entrega del estudiante}\\Archivo en C o C++};
+        \node[ca] (a) at (-4.9,-2.3) {\textbf{Canal A: similitud}\\GraphCodeBERT convierte el código en un vector y se compara con la solución de referencia};
+        \node[cb] (b) at (0,-2.3) {\textbf{Canal B: estilo}\\CharCNN lee el código carácter por carácter};
+        \node[cl] (l) at (4.9,-2.3) {\textbf{Línea base léxica}\\Compara fragmentos de texto del código (Jaccard)};
+        \node[outp] (oa) at (-4.9,-4.8) {Similitud con la referencia (coseno)};
+        \node[outp] (ob) at (0,-4.8) {Indicador de estilo de IA (probabilidad)};
+        \node[outp] (ol) at (4.9,-4.8) {Porcentaje de fragmentos compartidos};
+        \node[fin] (f) at (0,-6.7) {\textbf{Información para la revisión docente}\\El docente decide; ninguna salida es un veredicto};
+        \draw[arrow] (in.south) -- (a.north);
+        \draw[arrow] (in.south) -- (b.north);
+        \draw[arrow] (in.south) -- (l.north);
+        \draw[arrow] (a.south) -- (oa.north);
+        \draw[arrow] (b.south) -- (ob.north);
+        \draw[arrow] (l.south) -- (ol.north);
+        \draw[arrow] (oa.south) -- (f.north);
+        \draw[arrow] (ob.south) -- (f.north);
+        \draw[arrow] (ol.south) -- (f.north);
     \end{tikzpicture}
-    \caption{Flujo de inferencia del pipeline bimodal de Graphito.}
-    \label{fig:pipeline_bimodal_inferencia}
+    \caption{Panorama de los modelos de Graphito: dos canales y una línea base léxica, cuyas salidas orientan la revisión del docente.}
+    \label{fig:panorama_modelos}
 \end{figure}
 
-Para una entrega estudiantil $A$, la fusión genera tanto un vector de características unificado como un dictamen estructurado:
-
-\begin{enumerate}
-    \item \textbf{Concatenación Multimodal:} El vector de embedding lógico ($v_{\text{sem}} \in \mathbb{R}^{768}$) se concatena con el vector de rasgos de estilo ($v_{\text{est}} \in \mathbb{R}^{1024}$), generando una representación completa de 1792 dimensiones:
-    \begin{equation}
-        v_{\text{fused}} = [v_{\text{sem}} \,;\, v_{\text{est}}] \in \mathbb{R}^{1792}
-    \end{equation}
-    
-    \item \textbf{Cálculo de Similitud del Coseno Lógica:} Para evaluar si el estudiante resolvió el problema correctamente frente a la solución de referencia oficial del docente ($R$), se calcula la proximidad angular sobre las representaciones de GraphCodeBERT:
-    \begin{equation}
-        \text{Sim}_{\text{sem}}(A, R) = \frac{v_{\text{sem}}^{(A)} \cdot v_{\text{sem}}^{(R)}}{\|v_{\text{sem}}^{(A)}\| \|v_{\text{sem}}^{(R)}\|}
-    \end{equation}
-    El empleo de la similitud del coseno sobre representaciones latentes normalizadas se fundamenta en los hallazgos de Wang e Isola \cite{Wang2020Hypersphere}, quienes demostraron que las propiedades de alineación y uniformidad en la hiperesfera unitaria garantizan que la proximidad angular refleje con alta fidelidad la equivalencia funcional de los programas sin distorsiones inducidas por la magnitud de los vectores.
-    
-    \item \textbf{Evaluación de Riesgo Combinado y Dictamen:} El sistema combina la similitud lógica ($\text{Sim}_{\text{sem}}$) con la probabilidad sintética emitida por CharCNN ($p_{\text{IA}}$) para generar una clasificación categórica auditable. En la Tabla~\ref{tab:matriz_decision_dictamen} se define la matriz de decisión que articula los cuatro cuadrantes del espacio bimodal y las acciones pedagógicas sugeridas para cada uno.
-
-\begin{table}[H]
-    \centering
-    \caption{Matriz de decisión y directrices del dictamen heurístico bimodal.}
-    \label{tab:matriz_decision_dictamen}
-    \renewcommand{\arraystretch}{1.25}
-    \small
-    \begin{tabularx}{\textwidth}{|c|c|l|X|X|}
-        \hline
-        \textbf{$\text{Sim}_{\text{sem}}$} & \textbf{$p_{\text{IA}}$} & \textbf{Dictamen} & \textbf{Interpretación Técnica} & \textbf{Acción Pedagógica Sugerida} \\ \hline
-        $\ge 0.75$ & $< 0.70$ & \texttt{INTEGRO} & Solución funcionalmente alineada con la referencia docente; estilo propio de autoría humana. & Aprobación directa de la entrega sin intervención adicional. \\ \hline
-        $\ge 0.75$ & $\ge 0.70$ & \texttt{SOSPECHA\_IA} & Lógica correcta pero con alta densidad de patrones de estilo atribuibles a LLMs. & Entrevista presencial de defensa o prueba práctica individual. \\ \hline
-        $< 0.75$ & $\ge 0.70$ & \texttt{DISCREPANCIA} & Estilo sintético y lógica no coincidente con la referencia oficial del profesor. & Revisión docente para determinar si se empleó una biblioteca no permitida o se alucinó código. \\ \hline
-        $< 0.75$ & $< 0.70$ & \texttt{INSUFICIENTE} & Estilo humano pero lógica distante de la solución esperada para el problema. & Retroalimentación formativa al alumno sobre deficiencias algorítmicas. \\ \hline
-    \end{tabularx}
-\end{table}
-
-Esta categorización cuadricular asegura que el sistema no opere como una caja negra punitiva, sino como un instrumento de diagnóstico pedagógico transparente que orienta al docente según el origen técnico de la discrepancia.
-\end{enumerate}
-
 % ======================================================================
-\section{Evaluación y Validación Experimental}
-\label{sec:evaluacion_experimental}
+\section{Entrenamiento de Modelos}
+\label{sec:entrenamiento_modelos}
 % ======================================================================
 
-Para validar objetivamente la confiabilidad de los modelos, se ejecutó un protocolo experimental exhaustivo adaptado de los estándares de comprensión y similitud de código del benchmark internacional \textbf{CodeXGLUE} \cite{Lu2021CodeXGLUE}. La evaluación empírica abarca: la evolución iterativa de versiones del clasificador, las curvas de aprendizaje y convergencia, la matriz de confusión sobre problemas no vistos, la robustez ante formateo automático y un benchmark semántico con casos de estudio del temario de ESCOM.
+Esta sección describe cada componente en orden: el Canal B (CharCNN), el Canal A (GraphCodeBERT), la línea base léxica y la calibración, que convierte las puntuaciones crudas en umbrales interpretables. Solo el CharCNN se entrena en este proyecto; GraphCodeBERT se usa tal como viene preentrenado.
 
 % ----------------------------------------------------------------------
-\subsection{Evolución Iterativa de los Modelos y Comparativa Experimental}
-\label{subsec:evolucion_versiones_modelos}
+\subsection{Canal B: CharCNN}
+\label{subsec:modelado_charcnn}
 
-El diseño final de Graphito fue el resultado de un proceso iterativo de refinamiento técnico. En la Tabla~\ref{tab:evolucion_versiones_modelos} se detalla la progresión de las cinco versiones desarrolladas a lo largo de los experimentos, evaluadas bajo el mismo conjunto de prueba agrupado por problema.
+\subsubsection{Idea General}
+Una \textbf{red neuronal convolucional} sobre caracteres lee el texto del código como una secuencia de letras y símbolos. Funciona como un conjunto de lupas que se deslizan sobre el texto. Cada lupa se fija en un tamaño de fragmento y aprende a reconocer hábitos de escritura: cómo se abren las llaves, cómo se nombran las variables, qué palabras se repiten. El enfoque sigue a Zhang et al. \cite{Zhang2015CharCNN} (clasificar texto leyendo caracteres, sin separar palabras) y a Kim \cite{Kim2014CNN} (usar varias lupas de tamaños distintos en paralelo). Las lupas de Graphito miran fragmentos de 3, 5, 7 y 9 caracteres. Las cortas captan detalles como operadores; las largas, trozos de palabras clave.
 
-\begin{table}[H]
+La Figura~\ref{fig:arquitectura_charcnn} muestra el recorrido de un archivo por la red. Cada bloque lleva una descripción en lenguaje llano.
+
+\begin{figure}[H]
     \centering
-    \caption{Evolución histórica de versiones y métricas de desempeño sobre el conjunto de prueba.}
-    \label{tab:evolucion_versiones_modelos}
-    \renewcommand{\arraystretch}{1.2}
-    \small
-    \begin{tabularx}{\textwidth}{|l|X|c|c|c|c|c|}
-        \hline
-        \textbf{Versión} & \textbf{Enfoque Tecnológico} & \textbf{Acc} & \textbf{Prec} & \textbf{Rec} & \textbf{$F_1$} & \textbf{FPR} \\ \hline
-        V1 & Baseline N-gramas TF-IDF + Random Forest & 78.4\,\% & 75.1\,\% & 72.8\,\% & 73.9\,\% & 18.5\,\% \\ \hline
-        V2 & CharCNN Secuencial (Zhang 2015, 6 capas, 21.6M params) & 84.2\,\% & 82.0\,\% & 81.5\,\% & 81.7\,\% & 14.2\,\% \\ \hline
-        V3 & MultiScaleCharCNN ($k \in \{3,5,7,9\}$) sin normalizar indentación & 88.1\,\% & 85.3\,\% & 86.0\,\% & 85.6\,\% & 13.8\,\% \\ \hline
-        V4 & GraphCodeBERT base (zero-shot C/C++) + CharCNN normalizada & 89.6\,\% & 88.4\,\% & 89.1\,\% & 88.7\,\% & 10.9\,\% \\ \hline
-        \textbf{V5 (Final)} & \textbf{Graphito Bimodal: MultiScaleCharCNN + LoRA ($r=8$) + indent\_only} & \textbf{92.4\,\%} & \textbf{91.8\,\%} & \textbf{93.1\,\%} & \textbf{92.4\,\%} & \textbf{8.2\,\%} \\ \hline
-    \end{tabularx}
-\end{table}
+    \begin{tikzpicture}[
+        node distance=0.45cm,
+        blk/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=12.6cm, align=center, inner sep=5pt, font=\small},
+        br/.style={rectangle, draw=black!60, fill=orange!8, rounded corners=3pt, text width=2.9cm, align=center, inner sep=4pt, font=\footnotesize},
+        io/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=12.6cm, align=center, inner sep=5pt, font=\small},
+        outb/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=12.6cm, align=center, inner sep=5pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[io] (txt) {\textbf{Texto normalizado}\\Hasta 4,096 caracteres por ventana; cada carácter es un número entre 0 y 97};
+        \node[blk, below=of txt] (emb) {\textbf{Embedding de caracteres}\\Cada carácter se convierte en una lista de 128 números (su ``ficha'' de identidad)};
+        \node[br, below=0.9cm of emb, xshift=-5.1cm] (b1) {\textbf{Lupa de 3}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[br, below=0.9cm of emb, xshift=-1.7cm] (b2) {\textbf{Lupa de 5}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[br, below=0.9cm of emb, xshift=1.7cm] (b3) {\textbf{Lupa de 7}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[br, below=0.9cm of emb, xshift=5.1cm] (b4) {\textbf{Lupa de 9}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[blk, below=0.9cm of b2, xshift=1.7cm] (pool) {\textbf{Resumen de cada lupa}\\El valor máximo y el promedio, solo sobre caracteres reales (se ignora el relleno): 4 lupas $\times$ 128 = 512 números};
+        \node[blk, below=of pool] (drop) {\textbf{Dropout (0.4)}\\Durante el entrenamiento se apaga al azar el 40\,\% de las conexiones, para que la red no memorice};
+        \node[blk, below=of drop] (fc) {\textbf{Capa densa: 1,024 números}\\La ``huella de estilo'' del fragmento};
+        \node[outb, below=of fc] (out) {\textbf{Salida: 2 puntuaciones}\\Una para ``humano'' y otra para ``IA''};
+        \foreach \b in {b1,b2,b3,b4} {
+            \draw[arrow] (emb.south) -- (\b.north);
+            \draw[arrow] (\b.south) -- (pool.north);
+        }
+        \draw[arrow] (txt.south) -- (emb.north);
+        \draw[arrow] (pool.south) -- (drop.north);
+        \draw[arrow] (drop.south) -- (fc.north);
+        \draw[arrow] (fc.south) -- (out.north);
+    \end{tikzpicture}
+    \caption{Arquitectura del CharCNN v2: del texto a una puntuación de estilo. Cada bloque indica en lenguaje llano qué hace.}
+    \label{fig:arquitectura_charcnn}
+\end{figure}
 
-El análisis de esta progresión técnica demuestra decisiones de diseño fundamentales:
-\begin{enumerate}
-    \item El paso de **V1** a **V2** confirmó la superioridad de las representaciones profundas de caracteres frente a conteos de frecuencias de subpalabras (el $F_1$-score aumentó del 73.9\,\% al 81.7\,\%).
-    \item La transición de **V2** a **V3** redujo los parámetros de 21.6 millones a menos de 2 millones mediante convoluciones paralelas multiescala y *Adaptive Pooling*, acelerando el entrenamiento en más del 60\,\%.
-    \item En **V3**, aunque la exactitud global era alta, la tasa de falsos positivos se mantenía en 13.8\,\% debido a que el modelo penalizaba la falta de sangría de alumnos antiguos. La incorporación del preprocesador \texttt{indent\_}\allowbreak\texttt{only.py} en **V4** redujo las falsas alarmas drásticamente.
-    \item Finalmente, en **V5**, la calibración del adaptador LoRA sobre GraphCodeBERT permitió especializar la proyección semántica a la lógica algorítmica de C/C++, alcanzando un $F_1$-score de 92.4\,\% y reduciendo los falsos positivos a un 8.2\,\%, cumpliendo con los requerimientos RNF-03, RNF-04 y RNF-06.
-\end{enumerate}
+Un \textbf{filtro} detecta un patrón concreto de caracteres (cada lupa tiene 64). La \textbf{normalización} estabiliza el entrenamiento y \textbf{ReLU} deja pasar solo los valores positivos. El \emph{pooling} (``resumen'') condensa lo que cada lupa encontró en dos números por filtro, sin contar el relleno de los archivos cortos.
 
-% ----------------------------------------------------------------------
-\subsection{Curvas de Aprendizaje y Dinámica de Entrenamiento}
-\label{subsec:curvas_aprendizaje}
+\subsubsection{Archivos Largos: Ventanas}
+La red recibe 4,096 caracteres a la vez. Los archivos más largos se leen por \textbf{ventanas} de 4,096 que avanzan de 2,048 en 2,048 (hasta 8), como leer por páginas que repiten la mitad de la anterior (Figura~\ref{fig:ventanas_charcnn}, con un archivo de 8,192 caracteres). Cada ventana produce dos puntuaciones; se promedian las de todas las ventanas y el promedio se convierte en una probabilidad. En el entrenamiento se usa un solo recorte aleatorio por archivo.
 
-En la Figura~\ref{fig:curvas_charcnn} se presentan las curvas de evolución de la función de pérdida y de las métricas de clasificación registradas durante las épocas de entrenamiento de la red MultiScaleCharCNN.
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        win/.style={rectangle, draw=black!60, fill=orange!15, minimum height=0.55cm, font=\footnotesize},
+        arrow/.style={->, >=stealth, thick, draw=black!75},
+        res/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=9cm, align=center, inner sep=5pt, font=\small}
+    ]
+        \draw[draw=black!60, fill=gray!12] (0,0) rectangle (12,0.6);
+        \node[font=\small] at (6,0.3) {Archivo normalizado de 8,192 caracteres};
+        \draw[draw=black!60, fill=orange!15] (0,-0.9) rectangle (6,-0.35);
+        \node[font=\footnotesize] at (3,-0.62) {Ventana 1 (caracteres 1 a 4,096)};
+        \draw[draw=black!60, fill=orange!15] (3,-1.6) rectangle (9,-1.05);
+        \node[font=\footnotesize] at (6,-1.32) {Ventana 2 (2,049 a 6,144)};
+        \draw[draw=black!60, fill=orange!15] (6,-2.3) rectangle (12,-1.75);
+        \node[font=\footnotesize] at (9,-2.02) {Ventana 3 (4,097 a 8,192)};
+        \node[res] (r) at (6,-3.9) {\textbf{Promedio de las puntuaciones de las ventanas}\\Se convierte en una sola probabilidad para el archivo};
+        \draw[arrow] (1.5,-0.9) -- (1.5,0 |- r.north);
+        \draw[arrow] (4.5,-1.6) -- (4.5,0 |- r.north);
+        \draw[arrow] (9,-2.3) -- (9,0 |- r.north);
+    \end{tikzpicture}
+    \caption{Lectura por ventanas con traslape: cada ventana se puntúa por separado y los resultados se promedian.}
+    \label{fig:ventanas_charcnn}
+\end{figure}
+
+\subsubsection{Hiperparámetros y Entrenamiento}
+Un \textbf{hiperparámetro} es un ajuste que se fija antes de entrenar, como el número de lupas o el ritmo de aprendizaje. La Tabla~\ref{tab:hiperparametros_charcnn} agrupa los principales en cuatro familias.
+
+{\small
+\renewcommand{\arraystretch}{1.2}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
+    \caption{Organizador de hiperparámetros del CharCNN v2.}\label{tab:hiperparametros_charcnn}\\
+    \hline
+    \textbf{Parámetro} & \textbf{Valor} & \textbf{Qué significa} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Parámetro} & \textbf{Valor} & \textbf{Qué significa} \\ \hline
+    \endhead
+    \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Entrada}} \\ \hline
+    Vocabulario & 98 símbolos & 96 caracteres imprimibles, más relleno y ``desconocido''. \\ \hline
+    Ventana y paso & 4,096 y 2,048 caracteres (hasta 8 ventanas) & Cuánto texto lee la red de una vez y cuánto avanza en archivos largos. \\ \hline
+    \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Arquitectura}} \\ \hline
+    Embedding & 128 números por carácter & Tamaño de la ``ficha'' de cada carácter. \\ \hline
+    Lupas \cite{Kim2014CNN} & 3, 5, 7 y 9; 64 filtros cada una & Fragmentos de distinto alcance: 256 detectores en total. \\ \hline
+    Dropout & 0.4 & Fracción de conexiones apagadas al azar al entrenar, para reducir la memorización. \\ \hline
+    Capa densa & 1,024 & Tamaño de la ``huella de estilo''. \\ \hline
+    \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Entrenamiento}} \\ \hline
+    Optimizador y tasa & Adam, $10^{-3}$ & Método que ajusta los pesos y tamaño de cada paso. \\ \hline
+    Reducción de la tasa & $\times 0.5$ si 3 épocas no mejoran & Pasos más finos al final; ocurrió en las épocas 20 y 35 (numeradas desde 0). \\ \hline
+    Tamaño de lote y épocas & 128 y hasta 50 & Ejemplos por ajuste y pasadas completas de entrenamiento. \\ \hline
+    Muestreo por época & 1:1 (874 de IA y 874 humanos nuevos) & En cada época se sortean humanos distintos (Sección~\ref{subsec:composicion_final}). \\ \hline
+    Semilla & 42 & Fija los sorteos aleatorios y hace repetible el experimento. \\ \hline
+    \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Selección}} \\ \hline
+    Paro anticipado & 7 épocas sin mejora & Se detiene si la validación no mejora. \\ \hline
+    Criterio de época & Máximo de (ROC-AUC, PR-AUC) en validación & Se conserva la mejor copia, no la última; la prueba no interviene. \\ \hline
+\end{xltabular}
+}
+
+Los datos de esta fase son la partición de entrenamiento del Capítulo~\ref{cap:ingenieria_datos}: 10,688 archivos humanos y 874 de IA (uno por familia de casi-copias), con 3,077 de validación (2,868 humanos y 209 de IA). La Figura~\ref{fig:epoca_entrenamiento} resume una época.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        st/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\small},
+        dc/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\small},
+        stp/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[st] (n1) at (-4.8,0) {\textbf{1. Sorteo}\\874 de IA y 874 humanos distintos en cada época};
+        \node[st] (n2) at (0,0) {\textbf{2. Aprender}\\14 lotes de 128 ejemplos; se ajustan los pesos};
+        \node[st] (n3) at (4.8,0) {\textbf{3. Evaluar}\\ROC-AUC y PR-AUC en validación};
+        \node[dc] (d1) at (4.8,-2.5) {\textbf{¿Mejor que todas las épocas anteriores?}\\Si es así, se guarda una copia};
+        \node[dc] (d2) at (0,-2.5) {\textbf{¿Siete épocas seguidas sin mejora?}};
+        \node[stp] (s) at (0,-4.5) {\textbf{Detener}\\Se conserva la mejor copia};
+        \draw[arrow] (n1.east) -- (n2.west);
+        \draw[arrow] (n2.east) -- (n3.west);
+        \draw[arrow] (n3.south) -- (d1.north);
+        \draw[arrow] (d1.west) -- (d2.east);
+        \draw[arrow] (d2.south) -- (s.north) node[midway, right, font=\footnotesize] {Sí};
+        \draw[arrow] (d2.west) -| (n1.south) node[pos=0.25, above, font=\footnotesize] {No: otra época};
+    \end{tikzpicture}
+    \caption{Una época de entrenamiento del CharCNN y la regla de paro anticipado.}
+    \label{fig:epoca_entrenamiento}
+\end{figure}
+
+La Figura~\ref{fig:curvas_charcnn} muestra la evolución real. A la izquierda, la pérdida de entrenamiento baja rápido y luego se estabiliza. A la derecha, ROC-AUC y PR-AUC en validación suben de forma pareja. El entrenamiento duró 38 épocas y se detuvo por paro anticipado. La época elegida es la 31.ª; la figura la marca como 30 porque numera desde 0. En ella la validación obtuvo ROC-AUC de 0.9991 y PR-AUC de 0.9890.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{figuras/curvas_entrenamiento_charcnn.png}
-    \caption{Curvas de pérdida y métricas de validación en problemas no vistos para MultiScaleCharCNN.}
+    \caption{Curvas de entrenamiento del CharCNN v2: pérdida de entrenamiento (izquierda) y métricas de validación (derecha). La línea punteada marca la época seleccionada.}
     \label{fig:curvas_charcnn}
 \end{figure}
 
-Como se observa en la gráfica de la izquierda, la pérdida de validación converge de manera regular hasta alcanzar su mínimo en la época 10, activándose posteriormente el mecanismo de paro anticipado (*early stopping*) para prevenir sobreajuste. En la gráfica de la derecha, la precisión, exactitud y $F_1$-score se mantienen de forma consistente por encima del umbral regulatorio del 80\,\% (RNF-04) desde las primeras épocas.
+% ----------------------------------------------------------------------
+\subsection{Canal A: GraphCodeBERT sin Entrenamiento Adicional}
+\label{subsec:modelado_graphcodebert}
+
+\subsubsection{Idea General}
+\textbf{GraphCodeBERT} \cite{Guo2021GraphCodeBERT} es un modelo preentrenado con millones de programas. Es como un lector que ya revisó muchísimo código antes de llegar a Graphito. Su resultado para un fragmento de código es un \textbf{vector}: una lista de 768 números que resume qué hace el código. Dos códigos que hacen cosas parecidas deberían producir vectores que apunten en direcciones parecidas.
+
+Para medir esa cercanía se usa la \textbf{similitud del coseno}. Imagine dos flechas que salen del mismo punto, como agujas de una brújula. Si apuntan casi hacia el mismo lado, el ángulo es pequeño y el coseno es cercano a 1. Si apuntan a lados distintos, el ángulo crece y el coseno baja (Figura~\ref{fig:coseno_intuicion}). La fórmula es:
+\begin{equation}
+    \text{coseno}(a, b) = \frac{a \cdot b}{\|a\|\,\|b\|}
+\end{equation}
+Se lee así: se mide qué tan alineados están los vectores $a$ y $b$, sin importar cuán largos sean. En la práctica, las similitudes de GraphCodeBERT sin entrenamiento adicional se concentran muy cerca de 1, incluso entre programas distintos. Esto limita cuánto se pueden separar los casos, como se verá en la calibración.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        vec/.style={->, >=stealth, very thick},
+        lbl/.style={font=\small, align=center}
+    ]
+        % Panel (a): ángulo pequeño
+        \draw[vec, blue!70!black] (0,0) -- (2.82,1.03);
+        \draw[vec, orange!80!black] (0,0) -- (2.46,1.72);
+        \draw[black!60] (1.41,0.51) arc (20:35:1.5);
+        \node[lbl] at (3.4,0.1) {ángulo pequeño};
+        \node[lbl] at (1.4,-0.9) {\textbf{(a) Parecidos}\\coseno cercano a 1};
+        % Panel (b): ángulo grande
+        \draw[vec, blue!70!black] (7.5,0) -- (10.4,0.78);
+        \draw[vec, orange!80!black] (7.5,0) -- (6.98,2.95);
+        \draw[black!60] (8.66,0.31) arc (15:100:1.2);
+        \node[lbl] at (9.7,1.9) {ángulo grande};
+        \node[lbl] at (8.4,-0.9) {\textbf{(b) Distintos}\\coseno cercano a 0};
+    \end{tikzpicture}
+    \caption{Intuición de la similitud del coseno: cuanto menor es el ángulo entre dos vectores, más parecidos son los códigos que representan.}
+    \label{fig:coseno_intuicion}
+\end{figure}
+
+\subsubsection{Cómo se Obtiene el Vector de un Archivo}
+La Figura~\ref{fig:flujo_graphcodebert} muestra el recorrido. Se eliminan los comentarios, el código se divide en \textbf{subtokens} (trozos de palabra) y se construye el \textbf{grafo de flujo de datos} (DFG), un esquema de ``qué variable le pasa su valor a cuál''. GraphCodeBERT recibe ambos. Los archivos largos se cortan en ventanas de 382 subtokens que se traslapan a la mitad; el vector de cada ventana es el promedio de sus subtokens de código, y el vector del archivo, el promedio de sus ventanas. El coseno entre el vector de la entrega y el de la referencia es la similitud que Graphito informa.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        st/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\small},
+        mdl/.style={rectangle, draw=black!60, fill=blue!6, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\small},
+        outb/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[st] (n1) at (-4.8,0) {\textbf{1. Archivo}\\C o C++, sin comentarios};
+        \node[st] (n2) at (0,0) {\textbf{2. Subtokens y DFG}\\El DFG indica ``quién le pasa valor a quién''};
+        \node[st] (n3) at (4.8,0) {\textbf{3. Ventanas}\\382 subtokens, paso de 191, hasta 16};
+        \node[mdl] (n4) at (4.8,-2.7) {\textbf{4. GraphCodeBERT}\\Sin reentrenar; un vector por ventana};
+        \node[mdl] (n5) at (0,-2.7) {\textbf{5. Promedio}\\Un vector para todo el archivo};
+        \node[outb] (n6) at (-4.8,-2.7) {\textbf{6. Coseno}\\Contra el vector de la solución de referencia: similitud};
+        \draw[arrow] (n1.east) -- (n2.west);
+        \draw[arrow] (n2.east) -- (n3.west);
+        \draw[arrow] (n3.south) -- (n4.north);
+        \draw[arrow] (n4.west) -- (n5.east);
+        \draw[arrow] (n5.west) -- (n6.east);
+    \end{tikzpicture}
+    \caption{Cómo el Canal A convierte un archivo en un vector y lo compara con la solución de referencia.}
+    \label{fig:flujo_graphcodebert}
+\end{figure}
+
+La Tabla~\ref{tab:config_graphcodebert} reúne la configuración. Como el modelo no se entrena, los valores son solo de entrada y de resumen.
+
+{\small
+\renewcommand{\arraystretch}{1.2}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
+    \caption{Organizador de la configuración de GraphCodeBERT (Canal A).}\label{tab:config_graphcodebert}\\
+    \hline
+    \textbf{Parámetro} & \textbf{Valor} & \textbf{Qué significa} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Parámetro} & \textbf{Valor} & \textbf{Qué significa} \\ \hline
+    \endhead
+    \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Modelo}} \\ \hline
+    Modelo base & \texttt{graphcodebert-base} & Modelo preentrenado de Microsoft \cite{Guo2021GraphCodeBERT}. \\ \hline
+    Reentrenamiento & Ninguno (\textit{zero-shot}) & Se usa tal como viene. \\ \hline
+    \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Entrada}} \\ \hline
+    Código por ventana & 382 subtokens (384 posiciones) & Dos posiciones son marcadores de inicio y fin. \\ \hline
+    Nodos del grafo & 128 & Completan las 512 posiciones que admite el modelo. \\ \hline
+    Paso y tope & 191 subtokens; hasta 16 ventanas & Traslape de la mitad; cerca del 11\,\% de los archivos superó el tope y se truncó. \\ \hline
+    \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Resumen}} \\ \hline
+    \textit{Pooling} & \textit{mean} (promedio) & Cómo se resume una ventana en un vector. Se eligió en validación: ROC-AUC de 0.865 contra 0.797 de la opción por defecto (\textit{cls}). \\ \hline
+\end{xltabular}
+}
+
+En los archivos evaluados, el analizador sintáctico reportó errores en cerca del 25\,\% (el código de estudiantes suele estar incompleto; aun así se procesa) y cada archivo ocupó en promedio 4.7 ventanas.
+
+\subsubsection{Adaptación a C y C++}
+\label{subsubsec:adaptacion_c_cpp}
+El código original de Microsoft construye el grafo de flujo de datos solo para lenguajes como Java. Se tradujo a C y C++ con Tree-sitter; en las construcciones que ambos lenguajes comparten, una prueba automática verifica que el resultado sea idéntico al original. La Figura~\ref{fig:dfg_ejemplo} muestra el grafo de un programa mínimo.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        code/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=3.6cm, align=left, inner sep=6pt, font=\small\ttfamily},
+        val/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, minimum width=1.2cm, minimum height=0.7cm, align=center, font=\small\ttfamily},
+        var/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, minimum width=1.2cm, minimum height=0.7cm, align=center, font=\small\ttfamily},
+        res/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, minimum width=1.8cm, minimum height=0.7cm, align=center, font=\small\ttfamily},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[code] (c) at (0,0) {int a = 5;\\int b = a + 2;\\return b;};
+        \node[val] (v5) at (4.6,0) {5};
+        \node[var, right=1.0cm of v5] (va) {a};
+        \node[var, right=1.0cm of va] (vb) {b}; Se probó también \textit{winnowing} \cite{Schleimer2003Winnowing}, una variante que compara una muestra de los fragmentos; se comporta casi igual que Jaccard, por lo que el capítulo solo muestra Jaccard.
+        \node[res, right=1.0cm of vb] (vr) {return};
+        \draw[arrow] (v5) -- (va);
+        \draw[arrow] (va) -- (vb);
+        \draw[arrow] (vb) -- (vr);
+        \node[font=\footnotesize, align=center] at (7.4,-1.1) {Cada flecha indica ``le pasa su valor a''};
+    \end{tikzpicture}
+    \caption{Grafo de flujo de datos de un programa mínimo: el valor 5 llega a \texttt{a}, de ahí a \texttt{b} y de ahí al \texttt{return}.}
+    \label{fig:dfg_ejemplo}
+\end{figure}
+
+La Tabla~\ref{tab:ajustes_c_cpp} resume los ajustes que C y C++ requirieron.
+
+\begin{table}[H]
+    \centering
+    \caption{Ajustes del grafo de flujo de datos para C y C++.}
+    \label{tab:ajustes_c_cpp}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+        \hline
+        \textbf{Situación en el código} & \textbf{Qué hace el grafo} \\ \hline
+        \texttt{int a[10];} & Define solo \texttt{a}, no el número 10. \\ \hline
+        Una función nueva & Las variables empiezan de cero en cada función. \\ \hline
+        Ciclos \texttt{do-while} y \texttt{switch} & Los recorre. \\ \hline
+        \texttt{x += y;} & \texttt{x} depende de sí misma y de \texttt{y}. \\ \hline
+        \texttt{int}, \texttt{char} & Son palabras reservadas, no variables. \\ \hline
+        Errores de sintaxis & Se omiten los nodos faltantes en lugar de descartar todo el grafo. \\ \hline
+    \end{tabularx}
+\end{table}
+
+Los apuntadores tienen un límite. El grafo sigue las variables por su nombre, igual que el original de Microsoft: reconoce la sintaxis de apuntadores (\texttt{*}, \texttt{\&}, \texttt{->}, arreglos, parámetros), pero no detecta cuándo dos nombres apuntan a los mismos datos (análisis de alias). La Tabla~\ref{tab:apuntadores} lo ilustra con \texttt{int x = 5; int *p = \&x; *p = 10; return x;}. El modelo, además, lee el texto completo del código, incluidos \texttt{*} y \texttt{\&}.
+
+\begin{table}[H]
+    \centering
+    \caption{Lo que el grafo registra en un ejemplo con apuntadores.}
+    \label{tab:apuntadores}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|l|X|l|}
+        \hline
+        \textbf{Línea} & \textbf{Qué registra el grafo} & \textbf{Resultado} \\ \hline
+        \texttt{int *p = \&x;} & \texttt{p} recibe su valor de \texttt{x}. & Correcto \\ \hline
+        \texttt{*p = 10;} & Lo registra como un cambio en \texttt{p}, no en \texttt{x}. & Incompleto \\ \hline
+        \texttt{return x;} & Cree que \texttt{x} sigue valiendo 5. & Incorrecto \\ \hline
+    \end{tabularx}
+\end{table}
+
+Conviene precisar qué se adaptó: la \emph{entrada} (el grafo), no el modelo. GraphCodeBERT nunca vio C ni C++ durante su preentrenamiento (Sección~\ref{subsec:limitaciones}).
+
+\subsubsection{Por Qué no se Entrena (\textit{Zero-Shot})}
+\textit{Zero-shot} significa usar un modelo tal como viene. Se evaluó la alternativa, un adaptador \textbf{LoRA} \cite{Hu2022LoRA} que reentrena solo una parte pequeña del modelo, pero con el protocolo anterior empeoró levemente el resultado (ROC-AUC de 0.646 a 0.630), así que no se usa. Lo que sí se corrigió fue la entrada: la versión actual (``v2'') reconstruye el grafo y la entrada de forma fiel al original, y el ROC-AUC en pares de plagio pasó de 0.741 a 0.856 (Sección~\ref{subsec:pares_plagio}). Es una mejora de implementación, no de método; el recorrido está en la Sección~\ref{subsec:evolucion_modelos}.
 
 % ----------------------------------------------------------------------
-\subsection{Matriz de Confusión sobre Problemas No Vistos}
-\label{subsec:matriz_confusion}
+\subsection{Línea Base Léxica: Jaccard}
+\label{subsec:linea_base_lexica}
 
-Para evaluar la capacidad de generalización del canal estilométrico ante tareas algorítmicas inéditas, se evaluó el mejor punto de control (\texttt{best\_}\allowbreak\texttt{model.pth}) sobre el conjunto de prueba ciego compuesto por 13 problemas que el modelo nunca observó durante el entrenamiento ni la validación. La matriz de confusión resultante se muestra en la Figura~\ref{fig:matriz_confusion_charcnn}.
+Una línea base es una regla simple contra la cual se compara un modelo complejo. Si el modelo no la supera, su complejidad no se justifica por ese criterio. Herramientas conocidas como MOSS \cite{AikenMOSS} y JPlag \cite{PrecheltJPlag} también comparan fragmentos de texto del código, por lo que esta línea base es cercana a lo que muchos docentes ya usan.
+
+El procedimiento tiene tres pasos, ilustrados en la Figura~\ref{fig:shingles_jaccard}. Primero, el código se divide en \textbf{tokens} (elementos del programa) y se abstrae: los identificadores pasan a \texttt{ID}, los números a \texttt{NUM}, las cadenas a \texttt{STR} y los caracteres a \texttt{CHR}; las palabras clave (\texttt{for}, \texttt{if}, \texttt{return}) se conservan. Segundo, se toman todas las ventanas de 5 tokens consecutivos, llamadas \textit{shingles}. Tercero, se comparan los conjuntos de shingles de dos archivos con la fórmula de Jaccard \cite{Broder1997Resemblance}:
+\begin{equation}
+    J(A, B) = \frac{|A \cap B|}{|A \cup B|}
+\end{equation}
+Se lee así: de todos los fragmentos distintos que aparecen en alguno de los dos archivos, qué fracción aparece en ambos. Vale 1 si son idénticos y 0 si no comparten ninguno. Como los nombres de variables se reemplazan por \texttt{ID}, la medida \textbf{no cambia} si un estudiante solo renombra variables; esto explica un resultado de la Sección~\ref{subsec:robustez_canal_a}. Como segunda referencia se usa \textit{winnowing} \cite{Schleimer2003Winnowing} (fragmentos de 5 tokens y ventana de 4), una variante que elige una muestra representativa de los fragmentos para comparar de forma más eficiente.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        tok/.style={rectangle, draw=black!60, fill=blue!6, minimum width=1.35cm, minimum height=0.6cm, font=\small\ttfamily},
+        lbl/.style={font=\small, align=center}
+    ]
+        \node[lbl] at (-1.7,2.0) {\textbf{Línea de código}};
+        \node[font=\small\ttfamily] at (3.5,2.0) {total = total + 5;};
+        \node[lbl] at (-1.7,0.9) {\textbf{Tokens}\\abstraídos};
+        \foreach \t [count=\i from 0] in {{ID},{=},{ID},{+},{NUM},{;}} {
+            \node[tok] (t\i) at (1.0+1.5*\i,0.9) {\t};
+        }
+        \node[lbl] at (-1.7,-0.45) {\textbf{Shingles}\\de 5 tokens};
+        \draw[thick, orange!80!black] (0.4,-0.1) -- (6.4,-0.1);
+        \node[font=\footnotesize] at (3.4,-0.38) {fragmento 1: ID = ID + NUM};
+        \draw[thick, cyan!60!black] (1.9,-0.7) -- (7.9,-0.7);
+        \node[font=\footnotesize] at (4.9,-0.98) {fragmento 2: = ID + NUM ;};
+        \node[lbl] at (-1.7,-3.3) {\textbf{Dos archivos}};
+        \draw[draw=black!60, fill=orange!25, fill opacity=0.5] (2.6,-3.3) ellipse (1.9 and 1.0);
+        \draw[draw=black!60, fill=cyan!25, fill opacity=0.5] (4.6,-3.3) ellipse (1.9 and 1.0);
+        \node[font=\footnotesize, align=center] at (1.7,-3.3) {solo en A\\2};
+        \node[font=\footnotesize, align=center] at (3.6,-3.3) {en ambos\\3};
+        \node[font=\footnotesize, align=center] at (5.5,-3.3) {solo en B\\1};
+        \node[font=\small, align=center] at (9.3,-3.3) {$J = \dfrac{3}{2+3+1} = 0.5$};
+    \end{tikzpicture}
+    \caption{Línea base léxica. Arriba, una línea de código se abstrae y se divide en fragmentos de 5 tokens. Abajo, ejemplo con dos archivos de 5 y 4 fragmentos que comparten 3.}
+    \label{fig:shingles_jaccard}
+\end{figure}
+
+% ----------------------------------------------------------------------
+\subsection{Calibración y Umbrales}
+\label{subsec:calibracion_umbrales}
+
+Las puntuaciones crudas de un modelo no se interpretan solas: un 0.7 puede ser mucho en un modelo y poco en otro. La \textbf{calibración} convierte la puntuación en una escala interpretable usando datos de validación \cite{SilvaFilho2023Calibration}. Después se fija un \textbf{umbral}: el valor a partir del cual se marca un caso. El umbral se elige según cuántas \textbf{falsas alarmas} se toleran, es decir, cuántos archivos humanos se marcarían por error. Graphito define dos puntos de operación: \texttt{fpr\_0.05} (hasta 5 falsas alarmas por cada 100 archivos humanos) y \texttt{fpr\_0.01} (hasta 1 por cada 100). El segundo es el que se despliega en el CharCNN. La Tabla~\ref{tab:calibracion_umbrales} resume ambos canales.
+
+\begin{table}[H]
+    \centering
+    \caption{Organizador de calibración y umbrales, ajustados solo con datos de validación.}
+    \label{tab:calibracion_umbrales}
+    \renewcommand{\arraystretch}{1.25}
+    \small
+    \begin{tabularx}{\textwidth}{|l|l|X|c|c|X|}
+        \hline
+        \textbf{Canal} & \textbf{Método} & \textbf{Ajustado en} & \texttt{fpr\_0.05} & \texttt{fpr\_0.01} & \textbf{Nota} \\ \hline
+        B (CharCNN) & Platt (curva en S) & 2,868 humanos y 209 de IA de validación & 0.0075 & 0.1715 & Umbral desplegado: \texttt{fpr\_0.01}. \\ \hline
+        A (GraphCodeBERT) & Isotónica (escalones crecientes) & Pares de validación: 174 de plagio y 1,595,101 sin plagio & 0.00045 & No alcanzable & Las similitudes se concentran cerca de 1, y ningún umbral logra 1 falsa alarma por cada 100. \\ \hline
+    \end{tabularx}
+\end{table}
+
+La calibración de \textbf{Platt} \cite{Platt1999Probabilistic} ajusta una curva en forma de S que transforma la puntuación en probabilidad. La \textbf{isotónica} \cite{Zadrozny2002Transforming} ajusta una función escalonada que solo puede crecer. En el Canal A el valor de \texttt{fpr\_0.05} es una probabilidad calibrada de que un par sea de plagio; es baja porque estos pares son muy raros entre todos los pares posibles. Con ese umbral, el Canal A detectó cerca del 49\,\% de los pares anotados en validación, con 4\,\% de falsas alarmas.
+
+% ----------------------------------------------------------------------
+\subsection{Evolución de los Modelos: de la Primera Versión a la Final}
+\label{subsec:evolucion_modelos}
+
+Los modelos de esta sección son la versión final de un proceso de iteración. Las primeras versiones (septiembre de 2026) reportaron cifras muy altas; al evaluarlas con un protocolo más riguroso aparecieron fugas de información y errores de implementación. Las cifras de cada versión anterior se midieron con \emph{su} protocolo, así que \textbf{no son comparables} con las de la Sección~\ref{sec:evaluacion_modelos}: es como comparar la nota de un examen cuyas preguntas el alumno ya conocía con la de uno que no vio antes.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        dt/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=2.6cm, align=center, inner sep=5pt, font=\small},
+        ms/.style={rectangle, draw=black!60, rounded corners=3pt, text width=9.6cm, align=left, inner sep=5pt, font=\small},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[dt] (d1) at (0,0) {\textbf{Septiembre 2026}};
+        \node[ms, fill=orange!15, right=0.8cm of d1] (m1) {\textbf{Primeras versiones.} CharCNN y GraphCodeBERT con adaptador, más una fusión de ambos canales; cifras muy altas con el protocolo anterior.};
+        \node[dt, below=0.7cm of d1] (d2) {\textbf{Inicio de octubre}};
+        \node[ms, fill=cyan!10, right=0.8cm of d2] (m2) {\textbf{Auditoría y nuevo protocolo.} Se detecta que el conjunto de prueba anterior reutilizaba muestras de entrenamiento; se construye una evaluación sin fugas.};
+        \node[dt, below=0.7cm of d2] (d3) {\textbf{10 de octubre}};
+        \node[ms, fill=orange!15, right=0.8cm of d3] (m3) {\textbf{CharCNN v2.} Limpieza simétrica, normalización por capas y calibración en validación.};
+        \node[dt, below=0.7cm of d3] (d4) {\textbf{11 de octubre}};
+        \node[ms, fill=cyan!10, right=0.8cm of d4] (m4) {\textbf{GraphCodeBERT v2.} Entrada fiel al modelo original, sin adaptador (\textit{zero-shot}).};
+        \node[dt, below=0.7cm of d4] (d5) {\textbf{Sistema final}};
+        \node[ms, fill=green!12, right=0.8cm of d5] (m5) {\textbf{Dos canales por separado}, con umbrales calibrados y sin fusión.};
+        \draw[arrow] (d1.south) -- (d2.north);
+        \draw[arrow] (d2.south) -- (d3.north);
+        \draw[arrow] (d3.south) -- (d4.north);
+        \draw[arrow] (d4.south) -- (d5.north);
+    \end{tikzpicture}
+    \caption{Línea de tiempo de la evolución de los modelos: de las primeras versiones al sistema final.}
+    \label{fig:linea_tiempo_modelos}
+\end{figure}
+
+La Tabla~\ref{tab:evolucion_versiones} resume cada versión, su problema y su solución.
+
+{\small
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{1.3cm}|>{\raggedright\arraybackslash}p{1.9cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+    \caption{Evolución de los modelos. Las cifras del protocolo anterior no son comparables con las del actual.}\label{tab:evolucion_versiones}\\
+    \hline
+    \textbf{Canal} & \textbf{Versión} & \textbf{Resultado} & \textbf{Problema} & \textbf{Solución} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Canal} & \textbf{Versión} & \textbf{Resultado} & \textbf{Problema} & \textbf{Solución} \\ \hline
+    \endhead
+    Ambos & Evaluación anterior & Cifras muy altas (anterior). & El examen reutilizaba 1,825 de 2,621 muestras de entrenamiento. & Partición por tarea y calibración en validación. \\ \hline
+    B & V1 & ROC-AUC 0.999 y F1 0.992 (anterior). & Fugas de etiqueta y falsas alarmas por el formato del código. & Formato único; luego reconstrucción. \\ \hline
+    B & Formato canónico & ROC-AUC 0.996, F1 cercano a 0.88 (anterior). & Bajó la detección; no atacaba las causas. & Corregir las causas (V2). \\ \hline
+    B & V2 (final) & ROC-AUC 0.994 y F1 0.884 (actual). & Atajos pequeños y dos generadores. & Trabajo futuro. \\ \hline
+    A & V1 & ROC-AUC 0.630 con adaptador y 0.646 sin él (anterior). & Entrada desordenada y similitudes saturadas. & Reconstruir la entrada; quitar el adaptador. \\ \hline
+    A & V2 (final) & ROC-AUC de 0.741 a 0.856 (actual). & Por debajo de Jaccard (0.945). & Entrenamiento contrastivo (futuro). \\ \hline
+    A + B & Fusión & ROC-AUC 0.874, peor que el Canal B solo (anterior). & Pesos elegidos a mano. & Se mantiene como investigación. \\ \hline
+\end{xltabular}
+}
+
+La lección es que las cifras más altas del principio estaban infladas por fugas de información. Una evaluación rigurosa cambia números llamativos por números confiables, y eso permite al docente apoyarse en ellos con criterio.
+
+% ======================================================================
+\section{Evaluación de Modelos}
+\label{sec:evaluacion_modelos}
+% ======================================================================
+
+\subsection{Protocolo de Evaluación}
+\label{subsec:protocolo_evaluacion}
+
+Las reglas se fijaron antes de ver los resultados (Figura~\ref{fig:protocolo_evaluacion}). Es la lógica de un examen: el \textbf{entrenamiento} sirve para aprender, la \textbf{validación} para decidir y la \textbf{prueba} para medir una sola vez, sin ajustarla después de ver las respuestas. Esto sigue la recomendación de evitar la fuga de información \cite{Allamanis2019Adverse,Kapoor2023Leakage}; la partición por tarea (\texttt{split\_v1}) se explicó en el Capítulo~\ref{cap:ingenieria_datos}.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        st/.style={rectangle, draw=black!60, rounded corners=3pt, text width=4.2cm, align=center, inner sep=6pt, font=\small},
+        note/.style={rectangle, draw=black!60, dashed, rounded corners=3pt, text width=6.3cm, align=center, inner sep=5pt, font=\footnotesize},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[st, fill=blue!8] (tr) at (-4.9,0) {\textbf{Entrenamiento}\\Aprender: ajustar los pesos del CharCNN};
+        \node[st, fill=cyan!10] (va) at (0,0) {\textbf{Validación}\\Decidir: época, \textit{pooling}, calibración y umbrales};
+        \node[st, fill=orange!15] (te) at (4.9,0) {\textbf{Prueba}\\Medir una sola vez; nunca se usa para decidir};
+        \node[note] (n1) at (-3.2,-2.1) {\textbf{Intervalos de confianza al 95\,\%}\\Se repite la medición con muestras ligeramente distintas (1,000 veces) para ver cuánto varía el resultado};
+        \node[note] (n2) at (3.2,-2.1) {\textbf{Hipótesis registradas}\\Se escribió qué se esperaba y cómo se juzgaría antes de ver los resultados};
+        \draw[arrow] (tr.east) -- (va.west);
+        \draw[arrow] (va.east) -- (te.west);
+    \end{tikzpicture}
+    \caption{Protocolo de evaluación: cada partición tiene un único rol, y cada cifra se acompaña de su intervalo de confianza.}
+    \label{fig:protocolo_evaluacion}
+\end{figure}
+
+Un \textbf{intervalo de confianza} (IC) del 95\,\% es un rango razonable para el valor real, calculado con \textit{bootstrap} \cite{Efron1993Bootstrap}. Si dos intervalos se traslapan mucho, la diferencia puede deberse al azar. La Tabla~\ref{tab:glosario_metricas} define cada métrica con la pregunta que responde.
+
+\begin{table}[H]
+    \centering
+    \caption{Glosario de métricas: qué pregunta responde cada una.}
+    \label{tab:glosario_metricas}
+    \renewcommand{\arraystretch}{1.25}
+    \small
+    \begin{tabularx}{\textwidth}{|l|X|}
+        \hline
+        \textbf{Métrica} & \textbf{Qué pregunta responde} \\ \hline
+        ROC-AUC & Si se toman un caso positivo y uno negativo al azar, ¿con qué frecuencia el positivo recibe la puntuación más alta? (0.5 es azar; 1 es perfecto). \\ \hline
+        PR-AUC & ¿Qué tan bien se encuentran los casos positivos sin generar muchas falsas alarmas cuando son pocos? (el azar equivale a la proporción de positivos). Su conveniencia frente a ROC-AUC depende del uso previsto del modelo \cite{McDermott2024AUROC}. \\ \hline
+        Precisión & De los archivos marcados, ¿qué fracción era realmente de IA? \\ \hline
+        Recall (exhaustividad) & De los archivos de IA, ¿qué fracción se marcó? \\ \hline
+        $F_1$ & Un solo número que resume precisión y recall (alto solo si ambas lo son). \\ \hline
+        FPR (falsas alarmas) & De los archivos humanos, ¿qué fracción se marcó por error? \\ \hline
+        ECE \cite{SilvaFilho2023Calibration} & ¿Las probabilidades del modelo coinciden con la frecuencia real? (0 es calibración perfecta). \\ \hline
+        MAP@R \cite{Musgrave2020Reality} & Al ordenar las demás entregas por parecido, ¿qué tan arriba aparecen las de la misma tarea? \\ \hline
+        Recall@1 & ¿La entrega más parecida a una dada es de la misma tarea? \\ \hline
+    \end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------
+\subsection{Canal B: Resultados del CharCNN}
+\label{subsec:resultados_charcnn}
+
+La evaluación usa el conjunto de prueba, con tareas que el modelo no vio: 4,531 archivos representativos (4,201 humanos y 330 de IA, uno por familia de casi-copias). Con las puntuaciones calibradas en validación, el ROC-AUC fue de 0.9937 (IC 95\,\%: 0.9909 a 0.9965) y el PR-AUC, de 0.9581 (0.9437 a 0.9726). Un clasificador al azar obtendría un PR-AUC cercano a 0.07, la proporción de código de IA en esta prueba. La Figura~\ref{fig:roc_pr_charcnn} muestra las curvas.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_roc.png}\hspace{0.04\textwidth}\includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_pr.png}
+    \caption{Curvas ROC (izquierda) y de precisión-recall (derecha) del CharCNN v2 en el conjunto de prueba (\textit{TPR}: tasa de verdaderos positivos; \textit{FPR}: tasa de falsos positivos; AP: precisión promedio).}
+    \label{fig:roc_pr_charcnn}
+\end{figure}
+
+En la práctica hay que elegir un umbral. La Tabla~\ref{tab:puntos_operacion} compara dos y la Figura~\ref{fig:matriz_confusion_charcnn} muestra la matriz de confusión del desplegado (\texttt{fpr\_0.01}).
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del CharCNN en la prueba en los dos puntos de operación (IC 95\,\% entre corchetes).}
+    \label{tab:puntos_operacion}
+    \renewcommand{\arraystretch}{1.25}
+    \small
+    \begin{tabularx}{\textwidth}{|l|c|c|X|}
+        \hline
+        \textbf{Métrica} & \texttt{fpr\_0.01} (desplegado) & \texttt{fpr\_0.05} & \textbf{Lectura} \\ \hline
+        Precisión & 0.880 [0.840, 0.912] & 0.626 [0.583, 0.669] & Con el umbral más permisivo, casi 4 de cada 10 marcas son falsas. \\ \hline
+        Recall & 0.888 [0.858, 0.922] & 0.973 [0.956, 0.989] & El umbral permisivo detecta casi toda la IA. \\ \hline
+        $F_1$ & 0.884 [0.860, 0.909] & 0.762 [0.729, 0.793] & Resumen de lo anterior. \\ \hline
+        FPR & 0.0095 [0.0069, 0.0128] & 0.0457 [0.0397, 0.0518] & Coincide con lo buscado (1 y 5 por cada 100). \\ \hline
+    \end{tabularx}
+\end{table}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.55\textwidth]{figuras/matriz_confusion_charcnn.png}
-    \caption{Matriz de confusión de MultiScaleCharCNN en el conjunto de prueba ciego (13 problemas no vistos).}
+    \caption{Matriz de confusión del CharCNN v2 en la prueba con el umbral desplegado (\texttt{fpr\_0.01}).}
     \label{fig:matriz_confusion_charcnn}
 \end{figure}
 
-El clasificador demostró una alta capacidad de discriminación, clasificando correctamente el 95.93\,\% de las instancias con un $F_1$-score de 0.9609 en este subconjunto de evaluación independiente.
+De 4,201 archivos humanos, 4,161 se reconocieron como humanos y 40 se marcaron por error; de 330 de IA, 293 se detectaron y 37 pasaron como humanos. Bajar el umbral detecta más IA, pero marca más archivos humanos; como Graphito apoya la revisión y no la sanciona, el punto desplegado prioriza pocas falsas alarmas. La \textbf{precisión} depende de cuánta IA haya: aquí es cerca del 7\,\% de los archivos, y en un aula con menos IA una fracción mayor de las marcas serían falsas. Las probabilidades son confiables: el ECE fue de 0.0088 (0.0069 a 0.0123), muy cercano a 0.
+
+\paragraph{Por generador.} La IA de la prueba proviene casi toda de dos generadores: para \textit{DeepSeek-Chat} (227 archivos) el ROC-AUC fue de 0.992 y la detección en el umbral desplegado, de 0.881; para \textit{Qwen3} (100 archivos), de 0.997 y 0.900. Los demás tienen un archivo o ninguno. Por curso, el ROC-AUC se mantuvo entre 0.995 y 0.999. Una versión anterior con cifras aún más altas (cercanas a 0.999) estaba contaminada y no se compara. Los límites de estas cifras se reúnen en la Sección~\ref{subsec:limitaciones}.
 
 % ----------------------------------------------------------------------
-\subsection{Evaluación del Canal Semántico con Casos de Estudio de ESCOM}
-\label{subsec:benchmark_semantico_escom}
+\subsection{Canal A: ¿Qué tan Semántica es la Similitud?}
+\label{subsec:canal_a_semantica}
 
-Un riesgo crítico de los modelos basados en Transformers aplicados a código fuente es la saturación semántica: tienden a asignar valores altos de similitud a programas que simplemente pertenecen al mismo lenguaje, dificultando la distinción entre algoritmos diferentes.
+Esta es la pregunta guía del Canal A. Se responde con cuatro mediciones: si ordena bien los pares de plagio anotados, si resiste cambios de estructura, si agrupa las entregas por problema y si se relaciona con la corrección (resumen en la Sección~\ref{subsec:hallazgos_canal_a}). En todas se compara GraphCodeBERT (``v2'') con la línea base léxica de Jaccard. Dos variantes se probaron y no cambiaron la conclusión: quitar el grafo de flujo de datos (0.851 frente a 0.856, sin diferencia medible) y normalizar los nombres de variables (no ayudó).
 
-Para verificar que GraphCodeBERT con el adaptador LoRA supera esta deficiencia, se realizó una prueba comparativa empleando ejercicios reales del temario de la materia Fundamentos de Programación de ESCOM-IPN (Unidades I a III). En la Figura~\ref{fig:benchmark_semantico_escom} se comparan los puntajes de similitud del modelo base frente al modelo ajustado con LoRA.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.95\textwidth]{figuras/benchmark_semantico_escom.png}
-    \caption{Comparativa de similitud semántica en casos de estudio del temario de ESCOM IPN.}
-    \label{fig:benchmark_semantico_escom}
-\end{figure}
-
-Los resultados ilustran una mejora sustancial:
-\begin{itemize}
-    \item Para programas que resuelven el mismo problema con estructuras sintácticas alternativas (como bucles \texttt{for} frente a \texttt{while}, o punteros frente a arreglos), ambos modelos mantienen similitudes elevadas por encima del umbral de equivalencia ($0.85$).
-    \item Para programas completamente distintos (pares negativos en el rango derecho de la gráfica), el modelo base exhibía una correlación espuria cercana a $0.92$, mientras que el adaptador LoRA logró reducir dicha similitud a menos de $0.78$, permitiendo una separación neta y confiable entre ejercicios no equivalentes.
-\end{itemize}
-
-% ----------------------------------------------------------------------
-\subsection{Evaluación de Invarianza Estilométrica}
-\label{subsec:invarianza_estilometrica}
-
-En la Figura~\ref{fig:invarianza_estilometrica} se presentan las pruebas de robustez realizadas sobre la red CharCNN ante transformaciones superficiales comunes en entornos docentes, tales como el uso de herramientas de formateo automático (\texttt{clang-format}) y la adición o eliminación de comentarios de documentación generados por LLMs.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.72\textwidth]{figuras/invarianza_estilometrica.png}
-    \caption{Invarianza de la probabilidad sintética ante formateo y comentarios.}
-    \label{fig:invarianza_estilometrica}
-\end{figure}
-
-Los resultados confirman que el código de estudiantes mantiene una probabilidad de IA reducida ($\approx 30$\,\%) independientemente de si se entrega con sangría desordenada o formateada profesionalmente, mientras que el código de LLM conserva una probabilidad superior al 97\,\% aún si se le remueven los comentarios explicativos. Este comportamiento valida experimentalmente las conclusiones de Abuhamad et al. \cite{Abuhamad2020Authorship}, demostrando que el modelado convolucional sobre secuencias de caracteres captura invariantes morfológicas profundas que resultan altamente resistentes ante perturbaciones superficiales de formato.
-
-% ----------------------------------------------------------------------
-\subsection{Rendimiento Global de MultiScaleCharCNN en el Conjunto de Prueba}
-\label{subsec:rendimiento_charcnn}
-
-La síntesis de las métricas cuantitativas consolidadas sobre la totalidad de las 3,000 muestras del conjunto de prueba se presenta en la Tabla~\ref{tab:metricas_test_charcnn}.
+\subsubsection{Pares de Plagio}
+\label{subsec:pares_plagio}
+En el conjunto de prueba hay 6,797 programas de 14 asignaciones, con 1,908,545 pares posibles; 338 están anotados como plagio. La tarea es dar más similitud a esos pares que al resto. Las anotaciones tienen ruido (se hicieron por asignación), por lo que se interpretan con cautela.
 
 \begin{table}[H]
     \centering
-    \caption{Métricas de desempeño consolidadas de MultiScaleCharCNN sobre el conjunto de prueba (3,000 muestras).}
-    \label{tab:metricas_test_charcnn}
-    \begin{tabular}{|l|c|c|}
+    \caption{Pares de plagio en la prueba: ROC-AUC (IC 95\,\%).}
+    \label{tab:pares_plagio}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|l|c|X|}
         \hline
-        \textbf{Métrica de Evaluación} & \textbf{Resultado Obtenido} & \textbf{Criterio RNF Requerido} \\ \hline
-        Exactitud (\textit{Accuracy}) & 92.4\,\% & -- \\ \hline
-        Precisión (\textit{Precision}) & 91.8\,\% & $\ge 80.0$\,\% (RNF-04) \\ \hline
-        Exhaustividad (\textit{Recall}) & 93.1\,\% & -- \\ \hline
-        Puntuación $F_1$ (\textit{F1-Score}) & 92.4\,\% & $\ge 85.0$\,\% (RNF-03) \\ \hline
-        Área bajo la curva ROC (AUC) & 0.968 & -- \\ \hline
-        Tasa de Falsos Positivos (FPR) & 8.2\,\% & $< 10.0$\,\% (RNF-06) \\ \hline
-    \end{tabular}
+        \textbf{Método} & \textbf{ROC-AUC} & \textbf{Comentario} \\ \hline
+        Jaccard (línea base léxica) & 0.945 [0.930, 0.964] & Mejor resultado. \\ \hline
+        GraphCodeBERT v2 & 0.856 [0.796, 0.893] & Por debajo de la línea base. \\ \hline
+        Pipeline anterior & 0.741 [0.653, 0.800] & Mejorado por la corrección de implementación. \\ \hline
+        Azar & 0.500 & Referencia. \\ \hline
+    \end{tabularx}
 \end{table}
 
-Los resultados confirman que el modelo supera con holgura los requerimientos no funcionales establecidos en el Capítulo~5: se alcanzó una precisión de 91.8\,\% (frente a la meta de 80\,\%) y un $F_1$-score de 92.4\,\%. Además, la tasa de falsos positivos se ubicó en 8.2\,\%, cumpliendo con la restricción de diseño de mantener las falsas alarmas por debajo del 10\,\% para proteger a los estudiantes de acusaciones infundadas.
+GraphCodeBERT zero-shot no supera a la línea base léxica y los intervalos no se traslapan. No es un error de implementación: al excluir los pares idénticos la brecha persiste (0.883 contra 0.975). La corrección del pipeline sí mejoró el resultado frente al anterior.
 
-% ----------------------------------------------------------------------
-\subsection{Evaluación del Canal Semántico ante Clones de Bellon}
-\label{subsec:evaluacion_clones}
-
-Para verificar que GraphCodeBERT no dependa de coincidencias superficiales, se evaluó la estabilidad de la similitud del coseno ante los cuatro tipos de clones de la taxonomía de Bellon \cite{Bellon2007}:
-
-\begin{itemize}
-    \item \textbf{Clones Tipo I (Variaciones de espacios y comentarios):} Al aplicar eliminación de comentarios y compresión de espacios en el preprocesamiento, la similitud lógica resultante fue idéntica: $\text{Sim}_{\text{sem}} = 1.000$.
-    \item \textbf{Clones Tipo II (Renombrado de variables y tipos):} La normalización de identificadores a tokens canónicos permitió que el DFG conservara la misma topología de relaciones, manteniendo la similitud en $\text{Sim}_{\text{sem}} \ge 0.965$.
-    \item \textbf{Clones Tipo III (Sentencias añadidas o reordenadas):} Ante modificaciones en el orden de declaraciones independientes y sentencias auxiliares, el grafo de dependencias de datos preservó el núcleo algorítmico, registrando valores en el rango $0.850 \le \text{Sim}_{\text{sem}} \le 0.920$.
-    \item \textbf{Clones Tipo IV (Equivalencia semántica con distinta sintaxis):} Se contrastaron implementaciones de un mismo problema mediante bucles \texttt{for} frente a bucles \texttt{while} o soluciones recursivas. La similitud se mantuvo en el rango $0.760 \le \text{Sim}_{\text{sem}} \le 0.840$, demostrando que el modelo reconoce el flujo funcional subyacente.
-\end{itemize}
-
-% ----------------------------------------------------------------------
-\subsection{Robustez del Canal A ante Ofuscación Estructural}
+\subsubsection{Robustez ante Cambios en el Código}
 \label{subsec:robustez_canal_a}
-
-Con el fin de someter a prueba de esfuerzo la resistencia del Canal A ante ataques adversarios y técnicas sistemáticas de evasión en entornos académicos, se diseñó y ejecutó un protocolo formal de robustez pre-registrado sobre el conjunto ciego de prueba (\texttt{test}, con 1,993,656 pares y 6,797 programas únicos distribuidos en 14 asignaciones docentes). Se implementaron ocho operadores sintácticos sobre el Árbol de Sintaxis Abstracta (AST) mediante \texttt{tree-sitter}:
-\begin{itemize}
-    \item $T_0$: Línea base de identidad (código original sin modificaciones).
-    \item $T_1$: Renombrado exhaustivo de identificadores locales y parámetros por tokens uniformes \texttt{var\_k}.
-    \item $T_2$: Transmutación de estructuras de control iterativas (\texttt{for} $\leftrightarrow$ \texttt{while}).
-    \item $T_3$: Reordenamiento de sentencias independientes preservando la relación de lectura/escritura ($\mathcal{R}/\mathcal{W}$).
-    \item $T_4$: Sustitución de operadores aritméticos y lógicos equivalentes (\texttt{x += 1} $\leftrightarrow$ \texttt{x = x + 1}).
-    \item $T_5$: Inyección de código muerto e instrucciones benignas (\texttt{if (0) \{ ; \}}).
-    \item $T_6$: Inversión de ramificaciones condicionales (\texttt{if (cond)} $\leftrightarrow$ \texttt{if (!cond)} con intercambio de bloques).
-    \item $T_7$: Oleada combinada en cascada ($T_2 \to T_3 \to T_4 \to T_5$) a tres niveles de intensidad acumulada ($p \in \{0.25, 0.50, 1.00\}$).
-\end{itemize}
-
-La validez sintáctica de cada variante fue verificada mediante análisis de errores de análisis en AST (\textit{parse error rate} $< 0.1\,\%$ en $T_1$ a $T_6$, y $95.6\,\%$ de éxito sintáctico bajo $T_7$ al $100\,\%$). En la Tabla~\ref{tab:robustez_canal_a} se presentan las métricas de área bajo la curva ROC (ROC-AUC) obtenidas para los cuatro métodos evaluados: Jaccard, Winnowing, GraphCodeBERT con DFG (\texttt{v2}) y GraphCodeBERT sin DFG (\texttt{v2\_nodfg}), acompañadas de sus intervalos de confianza al 95\,\% calculados mediante remuestreo estratificado (\textit{paired cluster bootstrap}, $N_{\text{boot}} = 1{,}000$ agrupado por asignación).
+Una similitud verdaderamente semántica debería mantenerse si el programa se reescribe sin cambiar lo que hace. Se aplicaron siete transformaciones automáticas, con \texttt{tree-sitter}, a los 6,797 programas de la prueba, más la identidad como control (Tabla~\ref{tab:transformaciones}).
 
 \begin{table}[H]
     \centering
-    \caption{Rendimiento del Canal A ante transformaciones adversarias en el conjunto \texttt{test} (ROC-AUC [IC 95\,\%]).}
+    \caption{Transformaciones del protocolo de robustez, con un ejemplo de cada una.}
+    \label{tab:transformaciones}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \hline
+        \textbf{Clave} & \textbf{Nombre} & \textbf{Qué hace (ejemplo)} \\ \hline
+        $T_0$ & Identidad & No cambia nada; es el control. \\ \hline
+        $T_1$ & Renombrado & \texttt{suma} pasa a \texttt{var\_1}. \\ \hline
+        $T_2$ & Bucles & Cambia un \texttt{for} por un \texttt{while} equivalente. \\ \hline
+        $T_3$ & Reordenamiento & \texttt{a = 1; b = 2;} pasa a \texttt{b = 2; a = 1;}. \\ \hline
+        $T_4$ & Operadores & \texttt{x += 1} pasa a \texttt{x = x + 1}. \\ \hline
+        $T_5$ & Código muerto & Inserta instrucciones inútiles: \texttt{if (0) \{ ; \}}. \\ \hline
+        $T_6$ & Inversión de \texttt{if} & Niega la condición e intercambia los bloques. \\ \hline
+        $T_7$ & Cascada & Aplica $T_2$ a $T_5$ en secuencia, con intensidad 0.25, 0.50 o 1.00. \\ \hline
+    \end{tabularx}
+\end{table}
+
+La Tabla~\ref{tab:robustez_canal_a} muestra el ROC-AUC en cada condición y la Figura~\ref{fig:robustez_degradacion_canal_a} lo presenta en curvas.
+
+\begin{table}[H]
+    \centering
+    \caption{ROC-AUC [IC 95\,\%] en pares de plagio de la prueba bajo cada transformación.}
     \label{tab:robustez_canal_a}
     \renewcommand{\arraystretch}{1.2}
     \small
-    \begin{tabular}{|l|c|c|c|c|}
+    \begin{tabular}{|l|c|c|}
         \hline
-        \textbf{Condición} & \textbf{Jaccard (Léxico)} & \textbf{Winnowing} & \textbf{GraphCodeBERT (v2)} & \textbf{GraphCodeBERT (sin DFG)} \\ \hline
-        $T_0$ (Identidad) & 0.945 [0.929, 0.963] & 0.944 [0.929, 0.961] & 0.856 [0.790, 0.894] & 0.851 [0.782, 0.890] \\ \hline
-        $T_1$ (Renombrado) & 0.945 [0.929, 0.963] & 0.944 [0.929, 0.961] & 0.683 [0.562, 0.774] & 0.683 [0.561, 0.773] \\ \hline
-        $T_2$ (Bucles) & 0.943 [0.927, 0.960] & 0.941 [0.927, 0.958] & 0.852 [0.785, 0.888] & 0.848 [0.776, 0.887] \\ \hline
-        $T_3$ (Reordenamiento) & 0.943 [0.928, 0.963] & 0.941 [0.927, 0.961] & 0.854 [0.795, 0.891] & 0.850 [0.786, 0.888] \\ \hline
-        $T_4$ (Operadores) & 0.937 [0.921, 0.956] & 0.937 [0.921, 0.955] & 0.850 [0.776, 0.890] & 0.846 [0.770, 0.886] \\ \hline
-        $T_5$ (Código muerto) & 0.950 [0.935, 0.964] & 0.950 [0.933, 0.963] & 0.768 [0.645, 0.849] & 0.776 [0.650, 0.855] \\ \hline
-        $T_6$ (Inversión if) & 0.942 [0.926, 0.960] & 0.940 [0.927, 0.959] & 0.854 [0.782, 0.896] & 0.851 [0.776, 0.894] \\ \hline
-        $T_7@0.25$ & 0.942 [0.928, 0.959] & 0.937 [0.922, 0.954] & 0.857 [0.790, 0.895] & 0.853 [0.782, 0.894] \\ \hline
-        $T_7@0.50$ & 0.944 [0.927, 0.960] & 0.937 [0.921, 0.954] & 0.795 [0.695, 0.853] & 0.799 [0.698, 0.857] \\ \hline
-        $T_7@1.00$ (Completo) & 0.931 [0.912, 0.949] & 0.927 [0.907, 0.943] & 0.714 [0.555, 0.814] & 0.728 [0.576, 0.823] \\ \hline
+        \textbf{Condición} & \textbf{Jaccard} & \textbf{GraphCodeBERT v2} \\ \hline
+        $T_0$ (Identidad) & 0.945 [0.930, 0.964] & 0.856 [0.796, 0.893] \\ \hline
+        $T_1$ (Renombrado) & 0.945 [0.930, 0.964] & 0.683 [0.562, 0.774] \\ \hline
+        $T_5$ (Código muerto) & 0.950 [0.935, 0.964] & 0.768 [0.645, 0.849] \\ \hline
+        $T_2$, $T_3$, $T_4$, $T_6$ (estructura) & 0.937 a 0.943 & 0.850 a 0.854 \\ \hline
+        $T_7@0.25$ & 0.942 [0.928, 0.959] & 0.857 [0.790, 0.895] \\ \hline
+        $T_7@0.50$ & 0.944 [0.927, 0.960] & 0.795 [0.695, 0.853] \\ \hline
+        $T_7@1.00$ & 0.931 [0.912, 0.949] & 0.714 [0.555, 0.814] \\ \hline
     \end{tabular}
 \end{table}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.88\textwidth]{figuras/robustez_degradacion_canal_a.png}
-    \caption{Curvas de degradación de discriminabilidad ROC-AUC del Canal A ante las 10 condiciones de ofuscación.}
+    \caption{Degradación del ROC-AUC del Canal A en las condiciones del protocolo de robustez.}
     \label{fig:robustez_degradacion_canal_a}
 \end{figure}
 
-\subsubsection{Evaluación de Hipótesis Pre-registradas y Hallazgos}
+GraphCodeBERT resiste los cambios de estructura: con $T_2$, $T_3$, $T_4$ y $T_6$ el ROC-AUC cambia como máximo 0.006. En cambio, es sensible al renombrado ($0.856 \rightarrow 0.683$) y al código muerto ($0.856 \rightarrow 0.768$). Jaccard casi no se mueve (entre 0.927 y 0.950). Una explicación posible es que los nombres aportan información al modelo y que el código muerto diluye el resumen del archivo; ambas son hipótesis que este experimento no prueba.
 
-El análisis inferencial mediante el estimador de Diferencias en Diferencias ($\text{DiD}$) arrojó conclusiones empíricas de alta relevancia arquitectónica:
-
-\begin{enumerate}
-    \item \textbf{Refutación de H1 ($\text{DiD}(T_7@1.0; \text{Jaccard}, \text{v2}) = +0.128$ [IC 95\,\%: $+0.014, +0.276$]):} 
-    Se planteó como hipótesis que el modelo semántico neuronal presentaría mayor resiliencia que las líneas base léxicas ante la ofuscación extrema. La evidencia empírica refutó esta hipótesis: GraphCodeBERT exhibió una degradación neta de $\Delta = -0.142$ puntos de ROC-AUC bajo $T_7@1.0$, mientras que el índice de Jaccard únicamente retrocedió $\Delta = -0.014$. Esto se atribuye a la sensibilidad de los mecanismos de atención densa frente a la inyección de secuencias muertas ($T_5$), que diluyen la concentración de masa en los \textit{embeddings} contextuales, mientras que la similitud léxica mantiene la masa de intersección entre las funciones sustantivas.
-    
-    \item \textbf{Control Invariante H2 ($\Delta \text{ROC-AUC}_{\text{Jaccard}}(T_1) = 0.0000$ [IC 95\,\%: $-0.0000, +0.0000$]):}
-    El operador $T_1$ verificó la propiedad teórica de invarianza de Jaccard ante el renombrado de identificadores locales, actuando como control experimental perfecto ($\Delta = 1.95 \times 10^{-6}$, dentro del margen de error numérico).
-    
-    \item \textbf{Inconclusión de H3 ($\text{DiD}(T_3; \text{v2\_nodfg}, \text{v2}) = -0.0005$ [IC 95\,\%: $-0.0010, +0.0002$]):}
-    El intervalo de confianza contiene al cero, lo que indica que, en el estado actual sin ajuste contrastivo específico, la inclusión explícita del grafo de flujo de datos (DFG) en GraphCodeBERT no confiere una ventaja estadísticamente significativa de invarianza ante el reordenamiento de sentencias independientes frente a la variante sin DFG.
-\end{enumerate}
-
-Estos resultados fundamentan la recomendación técnica para la Fase 2 del proyecto: el empleo de aprendizaje contrastivo supervisado (\textit{contrastive fine-tuning} con pérdidas InfoNCE) utilizando las variantes de datos aumentados generadas en este benchmark, con el propósito de inducir la invarianza topológica que la red preentrenada no posee de forma innata ante perturbaciones semánticamente neutras.
-
-% ----------------------------------------------------------------------
-\subsection{Evaluación de Agrupamiento Lógico en el Canal A}
-\label{subsec:evaluacion_agrupamiento_logico}
-
-En consonancia con el objetivo pedagógico de la herramienta, el Canal A no emite veredictos categóricos de corrección, sino que estima la proximidad lógica entre la entrega del estudiante y la solución de referencia propuesta por el docente. Con el fin de evaluar si las representaciones latentes actuales agrupan las soluciones en función de su problema y si la similitud con una solución funcionalmente válida correlaciona con la corrección empírica, se pre-registró y ejecutó un protocolo formal de evaluación \textit{zero-shot} sobre las soluciones de los estudiantes en \texttt{split\_v1.json.gz}.
-
-Se formularon cuatro hipótesis estadísticas previas a la ejecución:
+Las tres hipótesis registradas antes de ejecutar el protocolo se resolvieron así:
 \begin{itemize}
-    \item \textbf{E1-H1 (Agrupamiento por tarea):} Las soluciones de la misma tarea exhiben mayor similitud latente mutua que las pertenecientes a tareas distintas ($\text{MAP@R}_{\text{v2}} > \text{MAP@R}_{\text{aleatorio}}$ con IC 95\,\% excluyente).
-    \item \textbf{E1-H2 (Invarianza ante normalización canónica):} Normalizar deterministamente identificadores locales mejora la concentración topológica de GraphCodeBERT ($\Delta\text{MAP@R}(\text{v2\_norm} - \text{v2}) > 0$).
-    \item \textbf{E1-H3 (Representación neuronal vs. léxica):} GraphCodeBERT supera o iguala a la similitud léxica de Jaccard en el espacio latente original ($\Delta\text{MAP@R}(\text{v2} - \text{jaccard}) \ge 0$).
-    \item \textbf{E2-H1 (Similitud a solución correcta como indicador de corrección):} Enfoque \textit{leave-one-out} sobre las entregas que superan todas las pruebas unitarias: las entregas aprobadas se ubican más cercanas a la referencia que las reprobadas ($\text{AUC} > 0.5$ con IC 95\,\% excluyente de 0.5).
+    \item \textbf{H1 (refutada).} Se esperaba que Jaccard se degradara más que GraphCodeBERT con la cascada completa. Ocurrió lo contrario: GraphCodeBERT cayó 0.142 y Jaccard, 0.014.
+    \item \textbf{H2 (control de Jaccard ante el renombrado).} Se esperaba que no cambiara. El verificador automático la marcó como fallida porque exige una caída exactamente nula y observó 0.000002, compatible con ruido numérico. En la práctica, Jaccard no cambia con el renombrado.
+    \item \textbf{H3 (no concluyente).} Se esperaba que el grafo de flujo de datos diera ventaja ante el reordenamiento. La diferencia fue de $+0.0005$, y su intervalo incluye el cero.
 \end{itemize}
 
-El experimento procesó $2{,}842$ soluciones humanas seleccionadas a través de 48 tareas y bloques curriculares independientes (máximo 60 entregas por tarea, un representante por grupo de duplicados exactos). La Tabla~\ref{tab:resultados_agrupamiento_logico} y la Tabla~\ref{tab:contrastes_agrupamiento_logico} resumen las métricas calculadas en el espacio métrico original.
+\subsubsection{Agrupamiento por Lógica (E1)}
+\label{subsec:agrupamiento_e1}
+La tercera pregunta es si las entregas de una misma tarea quedan cerca entre sí. Se evaluaron 2,842 entregas de 48 tareas. Como el Canal A no se entrena con estos datos, no hay fuga de entrenamiento posible. El \textit{Silhouette} indica si las entregas de una tarea forman un grupo compacto y separado (1 es muy separado; 0, sin separación clara).
 
 \begin{table}[H]
     \centering
-    \caption{Métricas de agrupamiento lógico (E1) sobre el espacio original de representaciones.}
+    \caption{Agrupamiento por tarea (E1) en el espacio original de los vectores.}
     \label{tab:resultados_agrupamiento_logico}
     \renewcommand{\arraystretch}{1.2}
     \small
     \begin{tabularx}{\textwidth}{|l|c|c|c|c|}
         \hline
-        \textbf{Método} & \textbf{MAP@R (IC 95\,\%)} & \textbf{Recall@1} & \textbf{ROC-AUC} & \textbf{Silhouette (Coseno)} \\ \hline
-        \texttt{jaccard} & \textbf{0.4497} [0.4056, 0.4993] & \textbf{0.8469} & \textbf{0.8733} & \textbf{0.0592} \\ \hline
-        \texttt{winnowing} & 0.4414 [0.3972, 0.4907] & 0.8455 & 0.8727 & 0.0559 \\ \hline
-        \texttt{v2} (GraphCodeBERT + DFG) & 0.3865 [0.3410, 0.4426] & 0.8248 & 0.8051 & -0.0018 \\ \hline
-        \texttt{v2\_nodfg} & 0.3897 [0.3441, 0.4453] & 0.8300 & 0.8015 & -0.0064 \\ \hline
-        \texttt{v2\_norm} (Canónico) & 0.3790 [0.3361, 0.4297] & 0.8216 & 0.8049 & -0.0530 \\ \hline
+        \textbf{Método} & \textbf{MAP@R (IC 95\,\%)} & \textbf{Recall@1} & \textbf{ROC-AUC} & \textbf{Silhouette} \\ \hline
+        Jaccard & \textbf{0.450} [0.406, 0.499] & \textbf{0.847} & \textbf{0.873} & \textbf{0.059} \\ \hline
+        GraphCodeBERT v2 & 0.387 [0.341, 0.443] & 0.825 & 0.805 & $-0.002$ \\ \hline
+        Azar & 0.002 & 0.021 & -- & -- \\ \hline
     \end{tabularx}
 \end{table}
 
-\begin{table}[H]
-    \centering
-    \caption{Contrastes pareados y verificación de hipótesis pre-registradas (1{,}000 bootstraps sobre tareas).}
-    \label{tab:contrastes_agrupamiento_logico}
-    \renewcommand{\arraystretch}{1.2}
-    \small
-    \begin{tabularx}{\textwidth}{|l|l|c|c|c|}
-        \hline
-        \textbf{ID} & \textbf{Hipótesis Evaluada} & \textbf{Diferencia Media ($\Delta$)} & \textbf{IC 95\,\%} & \textbf{Veredicto} \\ \hline
-        \textbf{E1-H1} & $\text{MAP@R}(\text{v2}) > \text{Aleatorio}\ (0.0020)$ & $+0.3845$ & $[0.3410, 0.4426]$ & \textbf{CONFIRMADA} \\ \hline
-        \textbf{E1-H2} & $\Delta\text{MAP@R}(\text{v2\_norm} - \text{v2}) > 0$ & $-0.0082$ & $[-0.0223, +0.0057]$ & \textbf{REFUTADA} \\ \hline
-        \textbf{E1-H3} & $\Delta\text{MAP@R}(\text{v2} - \text{jaccard}) \ge 0$ & $-0.0639$ & $[-0.0830, -0.0443]$ & \textbf{REFUTADA} \\ \hline
-        \textbf{E2-H1} & $\text{Macro-AUC}(\text{v2; Aprobado vs. Reprobado}) > 0.5$ & $+0.0598$ (AUC = $0.5598$) & $[0.5199, 0.6015]$ & \textbf{CONFIRMADA} \\ \hline
-    \end{tabularx}
-\end{table}
+Las hipótesis se registraron antes de ejecutar. GraphCodeBERT agrupa por tarea muy por encima del azar (MAP@R de 0.387 frente a 0.002; hipótesis confirmada), pero Jaccard lo hace algo mejor (0.450; la diferencia, $-0.064$ con IC 95\,\% de $-0.083$ a $-0.044$, refuta que v2 lo iguale). Normalizar los nombres tampoco ayudó, lo que concuerda con la sensibilidad al renombrado. El \textit{Silhouette} cercano a 0 sugiere que las tareas se traslapan, quizá por rutinas comunes a varios ejercicios. Las Figuras~\ref{fig:map_at_r_eval}, \ref{fig:clusters_canal_a} y~\ref{fig:heatmap_logico} lo ilustran.
 
-\begin{table}[H]
-    \centering
-    \caption{Evaluación exploratoria multi-método de proximidad a la referencia en E2 (\textit{Leave-One-Out} sobre 14 tareas deduplicadas, 543 entregas).}
-    \label{tab:resultados_e2_multimetodo}
-    \renewcommand{\arraystretch}{1.2}
-    \small
-    \begin{tabularx}{\textwidth}{|l|c|c|}
-        \hline
-        \textbf{Método Evaluado} & \textbf{Macro-AUC (IC 95\,\%)} & \textbf{Macro-Spearman $\rho$ (IC 95\,\%)} \\ \hline
-        \texttt{jaccard} & \textbf{0.5631} [0.5205, 0.6114] & \textbf{0.1069} [0.0364, 0.1859] \\ \hline
-        \texttt{winnowing} & 0.5581 [0.5168, 0.6045] & 0.0999 [0.0363, 0.1726] \\ \hline
-        \texttt{v2} (GraphCodeBERT + DFG) & 0.5598 [0.5199, 0.6015] & 0.0772 [0.0215, 0.1407] \\ \hline
-        \texttt{v2\_nodfg} & 0.5536 [0.5119, 0.5992] & 0.0705 [0.0149, 0.1328] \\ \hline
-        \texttt{v2\_norm} (Canónico) & 0.5550 [0.5049, 0.6094] & 0.0646 [0.0008, 0.1387] \\ \hline
-    \end{tabularx}
-\end{table}
+\paragraph{Recall@1 frente al azar.} Se toma una entrega y se busca, entre las otras 2,841, la que el modelo considera más parecida. El modelo no conoce la tarea de cada entrega, solo compara vectores. Con 48 tareas de entre 43 y 60 entregas, una vecina al azar sería de la misma tarea solo el 2.1\,\% de las veces.\footnote{Probabilidad calculada con el tamaño de cada tarea: $\sum_t n_t(n_t-1) / \big(N(N-1)\big)$, con $N = 2{,}842$ entregas y $n_t$ entregas en la tarea $t$.} GraphCodeBERT acierta el 82.5\,\%, unas 40 veces más. En unas 4 de cada 5 entregas, lo más parecido es otra solución del mismo ejercicio, aunque la haya escrito otro estudiante; esto sugiere que los vectores capturan, en buena medida, \emph{qué problema resuelve} el programa. El 84.7\,\% de Jaccard es algo mayor, y los casos restantes se explican por ejercicios con rutinas parecidas (Figura~\ref{fig:clusters_canal_a}\,(b)).
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{figuras/g3_map_at_r.png}
-    \caption{Comparativa de precisión media en rango $R$ ($\text{MAP@R}$) con intervalos de confianza al 95\,\% calculados por remuestreo bootstrap sobre tareas frente a la línea base aleatoria.}
+    \caption{MAP@R de cada método con IC 95\,\% y línea base aleatoria (0.002).}
     \label{fig:map_at_r_eval}
+\end{figure}
+
+La Figura~\ref{fig:clusters_canal_a} es una proyección en dos dimensiones (t-SNE) de los vectores. Deforma las distancias \cite{Chari2023Specious}, por lo que solo ilustra; las conclusiones se basan en las métricas del espacio original. En (a), tres problemas distintos forman grupos separados; en (b), dos problemas con lógica similar se mezclan.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figuras/clusters_canal_a.png}
+    \caption{Proyección t-SNE de los vectores de GraphCodeBERT: problemas distintos (a) y problemas similares que se superponen (b). La estrella marca la solución de referencia.}
+    \label{fig:clusters_canal_a}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figuras/g1_heatmap.png}
-    \caption{Matrices de similitud coseno ordenadas por tarea curricular. Los bloques diagonales densos reflejan la concentración intrínseca de soluciones de una misma lógica.}
+    \caption{Matrices de similitud del coseno ordenadas por tarea. Los bloques densos sobre la diagonal indican que las entregas de una misma tarea son más parecidas entre sí.}
     \label{fig:heatmap_logico}
 \end{figure}
 
-\subsubsection{Discusión y Conclusiones del Protocolo}
-Los hallazgos del protocolo empírico aportan conclusiones determinantes:
-\begin{enumerate}
-    \item \textbf{Confirmación de agrupamiento latente (E1-H1):} GraphCodeBERT exhibe una capacidad de recuperación $\text{MAP@R} = 0.3865$ significativamente superior a la línea base aleatoria ($0.0020$), con un $\text{Recall@1} = 82.5\,\%$. Esto confirma que las representaciones capturan regularidades asociadas a la lógica de la tarea.
-    \item \textbf{Refutación de ventaja neuronal sobre índices léxicos (E1-H3):} Jaccard supera a GraphCodeBERT en $\Delta = +0.0639$ puntos de $\text{MAP@R}$ (IC 95\,\%: $[+0.0443, +0.0830]$). Se plantea como hipótesis que, en ejercicios de programación introductoria estructurados con librerías homogéneas y estructuras secuenciales simples, los patrones léxicos superficiales bastan para diferenciar problemas sin el costo computacional de un transformador denso.
-    \item \textbf{Refutación de normalización canónica (E1-H2):} La normalización de identificadores locales no mejoró el agrupamiento ($\Delta = -0.0082$, IC 95\,\%: $[-0.0223, +0.0057]$). Una posible explicación es que los nombres mnemónicos aportan información semántica que los mecanismos de atención preentrenados aprovechan; no obstante, este experimento no lo demuestra de forma causal.
-    \item \textbf{Topología del espacio latente (Silhouette $\approx 0$):} El contraste entre un alto $\text{Recall@1}$ y un coeficiente de Silhouette cercano a cero o levemente negativo revela que las entregas vecinas pertenecen a la misma tarea, pero las diferentes tareas no constituyen cúmulos densos y globalmente disjuntos, sino que presentan traslapes debidos a rutinas estándar comunes.
-    \item \textbf{Señal de correlación con la corrección (E2-H1):} Tras podar duplicados exactos intra-tarea (14 casos consistentes retenidos como observaciones únicas y 25 casos con resultados contradictorios descartados por ruido), la evaluación \textit{leave-one-out} sobre 14 tareas elegibles arrojó una señal débil pero estadísticamente positiva ($\text{Macro-AUC} = 0.5598$, IC 95\,\%: $[0.5199, 0.6015]$). En un par compuesto por una entrega aprobada y una reprobada, el sistema ordena primero a la aprobada el 56\,\% de las veces. La correlación global es modesta ($\rho_{\text{Spearman}} = 0.0772$), confirmando que la similitud **complementa** la labor docente orientando la inspección hacia entregas atípicas, sin sustituir las pruebas unitarias.
-\end{enumerate}
+\subsubsection{Similitud y Corrección (E2)}
+\label{subsec:similitud_correccion_e2}
+La cuarta pregunta es si una entrega más parecida a una solución aprobada tiende a ser correcta. Como el conjunto no incluye soluciones del docente (Capítulo~\ref{cap:ingenieria_datos}), la referencia es una entrega de estudiante que aprobó todas las pruebas unitarias. Se consideraron 14 tareas y 543 entregas. El ROC-AUC fue de 0.560 (IC 95\,\%: 0.520 a 0.602): hay señal, pero débil. Al comparar una entrega aprobada con una reprobada, la aprobada queda primero el 56\,\% de las veces.
+
+Los métodos empatan: Jaccard obtuvo 0.563 y v2, 0.560, con una diferencia de $-0.003$ (IC 95\,\%: $-0.052$ a $+0.036$). La correlación de Spearman con el resultado de las pruebas es modesta (0.107 y 0.077). La Figura~\ref{fig:correctness_eval} muestra que las similitudes de GraphCodeBERT quedan comprimidas cerca de 1, mientras que las de Jaccard se distribuyen en un rango amplio. La similitud con una solución aprobada puede ayudar a priorizar la revisión, pero no sustituye las pruebas unitarias.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figuras/g4_correctness.png}
-    \caption{Distribución comparativa multi-método de similitud respecto a la solución de referencia evaluada por categoría de resultado en pruebas unitarias (\textit{Leave-One-Out}).}
+    \caption{Similitud con la solución de referencia según el resultado de las pruebas unitarias (pasa todas, parcial, falla todas), para tres métodos.}
     \label{fig:correctness_eval}
 \end{figure}
 
-% ----------------------------------------------------------------------
-\subsection{Validación con Arquetipos Estudiantiles (Caso Práctico)}
-\label{subsec:benchmark_arquetipos}
-
-Para comprobar el comportamiento del sistema integrado en situaciones docentes reales, se ejecutó la suite de prueba \texttt{scripts/benchmark\_student\_archetypes.py}, cuyos resultados se encuentran consolidados en \texttt{benchmark\_archetypes\_results.json}.
-
-Se definieron tres arquetipos de entrega para el problema de verificación de números primos:
-
-\begin{enumerate}
-    \item \textbf{Arquetipo 1: Alumno IA (Gemini / ChatGPT puro):} Código generado íntegramente por un LLM, con comentarios formales en inglés, constantes simbólicas y formato canónico.
-    \item \textbf{Arquetipo 2: Alumno Aplicado (Humano ordenado):} Estudiante responsable que resuelve el problema modularmente con funciones, variables en su lengua materna y formato estándar de laboratorio.
-    \item \textbf{Arquetipo 3: Alumno con Malas Prácticas (Desordenado):} Estudiante novato que incluye toda la lógica en la función \texttt{main()}, utiliza variables de una letra (\texttt{i, j, b, c}) y no incluye comentarios ni funciones modulares.
-\end{enumerate}
-
-Los resultados obtenidos por el orquestador de análisis bimodal se sintetizan en la Tabla~\ref{tab:resultados_benchmark_arquetipos}.
+\subsubsection{Resumen de Hallazgos}
+\label{subsec:hallazgos_canal_a}
+La Tabla~\ref{tab:hallazgos} reúne los resultados principales de ambos canales y qué significan para el docente.
 
 \begin{table}[H]
     \centering
-    \caption{Resultados del análisis bimodal sobre los arquetipos de entrega estudiantil.}
-    \label{tab:resultados_benchmark_arquetipos}
-    \renewcommand{\arraystretch}{1.2}
+    \caption{Organizador de hallazgos: pregunta, resultado y significado para el docente.}
+    \label{tab:hallazgos}
+    \renewcommand{\arraystretch}{1.25}
     \small
-    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
         \hline
-        \textbf{Arquetipo Evaluado} & \textbf{Sim. Lógica} & \textbf{Prob. IA ($p_{\text{IA}}$)} & \textbf{Predicción} & \textbf{Dictamen del Sistema} \\ \hline
-        1. Alumno IA (Gemini puro) & 0.892 & 99.5\,\% & Sintético & \texttt{SOSPECHA\_IA} (Alerta moderada) \\ \hline
-        2. Alumno Aplicado & 0.915 & 99.6\,\% & Sintético & \texttt{SOSPECHA\_IA} (Revisión asistida) \\ \hline
-        3. Alumno Malas Prácticas & 0.887 & 68.9\,\% & Orgánico & \texttt{INTEGRO} (Sin alerta) \\ \hline
+        \textbf{Pregunta} & \textbf{Resultado} & \textbf{Qué significa para el docente} \\ \hline
+        ¿El CharCNN distingue código de IA en tareas no vistas? & ROC-AUC de 0.994; con 1 falsa alarma por cada 100 humanos, detecta el 89\,\% de la IA. & Es un indicador de apoyo, no una prueba de autoría. La generalización a otros generadores no está medida. \\ \hline
+        ¿Ordena bien GraphCodeBERT los pares de plagio? & ROC-AUC de 0.856 frente a 0.945 de Jaccard. & Ayuda, pero una regla léxica simple lo hace mejor en este dataset. \\ \hline
+        ¿Resiste cambios de estructura? & Con bucles, reordenamiento, operadores e \texttt{if} cambia como máximo 0.006. & Un cambio de forma sin tocar nombres no esconde una copia al Canal A. \\ \hline
+        ¿Y los nombres y el código muerto? & Renombrado: 0.856 a 0.683. Código muerto: 0.856 a 0.768. & Renombrar variables sí reduce la similitud que ve el Canal A. \\ \hline
+        ¿Agrupa las entregas por problema (E1)? & MAP@R de 0.387 (azar 0.002), Recall@1 de 0.825; Jaccard, 0.450. & Reconoce qué entregas resuelven el mismo problema; Jaccard lo hace algo mejor. \\ \hline
+        ¿Se relaciona con la corrección (E2)? & ROC-AUC de 0.560; empate con Jaccard. & Señal débil; sirve para ordenar la revisión, no para decidir si una entrega es correcta. \\ \hline
     \end{tabularx}
 \end{table}
 
-\subsubsection{Análisis de los Resultados}
-El benchmark revela hallazgos pedagógicos de gran valor para la auditoría académica:
+% ----------------------------------------------------------------------
+\subsection{Explicabilidad}
+\label{subsec:explicabilidad}
+
+\textbf{Explicabilidad} es la capacidad de mostrar por qué un modelo da cierta salida. Graphito \textbf{no} explica las decisiones internas de los modelos (no hay mapas de atención ni de saliencia). Ofrece tres apoyos:
 \begin{itemize}
-    \item En el \textbf{Arquetipo 1}, el sistema identifica correctamente la coincidencia funcional con la referencia del profesor ($0.892$) y alerta al docente sobre una certeza estilométrica de redacción sintética del 99.5\,\%.
-    \item En el \textbf{Arquetipo 3}, a pesar de que el código está desordenado y carece de funciones, el canal semántico reconoce que la lógica de cálculo es correcta ($0.887$), mientras que la CharCNN descarta una autoría sintética categórica (asignando una probabilidad inferior al umbral de corte de 70\,\%). Esto demuestra que \textbf{el sistema no confunde la falta de pulcritud o las malas prácticas de un estudiante con el uso de IA}.
-    \item En el \textbf{Arquetipo 2}, el código humano altamente estructurado genera un indicio de revisión debido a la regularidad de sus funciones; en estos casos de frontera, el sistema cumple con la regla de negocio \textbf{RN-04}: actúa como una herramienta de soporte con evidencia visual para que sea el profesor quien determine la validez en la entrevista de evaluación.
+    \item \textbf{Visualización y robustez.} El mapa de calor y la proyección t-SNE (Figuras~\ref{fig:clusters_canal_a} y~\ref{fig:heatmap_logico}) muestran cómo organiza el modelo las soluciones, y la robustez, a qué es sensible.
+    \item \textbf{Indicadores de la interfaz.} Cada entrega muestra su similitud a nivel de archivo (Jaccard y la referencia más cercana) y líneas marcadas por reglas fijas, rotuladas ``no es salida del modelo''.
+    \item \textbf{Jaccard.} Es explicable por construcción: ``comparten el X\,\% de los fragmentos''.
 \end{itemize}
+Los mapas de saliencia quedan como idea no explorada (Sección~\ref{subsec:limitaciones}).
+
+% ----------------------------------------------------------------------
+\subsection{Limitaciones e Ideas no Exploradas}
+\label{subsec:limitaciones}
+
+La Tabla~\ref{tab:limitaciones} reúne los límites conocidos de los resultados y la Tabla~\ref{tab:ideas_no_exploradas}, ideas que podrían superarlos. Estas ideas son propuestas para trabajo futuro (Capítulo~\ref{cap:conclusiones}); no se ejecutaron.
+
+{\small
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{1.5cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+    \caption{Limitaciones de los resultados.}\label{tab:limitaciones}\\
+    \hline
+    \textbf{Canal} & \textbf{Limitación} & \textbf{Qué implica} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Canal} & \textbf{Limitación} & \textbf{Qué implica} \\ \hline
+    \endhead
+    A & GraphCodeBERT se preentrenó con CodeSearchNet (Python, Java, JavaScript, PHP, Ruby y Go) \cite{Guo2021GraphCodeBERT}: nunca vio C ni C++. & Se adaptó la entrada, no el modelo; su lectura de C y C++ es menos fiable. \\ \hline
+    A & Se preentrenó para completar código y aprender relaciones del grafo, no para medir parecido entre programas. & Las similitudes se acumulan cerca de 1 y separan poco. \\ \hline
+    A & Aprendió sobre todo nombres en inglés; aquí están en serbocroata. & Es sensible al renombrado (0.856 a 0.683). \\ \hline
+    A & Los apuntadores se siguen por nombre, sin análisis de alias (Sección~\ref{subsubsec:adaptacion_c_cpp}). & El grafo puede registrar mal el flujo de datos con apuntadores. \\ \hline
+    A & La referencia de la evaluación es una entrega aprobada de un estudiante, no del docente. & Mide parecido con un compañero, no con la solución del docente. \\ \hline
+    B & El modelo se ajusta a la tarea; el límite son los datos: un curso, un país y dos generadores de IA con datos suficientes (\textit{deepseek-chat} y \textit{qwen3}). Quedan atajos pequeños: \texttt{using namespace} aparece en el 7\,\% del código humano y en el 30\,\% del de IA \cite{Geirhos2020Shortcut}. & No se midió la generalización a otros generadores; el modelo podría apoyarse en atajos. \\ \hline
+    Ambos & Los datos son de 2016 a 2017 de la Universidad de Sarajevo, y un estudiante puede aparecer en varias particiones. & No se midió con estudiantes de la ESCOM; las cifras pueden ser algo optimistas. \\ \hline
+\end{xltabular}
+}
+
+{\small
+\renewcommand{\arraystretch}{1.25}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{3.2cm}|}
+    \caption{Ideas no exploradas (propuestas para trabajo futuro).}\label{tab:ideas_no_exploradas}\\
+    \hline
+    \textbf{Idea} & \textbf{Qué resolvería} & \textbf{Estado} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Idea} & \textbf{Qué resolvería} & \textbf{Estado} \\ \hline
+    \endhead
+    Entrenamiento contrastivo de GraphCodeBERT & Enseñaría al modelo a separar programas parecidos de distintos. & Script preparado, nunca ejecutado. \\ \hline
+    Modelos con C y C++ en su preentrenamiento (por ejemplo, UniXcoder) & Una lectura nativa de C y C++. & Propuesta. \\ \hline
+    Métrica de contención & Agregar código extra no bajaría la similitud. & Propuesta. \\ \hline
+    Más generadores de IA en el dataset & Medir la generalización del Canal B. & Propuesta. \\ \hline
+    Mapas de saliencia & Mostrar qué partes del código pesan en la salida. & Propuesta. \\ \hline
+    Un LLM local como juez & Una segunda opinión explicada en lenguaje natural. & Propuesta. \\ \hline
+\end{xltabular}
+}
+
+% ----------------------------------------------------------------------
+\subsection{Discusión}
+\label{subsec:discusion_modelado}
+
+Los dos canales aportan cosas distintas. El \textbf{Canal B} detecta bien, en este dataset, el estilo de dos generadores de IA con pocas falsas alarmas. El \textbf{Canal A} capta que dos programas comparten estructura y resiste reescrituras de forma, pero depende de los nombres de las variables y no supera a una regla léxica simple. Eso no invalida el canal, pero relativiza su costo.
+
+Las explicaciones de por qué ocurre así (nombres que aportan información, código muerto que diluye el resumen, ejercicios simples donde basta el texto) son hipótesis, no causas medidas. Tampoco se midió que el CharCNN capte el ``estilo de IA'' en general. Las mejoras posibles se tratan en el Capítulo~\ref{cap:conclusiones}.
 
 % ======================================================================
 \section{Conclusión del capítulo}
 \label{sec:conclusion_modelado}
 % ======================================================================
 
-El desarrollo de las fases de Entrenamiento y Evaluación de la metodología Komorebi consolidó la capacidad analítica de Graphito. La combinación de GraphCodeBERT adaptado con LoRA para el canal semántico y la red MultiScaleCharCNN para el canal estilométrico permitió alcanzar un $F_1$-score de 92.4\,\% y una tasa de falsos positivos de 8.2\,\% en pruebas ciegas, cumpliendo con los estándares de rigor técnico y pedagógico requeridos.
+Este capítulo describió los modelos de Graphito y la evidencia sobre su funcionamiento. El CharCNN v2 se entrenó con una arquitectura multiescala y alcanzó, en tareas no vistas, un ROC-AUC de 0.994 y una $F_1$ de 0.884 en el umbral desplegado. GraphCodeBERT se usa sin entrenamiento adicional; capta estructura y agrupa por problema, pero depende de los nombres y no supera a la línea base léxica. Se dijeron con claridad tanto los aciertos como los resultados negativos, y los límites: dos generadores, atajos residuales y una referencia que es una entrega de alumno.
 
-Con los modelos entrenados, calibrados y validados experimentalmente, la siguiente fase de Komorebi corresponde al **Despliegue y Monitorización**, donde se detalla la integración de estos componentes en una API REST construida con FastAPI, la persistencia dual en PostgreSQL y ChromaDB, y la interfaz de usuario en React.
+El Capítulo~\ref{cap:despliegue} describe cómo se integran estos componentes en una plataforma que el docente puede usar, con la información de ambos canales presentada como apoyo a su criterio.
