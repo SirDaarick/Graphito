@@ -23,6 +23,7 @@ data/processed/*
 data/output/
 data/golden_set/corpus/
 data/golden_set/corpus_*/
+data/cache/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 chroma_data/
@@ -49,6 +50,7 @@ runs/
 .env
 .env.*
 !.env.example
+!.env.production.example
 .dockerignore
 data/.env
 

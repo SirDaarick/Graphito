@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-graphito} -d ${POSTGRES_DB:-graphito_db} || pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - graphito-net
+
+  chroma:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - graphito-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+    volumes:
+      - ./models/deploy:/models/deploy:ro
+      - hf_cache:/hf_cache
+    env_file:
+      - .env.production
+    environment:
+      - APP_ENV=production
+      - INFERENCE_MODE=REAL
+      - ALLOW_UNCALIBRATED=false
+      - USE_CHROMA_SERVER=true
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - HF_HOME=/hf_cache
+    networks:
+      - graphito-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - graphito-net
+
+networks:
+  graphito-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  chroma_data:
+  hf_cache:
