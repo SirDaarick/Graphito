@@ -9,6 +9,7 @@ import os
 import platform
 import subprocess
 import sys
+import time
 from importlib import metadata
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Union
@@ -57,10 +58,18 @@ def atomic_write_bytes(path: Union[str, Path], data: bytes) -> Path:
     any failure (including `KeyboardInterrupt`). Parent directories are created."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
     try:
         tmp.write_bytes(data)
-        os.replace(tmp, path)
+        max_attempts = 15 if os.name == "nt" else 1
+        for attempt in range(max_attempts):
+            try:
+                os.replace(tmp, path)
+                break
+            except PermissionError:
+                if attempt == max_attempts - 1:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
     except BaseException:
         try:
             tmp.unlink()

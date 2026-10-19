@@ -273,6 +273,52 @@ def _plot_curve(mpl, path: Path, x, y_, title: str, xlabel: str, ylabel: str, di
     fig.savefig(path)
 
 
+# Curve text per language: "en" is what run directories always contain; "es" is for the thesis.
+CURVE_LABELS = {
+    "en": {"roc": ("ROC (AUC={auc})", "FPR", "TPR"), "pr": ("PR (AP={ap})", "Recall", "Precision")},
+    "es": {
+        "roc": ("ROC (AUC={auc})", "Tasa de falsos positivos (FPR)", "Tasa de verdaderos positivos (TPR)"),
+        "pr": ("PR (AP={ap})", "Exhaustividad (recall)", "Precisión"),
+    },
+}
+
+
+def _plot_roc(mpl, path: Path, fpr, tpr, auc, lang: str = "en") -> None:
+    title, xlabel, ylabel = CURVE_LABELS[lang]["roc"]
+    _plot_curve(mpl, path, fpr, tpr, title.format(auc=_fmt(auc)), xlabel, ylabel, True)
+
+
+def _plot_pr(mpl, path: Path, recall, precision, ap, lang: str = "en") -> None:
+    title, xlabel, ylabel = CURVE_LABELS[lang]["pr"]
+    _plot_curve(mpl, path, recall, precision, title.format(ap=_fmt(ap)), xlabel, ylabel, False)
+
+
+def replot_curves(run_dir: Union[str, Path], out_dir: Union[str, Path], *, lang: str = "en",
+                  prefix: str = "") -> List[Path]:
+    """Redraw `roc.png` / `pr.png` of an existing run from its `roc.csv`, `pr.csv` and
+    `metrics.json`; nothing is recomputed. Writes `<prefix>roc.png` / `<prefix>pr.png` in out_dir."""
+    if lang not in CURVE_LABELS:
+        raise ValueError(f"unsupported lang {lang!r}; expected one of {sorted(CURVE_LABELS)}")
+    mpl = _matplotlib()
+    if mpl is None:
+        raise RuntimeError("matplotlib is unavailable")
+    run_dir, out_dir = Path(run_dir), Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tf = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))["threshold_free"]
+
+    def columns(name: str, *cols: str):
+        with open(run_dir / name, encoding="utf-8", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        return [np.array([float(r[c]) for r in rows]) for c in cols]
+
+    fpr, tpr = columns("roc.csv", "fpr", "tpr")
+    precision, recall = columns("pr.csv", "precision", "recall")
+    roc_path, pr_path = out_dir / f"{prefix}roc.png", out_dir / f"{prefix}pr.png"
+    _plot_roc(mpl, roc_path, fpr, tpr, tf["roc_auc"]["value"], lang)
+    _plot_pr(mpl, pr_path, recall, precision, tf["pr_auc"]["value"], lang)
+    return [roc_path, pr_path]
+
+
 def _plot_confusion(mpl, path: Path, point: Mapping, key: str) -> None:
     obs = point["observed"]
     cells = np.array([[obs["tn"], obs["fp"]], [obs["fn"], obs["tp"]]], dtype=np.float64)
@@ -341,6 +387,7 @@ class RunContext:
         config: Optional[Mapping] = None,
         argv: Optional[Sequence[str]] = None,
         root: Union[str, Path] = "runs",
+        run_dir: Optional[Union[str, Path]] = None,
         now: Optional[datetime] = None,
     ) -> "RunContext":
         """Create a fresh run directory and write `config.json` (provenance inside)."""
@@ -351,17 +398,21 @@ class RunContext:
             raise ValueError("a run must record the split manifest sha256 (manifest_path or manifest_sha256)")
         calibration_sha256 = provenance.file_sha256(calibration_path) if calibration_path else None
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        base = Path(root) / channel
-        base.mkdir(parents=True, exist_ok=True)
-        stamp = now.strftime("%Y%m%d-%H%M%S")
-        suffix = 0
-        while True:
-            path = base / (stamp if suffix == 0 else f"{stamp}-{suffix}")
-            try:
-                path.mkdir()
-                break
-            except FileExistsError:
-                suffix += 1
+        if run_dir is not None:
+            path = Path(run_dir)
+            path.mkdir(parents=True, exist_ok=True)
+        else:
+            base = Path(root) / channel
+            base.mkdir(parents=True, exist_ok=True)
+            stamp = now.strftime("%Y%m%d-%H%M%S")
+            suffix = 0
+            while True:
+                path = base / (stamp if suffix == 0 else f"{stamp}-{suffix}")
+                try:
+                    path.mkdir()
+                    break
+                except FileExistsError:
+                    suffix += 1
         if calibration_sha256:
             threshold_source = f"calibration:{calibration_sha256}"
         else:
@@ -429,11 +480,9 @@ class RunContext:
             target = self.path / name
             try:
                 if name == "roc.png":
-                    auc = metrics["threshold_free"]["roc_auc"]["value"]
-                    _plot_curve(mpl, target, roc[0], roc[1], f"ROC (AUC={_fmt(auc)})", "FPR", "TPR", True)
+                    _plot_roc(mpl, target, roc[0], roc[1], metrics["threshold_free"]["roc_auc"]["value"])
                 elif name == "pr.png":
-                    ap = metrics["threshold_free"]["pr_auc"]["value"]
-                    _plot_curve(mpl, target, pr[1], pr[0], f"PR (AP={_fmt(ap)})", "Recall", "Precision", False)
+                    _plot_pr(mpl, target, pr[1], pr[0], metrics["threshold_free"]["pr_auc"]["value"])
                 elif name == "confusion.png":
                     _plot_confusion(mpl, target, primary[1], primary[0])
                 else:

@@ -94,7 +94,105 @@ def _parse_scores_dict(
     return flat
 
 
+import concurrent.futures
 import math
+import os
+
+
+def _eval_recipe(recipe: Tuple[Any, ...], col_aucs: Sequence[Optional[float]]) -> Optional[float]:
+    rtype = recipe[0]
+    if rtype == "auc":
+        val = col_aucs[recipe[1]]
+        return float(val) if val is not None and math.isfinite(val) else None
+    elif rtype == "delta":
+        v_t = col_aucs[recipe[1]]
+        v_b = col_aucs[recipe[2]]
+        if v_t is not None and math.isfinite(v_t) and v_b is not None and math.isfinite(v_b):
+            return float(v_t - v_b)
+        return None
+    elif rtype == "did":
+        v_ak = col_aucs[recipe[1]]
+        v_a0 = col_aucs[recipe[2]]
+        v_bk = col_aucs[recipe[3]]
+        v_b0 = col_aucs[recipe[4]]
+        if (
+            v_ak is not None and math.isfinite(v_ak)
+            and v_a0 is not None and math.isfinite(v_a0)
+            and v_bk is not None and math.isfinite(v_bk)
+            and v_b0 is not None and math.isfinite(v_b0)
+        ):
+            return float((v_ak - v_a0) - (v_bk - v_b0))
+        return None
+    return None
+
+
+def _fast_roc_auc(y: np.ndarray, s: np.ndarray) -> Optional[float]:
+    """Exact Mann-Whitney U rank statistic with midranks for ties.
+    Optimized for fast bootstrap resampling without redundant array allocations.
+    """
+    n_pos = np.sum(y)
+    n_neg = len(y) - n_pos
+    if n_pos <= 0 or n_neg <= 0:
+        return None
+    order = np.argsort(s)
+    s_sorted = s[order]
+    ranks = np.empty_like(order, dtype=np.float64)
+    ranks[order] = np.arange(1, len(s) + 1)
+    dup_mask = np.diff(s_sorted) == 0
+    if np.any(dup_mask):
+        starts = np.r_[0, np.flatnonzero(np.diff(s_sorted)) + 1]
+        ends = np.r_[starts[1:], len(s)]
+        counts = ends - starts
+        for start, end in zip(starts[counts > 1], ends[counts > 1]):
+            ranks[order[start:end]] = (start + 1 + end) / 2.0
+    sum_ranks_pos = np.sum(ranks[y == 1])
+    u = sum_ranks_pos - n_pos * (n_pos + 1) / 2.0
+    return float(u / (n_pos * n_neg))
+
+
+def _resample_chunk(
+    chunk_seed: int,
+    n_chunk: int,
+    y_data: Any,
+    s_data: Any,
+    n: int,
+    num_cols: int,
+    recipes: Mapping[str, Tuple[Any, ...]],
+    groups_data: Optional[Tuple[np.ndarray, np.ndarray, int]],
+) -> Tuple[Dict[str, List[float]], Dict[str, int]]:
+    if isinstance(y_data, str):
+        y_arr = np.memmap(y_data, dtype=np.int64, mode="r", shape=(n,))
+    else:
+        y_arr = y_data
+    if isinstance(s_data, str):
+        S = np.memmap(s_data, dtype=np.float64, mode="r", shape=(n, num_cols))
+    else:
+        S = s_data
+
+    rng = np.random.default_rng(chunk_seed)
+    stats: Dict[str, List[float]] = {name: [] for name in recipes}
+    skipped: Dict[str, int] = {name: 0 for name in recipes}
+
+    for _ in range(n_chunk if n else 0):
+        if groups_data is None:
+            idx = rng.integers(0, n, n)
+        else:
+            by_group, group_of_sorted, n_units = groups_data
+            counts = np.bincount(rng.integers(0, n_units, n_units), minlength=n_units)
+            idx = np.repeat(by_group, counts[group_of_sorted])
+
+        yy = y_arr[idx]
+        # Evaluate each column individually without allocating the 608 MB matrix S[idx]
+        col_aucs = [_fast_roc_auc(yy, S[:, k][idx]) for k in range(num_cols)]
+
+        for name, recipe in recipes.items():
+            val = _eval_recipe(recipe, col_aucs)
+            if val is not None:
+                stats[name].append(val)
+            else:
+                skipped[name] += 1
+
+    return stats, skipped
 
 
 def paired_bootstrap(
@@ -197,53 +295,66 @@ def paired_bootstrap(
 
     stats: Dict[str, List[float]] = {name: [] for name in recipes}
     skipped: Dict[str, int] = {name: 0 for name in recipes}
+    groups_data = (by_group, group_of_sorted, n_units) if groups is not None else None
 
-    def _eval_recipe(recipe: Tuple[Any, ...], col_aucs: Sequence[Optional[float]]) -> Optional[float]:
-        rtype = recipe[0]
-        if rtype == "auc":
-            val = col_aucs[recipe[1]]
-            return float(val) if val is not None and math.isfinite(val) else None
-        elif rtype == "delta":
-            v_t = col_aucs[recipe[1]]
-            v_b = col_aucs[recipe[2]]
-            if v_t is not None and math.isfinite(v_t) and v_b is not None and math.isfinite(v_b):
-                return float(v_t - v_b)
-            return None
-        elif rtype == "did":
-            v_ak = col_aucs[recipe[1]]
-            v_a0 = col_aucs[recipe[2]]
-            v_bk = col_aucs[recipe[3]]
-            v_b0 = col_aucs[recipe[4]]
-            if (
-                v_ak is not None and math.isfinite(v_ak)
-                and v_a0 is not None and math.isfinite(v_a0)
-                and v_bk is not None and math.isfinite(v_bk)
-                and v_b0 is not None and math.isfinite(v_b0)
-            ):
-                return float((v_ak - v_a0) - (v_bk - v_b0))
-            return None
-        return None
+    workers = min(4, os.cpu_count() or 4) if n_boot >= 100 else 1
+    if workers > 1:
+        chunk_size = n_boot // workers
+        chunks = [chunk_size] * workers
+        remainder = n_boot % workers
+        for r_i in range(remainder):
+            chunks[r_i] += 1
 
-    # Resample loop
-    for _ in range(n_boot if n else 0):
-        if groups is None:
-            idx = rng.integers(0, n, n)
-        else:
-            counts = np.bincount(rng.integers(0, n_units, n_units), minlength=n_units)
-            idx = np.repeat(by_group, counts[group_of_sorted])
+        import tempfile
+        import uuid
+        temp_dir = tempfile.gettempdir()
+        uid = uuid.uuid4().hex[:8]
+        y_path = os.path.join(temp_dir, f"_boot_y_{uid}.dat")
+        s_path = os.path.join(temp_dir, f"_boot_s_{uid}.dat")
 
-        yy, ss = y_arr[idx], S[idx]
-        col_aucs = [M.roc_auc(yy, ss[:, k]) for k in range(num_cols)]
+        try:
+            mm_y = np.memmap(y_path, dtype=np.int64, mode="w+", shape=(n,))
+            mm_y[:] = y_arr[:]
+            mm_y.flush()
+            del mm_y
 
-        for name, recipe in recipes.items():
-            val = _eval_recipe(recipe, col_aucs)
-            if val is not None:
-                stats[name].append(val)
-            else:
-                skipped[name] += 1
+            mm_s = np.memmap(s_path, dtype=np.float64, mode="w+", shape=(n, num_cols))
+            mm_s[:] = S[:]
+            mm_s.flush()
+            del mm_s
+
+            tasks = [
+                (seed + i * 10007, ch, y_path, s_path, n, num_cols, recipes, groups_data)
+                for i, ch in enumerate(chunks) if ch > 0
+            ]
+            with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+                futures = [executor.submit(_resample_chunk, *t) for t in tasks]
+                for fut in concurrent.futures.as_completed(futures):
+                    c_stats, c_skipped = fut.result()
+                    for name in recipes:
+                        stats[name].extend(c_stats[name])
+                        skipped[name] += c_skipped[name]
+        finally:
+            if os.path.isfile(y_path):
+                try:
+                    os.remove(y_path)
+                except OSError:
+                    pass
+            if os.path.isfile(s_path):
+                try:
+                    os.remove(s_path)
+                except OSError:
+                    pass
+    else:
+        c_stats, c_skipped = _resample_chunk(
+            seed, n_boot, y_arr, S, n, num_cols, recipes, groups_data
+        )
+        for name in recipes:
+            stats[name].extend(c_stats[name])
+            skipped[name] += c_skipped[name]
 
     # Point estimates
-    point_col_aucs = [M.roc_auc(y_arr, S[:, k]) for k in range(num_cols)] if n else [None] * num_cols
+    point_col_aucs = [_fast_roc_auc(y_arr, S[:, k]) for k in range(num_cols)] if n else [None] * num_cols
 
     out = {}
     for name, recipe in recipes.items():

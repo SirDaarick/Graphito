@@ -31,13 +31,15 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from models.char_cnn.v2.checkpoint import make_checkpoint
+from models.char_cnn.v2.checkpoint import load_checkpoint, make_checkpoint
 from models.char_cnn.v2.config import CharCNNV2Config
 from models.char_cnn.v2.data import (
+    VIEWS,
     EncodedSet,
     check_trainable,
     collate,
@@ -45,9 +47,12 @@ from models.char_cnn.v2.data import (
     epoch_batches,
     label_of,
     limit_per_class,
+    load_encoded,
     load_views,
     view_samples,
 )
+from models.char_cnn.v2.subsample import subsample_ai_train
+from models.evaluation.calibration import select_threshold
 from models.char_cnn.v2.evaluate import SHORTCUT_VIEWS, evaluate_run, update_run_config
 from models.char_cnn.v2.model import CharCNNV2
 from models.char_cnn.v2.preprocess import LeakGuardError, leak_guard
@@ -133,6 +138,11 @@ class TrainOptions:
     eval_batch_size: int = DEFAULT_EVAL_BATCH_SIZE
     n_boot: int = DEFAULT_N_BOOT
     limit_per_class: Optional[int] = None
+    train_ai_fraction: float = 1.0
+    subsample_seed: Optional[int] = None
+    run_dir: Optional[Path] = None
+    skip_test_eval: bool = False
+    keep_checkpoints: bool = True
 
     def __post_init__(self) -> None:
         for name, flag, minimum, inclusive in _OPTION_BOUNDS:
@@ -145,11 +155,16 @@ class TrainOptions:
                 raise ValueError(f"{name} ({flag}) must be a finite number {bound} (got {value!r})")
         if not (math.isfinite(self.lr_factor) and 0.0 < self.lr_factor < 1.0):
             raise ValueError(f"lr_factor (--lr-factor) must be in (0, 1) (got {self.lr_factor!r})")
+        if not (math.isfinite(self.train_ai_fraction) and 0.0 < self.train_ai_fraction <= 1.0):
+            raise ValueError(
+                f"train_ai_fraction (--train-ai-fraction) must be in (0, 1] (got {self.train_ai_fraction!r})"
+            )
 
     def hyperparams(self) -> Dict[str, Any]:
         keys = (
             "seed", "epochs", "batch_size", "lr", "weight_decay", "early_stop", "lr_patience",
             "lr_factor", "eval_batch_size", "n_boot", "limit_per_class",
+            "train_ai_fraction", "subsample_seed",
         )
         return {key: getattr(self, key) for key in keys}
 
@@ -388,6 +403,8 @@ def run(
     options: TrainOptions,
     model_config: Optional[CharCNNV2Config] = None,
     argv: Optional[Sequence[str]] = None,
+    preloaded_views: Optional[Dict[str, EncodedSet]] = None,
+    preloaded_val_all: Optional[EncodedSet] = None,
 ) -> RunResult:
     """Execute one run (steps 1-7).
 
@@ -416,11 +433,15 @@ def run(
         },
         argv=argv,
         root=options.runs_root,
+        run_dir=options.run_dir,
     )
     ctx = update_run_config(ctx, status=STATUS_RUNNING, failure=None)
     stage = _Stage()
     try:
-        return _execute(ctx, manifest, options, model_config, device, stage)
+        return _execute(
+            ctx, manifest, options, model_config, device, stage,
+            preloaded_views=preloaded_views, preloaded_val_all=preloaded_val_all,
+        )
     except BaseException as exc:  # recorded in config.json instead of leaving a silent half-written run
         reason = describe_error(exc)
         set_run_status(ctx.path, STATUS_FAILED, stage=stage.name, reason=reason)
@@ -437,29 +458,47 @@ def _execute(
     model_config: CharCNNV2Config,
     device: torch.device,
     stage: _Stage,
+    preloaded_views: Optional[Dict[str, EncodedSet]] = None,
+    preloaded_val_all: Optional[EncodedSet] = None,
 ) -> RunResult:
     """Steps 4-7 inside an existing run directory (`run` handles failures)."""
-    guard_ids = {s.id for view in GUARD_VIEWS for s in view_samples(manifest, view)}
-    guard = GuardCollector(guard_ids)
-    audit = ShortcutAudit({view: [s.id for s in view_samples(manifest, view)] for view in SHORTCUT_VIEWS})
-    views = load_views(manifest, root=options.root, on_text=_fan_out(guard, audit))
-    guard_doc = guard.check()
-    write_json(ctx.path / "leak_guard.json", guard_doc)
-    ctx = update_run_config(
-        ctx,
-        leak_guard={"path": "leak_guard.json", "passed": guard_doc["passed"], "shares": guard_doc["shares"]},
-    )
-    if not guard_doc["passed"]:
-        over = {k: v for k, v in guard_doc["shares"].items() if v > guard_doc["threshold"]}
-        reason = f"leak patterns above {guard_doc['threshold']} of human representatives: {over}"
-        set_run_status(ctx.path, STATUS_FAILED, stage="leak_guard", reason=reason)
-        print(f"ERROR: leak guard failed: {over}; see {ctx.path / 'leak_guard.json'}", file=sys.stderr)
-        return RunResult(LEAK_GUARD_EXIT, ctx.path)
+    if preloaded_views is not None:
+        views = dict(preloaded_views)
+    else:
+        guard_ids = {s.id for view in GUARD_VIEWS for s in view_samples(manifest, view)}
+        guard = GuardCollector(guard_ids)
+        audit = ShortcutAudit({view: [s.id for s in view_samples(manifest, view)] for view in SHORTCUT_VIEWS})
+        views_to_load = tuple(VIEWS) if not options.skip_test_eval else ("train", "val", "test")
+        views = load_views(manifest, views=views_to_load, root=options.root, on_text=_fan_out(guard, audit))
+        guard_doc = guard.check()
+        write_json(ctx.path / "leak_guard.json", guard_doc)
+        ctx = update_run_config(
+            ctx,
+            leak_guard={"path": "leak_guard.json", "passed": guard_doc["passed"], "shares": guard_doc["shares"]},
+        )
+        if not guard_doc["passed"]:
+            over = {k: v for k, v in guard_doc["shares"].items() if v > guard_doc["threshold"]}
+            reason = f"leak patterns above {guard_doc['threshold']} of human representatives: {over}"
+            set_run_status(ctx.path, STATUS_FAILED, stage="leak_guard", reason=reason)
+            print(f"ERROR: leak guard failed: {over}; see {ctx.path / 'leak_guard.json'}", file=sys.stderr)
+            return RunResult(LEAK_GUARD_EXIT, ctx.path)
+
+    n_ai_orig = int(views["train"].y.sum())
+    subsample_info = {
+        "fraction": options.train_ai_fraction,
+        "seed": options.subsample_seed,
+        "n_ai_original": n_ai_orig,
+        "n_ai_subsampled": n_ai_orig,
+    }
+    if options.train_ai_fraction < 1.0:
+        sub_seed = options.subsample_seed if options.subsample_seed is not None else options.seed
+        views["train"] = subsample_ai_train(views["train"], fraction=options.train_ai_fraction, seed=sub_seed)
+        subsample_info["n_ai_subsampled"] = int(views["train"].y.sum())
 
     if options.limit_per_class is not None:
         views = {name: limit_per_class(view, options.limit_per_class) for name, view in views.items()}
     summary = data_summary(views)
-    ctx = update_run_config(ctx, data_summary=summary)
+    ctx = update_run_config(ctx, data_summary=summary, subsample=subsample_info)
     check_trainable(views)
 
     stage.name = "fit"
@@ -491,6 +530,69 @@ def _execute(
         },
     )
 
+    stage.name = "evaluate_val"
+    best_ckpt = load_checkpoint(ctx.path / CHECKPOINT_NAME, map_location=device)
+    model.load_state_dict(best_ckpt["model_state_dict"])
+    model.eval()
+
+    p_val_rep, _, _ = score_arrays(model, views["val"].arrays, device, options.eval_batch_size)
+    y_val_rep = views["val"].y
+    val_rep_roc = M.roc_auc(y_val_rep, p_val_rep)
+    val_rep_pr = M.average_precision(y_val_rep, p_val_rep)
+    th_rep = select_threshold(y_val_rep, p_val_rep, 0.01)
+    t_rep = th_rep["threshold"]
+    tm_rep = M.threshold_metrics(y_val_rep, p_val_rep, t_rep) if t_rep is not None else {}
+
+    if preloaded_val_all is not None:
+        p_val, _, _ = score_arrays(model, preloaded_val_all.arrays, device, options.eval_batch_size)
+        y_val = preloaded_val_all.y
+    else:
+        val_all_samples = manifest.samples("val", representatives_only=False)
+        if len(val_all_samples) != len(views["val"]):
+            val_all_encoded = load_encoded(manifest, val_all_samples, root=options.root)
+            p_val, _, _ = score_arrays(model, val_all_encoded.arrays, device, options.eval_batch_size)
+            y_val = val_all_encoded.y
+        else:
+            p_val, y_val = p_val_rep, y_val_rep
+
+    val_roc = M.roc_auc(y_val, p_val)
+    val_pr = M.average_precision(y_val, p_val)
+    th_info = select_threshold(y_val, p_val, 0.01)
+    t_val = th_info["threshold"]
+    tm = M.threshold_metrics(y_val, p_val, t_val) if t_val is not None else {}
+
+    metrics_val = {
+        "pr_auc": val_pr,
+        "roc_auc": val_roc,
+        "f1": tm.get("f1"),
+        "precision": tm.get("precision"),
+        "recall": tm.get("recall"),
+        "threshold": t_val,
+        "epoch": result.best_epoch,
+        "n_ai": int(np.sum(y_val == 1)),
+        "n_human": int(np.sum(y_val == 0)),
+        "train_ai_fraction": options.train_ai_fraction,
+        "subsample_seed": options.subsample_seed,
+        "n_ai_train": int(views["train"].y.sum()),
+        "val_representatives": {
+            "pr_auc": val_rep_pr,
+            "roc_auc": val_rep_roc,
+            "f1": tm_rep.get("f1"),
+            "precision": tm_rep.get("precision"),
+            "recall": tm_rep.get("recall"),
+            "threshold": t_rep,
+        },
+    }
+    write_json(ctx.path / "metrics_val.json", metrics_val)
+
+    if options.skip_test_eval:
+        if not options.keep_checkpoints:
+            best_pth = ctx.path / CHECKPOINT_NAME
+            if best_pth.is_file():
+                best_pth.unlink()
+        set_run_status(ctx.path, STATUS_COMPLETE)
+        return RunResult(0, ctx.path, result)
+
     stage.name = "evaluate"
     evaluate_run(
         ctx,
@@ -503,6 +605,10 @@ def _execute(
         shortcuts=audit.to_dict(),
         data_summary=summary,
     )
+    if not options.keep_checkpoints:
+        best_pth = ctx.path / CHECKPOINT_NAME
+        if best_pth.is_file():
+            best_pth.unlink()
     set_run_status(ctx.path, STATUS_COMPLETE)
     return RunResult(0, ctx.path, result)
 
@@ -545,6 +651,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--n-boot", type=int, default=d.n_boot, help="bootstrap resamples for the CI95")
     p.add_argument("--limit-per-class", type=int, default=None, help="debug only: first N per class per view")
     p.add_argument("--model-config", type=Path, default=None, help="JSON object of CharCNNV2Config overrides")
+    p.add_argument("--train-ai-fraction", type=float, default=d.train_ai_fraction, help="fraction of train AI data (0.0, 1.0]")
+    p.add_argument("--subsample-seed", type=int, default=d.subsample_seed, help="seed for AI train subsampling")
+    p.add_argument("--run-dir", type=Path, default=d.run_dir, help="exact run directory to write into")
+    p.add_argument("--skip-test-eval", action="store_true", default=d.skip_test_eval, help="skip test evaluation (val only)")
+    p.add_argument("--no-save-checkpoint", dest="keep_checkpoints", action="store_false", help="do not retain best.pth")
+    p.set_defaults(keep_checkpoints=True)
     return p
 
 
@@ -566,6 +678,11 @@ def options_from_args(args: argparse.Namespace) -> TrainOptions:
         eval_batch_size=args.eval_batch_size,
         n_boot=args.n_boot,
         limit_per_class=args.limit_per_class,
+        train_ai_fraction=args.train_ai_fraction,
+        subsample_seed=args.subsample_seed,
+        run_dir=args.run_dir,
+        skip_test_eval=args.skip_test_eval,
+        keep_checkpoints=args.keep_checkpoints,
     )
 
 

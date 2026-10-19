@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -85,12 +85,232 @@ def parse_args():
     parser.add_argument("--out", default="runs/logic_eval", help="Output directory")
     parser.add_argument("--stats-dir", default="data/raw/stats", help="Directory containing student stats")
     parser.add_argument("--cache-dir", default="data/cache/embeddings", help="Embedding cache directory")
+    parser.add_argument(
+        "--only-cluster-figure",
+        action="store_true",
+        help="Regenerate only the cluster showcase figure/JSON from an existing run (needs --run-dir)",
+    )
+    parser.add_argument(
+        "--only-figures",
+        action="store_true",
+        help="Redraw G1-G5 from an existing run (needs --run-dir and --figures-dir); "
+        "embeddings come from the cache only and stored metrics are checked, nothing is written to the run",
+    )
+    parser.add_argument("--figures-dir", default=None, help="Output directory for --only-figures")
+    parser.add_argument("--lang", default="en", choices=["en", "es"], help="Figure label language")
+    parser.add_argument("--run-dir", default=None, help="Existing run directory (with --only-cluster-figure/--only-figures)")
+    parser.add_argument(
+        "--figure-out",
+        default="Documentacion/Documento/figuras/clusters_canal_a.png",
+        help="Output PNG path for --only-cluster-figure",
+    )
     return parser.parse_args()
+
+
+def passing_flags(entries: List[Dict[str, Any]], stats_dir: Path) -> List[bool]:
+    """True when the student's last_test_results is fully passing (x/x); False if failing or unknown."""
+    flags: List[bool] = []
+    for e in entries:
+        ok = False
+        student = str(e.get("student", ""))
+        names = [f"{student}.json"] + ([] if student.startswith("student") else [f"student{student}.json"])
+        for name in names:
+            sp = stats_dir / str(e.get("course", "")) / name
+            if sp.is_file():
+                try:
+                    data = json.loads(sp.read_text(encoding="utf-8"))
+                    ltr = data.get(e.get("assignment"), {}).get("last_test_results", "")
+                    x, y = (int(v) for v in ltr.split("/"))
+                    ok = y > 0 and x == y
+                except Exception:
+                    ok = False
+                break
+        flags.append(ok)
+    return flags
+
+
+def run_only_cluster_figure(args) -> None:
+    """Rebuild the v2 embeddings of an existing run (from cache) and redraw the showcase figure."""
+    if not args.run_dir:
+        raise SystemExit("--only-cluster-figure requires --run-dir")
+    run_dir = Path(args.run_dir)
+    run_config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+    sample_ids = json.loads((run_dir / "sample.json").read_text(encoding="utf-8"))["e1_sample_ids"]
+
+    manifest_path = Path.cwd() / args.split
+    e1_sample = load_e1_sample(
+        manifest_path,
+        max_per_block=run_config["per_assignment"],
+        seed=run_config["seed"],
+    )
+    if [e["id"] for e in e1_sample] != sample_ids:
+        raise SystemExit("Reloaded E1 sample does not match sample.json of the run; aborting.")
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    embedder = GraphCodeBERTV2Embedder.from_pretrained(
+        "microsoft/graphcodebert-base", device=device, local_files_only=True,
+    )
+    file_embedder = V2FileEmbedder(embedder, use_dfg=True)
+    cached = CachedEmbedder(file_embedder, EmbeddingCache(Path(args.cache_dir), file_embedder.key_fields()))
+
+    vectors = []
+    for item in e1_sample:
+        code = read_file_text(Path.cwd(), item["id"])
+        sha = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        res = cached.embed(sha, code, item.get("lang", "c"))
+        vec = res.vectors.get("mean")
+        vectors.append(vec if vec is not None else np.zeros(768, dtype=np.float32))
+    labels = [item.get("block") or item.get("assignment") for item in e1_sample]
+
+    info = plot_cluster_showcase(
+        embeddings=np.stack(vectors, axis=0),
+        labels=labels,
+        out_path=Path(args.figure_out),
+        json_path=run_dir / "cluster_showcase.json",
+        seeds=(42, 7, 123),
+        dpi=300,
+        passing=passing_flags(e1_sample, Path(args.stats_dir)),
+    )
+    print(json.dumps(info, indent=2, ensure_ascii=False))
+    print(f"Figure written to: {args.figure_out}")
+
+
+def run_only_figures(args) -> None:
+    """Redraw G1-G5 of an existing run without re-evaluating any model.
+
+    Samples are reloaded and checked against sample.json, GraphCodeBERT vectors are read from
+    the embedding cache (a miss aborts), and the rebuilt similarities are checked against the
+    run's E1 MAP@R and E2 per-assignment AUC before anything is drawn.
+    """
+    if not args.run_dir or not args.figures_dir:
+        raise SystemExit("--only-figures requires --run-dir and --figures-dir")
+    run_dir = Path(args.run_dir)
+    figures_dir = Path(args.figures_dir)
+    run_config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+    sample_doc = json.loads((run_dir / "sample.json").read_text(encoding="utf-8"))
+    e1_stored = json.loads((run_dir / "e1_metrics.json").read_text(encoding="utf-8"))
+    e2_stored = json.loads((run_dir / "e2_metrics.json").read_text(encoding="utf-8"))
+    methods = run_config["methods"]
+    repo = Path.cwd()
+
+    e1_sample = load_e1_sample(repo / args.split, max_per_block=run_config["per_assignment"], seed=run_config["seed"])
+    if [e["id"] for e in e1_sample] != sample_doc["e1_sample_ids"]:
+        raise SystemExit("Reloaded E1 sample does not match sample.json of the run; aborting.")
+    manifest_data = load_manifest_data(repo / args.split)
+    human = [e for e in manifest_data.get("entries", []) if e.get("source") == "human" and not e.get("excluded", False)]
+    e2_qualified = load_e2_stats(human, stats_dir=args.stats_dir, min_pass=5, min_fail=3, seed=run_config["seed"])
+    if {k: [s["id"] for s in v] for k, v in e2_qualified.items()} != sample_doc["e2_assignments"]:
+        raise SystemExit("Reloaded E2 assignments do not match sample.json of the run; aborting.")
+
+    caches: Dict[bool, EmbeddingCache] = {}
+    if any(m.startswith("v2") for m in methods):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        embedder = GraphCodeBERTV2Embedder.from_pretrained("microsoft/graphcodebert-base", device=device, local_files_only=True)
+        for use_dfg in (True, False):
+            caches[use_dfg] = EmbeddingCache(Path(args.cache_dir), V2FileEmbedder(embedder, use_dfg=use_dfg).key_fields())
+
+    def cached_vector(use_dfg: bool, sha: str) -> np.ndarray:
+        entry = caches[use_dfg].get(sha)
+        if entry is None:
+            raise SystemExit(f"Embedding cache miss (use_dfg={use_dfg}, sha={sha}); refusing to re-embed.")
+        vec = entry.vectors.get("mean")
+        return vec if vec is not None else np.zeros(768, dtype=np.float32)
+
+    def similarity(method: str, items: List[Dict[str, Any]], codes: List[str], sha_of) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        if method in ("jaccard", "winnowing"):
+            to_set = jaccard_set if method == "jaccard" else winnowing_set
+            return SetSimilarity([to_set(c) for c in codes])(0, len(codes)), None
+        if method in ("v2", "v2_nodfg", "v2_norm"):
+            use_dfg, use_norm = "nodfg" not in method, "norm" in method
+            vecs = []
+            for item, code in zip(items, codes):
+                text = canonicalize_code(code, lang=item.get("lang", "c")) if use_norm else code
+                sha = hashlib.sha256(text.encode("utf-8")).hexdigest() if use_norm else sha_of(item, code)
+                vecs.append(cached_vector(use_dfg, sha))
+            emb = np.stack(vecs, axis=0)
+            return cosine_sim_matrix(emb), emb
+        raise SystemExit(f"Unsupported method for --only-figures: {method}")
+
+    # E1: rebuild similarities and check them against the stored MAP@R.
+    e1_codes = [read_file_text(repo, item["id"]) for item in e1_sample]
+    labels = [item.get("block") or item.get("assignment") for item in e1_sample]
+    e1_sha = lambda item, code: hashlib.sha256(code.encode("utf-8")).hexdigest()  # noqa: E731
+    sim_matrices: Dict[str, np.ndarray] = {}
+    embeddings_by_method: Dict[str, np.ndarray] = {}
+    for method in methods:
+        sim, emb = similarity(method, e1_sample, e1_codes, e1_sha)
+        got, want = compute_map_at_r(sim, labels).get("value"), e1_stored[method]["value"]
+        if not np.isclose(got, want, rtol=0, atol=1e-9):
+            raise SystemExit(f"E1 MAP@R mismatch for {method}: rebuilt {got} vs stored {want}")
+        sim_matrices[method] = sim
+        if emb is not None:
+            embeddings_by_method[method] = emb
+
+    # E2: rebuild per-assignment similarities (same loop order and G5 rule as main()).
+    e2_sha = lambda item, code: item.get("sha256") or hashlib.sha256(code.encode("utf-8")).hexdigest()  # noqa: E731
+    correctness_points_by_method: Dict[str, List[Dict[str, Any]]] = {m: [] for m in methods}
+    g5_ranking: List[Dict[str, Any]] = []
+    g5_name = ""
+    for method in methods:
+        stored_auc = {a["assignment"]: a["auc"] for a in e2_stored[method]["per_assignment"]}
+        for assign_name in sorted(e2_qualified):
+            submissions = e2_qualified[assign_name]
+            raw_codes = [read_file_text(repo, s["id"]) for s in submissions]
+            pass_rates = [s["pass_rate"] for s in submissions]
+            sub_sim, _ = similarity(method, submissions, raw_codes, e2_sha)
+            got = evaluate_assignment_leave_one_out(sub_sim, pass_rates, assignment_name=assign_name)["auc"]
+            want = stored_auc[assign_name]
+            if (got is None) != (want is None) or (got is not None and not np.isclose(got, want, rtol=0, atol=1e-9)):
+                raise SystemExit(f"E2 AUC mismatch for {method}/{assign_name}: rebuilt {got} vs stored {want}")
+
+            pass_idxs = [i for i, r in enumerate(pass_rates) if r == 1.0]
+            if not pass_idxs:
+                continue
+            ref_idx = pass_idxs[0]
+            for idx, s in enumerate(submissions):
+                if idx != ref_idx:
+                    correctness_points_by_method[method].append({
+                        "assignment": assign_name,
+                        "pass_rate": s["pass_rate"],
+                        "pasa": s["pasa"],
+                        "sim_to_ref": float(sub_sim[ref_idx, idx]),
+                    })
+            if (method == "v2" or (not g5_ranking and method == methods[0])) and not g5_ranking:
+                g5_name = assign_name
+                g5_ranking = sorted(
+                    (
+                        {
+                            "student": s.get("student", s["id"]),
+                            "last_test_results": s.get("last_test_results", ""),
+                            "pasa": s["pasa"],
+                            "sim": float(sub_sim[ref_idx, idx]),
+                        }
+                        for idx, s in enumerate(submissions)
+                        if idx != ref_idx
+                    ),
+                    key=lambda x: x["sim"],
+                    reverse=True,
+                )
+
+    lang = args.lang
+    plot_g1_heatmap(sim_matrices, labels, figures_dir / "g1_heatmap.png", lang=lang)
+    plot_g2_projection(embeddings_by_method, labels, figures_dir / "g2_projection.png", seed=run_config["seed"], lang=lang)
+    plot_g3_map_at_r(e1_stored, run_config["random_baseline"], figures_dir / "g3_map_at_r.png", lang=lang)
+    plot_g4_correctness(correctness_points_by_method, figures_dir / "g4_correctness.png", lang=lang)
+    plot_g5_teacher_view(g5_ranking, g5_name or "A2016/Z1/Z1", figures_dir / "g5_teacher_view.png", lang=lang)
+    print(f"Stored E1 MAP@R and E2 AUC reproduced for {methods}; G5 uses {g5_name}.")
+    print(f"Figures written to: {figures_dir}")
 
 
 def main():
     start_time = time.time()
     args = parse_args()
+    if args.only_cluster_figure:
+        run_only_cluster_figure(args)
+        return
+    if args.only_figures:
+        run_only_figures(args)
+        return
     methods = [m.strip() for m in args.methods.split(",") if m.strip()]
 
     repo_root = Path.cwd()
@@ -622,3 +842,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

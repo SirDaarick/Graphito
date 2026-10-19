@@ -116,6 +116,10 @@ def _plain(value: Any) -> Any:
     return value
 
 
+def write_json(path: Path, doc: Any) -> None:
+    atomic_write_bytes(path, json.dumps(doc, indent=2).encode("utf-8"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Channel A robustness evaluation under structural obfuscation.")
     p.add_argument("--manifest", default=DEFAULT_MANIFEST, help="Path to split manifest.")
@@ -200,6 +204,75 @@ def _transform_one_file(
         "edit_tokens": e_tokens,
         "edit_abstract": e_abstract,
     }
+
+
+def _compute_single_method_views(
+    cond: str,
+    m: str,
+    score_file_str: str,
+    y_all: np.ndarray,
+    assignments: np.ndarray,
+    masks: Dict[str, np.ndarray],
+    n_boot_cond: int,
+    seed: int,
+    split: str,
+    val_th: Optional[float],
+    jaccard_cal_path: Optional[str],
+) -> Tuple[str, str, Dict[str, Any]]:
+    data = np.load(score_file_str)
+    raw_s = data["scores"]
+    jaccard_cal = load_calibration(Path(jaccard_cal_path)) if jaccard_cal_path else None
+
+    views_doc: Dict[str, Any] = {}
+    for view in ("all", "no_identical"):
+        mask = masks[view]
+        yy = y_all[mask]
+        ss = raw_s[mask]
+        grp = assignments[mask]
+
+        ops = {}
+        if m == "jaccard" and jaccard_cal is not None:
+            decisions = jaccard_cal.decide(ss)
+            tp = int((decisions & (yy == 1)).sum())
+            fp = int((decisions & (yy == 0)).sum())
+            fn = int((~decisions & (yy == 1)).sum())
+            tn = int((~decisions & (yy == 0)).sum())
+            ops["deployed"] = {
+                "threshold": jaccard_cal.threshold()["threshold"],
+                "tp": tp, "fp": fp, "fn": fn, "tn": tn,
+                "tpr": float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0,
+                "fpr": float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0,
+            }
+        elif val_th is not None:
+            decisions = ss >= val_th
+            tp = int((decisions & (yy == 1)).sum())
+            fp = int((decisions & (yy == 0)).sum())
+            fn = int((~decisions & (yy == 1)).sum())
+            tn = int((~decisions & (yy == 0)).sum())
+            ops["deployed"] = {
+                "threshold": val_th,
+                "tp": tp, "fp": fp, "fn": fn, "tn": tn,
+                "tpr": float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0,
+                "fpr": float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0,
+            }
+
+        met = compute_metrics(
+            yy, ss,
+            channel=CHANNEL,
+            split=split,
+            mode="robustness",
+            n_boot=n_boot_cond,
+            seed=seed,
+            bootstrap_groups=grp,
+            operating_points=ops,
+        )
+        views_doc[view] = {
+            **met,
+            "roc_auc": met["threshold_free"]["roc_auc"],
+            "pr_auc": met["threshold_free"]["pr_auc"],
+        }
+
+    return cond, m, views_doc
 
 
 # --- Plotting Helpers ---------------------------------------------------------------------------
@@ -816,63 +889,43 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # 9. STAGE: Compute Metrics & Bootstrap
         _log("Computing metrics and bootstrap confidence intervals...")
 
+        metrics_partial_path = run_dir / "metrics_partial.json"
         metrics_doc: Dict[str, Any] = {}
+        if metrics_partial_path.is_file():
+            try:
+                metrics_doc = json.loads(metrics_partial_path.read_text(encoding="utf-8"))
+                n_res = sum(len(v) for v in metrics_doc.values() if isinstance(v, dict))
+                _log(f"Resumed {n_res} completed condition-method entries from metrics_partial.json")
+            except Exception:
+                metrics_doc = {}
+
+        tasks = []
+        masks = {"all": ep.view_mask("all"), "no_identical": ep.view_mask("no_identical")}
+        j_cal_str = str(deploy_cal) if jaccard_cal is not None else None
+
         for cond in conditions:
-            metrics_doc[cond] = {}
+            metrics_doc.setdefault(cond, {})
             n_boot_cond = args.n_boot if cond in ("T0", "T1", "T3", "T7@1.0") else min(args.n_boot, args.n_boot_secondary)
             for m in methods:
-                raw_s = scores_by_cond_method[cond][m]
-                views_doc: Dict[str, Any] = {}
-                for view in ("all", "no_identical"):
-                    mask = ep.view_mask(view)
-                    yy = y_all[mask]
-                    ss = raw_s[mask]
-                    grp = assignments[mask]
+                if m in metrics_doc[cond]:
+                    continue  # already computed!
+                score_file = scores_dir / f"{cond}__{m}.npz"
+                val_th = val_thresholds.get(m)
+                tasks.append((
+                    cond, m, str(score_file), y_all, assignments, masks,
+                    n_boot_cond, args.seed, args.split, val_th, j_cal_str
+                ))
 
-                    ops = {}
-                    if m == "jaccard" and jaccard_cal is not None:
-                        decisions = jaccard_cal.decide(ss)
-                        tp = int((decisions & (yy == 1)).sum())
-                        fp = int((decisions & (yy == 0)).sum())
-                        fn = int((~decisions & (yy == 1)).sum())
-                        tn = int((~decisions & (yy == 0)).sum())
-                        ops["deployed"] = {
-                            "threshold": jaccard_cal.threshold()["threshold"],
-                            "tp": tp, "fp": fp, "fn": fn, "tn": tn,
-                            "tpr": float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0,
-                            "fpr": float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0,
-                        }
-                    elif m in val_thresholds:
-                        th = val_thresholds[m]
-                        decisions = ss >= th
-                        tp = int((decisions & (yy == 1)).sum())
-                        fp = int((decisions & (yy == 0)).sum())
-                        fn = int((~decisions & (yy == 1)).sum())
-                        tn = int((~decisions & (yy == 0)).sum())
-                        ops["deployed"] = {
-                            "threshold": th,
-                            "tp": tp, "fp": fp, "fn": fn, "tn": tn,
-                            "tpr": float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0,
-                            "fpr": float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0,
-                        }
-
-                    met = compute_metrics(
-                        yy, ss,
-                        channel=CHANNEL,
-                        split=args.split,
-                        mode="robustness",
-                        n_boot=n_boot_cond,
-                        seed=args.seed,
-                        bootstrap_groups=grp,
-                        operating_points=ops,
-                    )
-                    views_doc[view] = {
-                        **met,
-                        "roc_auc": met["threshold_free"]["roc_auc"],
-                        "pr_auc": met["threshold_free"]["pr_auc"],
-                    }
-
-                metrics_doc[cond][m] = {"views": views_doc}
+        if tasks:
+            _log(f"Computing metrics for {len(tasks)} tasks across parallel processes...")
+            n_workers = min(10, os.cpu_count() or 4)
+            with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                futures = {executor.submit(_compute_single_method_views, *t): (t[0], t[1]) for t in tasks}
+                for fut in concurrent.futures.as_completed(futures):
+                    cond_res, m_res, views_res = fut.result()
+                    metrics_doc[cond_res][m_res] = {"views": views_res}
+                    _log(f"Completed metrics: condition={cond_res}, method={m_res}")
+                    metrics_partial_path.write_text(json.dumps(_plain(metrics_doc), indent=2), encoding="utf-8")
 
         # 10. STAGE: Paired Bootstrap Contrasts (H1, H2, H3, deltas)
         _log("Computing paired bootstrap contrasts...")

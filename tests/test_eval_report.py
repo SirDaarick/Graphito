@@ -295,6 +295,32 @@ def test_threshold_views_runs_once_per_point_per_resample(monkeypatch):
     assert calls.count(0.45) == calls.count(0.6) == n_boot + 1
 
 
+def test_replot_curves_default_lang_reproduces_run_pngs(tmp_path, manifest):
+    ctx = _run(tmp_path, manifest)
+    out = R.replot_curves(ctx.path, tmp_path / "replot")
+    assert [p.name for p in out] == ["roc.png", "pr.png"]
+    for p in out:
+        assert p.read_bytes() == (ctx.path / p.name).read_bytes()
+
+
+def test_replot_curves_spanish_labels_and_prefix(tmp_path, manifest, monkeypatch):
+    ctx = _run(tmp_path, manifest)
+    texts = []
+    original = R._figure
+    monkeypatch.setattr(R, "_figure", lambda mpl, *t: texts.append(t) or original(mpl, *t))
+    out = R.replot_curves(ctx.path, tmp_path / "es", lang="es", prefix="charcnn_v2_")
+    assert [p.name for p in out] == ["charcnn_v2_roc.png", "charcnn_v2_pr.png"]
+    auc = json.loads((ctx.path / "metrics.json").read_text(encoding="utf-8"))["threshold_free"]["roc_auc"]["value"]
+    assert texts[0] == (f"ROC (AUC={auc:.4f})", *R.CURVE_LABELS["es"]["roc"][1:])
+    assert texts[1][1:] == R.CURVE_LABELS["es"]["pr"][1:]
+
+
+def test_replot_curves_rejects_unknown_lang(tmp_path, manifest):
+    ctx = _run(tmp_path, manifest)
+    with pytest.raises(ValueError, match="lang"):
+        R.replot_curves(ctx.path, tmp_path / "x", lang="fr")
+
+
 def test_run_requires_a_manifest_hash(tmp_path):
     with pytest.raises(ValueError, match="manifest"):
         R.RunContext.create("channel_b", seed=1, split="test", root=tmp_path)
