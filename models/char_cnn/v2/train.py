@@ -51,6 +51,7 @@ from models.char_cnn.v2.data import (
     load_views,
     view_samples,
 )
+from models.char_cnn.v2 import lolo
 from models.char_cnn.v2.subsample import subsample_ai_train
 from models.evaluation.calibration import select_threshold
 from models.char_cnn.v2.evaluate import SHORTCUT_VIEWS, evaluate_run, update_run_config
@@ -143,8 +144,12 @@ class TrainOptions:
     run_dir: Optional[Path] = None
     skip_test_eval: bool = False
     keep_checkpoints: bool = True
+    train_ai_models: Tuple[str, ...] = ()  # leave-one-LLM-out: AI generators allowed in train/val (empty = all)
+    match_ai_groups_to: Optional[str] = None  # subsample train AI to this generator's train dup_group count
 
     def __post_init__(self) -> None:
+        if self.match_ai_groups_to is not None and not self.train_ai_models:
+            raise ValueError("match_ai_groups_to (--match-ai-groups-to) requires --train-ai-models")
         for name, flag, minimum, inclusive in _OPTION_BOUNDS:
             value = getattr(self, name)
             if value is None and name == "limit_per_class":
@@ -166,7 +171,11 @@ class TrainOptions:
             "lr_factor", "eval_batch_size", "n_boot", "limit_per_class",
             "train_ai_fraction", "subsample_seed",
         )
-        return {key: getattr(self, key) for key in keys}
+        out = {key: getattr(self, key) for key in keys}
+        if self.train_ai_models:  # recorded only when active, so default configs are unchanged
+            out["train_ai_models"] = list(self.train_ai_models)
+            out["match_ai_groups_to"] = self.match_ai_groups_to
+        return out
 
 
 # --- selection -----------------------------------------------------------------------------------
@@ -451,6 +460,28 @@ def run(
         return RunResult(RUN_FAILED_EXIT, ctx.path)
 
 
+def _restrict_view(view: EncodedSet, transform: Callable[[Sequence[Sample]], Sequence[Sample]]) -> EncodedSet:
+    """Apply a pure sample-list filter to an encoded view, keeping arrays aligned."""
+    kept = {s.id for s in transform(view.samples)}
+    idx = [i for i, s in enumerate(view.samples) if s.id in kept]
+    return EncodedSet.build([view.samples[i] for i in idx], [view.arrays[i] for i in idx])
+
+
+def _ai_counts(view: EncodedSet) -> Dict[str, Any]:
+    """Counts of AI files and unique dup_groups per generator in a view (for config.json)."""
+    files: Dict[str, int] = {}
+    groups: Dict[str, Set[str]] = {}
+    for s in view.samples:
+        if s.source == "ai":
+            files[str(s.model)] = files.get(str(s.model), 0) + 1
+            groups.setdefault(str(s.model), set()).add(str(s.dup_group or s.id))
+    return {
+        "n_human": int(len(view) - view.y.sum()),
+        "files_by_model": files,
+        "groups_by_model": {m: len(g) for m, g in groups.items()},
+    }
+
+
 def _execute(
     ctx: RunContext,
     manifest,
@@ -483,6 +514,21 @@ def _execute(
             print(f"ERROR: leak guard failed: {over}; see {ctx.path / 'leak_guard.json'}", file=sys.stderr)
             return RunResult(LEAK_GUARD_EXIT, ctx.path)
 
+    lolo_info = None
+    if options.train_ai_models:
+        lolo_info = {"train_ai_models": list(options.train_ai_models), "match_ai_groups_to": options.match_ai_groups_to}
+        lolo_info["before"] = {v: _ai_counts(views[v]) for v in ("train", "val")}
+        views["train"] = _restrict_view(views["train"], lambda ss: lolo.restrict_ai_models(ss, options.train_ai_models))
+        views["val"] = _restrict_view(views["val"], lambda ss: lolo.restrict_ai_models(ss, options.train_ai_models))
+        if options.match_ai_groups_to:
+            target = lolo_info["before"]["train"]["groups_by_model"].get(options.match_ai_groups_to, 0)
+            lolo_info["match_target_groups"] = target
+            sub_seed = options.subsample_seed if options.subsample_seed is not None else options.seed
+            views["train"] = _restrict_view(
+                views["train"], lambda ss: lolo.match_ai_groups(ss, target, sub_seed, split="train")
+            )
+        lolo_info["after"] = {v: _ai_counts(views[v]) for v in ("train", "val")}
+
     n_ai_orig = int(views["train"].y.sum())
     subsample_info = {
         "fraction": options.train_ai_fraction,
@@ -499,6 +545,8 @@ def _execute(
         views = {name: limit_per_class(view, options.limit_per_class) for name, view in views.items()}
     summary = data_summary(views)
     ctx = update_run_config(ctx, data_summary=summary, subsample=subsample_info)
+    if lolo_info is not None:
+        ctx = update_run_config(ctx, lolo=lolo_info)
     check_trainable(views)
 
     stage.name = "fit"
@@ -548,6 +596,8 @@ def _execute(
         y_val = preloaded_val_all.y
     else:
         val_all_samples = manifest.samples("val", representatives_only=False)
+        if options.train_ai_models:  # the held-out generator never reaches val-side threshold selection
+            val_all_samples = lolo.restrict_ai_models(val_all_samples, options.train_ai_models)
         if len(val_all_samples) != len(views["val"]):
             val_all_encoded = load_encoded(manifest, val_all_samples, root=options.root)
             p_val, _, _ = score_arrays(model, val_all_encoded.arrays, device, options.eval_batch_size)
@@ -653,7 +703,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model-config", type=Path, default=None, help="JSON object of CharCNNV2Config overrides")
     p.add_argument("--train-ai-fraction", type=float, default=d.train_ai_fraction, help="fraction of train AI data (0.0, 1.0]")
     p.add_argument("--subsample-seed", type=int, default=d.subsample_seed, help="seed for AI train subsampling")
-    p.add_argument("--run-dir", type=Path, default=d.run_dir, help="exact run directory to write into")
+    p.add_argument("--train-ai-models", nargs="+", default=[], metavar="MODEL",
+                   help="leave-one-LLM-out: keep only AI files of these generators in train and val")
+    p.add_argument("--match-ai-groups-to", default=None, metavar="MODEL",
+                   help="subsample train AI to the number of dup_groups MODEL has in train (needs --train-ai-models)")
+    p.add_argument("--run-dir",type=Path, default=d.run_dir, help="exact run directory to write into")
     p.add_argument("--skip-test-eval", action="store_true", default=d.skip_test_eval, help="skip test evaluation (val only)")
     p.add_argument("--no-save-checkpoint", dest="keep_checkpoints", action="store_false", help="do not retain best.pth")
     p.set_defaults(keep_checkpoints=True)
@@ -683,6 +737,8 @@ def options_from_args(args: argparse.Namespace) -> TrainOptions:
         run_dir=args.run_dir,
         skip_test_eval=args.skip_test_eval,
         keep_checkpoints=args.keep_checkpoints,
+        train_ai_models=tuple(args.train_ai_models),
+        match_ai_groups_to=args.match_ai_groups_to,
     )
 
 
