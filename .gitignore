@@ -54,6 +54,11 @@ runs/
 .dockerignore
 data/.env
 
+# Local tooling and working files
+.claude/
+Documentacion/cronogramas/~$*
+Programas_ESCOM/paradigmas_programaci*/
+
 # IDE y SO
 .DS_Store
 .vscode/
