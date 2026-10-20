@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { ArrowLeft, Download, ShieldCheck, UserCheck, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, Code2, Download, ShieldCheck, UserCheck, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
@@ -45,10 +45,33 @@ interface CodeData {
     indicadores?: IndicadorIntegridad[];
 }
 
+type ViewMode = "report" | "code_diff";
+type CodeStatus = "idle" | "loading" | "error" | "ready";
+
 const KBD = "px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700";
 
 const FOOTER_TOOLTIP =
     "absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]";
+
+function parseReportId(id: string | number | undefined): number | null {
+    if (id === undefined || id === null || id === "") return null;
+    const n = typeof id === "string" ? parseInt(id, 10) : id;
+    return Number.isNaN(n) ? null : n;
+}
+
+/** True when the viewport is at least `minWidth` px wide; used to size the code panes (side by side vs stacked). */
+function useMinWidth(minWidth: number): boolean {
+    const query = `(min-width: ${minWidth}px)`;
+    const [matches, setMatches] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+    useEffect(() => {
+        const mql = window.matchMedia(query);
+        const onChange = () => setMatches(mql.matches);
+        onChange();
+        mql.addEventListener("change", onChange);
+        return () => mql.removeEventListener("change", onChange);
+    }, [query]);
+    return matches;
+}
 
 export function SimilarityReportModal({
     isOpen,
@@ -60,8 +83,9 @@ export function SimilarityReportModal({
     const [isAnimating, setIsAnimating] = useState(false);
     const [shouldRender, setShouldRender] = useState(isOpen);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+    const [viewMode, setViewMode] = useState<ViewMode>("report");
     const [codeData, setCodeData] = useState<CodeData | null>(null);
-    const [isLoadingCode, setIsLoadingCode] = useState(false);
+    const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
     const [comments, setComments] = useState<ComentarioRevisionItem[]>([]);
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
@@ -69,12 +93,20 @@ export function SimilarityReportModal({
     const backdropRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const bodyContainerRef = useRef<HTMLDivElement>(null);
+    const viewCodeButtonRef = useRef<HTMLButtonElement>(null);
+    const backToSummaryRef = useRef<HTMLButtonElement>(null);
+    /** Report id whose code was requested last; guards against late responses and avoids refetching. */
+    const requestedCodeFor = useRef<number | null>(null);
+    const previousViewMode = useRef<ViewMode>("report");
+    const isWide = useMinWidth(768);
 
+    const reportId = parseReportId(comparison?.id);
     const currentIndex = submissions && comparison
         ? submissions.findIndex((s) => String(s.id) === String(comparison.id))
         : -1;
     const hasNext = Boolean(submissions && currentIndex >= 0 && currentIndex < submissions.length - 1);
     const hasPrev = Boolean(submissions && currentIndex > 0);
+    const inCodeView = viewMode === "code_diff";
 
     const navigateTo = (newIndex: number) => {
         if (!submissions || newIndex < 0 || newIndex >= submissions.length || isNavigating) return;
@@ -120,9 +152,8 @@ export function SimilarityReportModal({
 
         if (comparison?.id) {
             saveVerdict(comparison.id, isConforme ? "CONFORME" : "DUDA");
-            const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-            if (!isNaN(repId)) {
-                api.analysis.updateVerdict(repId, isConforme ? "APROBADO" : "EN_DUDA").catch((err) => {
+            if (reportId !== null) {
+                api.analysis.updateVerdict(reportId, isConforme ? "APROBADO" : "EN_DUDA").catch((err) => {
                     console.warn("No se pudo persistir el veredicto en backend:", err);
                 });
             }
@@ -146,17 +177,62 @@ export function SimilarityReportModal({
         }
     };
 
+    const loadCode = (repId: number) => {
+        requestedCodeFor.current = repId;
+        setCodeStatus("loading");
+        const isCurrent = () => requestedCodeFor.current === repId;
+
+        api.comments
+            .list(repId)
+            .then((list) => isCurrent() && setComments(list))
+            .catch(() => isCurrent() && setComments([]));
+
+        api.analysis
+            .getCode(repId)
+            .then((data) => {
+                if (!isCurrent()) return;
+                setCodeData({
+                    reference_code: data.reference_code || "// Sin código de referencia registrado",
+                    student_code: data.student_code || "// Sin código de entrega registrado",
+                    reference_author: data.reference_author || "Docente (Referencia)",
+                    student_author: data.student_author || comparison?.title || "Estudiante",
+                    language: data.language || "c",
+                    indicadores: data.indicadores,
+                });
+                setCodeStatus("ready");
+            })
+            .catch((err) => {
+                if (!isCurrent()) return;
+                console.warn("No se pudo obtener el código desde la API:", err);
+                setCodeData(null);
+                setCodeStatus("error");
+            });
+    };
+
+    // Reset everything tied to a report when it changes or the modal closes.
     useEffect(() => {
-        if (isOpen && comparison?.id) {
-            const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-            if (!isNaN(repId)) {
-                api.comments.list(repId).then(setComments).catch(() => setComments([]));
-                fetchCode(repId);
-            }
-        } else {
-            setCodeData(null);
-        }
-    }, [isOpen, comparison?.id]);
+        requestedCodeFor.current = null;
+        setCodeData(null);
+        setCodeStatus("idle");
+        setComments([]);
+        if (!isOpen) setViewMode("report");
+    }, [isOpen, reportId]);
+
+    // The code is fetched lazily, the first time the code view is opened for a report.
+    useEffect(() => {
+        if (!isOpen || !inCodeView || reportId === null) return;
+        if (requestedCodeFor.current === reportId) return;
+        loadCode(reportId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, inCodeView, reportId]);
+
+    // Keep keyboard focus on the control that replaces the one just used.
+    useEffect(() => {
+        if (previousViewMode.current === viewMode) return;
+        previousViewMode.current = viewMode;
+        if (viewMode === "code_diff") backToSummaryRef.current?.focus();
+        else viewCodeButtonRef.current?.focus();
+    }, [viewMode]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -184,7 +260,9 @@ export function SimilarityReportModal({
                 }
             } else if (e.key === "Escape") {
                 e.preventDefault();
-                onClose();
+                // An open "?" popover handles Escape first (capture phase); here it steps back or closes.
+                if (inCodeView) setViewMode("report");
+                else onClose();
             } else if (e.key === "a" || e.key === "A") {
                 e.preventDefault();
                 handleVerdictAndAdvance("conforme");
@@ -196,116 +274,15 @@ export function SimilarityReportModal({
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, currentIndex, hasNext, hasPrev, submissions, isNavigating]);
-
-    const fetchCode = async (repId: number) => {
-        setIsLoadingCode(true);
-        try {
-            const data = await api.analysis.getCode(repId);
-            setCodeData({
-                reference_code: data.reference_code || "// Sin código de referencia registrado",
-                student_code: data.student_code || "// Sin código de entrega registrado",
-                reference_author: data.reference_author || "Docente (Referencia)",
-                student_author: data.student_author || comparison?.title || "Estudiante",
-                language: data.language || "c",
-                indicadores: data.indicadores,
-            });
-        } catch (err) {
-            console.warn("No se pudo obtener el código desde la API, usando código de demostración:", err);
-            setCodeData({
-                reference_code: `// Código Canónico de Referencia - ${comparison?.title || "Práctica"}
-#include <stdio.h>
-#include <stdlib.h>
-
-int busqueda_binaria(int arr[], int n, int objetivo) {
-    int inicio = 0;
-    int fin = n - 1;
-
-    while (inicio <= fin) {
-        int medio = inicio + (fin - inicio) / 2;
-        if (arr[medio] == objetivo) {
-            return medio; // Encontrado
-        }
-        if (arr[medio] < objetivo) {
-            inicio = medio + 1;
-        } else {
-            fin = medio - 1;
-        }
-    }
-    return -1; // No encontrado
-}
-
-int main() {
-    int datos[] = {2, 4, 6, 8, 10, 12, 14, 16};
-    int tam = sizeof(datos) / sizeof(datos[0]);
-    int obj = 10;
-    int pos = busqueda_binaria(datos, tam, obj);
-    printf("Posicion: %d\\n", pos);
-    return 0;
-}`,
-                student_code: `// Entrega del Alumno - ${comparison?.title || "Solución"}
-#include <stdio.h>
-
-int binarySearch(int a[], int size, int target) {
-    int low = 0;
-    int high = size - 1;
-
-    // Búsqueda iterativa en subarreglo ordenado
-    while (low <= high) {
-        int mid = (low + high) / 2;
-        if (a[mid] == target) {
-            return mid;
-        }
-        if (a[mid] < target) {
-            low = mid + 1;
-        } else {
-            high = mid - 1;
-        }
-    }
-    return -1;
-}
-
-int main() {
-    int a[] = {2, 4, 6, 8, 10, 12, 14, 16};
-    int n = 8;
-    int x = 10;
-    int r = binarySearch(a, n, x);
-    printf("Resultado: %d\\n", r);
-    return 0;
-}`,
-                reference_author: "Prof. Manuel Portillo (ESCOM)",
-                student_author: comparison?.title || "Estudiante Evaluado",
-                language: "c",
-                indicadores: [
-                    {
-                        tipo_alerta: "Estructura idéntica a la referencia",
-                        descripcion: "Bucle iterativo con cálculo de punto medio idéntico a la referencia.",
-                        severidad: "MEDIA",
-                        numero_linea: 7,
-                        categoria: "ISOMORFISMO_DFG",
-                    },
-                    {
-                        tipo_alerta: "Estilo de código generado",
-                        descripcion: "Nomenclatura y formateo afín a generadores LLM.",
-                        severidad: "BAJA",
-                        numero_linea: 4,
-                        categoria: "ESTILO_LLM",
-                    }
-                ],
-            });
-        } finally {
-            setIsLoadingCode(false);
-        }
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, currentIndex, hasNext, hasPrev, submissions, isNavigating, inCodeView]);
 
     const handleAddComment = async (lineNum: number | null, text: string) => {
-        if (!comparison?.id) return;
-        const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-        if (isNaN(repId)) return;
+        if (reportId === null) return;
 
         setIsSubmittingComment(true);
         try {
-            const newComment = await api.comments.create(repId, {
+            const newComment = await api.comments.create(reportId, {
                 numero_linea: lineNum,
                 contenido: text,
             });
@@ -316,7 +293,7 @@ int main() {
                 ...prev,
                 {
                     id: Date.now(),
-                    reporte_id: repId,
+                    reporte_id: reportId,
                     docente_id: 1,
                     numero_linea: lineNum,
                     contenido: text,
@@ -330,11 +307,9 @@ int main() {
     };
 
     const handleDeleteComment = async (commentId: number) => {
-        if (!comparison?.id) return;
-        const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-        if (!isNaN(repId)) {
+        if (reportId !== null) {
             try {
-                await api.comments.delete(repId, commentId);
+                await api.comments.delete(reportId, commentId);
             } catch (err) {
                 console.warn("Error al eliminar comentario en API:", err);
             }
@@ -373,13 +348,10 @@ int main() {
     }, [comparison?.indicadores, codeData?.indicadores]);
 
     const handleDownloadPdf = async () => {
-        if (!comparison?.id) return;
+        if (reportId === null) return;
         try {
             setIsDownloadingPdf(true);
-            const reportId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-            if (!isNaN(reportId)) {
-                await api.analysis.downloadPdf(reportId, `reporte_integridad_${reportId}.pdf`);
-            }
+            await api.analysis.downloadPdf(reportId, `reporte_integridad_${reportId}.pdf`);
         } catch (err) {
             console.error("Error al descargar PDF:", err);
             alert("No se pudo generar o descargar el reporte PDF.");
@@ -391,9 +363,12 @@ int main() {
     if (!shouldRender || !comparison) return null;
 
     const isSample = comparison.engine === "stub" || comparison.engine === "demo";
-    const reportId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : (comparison.id ?? 1);
     const navButton =
         "p-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60";
+    const headerButton =
+        "p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60";
+    // Two panes side by side on wide screens; stacked (two shorter panes) on phones.
+    const paneHeight = isWide ? "calc(92dvh - 220px)" : "clamp(200px, 30dvh, 320px)";
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
@@ -404,16 +379,16 @@ int main() {
                 onClick={onClose}
             />
 
-            {/* Modal Content */}
+            {/* Modal Content: compact for the summary, wide for the code comparison */}
             <div
                 ref={contentRef}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="report-modal-title"
-                className="relative w-full max-w-[1200px] opacity-0"
+                className={`relative w-full opacity-0 ${inCodeView ? "max-w-[1600px]" : "max-w-4xl"}`}
             >
                 <AuthCard className="w-full !p-0 !rounded-3xl overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
-                    <div className="flex flex-col max-h-[92dvh] relative">
+                    <div className={`flex flex-col relative ${inCodeView ? "h-[92dvh]" : "max-h-[92dvh]"}`}>
                         {/* Floating Toast para Veredicto y Avance Ágil */}
                         {triageToast && (
                             <div
@@ -433,16 +408,24 @@ int main() {
                         {/* Top bar: back, title, submission carousel */}
                         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-[#0f1422] shrink-0">
                             <div className="flex items-center gap-3 min-w-0">
-                                <button
-                                    onClick={onClose}
-                                    aria-label="Volver a la biblioteca"
-                                    className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60"
-                                >
-                                    <ArrowLeft size={18} />
-                                </button>
+                                {inCodeView ? (
+                                    <button
+                                        ref={backToSummaryRef}
+                                        onClick={() => setViewMode("report")}
+                                        className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60"
+                                    >
+                                        <ArrowLeft size={16} aria-hidden="true" />
+                                        <span className="hidden sm:inline">Volver al resumen</span>
+                                        <span className="sm:hidden">Resumen</span>
+                                    </button>
+                                ) : (
+                                    <button onClick={onClose} aria-label="Volver a la biblioteca" className={headerButton}>
+                                        <ArrowLeft size={18} />
+                                    </button>
+                                )}
                                 <div className="min-w-0">
-                                    <h2 id="report-modal-title" className="text-lg sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                                        Reporte de similitud
+                                    <h2 id="report-modal-title" className="text-base sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                                        {inCodeView ? "Comparación de código" : "Reporte de similitud"}
                                     </h2>
                                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium truncate">
                                         Entrega de {comparison.title}
@@ -482,47 +465,41 @@ int main() {
                             </div>
                         </div>
 
-                        {/* Body: metrics first on phones, code comparison large beside them on desktop */}
+                        {/* Body: the summary by default; the code comparison only when asked for */}
                         <div
                             ref={bodyContainerRef}
-                            className="flex-1 overflow-y-auto p-3 sm:p-5 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent"
+                            className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent ${
+                                inCodeView ? "p-3 sm:p-4" : "p-4 sm:p-6"
+                            }`}
                         >
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
-                                <div className="order-1 lg:order-2 lg:col-span-4">
+                            {inCodeView ? (
+                                <CodeView
+                                    status={codeStatus}
+                                    codeData={codeData}
+                                    reportId={reportId ?? 1}
+                                    comments={comments}
+                                    onAddComment={handleAddComment}
+                                    onDeleteComment={handleDeleteComment}
+                                    isSubmittingComment={isSubmittingComment}
+                                    evidence={lineEvidence}
+                                    paneHeight={paneHeight}
+                                    onRetry={() => reportId !== null && loadCode(reportId)}
+                                />
+                            ) : (
+                                <div className="flex flex-col gap-5">
                                     <ReportMetrics report={comparison} animate={isAnimating} />
+                                    <div className="flex sm:justify-end">
+                                        <button
+                                            ref={viewCodeButtonRef}
+                                            onClick={() => setViewMode("code_diff")}
+                                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-graphito-blue text-white text-sm font-semibold shadow-sm hover:brightness-110 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0f1522]"
+                                        >
+                                            <Code2 size={18} aria-hidden="true" />
+                                            Ver comparación de código
+                                        </button>
+                                    </div>
                                 </div>
-
-                                <div className="order-2 lg:order-1 lg:col-span-8 min-w-0">
-                                    {isLoadingCode ? (
-                                        <div className="flex flex-col items-center justify-center py-24 text-slate-500 dark:text-slate-400" role="status">
-                                            <div className="w-8 h-8 border-2 border-graphito-blue border-t-transparent rounded-full animate-spin mb-3" />
-                                            <span className="text-sm">Cargando el código de la entrega...</span>
-                                        </div>
-                                    ) : (
-                                        <div className="h-full">
-                                            <SideBySideDiffViewer
-                                                referenceCode={codeData?.reference_code || ""}
-                                                studentCode={codeData?.student_code || ""}
-                                                referenceAuthor={codeData?.reference_author}
-                                                studentAuthor={codeData?.student_author}
-                                                language={codeData?.language || "c"}
-                                                reportId={reportId}
-                                                comments={comments}
-                                                onAddComment={handleAddComment}
-                                                onDeleteComment={handleDeleteComment}
-                                                isSubmittingComment={isSubmittingComment}
-                                                evidence={lineEvidence}
-                                                paneHeight="clamp(300px, 52vh, 560px)"
-                                            />
-                                            {lineEvidence.size > 0 && (
-                                                <p className="mt-2 px-1 text-xs text-slate-500 dark:text-slate-400">
-                                                    Las líneas resaltadas en amarillo tienen una observación: pasa el cursor o enfócalas con el teclado para leerla.
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Footer */}
@@ -534,7 +511,7 @@ int main() {
                                 <span aria-hidden="true">•</span>
                                 <span><kbd className={KBD}>R</kbd> aclarar</span>
                                 <span aria-hidden="true">•</span>
-                                <span><kbd className={KBD}>Esc</kbd> cerrar</span>
+                                <span><kbd className={KBD}>Esc</kbd> {inCodeView ? "volver al resumen" : "cerrar"}</span>
                             </div>
                             <div className="flex items-center gap-2.5 ml-auto">
                                 {/* Validar Conforme */}
@@ -564,7 +541,7 @@ int main() {
                                 {/* Descargar PDF */}
                                 <button
                                     onClick={handleDownloadPdf}
-                                    disabled={isDownloadingPdf || !comparison.id}
+                                    disabled={isDownloadingPdf || reportId === null}
                                     aria-label="Descargar reporte en PDF"
                                     className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center"
                                 >
@@ -581,7 +558,7 @@ int main() {
                                 {/* Cerrar */}
                                 <button
                                     onClick={onClose}
-                                    aria-label="Cerrar (Esc)"
+                                    aria-label="Cerrar"
                                     className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-rose-500 hover:border-rose-500/40 hover:bg-rose-500/10 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
                                 >
                                     <X size={19} />
@@ -594,6 +571,69 @@ int main() {
                     </div>
                 </AuthCard>
             </div>
+        </div>
+    );
+}
+
+interface CodeViewProps {
+    status: CodeStatus;
+    codeData: CodeData | null;
+    reportId: number;
+    comments: ComentarioRevisionItem[];
+    onAddComment: (lineNum: number | null, text: string) => Promise<void>;
+    onDeleteComment: (commentId: number) => Promise<void>;
+    isSubmittingComment: boolean;
+    evidence: ReturnType<typeof evidenceByLine>;
+    paneHeight: string;
+    onRetry: () => void;
+}
+
+/** The optional second view: loading, error with retry, or the side-by-side comparison. */
+function CodeView({ status, codeData, reportId, evidence, paneHeight, onRetry, ...viewer }: CodeViewProps) {
+    if (status === "error") {
+        return (
+            <div role="alert" className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+                <p className="text-base font-semibold text-slate-900 dark:text-white">No se pudo cargar el código</p>
+                <p className="max-w-sm text-sm text-slate-600 dark:text-slate-400">
+                    Revisa tu conexión e inténtalo de nuevo. El resumen de la entrega sigue disponible.
+                </p>
+                <button
+                    onClick={onRetry}
+                    className="mt-1 rounded-xl border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-800 transition-all hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                >
+                    Reintentar
+                </button>
+            </div>
+        );
+    }
+
+    if (status !== "ready" || !codeData) {
+        return (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-500 dark:text-slate-400" role="status">
+                <div className="w-8 h-8 border-2 border-graphito-blue border-t-transparent rounded-full animate-spin mb-3" />
+                <span className="text-sm">Cargando el código de la entrega...</span>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <SideBySideDiffViewer
+                referenceCode={codeData.reference_code}
+                studentCode={codeData.student_code}
+                referenceAuthor={codeData.reference_author}
+                studentAuthor={codeData.student_author}
+                language={codeData.language}
+                reportId={reportId}
+                evidence={evidence}
+                paneHeight={paneHeight}
+                {...viewer}
+            />
+            {evidence.size > 0 && (
+                <p className="mt-2 px-1 text-xs text-slate-500 dark:text-slate-400">
+                    Las líneas resaltadas en amarillo tienen una observación: pasa el cursor o enfócalas con el teclado para leerla.
+                </p>
+            )}
         </div>
     );
 }

@@ -129,6 +129,7 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                 <p className="mt-1 text-xs opacity-80">Apoya la revisión; la decisión final es del docente.</p>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <MetricCard
                 title="Similitud semántica"
                 pct={semantic.pct}
@@ -152,6 +153,7 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                 accent="violet"
                 animate={animate}
             />
+            </div>
 
             <div className="flex items-center justify-between gap-2 px-2 text-xs text-slate-500 dark:text-slate-400">
                 <span>
