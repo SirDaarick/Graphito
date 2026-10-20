@@ -171,6 +171,19 @@ def test_sql_adds_every_persisted_verdict_to_the_legacy_enum():
         assert f"ALTER TYPE DICTAMENENUM ADD VALUE IF NOT EXISTS '{member.name}'" in flat, member.name
 
 
+def test_sql_rewrites_legacy_verdict_labels_to_their_canonical_names():
+    # The ORM reads the enum by canonical member name, so a row still holding an alias label
+    # (SOSPECHA_IA, ...) raises LookupError and breaks every endpoint that loads its report.
+    aliases = {name: member.name for name, member in DictamenEnum.__members__.items() if name != member.name}
+    assert aliases, "DictamenEnum no longer has legacy aliases; drop this migration step"
+    flat = [" ".join(s.split()) for s in STATEMENTS]
+    last_enum_add = max(i for i, s in enumerate(flat) if "ADD VALUE" in s.upper())
+    for legacy, canonical in aliases.items():
+        stmt = f"UPDATE reportes_analisis SET dictamen = '{canonical}' WHERE dictamen = '{legacy}';"
+        assert stmt in flat, legacy
+        assert flat.index(stmt) > last_enum_add, f"{legacy} rewrite must run after the enum additions"
+
+
 def test_sql_enum_additions_and_columns_are_idempotent():
     for stmt in STATEMENTS:
         flat = " ".join(stmt.split()).upper()
