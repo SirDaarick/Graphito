@@ -493,17 +493,19 @@ Graphito analiza cada archivo con dos canales que miran cosas distintas. El Cana
         \node[stepb] (b1) at (3.0,1.1) {Texto normalizado (5 pasos)};
         \node[stepb] (b2) at (5.7,1.1) {Ventanas de 4,096 caracteres};
         \node[stepb] (b3) at (8.4,1.1) {Índices numéricos};
-        \node[stepa] (a1) at (3.0,-1.1) {Sin comentarios};
-        \node[stepa] (a2) at (5.7,-1.1) {Árbol sintáctico (Tree-sitter)};
-        \node[stepa] (a3) at (8.4,-1.1) {Grafo de flujo de datos};
-        \node[stepa] (a4) at (11.1,-1.1) {Ventanas de subtokens};
+        \node[stepa, text width=1.8cm] (a1) at (3.0,-1.1) {Sin comentarios};
+        \node[stepa, text width=1.8cm] (a1b) at (5.5,-1.1) {Renombrado canónico};
+        \node[stepa, text width=1.8cm] (a2) at (8.0,-1.1) {Árbol sintáctico (Tree-sitter)};
+        \node[stepa, text width=1.8cm] (a3) at (10.5,-1.1) {Grafo de flujo de datos};
+        \node[stepa, text width=1.8cm] (a4) at (13.0,-1.1) {Ventanas de subtokens};
         \node[lab] at (2.0,2.1) {Canal B (estilo)};
         \node[lab] at (2.0,-2.1) {Canal A (semántica)};
         \draw[arrow] (f.east) -- (b1.west);
         \draw[arrow] (f.east) -- (a1.west);
         \draw[arrow] (b1.east) -- (b2.west);
         \draw[arrow] (b2.east) -- (b3.west);
-        \draw[arrow] (a1.east) -- (a2.west);
+        \draw[arrow] (a1.east) -- (a1b.west);
+        \draw[arrow] (a1b.east) -- (a2.west);
         \draw[arrow] (a2.east) -- (a3.west);
         \draw[arrow] (a3.east) -- (a4.west);
     \end{tikzpicture}
@@ -521,7 +523,7 @@ Graphito analiza cada archivo con dos canales que miran cosas distintas. El Cana
         \hline
         \textbf{Componente} & \textbf{Canal A (GraphCodeBERT)} & \textbf{Canal B (CharCNN)} \\ \hline
         Comentarios & Eliminados antes de analizar el código. & Eliminados, igual que en el Canal A. \\ \hline
-        Nombres de variables & Se conservan; los nombres se parten en subtokens y también se usan en el grafo de flujo de datos. & Se conservan carácter por carácter. \\ \hline
+        Nombres de variables & Se renombran de forma canónica (\texttt{v1}, \texttt{v2}, \ldots); esos nombres se parten en subtokens y también se usan en el grafo de flujo de datos. & Se conservan carácter por carácter. \\ \hline
         Espacios y sangría & No influyen: el analizador sintáctico lee elementos del programa. & Tabuladores a espacios, espacios repetidos reducidos a uno, sangría y líneas vacías eliminadas; se conservan los saltos de línea. \\ \hline
         Representación final & Subtokens del código más nodos del grafo, hasta 512 posiciones por ventana (384 de código y 128 de grafo). & Índices numéricos de 98 posibles valores (relleno, desconocido y 96 caracteres). \\ \hline
         Archivos largos & Ventanas de 382 subtokens que avanzan de 191 en 191, hasta 16 ventanas. & Ventanas de 4,096 caracteres que avanzan de 2,048 en 2,048, hasta 8 ventanas. \\ \hline
@@ -551,12 +553,15 @@ El Canal A busca qué hace el programa, no cómo está escrito. Los pasos son:
 
 \begin{enumerate}
     \item \textbf{Eliminación de comentarios,} respetando el contenido de las cadenas de texto.
+    \item \textbf{Renombrado canónico.} Los identificadores definidos por el usuario se sustituyen por nombres genéricos: las variables por \texttt{v1}, \texttt{v2}, \ldots, las funciones por \texttt{f1}, \texttt{f2}, \ldots y los tipos propios por \texttt{t1}, \texttt{t2}, \ldots, en orden de primera aparición y de forma determinista. Así, dos programas que solo cambian los nombres producen el mismo texto.
     \item \textbf{Árbol sintáctico.} El analizador Tree-sitter \cite{Brunsfeld2021Treesitter} reconoce la estructura del programa (funciones, ciclos, condiciones). Tolera código incompleto o con errores locales, algo común en trabajos de estudiantes.
     \item \textbf{Grafo de flujo de datos (DFG).} Es un esquema que indica ``qué variable le pasa su valor a cuál''. Se construye una sola vez sobre el archivo completo.
     \item \textbf{Subtokens y ventanas.} El código se divide en subtokens, es decir, trozos de palabra. Si no cabe en una sola entrada, se corta en ventanas de 382 subtokens que se traslapan a la mitad, hasta 16 ventanas. Cada ventana conserva los nodos del grafo que quedan dentro de ella.
 \end{enumerate}
 
-En esta versión los identificadores no se renombran (no se sustituyen por nombres genéricos). Por eso el Canal A es sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}.\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+En la versión original (v2) los identificadores no se renombraban (no se sustituían por nombres genéricos). Por eso el Canal A era sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}. El renombrado canónico de la versión desplegada elimina esa sensibilidad (ROC-AUC de 0.856 a 0.902; Sección~\ref{subsec:robustez_canal_a}).\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+
+El renombrado no modifica \texttt{main}, las palabras clave ni las funciones y tipos de la biblioteca estándar (como \texttt{printf}, \texttt{scanf} o \texttt{std::vector}), y tampoco el código dentro de nodos con error de sintaxis. Se aplica solo al Canal A: CharCNN conserva los nombres tal como están, y Jaccard no lo necesita porque ya abstrae los identificadores en su propia tokenización (Sección~\ref{subsec:linea_base_lexica}). En el motor desplegado se aplica antes de cada embedding, tanto a las referencias como a las entregas.\footnote{Implementado en \texttt{models/logic\_eval/canonical.py}.} Si el renombrado falla, se usa el código original y el reporte registra \texttt{gcb\_estado = OK\_SIN\_NORM}.
 
 % ----------------------------------------------------------------------
 \subsection{Composición Final del Conjunto}
