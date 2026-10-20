@@ -66,6 +66,7 @@ from models.robustness.scoring import (
     CrossSetSimilarity,
     cross_embedding_similarity,
     paired_bootstrap,
+    texts_for_method,
 )
 from models.robustness.transforms import (
     TRANSFORMS,
@@ -82,9 +83,11 @@ from models.robustness.validity import (
 from models.graphcodebert.v2.dfg import parse_source
 
 CHANNEL = "robustness"
-ALL_METHODS = ("jaccard", "winnowing", "v2", "v2_nodfg", "legacy")
+ALL_METHODS = ("jaccard", "winnowing", "v2", "v2_nodfg", "legacy", "v2_norm")
 LEXICAL_METHODS = ("jaccard", "winnowing")
-EMBEDDING_METHODS = ("v2", "v2_nodfg", "legacy")
+EMBEDDING_METHODS = ("v2", "v2_nodfg", "legacy", "v2_norm")
+# v2_norm reuses the v2 embedder (same cache key); only the text fed to it differs.
+EMBEDDER_ALIAS = {"v2_norm": "v2"}
 LEXICAL_FNS: Dict[str, Callable[[str], np.ndarray]] = {
     "jaccard": jaccard_set,
     "winnowing": winnowing_set,
@@ -159,6 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--local-files-only", action="store_true", default=True, help="Disallow network HF downloads.")
     p.add_argument("--root", default=str(ROOT), help="Repository root.")
     p.add_argument("--runs-root", default="runs", help="Root directory for runs.")
+    p.add_argument("--run-dir", default=None, help="Exact output directory for a fresh run (default: <runs-root>/robustness/<timestamp>).")
+    p.add_argument("--reference-run", default="runs/robustness/20261012-050941", help="Earlier robustness run for the v2_norm reproduction check.")
     return p
 
 
@@ -572,6 +577,235 @@ def _generate_report_markdown(
     return "\n".join(lines)
 
 
+# --- v2_norm study (identifier canonicalization) -------------------------------------------------
+
+V2NORM_REFERENCE_RUN = "runs/robustness/20261012-050941"
+V2NORM_REPRO_TOL = 0.002
+V2NORM_SANITY_N = 200
+
+
+def _auc_of(metrics: Mapping, cond: str, method: str) -> Tuple[Optional[float], Optional[List[float]]]:
+    res = metrics.get(cond, {}).get(method, {}).get("views", {}).get("all", {}).get("roc_auc", {})
+    return res.get("value"), res.get("ci95")
+
+
+def v2norm_reproduction_check(metrics: Mapping, reference_run: Path) -> Dict[str, Any]:
+    """Compare v2/jaccard ROC-AUC (view all) at T0 and T1 against the earlier robustness run."""
+    ref = json.loads((Path(reference_run) / "metrics.json").read_text(encoding="utf-8"))
+    rows, ok = [], True
+    for method in ("v2", "jaccard"):
+        for cond in ("T0", "T1"):
+            new, _ = _auc_of(metrics, cond, method)
+            old, _ = _auc_of(ref, cond, method)
+            diff = None if new is None or old is None else new - old
+            passed = diff is not None and abs(diff) <= V2NORM_REPRO_TOL
+            ok = ok and passed
+            rows.append({"method": method, "condition": cond, "new": new, "reference": old, "diff": diff, "ok": passed})
+    return {"tolerance": V2NORM_REPRO_TOL, "reference_run": str(reference_run), "ok": ok, "rows": rows}
+
+
+def v2norm_sanity_check(ep, files, transformed_records, seed: int, n: int = V2NORM_SANITY_N) -> Dict[str, Any]:
+    """Fraction of sampled positive pairs whose file b satisfies canon(T1(b)) == canon(b)."""
+    from models.logic_eval.canonical import canonicalize_code
+
+    pos = np.flatnonzero(ep.pairs.label == 1)
+    rng = np.random.default_rng(seed)
+    pick = rng.choice(pos, size=min(n, pos.size), replace=False)
+    n_match, mismatches, n_applied = 0, [], 0
+    for pi in pick:
+        s = ep.samples[int(ep.pairs.b[pi])]
+        rec = transformed_records[(s.id, "T1")]
+        n_applied += int(rec["n_applied"] > 0)
+        ca = canonicalize_code(files[s.id].text, s.lang)
+        t1_code = rec["code_out"] if "code_out" in rec else apply_condition(
+            files[s.id].text, s.lang, "T1", seed=derive_seed(seed, rec["sha256_in"], "T1", 1.0)
+        ).code
+        cb = canonicalize_code(t1_code, s.lang)
+        if ca == cb:
+            n_match += 1
+        else:
+            al, bl = ca.splitlines(), cb.splitlines()
+            first = next((i for i, (x, y) in enumerate(zip(al, bl)) if x != y), min(len(al), len(bl)))
+            mismatches.append({
+                "id": s.id, "lang": s.lang, "line": first + 1,
+                "canon_orig": al[first] if first < len(al) else None,
+                "canon_t1": bl[first] if first < len(bl) else None,
+            })
+    return {
+        "n_sampled": int(pick.size), "n_equal": n_match, "fraction_equal": n_match / max(1, pick.size),
+        "n_t1_applied": n_applied, "n_mismatch": len(mismatches), "mismatches": mismatches,
+    }
+
+
+def v2norm_level_contrasts(y, scores_by_cond_method, mask, groups, conds, n_boot: int, seed: int) -> Dict[str, Any]:
+    """Paired bootstrap of AUC_v2_norm(c) - AUC_v2(c): pseudo-method with T0=v2 and T1=v2_norm."""
+    sd = {
+        f"lvl{i}": {"T0": scores_by_cond_method[c]["v2"][mask], "T1": scores_by_cond_method[c]["v2_norm"][mask]}
+        for i, c in enumerate(conds)
+    }
+    raw = paired_bootstrap(y, sd, groups=groups, n_boot=n_boot, seed=seed)
+    return {c: raw[f"delta__lvl{i}__T1"] for i, c in enumerate(conds)}
+
+
+def _fmt_ci(ci) -> str:
+    return f"[{ci[0]:.3f}, {ci[1]:.3f}]" if ci and ci[0] is not None else "n/d"
+
+
+def _plot_v2norm(path: Path, metrics: Mapping, conds: Sequence[str]) -> None:
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+
+    labels = {"T0": "T0\n(original)", "T1": "T1\n(renombrar identif.)", "T5": "T5\n(código muerto)", "T7@1.0": "T7@1.0\n(combinado)"}
+    series = [("v2", "v2 (GraphCodeBERT)", "#d62728"), ("v2_norm", "v2_norm (renombrado canónico)", "#2ca02c"), ("jaccard", "Jaccard (referencia)", "#1f77b4")]
+    fig = Figure(figsize=(8, 4.8), dpi=130)
+    FigureCanvasAgg(fig)
+    ax = fig.add_subplot(1, 1, 1)
+    width = 0.26
+    x = np.arange(len(conds))
+    for k, (m, name, color) in enumerate(series):
+        vals, lo, hi = [], [], []
+        for c in conds:
+            v, ci = _auc_of(metrics, c, m)
+            vals.append(v if v is not None else 0.0)
+            lo.append(v - ci[0] if v is not None and ci and ci[0] is not None else 0.0)
+            hi.append(ci[1] - v if v is not None and ci and ci[0] is not None else 0.0)
+        ax.bar(x + (k - 1) * width, vals, width, yerr=[lo, hi], capsize=3, label=name, color=color, alpha=0.88)
+    ax.set_xticks(x)
+    ax.set_xticklabels([labels.get(c, c) for c in conds])
+    ax.set_ylim(0.5, 1.0)
+    ax.set_ylabel("ROC-AUC (vista: todos), IC95%")
+    ax.set_title("Robustez de v2 con y sin renombrado canónico de identificadores")
+    ax.grid(True, axis="y", linestyle=":", alpha=0.5)
+    ax.legend(loc="lower left", framealpha=0.9, fontsize=8)
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    atomic_write_bytes(path, buf.getvalue())
+
+
+def write_v2norm_outputs(
+    run_dir: Path,
+    config: Mapping,
+    metrics: Mapping,
+    contrasts: Mapping,
+    levels: Mapping,
+    sanity: Mapping,
+    repro: Mapping,
+    conds: Sequence[str],
+) -> None:
+    """report.md (Spanish), v2norm_robustez.png and a machine-readable verdict summary."""
+    _plot_v2norm(run_dir / "v2norm_robustez.png", metrics, conds)
+
+    def c(key):
+        return contrasts.get(key, {})
+
+    d_v2, d_nm = c("delta__v2__T1"), c("delta__v2_norm__T1")
+    did = c("did__T1__v2__v2_norm")  # (v2 drop) - (v2_norm drop)
+    primary_v = None if did.get("value") is None else -did["value"]
+    pci = did.get("ci95")
+    primary_ci = [-pci[1], -pci[0]] if pci and pci[0] is not None else None
+    h1_ok = d_nm.get("value") is not None and abs(d_nm["value"]) < 0.01
+    l0 = levels.get("T0", {})
+    h2_ok = l0.get("value") is not None and abs(l0["value"]) < 0.02
+    verdicts = {
+        "primary_delta": {"value": primary_v, "ci95": primary_ci},
+        "H1": {"v2_norm_drop_T1": d_nm.get("value"), "ci95": d_nm.get("ci95"), "confirmed": bool(h1_ok)},
+        "H2": {"v2_norm_minus_v2_T0": l0.get("value"), "ci95": l0.get("ci95"), "confirmed": bool(h2_ok)},
+        "H3": {k: {"value": levels[k].get("value"), "ci95": levels[k].get("ci95")} for k in levels if k in ("T5", "T7@1.0")},
+    }
+    write_json(run_dir / "verdicts.json", _plain(verdicts))
+    write_json(run_dir / "sanity_t1.json", _plain(sanity))
+    write_json(run_dir / "reproduction.json", _plain(repro))
+    write_json(run_dir / "contrasts_levels.json", _plain(levels))
+
+    L = [
+        "# Robustez de v2 con renombrado canónico de identificadores (`v2_norm`)",
+        "",
+        f"- **Corrida:** `{config.get('run_id', run_dir.name)}`",
+        f"- **Partición:** `{config.get('split')}` (manifiesto `{config.get('manifest_sha256')}`)",
+        f"- **Semilla:** `{config.get('seed')}`; bootstrap estratificado por asignación; n_boot = {config.get('n_boot')} "
+        f"(contrastes primarios) y {config.get('n_boot_secondary')} en las métricas por condición secundarias.",
+        "- **Pregunta:** ¿el renombrado canónico elimina la vulnerabilidad de v2 al renombrado de identificadores (T1) y qué cuesta frente a las demás transformaciones?",
+        "",
+        "## 1. Verificación de reproducción",
+        "",
+        f"Se contrastó el ROC-AUC (vista `all`) de esta corrida con la corrida `{repro['reference_run']}` (tolerancia ±{repro['tolerance']}).",
+        "",
+        "| Método | Condición | Anterior | Actual | Diferencia | Resultado |",
+        "|---|---|---|---|---|---|",
+    ]
+    for r in repro["rows"]:
+        L.append(f"| {r['method']} | {r['condition']} | {r['reference']:.4f} | {r['new']:.4f} | {r['diff']:+.4f} | {'OK' if r['ok'] else 'FALLA'} |")
+    L += ["", f"Reproducción: **{'exitosa' if repro['ok'] else 'fallida'}**.", "", "## 2. ROC-AUC por método y condición (vista `all`, IC95%)", ""]
+    methods = [m for m in ("v2", "v2_norm", "jaccard") if m in config.get("methods", [])]
+    L.append("| Condición | " + " | ".join(methods) + " |")
+    L.append("|---|" + "---|" * len(methods))
+    for cnd in conds:
+        cells = []
+        for m in methods:
+            v, ci = _auc_of(metrics, cnd, m)
+            cells.append("n/d" if v is None else f"{v:.3f} {_fmt_ci(ci)}")
+        L.append(f"| `{cnd}` | " + " | ".join(cells) + " |")
+    L += ["", "Cambio respecto de T0 (ΔAUC) con IC95% por bootstrap pareado:", "", "| Condición | " + " | ".join(methods) + " |", "|---|" + "---|" * len(methods)]
+    for cnd in conds:
+        if cnd == "T0":
+            continue
+        cells = []
+        for m in methods:
+            d = c(f"delta__{m}__{cnd}")
+            cells.append("n/d" if d.get("value") is None else f"{d['value']:+.3f} {_fmt_ci(d.get('ci95'))}")
+        L.append(f"| `{cnd}` | " + " | ".join(cells) + " |")
+    L += [
+        "", "## 3. Contraste primario y veredictos preregistrados", "",
+        "Contraste primario: Δ = [AUC_v2_norm(T1) − AUC_v2_norm(T0)] − [AUC_v2(T1) − AUC_v2(T0)], es decir, la fracción de la caída de v2 por renombrado que v2_norm elimina.",
+        "",
+    ]
+    if primary_v is not None:
+        L.append(f"**Δ = {primary_v:+.4f} {_fmt_ci(primary_ci)}** (caída de v2 en T1: {d_v2['value']:+.4f} {_fmt_ci(d_v2.get('ci95'))}; "
+                 f"caída de v2_norm en T1: {d_nm['value']:+.4f} {_fmt_ci(d_nm.get('ci95'))}).")
+    L += [
+        "",
+        "| Hipótesis | Enunciado (preregistro) | Estimación [IC95%] | Veredicto |",
+        "|---|---|---|---|",
+        f"| H1 | La caída de v2_norm en T1 es ≈ 0 (|ΔAUC_v2_norm(T1)| < 0,01) | {d_nm.get('value', float('nan')):+.4f} {_fmt_ci(d_nm.get('ci95'))} | **{'CONFIRMADA' if h1_ok else 'REFUTADA'}** |",
+        f"| H2 | v2_norm en T0 está a menos de 0,02 de v2 en T0 | {l0.get('value', float('nan')):+.4f} {_fmt_ci(l0.get('ci95'))} | **{'CONFIRMADA' if h2_ok else 'REFUTADA'}** |",
+    ]
+    for k in ("T5", "T7@1.0"):
+        lv = levels.get(k, {})
+        if lv.get("value") is not None:
+            L.append(f"| H3 (exploratoria) | v2_norm − v2 en {k}, sin expectativa previa | {lv['value']:+.4f} {_fmt_ci(lv.get('ci95'))} | Descriptivo |")
+    L += [
+        "", "Diferencia de nivel v2_norm − v2 por condición (bootstrap pareado, mismo remuestreo):", "",
+        "| Condición | AUC_v2_norm − AUC_v2 [IC95%] |", "|---|---|",
+    ]
+    for k, lv in levels.items():
+        if lv.get("value") is not None:
+            L.append(f"| `{k}` | {lv['value']:+.4f} {_fmt_ci(lv.get('ci95'))} |")
+    L += [
+        "", "## 4. Verificación de sanidad: canon(T1(b)) = canon(b)", "",
+        f"Sobre {sanity['n_sampled']} segundos archivos de pares positivos muestreados (semilla {config.get('seed')}), "
+        f"la igualdad byte a byte se cumple en **{sanity['n_equal']}/{sanity['n_sampled']} ({sanity['fraction_equal']*100:.1f}%)**; "
+        f"T1 modificó el archivo en {sanity['n_t1_applied']}/{sanity['n_sampled']} casos.",
+        "",
+    ]
+    if sanity["mismatches"]:
+        L += ["Discrepancias (primera línea que difiere):", "", "| Archivo | Lenguaje | Línea | Original canónico | T1 canónico |", "|---|---|---|---|---|"]
+        for mm in sanity["mismatches"][:15]:
+            a = (mm["canon_orig"] or "").strip().replace("|", "\\|")
+            b = (mm["canon_t1"] or "").strip().replace("|", "\\|")
+            L.append(f"| `{mm['id']}` | {mm['lang']} | {mm['line']} | `{a}` | `{b}` |")
+        L.append("")
+    L += [
+        "## 5. Limitaciones", "",
+        "- No se recalcula la TPR al umbral desplegado para v2_norm: no existe un umbral calibrado de v2_norm; solo se informa una métrica independiente del umbral (ROC-AUC).",
+        "- La canonicalización se aplica después de la transformación y a ambos lados del par; no se evalúa un atacante que conozca la normalización.",
+        "- Solo se evalúan T0, T1, T5 y T7@1.0; no se extrapola a T2, T3, T4 ni T6.",
+        "- La transformación se aplica al segundo archivo de cada par y, como en la corrida previa, a todos los archivos del conjunto de prueba; hay pocos positivos (n_pos ≈ 338), por lo que los IC son amplios.",
+        "",
+        "## 6. Figura", "", "![ROC-AUC por condición](v2norm_robustez.png)", "",
+    ]
+    atomic_write_bytes(run_dir / "report.md", "\n".join(L).encode("utf-8"))
+
 # --- Main Pipeline ------------------------------------------------------------------------------
 
 
@@ -679,6 +913,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     poolings.setdefault("v2", "mean")
     poolings.setdefault("v2_nodfg", "mean")
     poolings.setdefault("legacy", "cls")
+    poolings.setdefault("v2_norm", poolings["v2"])
 
     # 4. Prepare Embedders if neural methods selected
     embedding_methods_active = [m for m in methods if m in EMBEDDING_METHODS]
@@ -686,12 +921,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     device = resolve_device(args.device) if embedding_methods_active else "cpu"
     if embedding_methods_active:
         embedders, statuses = load_embedders(
-            embedding_methods_active,
+            sorted({EMBEDDER_ALIAS.get(m, m) for m in embedding_methods_active}),
             model_name=DEFAULT_MODEL,
             local_files_only=args.local_files_only,
             device=device,
             batch_size=args.batch_size,
         )
+        for m_alias, m_base in EMBEDDER_ALIAS.items():
+            if m_alias in embedding_methods_active:
+                embedders[m_alias] = embedders[m_base]
 
     # 5. Initialize or Resume Run Context
     cache_root = Path(args.cache_dir)
@@ -727,6 +965,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             config=_plain(run_config),
             argv=argv_list,
             root=args.runs_root,
+            run_dir=args.run_dir,
         )
         run_dir = ctx.path
         set_run_status(run_dir, STATUS_RUNNING)
@@ -819,7 +1058,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for m in embedding_methods_active:
         pool = poolings[m]
         cached = cached_embedders[m]
-        entries = [cached.embed(r.sha256, r.text, r.lang) for r in orig_records]
+        o_texts, _ = texts_for_method(m, [r.text for r in orig_records], [r.text for r in orig_records], [r.lang for r in orig_records])
+        if m in EMBEDDER_ALIAS:
+            o_shas = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in o_texts]
+        else:
+            o_shas = [r.sha256 for r in orig_records]
+        entries = [cached.embed(sh, t, r.lang) for sh, t, r in zip(o_shas, o_texts, orig_records)]
         stacked, _ = stack_embeddings(entries, pool)
         orig_embeddings[m] = stacked
 
@@ -858,9 +1102,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             else:
                 pool = poolings[m]
                 cached = cached_embedders[m]
+                _, m_texts = texts_for_method(
+                    m, [files[s.id].text for s in ep.samples], trans_texts, [s.lang for s in ep.samples]
+                )
+                if m in EMBEDDER_ALIAS:
+                    m_shas = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in m_texts]
+                else:
+                    m_shas = [r["sha256_out"] for r in trans_records]
                 entries = [
-                    cached.embed(r["sha256_out"], t, s.lang)
-                    for s, r, t in zip(ep.samples, trans_records, trans_texts)
+                    cached.embed(sh, t, s.lang)
+                    for s, sh, t in zip(ep.samples, m_shas, m_texts)
                 ]
                 trans_stacked, _ = stack_embeddings(entries, pool)
                 sim_fn = cross_embedding_similarity(orig_embeddings[m], trans_stacked)
@@ -974,8 +1225,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         methods,
         conditions,
     )
-    atomic_write_bytes(run_dir / "report.md", report_content.encode("utf-8"))
-
+    if "v2_norm" in methods and "v2" in methods and "T1" in conditions:
+        generic = run_dir / "report_generic.md"
+        atomic_write_bytes(generic, report_content.encode("utf-8"))
+        ref_run = Path(args.reference_run)
+        if not ref_run.is_absolute():
+            ref_run = Path(args.root) / ref_run
+        repro = v2norm_reproduction_check(metrics_doc, ref_run)
+        _log(f"Reproduction check ok={repro['ok']}")
+        sanity = v2norm_sanity_check(ep, files, transformed_records, args.seed)
+        _log(f"Sanity canon(T1(b))==canon(b): {sanity['n_equal']}/{sanity['n_sampled']}")
+        lvl_conds = [x for x in ("T0", "T1", "T5", "T7@1.0") if x in conditions]
+        lvl_path = run_dir / "contrasts_levels.json"
+        if lvl_path.is_file():
+            levels = json.loads(lvl_path.read_text(encoding="utf-8"))
+        else:
+            levels = v2norm_level_contrasts(
+                y_all[mask_all], scores_by_cond_method, mask_all, assignments[mask_all], lvl_conds, args.n_boot, args.seed
+            )
+        write_v2norm_outputs(run_dir, run_config, metrics_doc, contrasts_doc, levels, sanity, repro, lvl_conds)
+    else:
+        atomic_write_bytes(run_dir / "report.md", report_content.encode("utf-8"))
     set_run_status(run_dir, STATUS_COMPLETE)
     _log(f"Experiment completed successfully! Artifacts written to {run_dir}")
     return 0
