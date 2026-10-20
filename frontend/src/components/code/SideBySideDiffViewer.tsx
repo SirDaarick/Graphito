@@ -6,11 +6,14 @@
  * 2. Resaltado léxico con paleta Synthwave '84 para C/C++.
  * 3. Hilo interactivo de anotaciones y observaciones pedagógicas (en línea y generales).
  * 4. Sincronización bidireccional de desplazamiento (scroll) con bloqueo preventivo de bucles.
+ * 5. Explicación al pasar el cursor (o enfocar) una línea sospechosa de la entrega.
  */
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useId, useState, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { MessageSquare, MessageSquarePlus, Plus, Trash2, X, Send, User, Sparkles, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { SynthwaveLine } from "./SynthwaveHighlighter";
+import type { LineEvidence } from "../../lib/evidence";
 
 /**
  * Representa una anotación pedagógica registrada por un docente en una revisión.
@@ -39,8 +42,21 @@ interface SideBySideDiffViewerProps {
     onAddComment: (lineNum: number | null, text: string) => Promise<void>;
     onDeleteComment: (commentId: number) => Promise<void>;
     isSubmittingComment?: boolean;
-    highlightedLine?: number | null;
+    /** Why a line of the student code is suspicious, by 1-based line number. Shown on hover or focus. */
+    evidence?: Map<number, LineEvidence[]>;
+    /** CSS height of each code pane (the viewer scrolls inside it). */
+    paneHeight?: string;
 }
+
+interface LineTip {
+    line: number;
+    top: number;
+    bottom: number;
+    left: number;
+}
+
+const NO_EVIDENCE: Map<number, LineEvidence[]> = new Map();
+const TIP_WIDTH = 340;
 
 export function SideBySideDiffViewer({
     referenceCode,
@@ -53,12 +69,17 @@ export function SideBySideDiffViewer({
     onAddComment,
     onDeleteComment,
     isSubmittingComment = false,
-    highlightedLine = null,
+    evidence = NO_EVIDENCE,
+    paneHeight = "calc(95vh - 145px)",
 }: SideBySideDiffViewerProps) {
     // Sincronización de scroll
     const leftScrollRef = useRef<HTMLDivElement>(null);
     const rightScrollRef = useRef<HTMLDivElement>(null);
     const isScrollingRef = useRef<"left" | "right" | null>(null);
+
+    const [tip, setTip] = useState<LineTip | null>(null);
+    const tipId = useId();
+    const tipRowRef = useRef<HTMLElement | null>(null);
 
     // Estado para nueva nota en línea
     const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null);
@@ -91,8 +112,27 @@ export function SideBySideDiffViewer({
         [comments]
     );
 
-    // Manejar scroll sincronizado
+    const showTip = (line: number, row: HTMLElement, by: "mouse" | "focus") => {
+        const rect = row.getBoundingClientRect();
+        tipRowRef.current = by === "focus" ? row : null;
+        setTip({ line, top: rect.top, bottom: rect.bottom, left: rect.left });
+    };
+
+    // A pointer tooltip disappears on scroll; a keyboard-focused row keeps its tooltip and follows the row.
+    const syncTipOnScroll = () => {
+        const row = tipRowRef.current;
+        if (!row) {
+            setTip(null);
+            return;
+        }
+        const rect = row.getBoundingClientRect();
+        setTip((prev) => (prev ? { ...prev, top: rect.top, bottom: rect.bottom, left: rect.left } : prev));
+    };
+
+    // Manejar scroll sincronizado (solo cuando los dos paneles van lado a lado)
     const handleScroll = (source: "left" | "right") => {
+        syncTipOnScroll();
+        if (!window.matchMedia("(min-width: 768px)").matches) return;
         if (isScrollingRef.current && isScrollingRef.current !== source) return;
         isScrollingRef.current = source;
 
@@ -108,16 +148,6 @@ export function SideBySideDiffViewer({
             isScrollingRef.current = null;
         }, 30);
     };
-
-    // Desplazamiento automático al inspeccionar línea desde XAI
-    useEffect(() => {
-        if (highlightedLine && rightScrollRef.current) {
-            const targetRow = rightScrollRef.current.querySelector<HTMLElement>(`[data-line="${highlightedLine}"]`);
-            if (targetRow) {
-                targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-        }
-    }, [highlightedLine]);
 
     const handleSaveLineComment = async (lineNum: number) => {
         if (!commentText.trim()) return;
@@ -219,8 +249,8 @@ export function SideBySideDiffViewer({
             )}
 
             {/* Column Headers — Zen Single Toolbar */}
-            <div className="grid grid-cols-2 border-b border-[#2d2244] bg-[#1a1427] text-xs font-sans shrink-0">
-                <div className="px-5 py-2 flex items-center justify-between border-r border-[#2d2244]">
+            <div className="grid grid-cols-1 md:grid-cols-2 border-b border-[#2d2244] bg-[#1a1427] text-xs font-sans shrink-0">
+                <div className="px-5 py-2 flex items-center justify-between md:border-r border-[#2d2244]">
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-[#36f9f6]" />
                         <span className="font-semibold text-slate-200 text-xs">{referenceAuthor}</span>
@@ -255,13 +285,13 @@ export function SideBySideDiffViewer({
             </div>
 
             {/* Side by Side Scrolling Area */}
-            <div className="grid grid-cols-2 flex-1 overflow-hidden relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 flex-1 overflow-hidden relative">
                 {/* Left Side: Teacher / Canonical Reference */}
                 <div
                     ref={leftScrollRef}
                     onScroll={() => handleScroll("left")}
-                    className="overflow-y-auto overflow-x-auto border-r border-[#2d2244] bg-[#1a1427] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ height: "calc(95vh - 145px)", minHeight: "520px" }}
+                    className="overflow-y-auto overflow-x-auto md:border-r border-b md:border-b-0 border-[#2d2244] bg-[#1a1427] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
+                    style={{ height: paneHeight }}
                 >
                     <table className="w-full border-collapse">
                         <tbody>
@@ -304,7 +334,7 @@ export function SideBySideDiffViewer({
                     ref={rightScrollRef}
                     onScroll={() => handleScroll("right")}
                     className="overflow-y-auto overflow-x-auto bg-[#181324] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ height: "calc(95vh - 145px)", minHeight: "520px" }}
+                    style={{ height: paneHeight }}
                 >
                     <table className="w-full border-collapse">
                         <tbody>
@@ -313,7 +343,7 @@ export function SideBySideDiffViewer({
                                 const refLine = refLines[index] ?? "";
                                 const stuLine = stuLines[index] ?? "";
                                 const isDiff = refLine !== stuLine;
-                                const isHighlighted = highlightedLine === lineNum;
+                                const lineEvidence = evidence.get(lineNum);
                                 const lineComments = commentsByLine.get(lineNum) || [];
                                 const isComposerActive = activeCommentLine === lineNum;
 
@@ -321,9 +351,16 @@ export function SideBySideDiffViewer({
                                     <React.Fragment key={`stu-frag-${lineNum}`}>
                                         <tr
                                             data-line={lineNum}
-                                            className={`group transition-all duration-300 ${
-                                                isHighlighted
-                                                    ? "bg-cyan-500/25 shadow-[inset_0_0_12px_rgba(6,182,212,0.3)] border-l-4 border-cyan-400"
+                                            tabIndex={lineEvidence ? 0 : undefined}
+                                            aria-describedby={lineEvidence && tip?.line === lineNum ? tipId : undefined}
+                                            aria-label={lineEvidence ? `Línea ${lineNum}: tiene una observación` : undefined}
+                                            onMouseEnter={lineEvidence ? (e) => showTip(lineNum, e.currentTarget, "mouse") : undefined}
+                                            onMouseLeave={lineEvidence ? () => setTip(null) : undefined}
+                                            onFocus={lineEvidence ? (e) => showTip(lineNum, e.currentTarget, "focus") : undefined}
+                                            onBlur={lineEvidence ? () => { tipRowRef.current = null; setTip(null); } : undefined}
+                                            className={`group transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300/70 ${
+                                                lineEvidence
+                                                    ? "bg-amber-400/10 hover:bg-amber-400/20 shadow-[inset_3px_0_0_rgba(251,191,36,0.9)] cursor-help"
                                                     : isDiff
                                                     ? "bg-fuchsia-950/20 hover:bg-fuchsia-950/30"
                                                     : "hover:bg-[#251d38]/50"
@@ -446,6 +483,40 @@ export function SideBySideDiffViewer({
                     </table>
                 </div>
             </div>
+
+            {tip && evidence.get(tip.line) && createPortal(
+                <LineTooltip id={tipId} tip={tip} items={evidence.get(tip.line)!} />,
+                document.body
+            )}
+        </div>
+    );
+}
+
+/** Floating explanation for a suspicious line; rendered in a portal so no scroll container clips it. */
+function LineTooltip({ id, tip, items }: { id: string; tip: LineTip; items: LineEvidence[] }) {
+    const margin = 8;
+    const left = Math.max(margin, Math.min(tip.left + 56, window.innerWidth - TIP_WIDTH - margin));
+    const placeAbove = tip.bottom + 180 > window.innerHeight && tip.top > 180;
+    const style: React.CSSProperties = placeAbove
+        ? { left, bottom: window.innerHeight - tip.top + 4, width: TIP_WIDTH }
+        : { left, top: tip.bottom + 4, width: TIP_WIDTH };
+
+    return (
+        <div
+            id={id}
+            role="tooltip"
+            style={style}
+            className="pointer-events-none fixed z-[300] max-w-[calc(100vw-16px)] space-y-2 rounded-xl border border-amber-400/40 bg-[#0e0a1a]/95 p-3 font-sans text-xs text-slate-200 shadow-2xl"
+        >
+            {items.map((item) => (
+                <div key={`${item.title}-${item.text}`}>
+                    <p className="font-bold text-amber-300">{item.title}</p>
+                    <p className="mt-0.5 leading-relaxed text-slate-300">{item.text}</p>
+                </div>
+            ))}
+            <p className="border-t border-white/10 pt-2 text-[11px] text-slate-400">
+                Indicio orientativo: ayuda a revisar la línea, no es una conclusión.
+            </p>
         </div>
     );
 }

@@ -53,6 +53,9 @@ export function Biblioteca({
     const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
     const [isActing, setIsActing] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
+    // Problems whose entregas could not be loaded: their counts would otherwise read as 0.
+    const [failedSubmissions, setFailedSubmissions] = useState<string[]>([]);
+    const [loadFailed, setLoadFailed] = useState(false);
     const itemsPerPage = 10;
 
     const fetchGroups = async () => {
@@ -69,16 +72,19 @@ export function Biblioteca({
         if (references.length === 0) {
             setIsLoading(true);
         }
+        const failedTitles: string[] = [];
         try {
             const problems = await api.problems.list(showArchived);
+            setLoadFailed(false);
             if (problems && problems.length > 0) {
                 const mapped = await Promise.all(
                     problems.map(async (p) => {
                         let subs: CodigoFuente[] = [];
                         try {
                             subs = await api.problems.listSubmissions(p.id);
-                        } catch {
-                            // ok
+                        } catch (err) {
+                            console.error(`Error al cargar las entregas del problema ${p.id}:`, err);
+                            failedTitles.push(p.titulo);
                         }
                         return {
                             id: String(p.id),
@@ -118,7 +124,9 @@ export function Biblioteca({
             }
         } catch (err) {
             console.error("Error al cargar problemas:", err);
+            setLoadFailed(true);
         } finally {
+            setFailedSubmissions(failedTitles);
             setIsLoading(false);
         }
     };
@@ -289,12 +297,37 @@ export function Biblioteca({
                 </div>
             )}
 
+            {!isLoading && (loadFailed || failedSubmissions.length > 0) && (
+                <div
+                    role="alert"
+                    className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-200 text-sm"
+                >
+                    <div>
+                        <p className="font-bold">
+                            {loadFailed ? "No se pudo cargar la biblioteca." : "No se pudieron cargar algunas entregas."}
+                        </p>
+                        <p className="mt-0.5 text-xs">
+                            {loadFailed
+                                ? "Revisa tu conexión e inténtalo de nuevo."
+                                : `Los conteos de comparaciones pueden estar incompletos en: ${failedSubmissions.join(", ")}. Inténtalo de nuevo en unos momentos.`}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => fetchProblems()}
+                        className="shrink-0 px-4 py-2 rounded-xl text-xs font-bold border border-amber-500/40 hover:bg-amber-500/20 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+                    >
+                        Reintentar
+                    </button>
+                </div>
+            )}
+
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
                     <Loader2 className="w-8 h-8 animate-spin text-graphito-blue mb-3" />
                     <p className="text-sm font-medium">Cargando soluciones de referencia...</p>
                 </div>
-            ) : references.length === 0 && !showArchived ? (
+            ) : references.length === 0 && !showArchived && !loadFailed ? (
                 <div className="flex flex-col items-center justify-center border border-graphito-blue/30 rounded-2xl p-10 text-center my-4 bg-gradient-to-br from-graphito-blue/10 to-graphito-violet/10 transition-colors">
                     <div className="w-12 h-12 rounded-2xl bg-graphito-blue/15 text-graphito-blue flex items-center justify-center mb-4">
                         <BookOpen size={24} />
@@ -314,7 +347,7 @@ export function Biblioteca({
                         <span>Ir al catálogo</span>
                     </button>
                 </div>
-            ) : filteredReferences.length === 0 ? (
+            ) : filteredReferences.length === 0 && !loadFailed ? (
                 <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-300 dark:border-[#2b3346] rounded-2xl p-8 text-center my-4 bg-white/60 dark:bg-[#121827]/20 transition-colors">
                     <p className="text-slate-800 dark:text-slate-300 font-bold text-lg mb-1">
                         {selectedGroupId !== null

@@ -1,64 +1,51 @@
 /**
  * @file evidence.ts
- * @description Display rules for the XAI evidence drawer: per-channel text and indicator badges.
- *
- * Only rows the backend marks `origen: "decision"` come from the calibrated flags; every other row,
- * including one without `categoria`/`origen`, is a rule-based heuristic (spec AR4.1).
+ * @description Maps report indicators to the suspicious lines of the student code, so the code view
+ * can explain a line when the teacher points at it. Only rows that name a real line are used.
  */
 import type { IndicadorIntegridad } from "./api";
 import { lookupLabel } from "./dictamen";
 
-export interface Badge {
-    label: string;
-    color: string;
+export interface LineEvidence {
+    title: string;
+    text: string;
+    severity: string;
 }
 
-/** Badges for rows driven by the calibrated decision flags. */
-const DECISION_BADGES: Record<string, Badge> = {
-    GENERAL: { label: "Decisión (bandera calibrada)", color: "text-rose-400" },
-    SIMILITUD_ARCHIVO: { label: "Similitud léxica (archivo)", color: "text-purple-400" },
-};
+const SEVERITY_RANK: Record<string, number> = { BAJA: 0, MEDIA: 1, ALTA: 2, CRITICA: 3 };
 
-/** Badges for rule-based heuristic categories. */
-const HEURISTIC_BADGES: Record<string, Badge> = {
-    ESTILO_LLM: { label: "Heurística: patrón de documentación", color: "text-emerald-400" },
-    NIVEL_AVANZADO: { label: "Heurística: construcción avanzada", color: "text-amber-400" },
-    ISOMORFISMO_DFG: { label: "Heurística legada (DFG)", color: "text-slate-400" },
-};
-
-/** Neutral default for any row that is not an explicit decision row. */
-export const HEURISTIC_BADGE: Badge = { label: "Heurística", color: "text-cyan-400" };
-
-/** Channel states in which the channel produced a score (backend `PERSISTED_STATE`). */
-const SCORED_STATES = new Set(["EVALUADO", "NO_CALIBRADO"]);
-
-export function isHeuristic(ind: IndicadorIntegridad): boolean {
-    return ind.origen !== "decision";
+function rank(severity: string): number {
+    return lookupLabel(SEVERITY_RANK, severity.toUpperCase()) ?? -1;
 }
 
-export function indicatorBadge(ind: IndicadorIntegridad): Badge {
-    if (!isHeuristic(ind)) return lookupLabel(DECISION_BADGES, ind.categoria) ?? HEURISTIC_BADGE;
-    return lookupLabel(HEURISTIC_BADGES, ind.categoria) ?? HEURISTIC_BADGE;
+function capitalize(text: string): string {
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-export interface ChannelTextInput {
-    /** Displayed channel score; null or undefined when the channel produced none. */
-    score: number | null | undefined;
-    flag: boolean | null | undefined;
-    estado: string | null | undefined;
-    onFlag: string;
-    onClear: string;
+/** Removes technical wording that adds nothing for a teacher ("Heurística", "Línea N:"). */
+function plainTitle(title: string): string {
+    return title.replace(/^Heur[ií]stica:\s*/i, "").trim();
 }
 
-/**
- * Text for one channel pillar. A calibrated flag decides the text; a scored channel without a
- * flag is "sin calibrar" (its number is shown but does not decide); only a channel without a
- * score is "No evaluado".
- */
-export function channelText({ score, flag, estado, onFlag, onClear }: ChannelTextInput): string {
-    if (flag === true) return onFlag;
-    if (flag === false) return onClear;
-    const scored = (score !== null && score !== undefined) || (estado != null && SCORED_STATES.has(estado));
-    if (scored) return "Evaluado sin calibrar: el puntaje se muestra, pero no hay bandera calibrada que decida.";
-    return `No evaluado (${estado ?? "sin estado"}): este canal no aporta bandera.`;
+function plainText(text: string): string {
+    const cleaned = text
+        .replace(/^Heur[ií]stica \(no es salida del modelo\)\.\s*/i, "")
+        .replace(/^L[ií]nea \d+:\s*/i, "")
+        .trim();
+    return capitalize(cleaned);
+}
+
+/** Evidence grouped by 1-based line number, most severe first, without exact duplicates. */
+export function evidenceByLine(indicadores: IndicadorIntegridad[]): Map<number, LineEvidence[]> {
+    const byLine = new Map<number, LineEvidence[]>();
+    for (const ind of indicadores) {
+        const line = ind.numero_linea;
+        if (typeof line !== "number" || !Number.isInteger(line) || line < 1) continue;
+        const entry: LineEvidence = { title: plainTitle(ind.tipo_alerta), text: plainText(ind.descripcion), severity: ind.severidad };
+        const list = byLine.get(line) ?? [];
+        if (!list.some((e) => e.title === entry.title && e.text === entry.text)) list.push(entry);
+        byLine.set(line, list);
+    }
+    for (const list of byLine.values()) list.sort((a, b) => rank(b.severity) - rank(a.severity));
+    return byLine;
 }

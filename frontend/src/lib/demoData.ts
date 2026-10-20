@@ -346,9 +346,9 @@ export const DEMO_REPORTS: Record<number, ReporteAnalisis> = {
             },
             {
                 tipo_alerta: "Heurística: Patrón de Documentación LLM",
-                descripcion: "Heurística (no es salida del modelo). Línea 178: comentarios paso a paso ('Paso 1: Inicialización...', 'Paso 2: Bucle...') frecuentes en código generado.",
+                descripcion: "Heurística (no es salida del modelo). Línea 47: comentarios paso a paso ('Paso 1: Inicialización...', 'Paso 2: Bucle...') frecuentes en código generado.",
                 severidad: "MEDIA",
-                numero_linea: 178,
+                numero_linea: 47,
                 categoria: "ESTILO_LLM",
                 origen: "heuristica",
             },
