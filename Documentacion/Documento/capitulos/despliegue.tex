@@ -74,13 +74,13 @@ El paquete no sobrescribe versiones anteriores. La Tabla~\ref{tab:desplegado} re
     \end{tabularx}
 \end{table}
 
-GraphCodeBERT no viaja en el paquete: se usa tal como viene preentrenado, y el paquete solo registra su versión exacta para poder reproducir el cálculo.
+GraphCodeBERT no viaja en el paquete: se usa tal como viene preentrenado, y el paquete solo registra su versión exacta para poder reproducir el cálculo. El embedding desplegado aplica antes un renombrado canónico de los identificadores (\texttt{v2\_norm}) y la colección de Chroma está versionada: cuando cambia ese procesamiento, las referencias se reindexan.
 
 % ----------------------------------------------------------------------
 \subsection{Cómo Decide la Plataforma}
 \label{subsec:decision}
 
-La alerta de similitud la decide la comparación léxica (Jaccard), no GraphCodeBERT. La razón está en la evaluación del Capítulo~\ref{cap:modelado}: al distinguir pares de plagio, Jaccard obtuvo 0.945 y GraphCodeBERT 0.856, y este último es sensible al cambio de nombres de variables. Por eso la plataforma usa la señal que mejor midió, y conserva el coseno de GraphCodeBERT como información adicional sobre la similitud lógica, sin que active alertas. Los umbrales los fija el servidor; cualquier umbral enviado desde fuera se ignora.
+La alerta de similitud la decide la comparación léxica (Jaccard), no GraphCodeBERT. La razón está en la evaluación del Capítulo~\ref{cap:modelado}: al distinguir pares de plagio, Jaccard obtuvo 0.945 y GraphCodeBERT 0.902 (0.856 sin el renombrado canónico de identificadores), y este último sigue siendo más sensible que Jaccard al código muerto y a los trucos combinados. Por eso la plataforma usa la señal que mejor midió, y conserva el coseno de GraphCodeBERT como información adicional sobre la similitud lógica, sin que active alertas. Los umbrales los fija el servidor; cualquier umbral enviado desde fuera se ignora.
 
 Dos preguntas determinan lo que ve el docente: ¿la similitud con la referencia es alta?, ¿el estilo es atípico? La Tabla~\ref{tab:decision} muestra las cuatro combinaciones.
 
