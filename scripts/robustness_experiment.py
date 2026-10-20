@@ -1058,20 +1058,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.prefill_shard:
         # Cache warm-up for one shard of the unique texts (run several shards in parallel processes).
         k_s, n_s = (int(x) for x in args.prefill_shard.split("/"))
-        langs_all = [s.lang for s in ep.samples]
-        orig_all = [files[s.id].text for s in ep.samples]
         todo: Dict[str, Tuple[str, str, str]] = {}
-        for m in embedding_methods_active:
-            for cond in conditions:
-                t_texts = []
-                for s, o in zip(ep.samples, orig_all):
+        for i_s, s in enumerate(ep.samples):
+            if i_s % n_s != k_s:
+                continue
+            orig_txt = files[s.id].text
+            for m in embedding_methods_active:
+                for cond in conditions:
                     r = transformed_records[(s.id, cond)]
-                    t_texts.append(r["code_out"] if "code_out" in r else o)
-                o_t, t_t = texts_for_method(m, orig_all, t_texts, langs_all)
-                for txt, lg in list(zip(o_t, langs_all)) + list(zip(t_t, langs_all)):
-                    sh = hashlib.sha256(txt.encode("utf-8")).hexdigest()
-                    if int(sh[:8], 16) % n_s == k_s:
-                        todo[f"{m}:{sh}"] = (m, txt, lg)
+                    t_txt = r["code_out"] if "code_out" in r else orig_txt
+                    o_t, t_t = texts_for_method(m, [orig_txt], [t_txt], [s.lang])
+                    for txt in (o_t[0], t_t[0]):
+                        sh = hashlib.sha256(txt.encode("utf-8")).hexdigest()
+                        todo[f"{m}:{sh}"] = (m, txt, s.lang)
         _log(f"Prefill shard {k_s}/{n_s}: {len(todo)} unique texts")
         for i, (key, (m, txt, lg)) in enumerate(todo.items()):
             cached_embedders[m].embed(key.split(":", 1)[1] if m in EMBEDDER_ALIAS else hashlib.sha256(txt.encode("utf-8")).hexdigest(), txt, lg)
