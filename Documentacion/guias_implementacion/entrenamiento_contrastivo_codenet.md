@@ -2,7 +2,7 @@
 
 > **Estado:** planificado, no ejecutado. Esta guía es el pre-registro del experimento: hipótesis, criterio de decisión y análisis quedan fijados aquí **antes** de entrenar o mirar resultados sobre ESCOM.
 > **Alcance:** ajuste contrastivo (LoRA) del Canal A con datos externos (Project CodeNet). La evaluación se hace únicamente sobre datos de ESCOM, en local.
-> **Línea base:** `v2` zero-shot (DFG, pooling `mean`), sin adaptador.
+> **Línea base y entrada:** `v2_norm` zero-shot: renombrado canónico de identificadores (`models/logic_eval/canonical.py`, `identifiers_v1`) y luego `v2` (DFG, pooling `mean`), sin adaptador. Es la entrada desplegada del Canal A (`odd/tasks/gcb-v2-norm.md`): en `runs/robustness_v2norm/20261019-222018`, ROC-AUC bajo T1 (renombrado) 0.684 → 0.902 y en T0 0.856 → 0.902; en E1 no hay diferencia significativa. Todas las referencias a `v2` más abajo se leen como `v2_norm`.
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Pregunta | Respuesta |
 |---|---|
-| ¿Qué se entrena? | Un adaptador LoRA sobre GraphCodeBERT con entrada `v2`, usando InfoNCE. |
+| ¿Qué se entrena? | Un adaptador LoRA sobre GraphCodeBERT con entrada `v2_norm` (identificadores canónicos + DFG), usando InfoNCE. |
 | ¿Con qué datos? | Project CodeNet C++1000: envíos humanos con estado verificado por un juez (Accepted / Wrong Answer). |
 | ¿Dónde se evalúa? | En ESCOM (E1, E2 y robustez T1–T7), una sola vez, con la configuración congelada. |
 | ¿Cuándo se detiene? | Si el piloto (F2) no cumple el criterio de continuación. Se reporta como resultado negativo. |

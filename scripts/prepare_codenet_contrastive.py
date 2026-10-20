@@ -5,7 +5,8 @@ the programs that fit ONE `v2` window, removes near-duplicates (Wrong Answer vs 
 problem, everything vs `Programas_ESCOM`), splits by problem and writes:
 
 - `manifest.jsonl`: one row per kept sample (problem, split, role, submission id, relative path, sha256).
-- `cache_<split>.pkl`: the upstream-format `v2` features of every sample (no attention mask; rebuild
+- `cache_<split>.pkl`: the upstream-format `v2` features of every sample, computed on identifier-
+  canonicalized code (`v2_norm`, the deployed Channel A input; no attention mask; rebuild
   it with `models.graphcodebert.v2.encode.build_attention_mask`).
 - `stats.json`: parameters, counts per stage and the ESCOM similarity distribution.
 
@@ -70,6 +71,17 @@ def fits_one_window(features: Mapping[str, int]) -> bool:
 # --- data access --------------------------------------------------------------------------------
 
 
+def canonicalize_or_raw(code: str, canonicalizer=None, lang: str = "cpp") -> tuple[str, bool]:
+    """Canonical identifier renaming (`v2_norm`, as the deployed engine does); the raw code and
+    False when the canonicalizer raises, so one unparsable file never aborts the run."""
+    if canonicalizer is None:
+        from models.logic_eval.canonical import canonicalize_code as canonicalizer
+    try:
+        return canonicalizer(code, lang), True
+    except Exception:
+        return code, False
+
+
 def read_code(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
@@ -101,10 +113,12 @@ def build_sample(path: Path, problem: str, role: str, codenet_root: Path, tokeni
     from models.graphcodebert.v2.baselines import jaccard_set
 
     code = read_code(path)
-    f = featurize(code, tokenizer, config)
+    canonical, canonicalized = canonicalize_or_raw(code)
+    f = featurize(canonical, tokenizer, config)  # fit is judged on the canonical code actually embedded
     if f is None or not fits_one_window(f):
         return None
     return {
+        "canonicalized": canonicalized,
         "problem": problem,
         "role": role,
         "submission_id": path.stem,
@@ -225,6 +239,8 @@ def main() -> None:
             pickle.dump(rows, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
     stats["problems_kept"] = len(kept)
+    stats["input"] = "v2_norm (identifiers_v1 canonical renaming, then v2 DFG features)"
+    stats["canonicalization_fallback_kept"] = sum(not s["canonicalized"] for v in kept.values() for s in v)
     stats["by_split"] = {
         name: {
             "problems": sum(v == name for v in split.values()),

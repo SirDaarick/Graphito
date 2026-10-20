@@ -65,6 +65,28 @@ def test_max_similarity_empty_reference_is_zero():
     assert prep.max_similarity(np.arange(3, dtype=np.uint64), []) == 0.0
 
 
+def test_canonicalize_or_raw_uses_the_canonicalizer():
+    code, ok = prep.canonicalize_or_raw("int x;", lambda c, lang: c.upper())
+    assert (code, ok) == ("INT X;", True)
+
+
+def test_canonicalize_or_raw_falls_back_to_raw_code_when_it_raises():
+    def boom(code, lang):
+        raise RuntimeError("unparsable")
+
+    assert prep.canonicalize_or_raw("int x;", boom) == ("int x;", False)
+
+
+def test_real_canonicalizer_makes_identifier_renaming_invisible():
+    a = "int suma(int a, int b) { int total = a + b; return total; }\nint main() { return suma(1, 2); }\n"
+    b = "int add(int x, int y) { int acc = x + y; return acc; }\nint main() { return add(1, 2); }\n"
+    ca, ok_a = prep.canonicalize_or_raw(a)
+    cb, ok_b = prep.canonicalize_or_raw(b)
+    assert ok_a and ok_b
+    assert ca == cb
+    assert "total" not in ca and "main" in ca
+
+
 @pytest.mark.parametrize(
     "kept, total, dfg_kept, dfg_total, expected",
     [(100, 100, 20, 20, True), (99, 100, 20, 20, False), (100, 100, 19, 20, False), (0, 0, 0, 0, True)],

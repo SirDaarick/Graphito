@@ -10,6 +10,11 @@ contrastive LoRA training of the Channel A encoder. Training and evaluation are 
   - Accepted: `cpp1000\Project_CodeNet_C++1000\<problem>\*.cpp` (500 per problem, 1000 problems)
   - Wrong Answer: `wa\Project_CodeNet\data\<problem>\C++\*.cpp` (15 per problem, `code_size` <= 4000)
   - Status metadata: `Project_CodeNet\metadata\<problem>.csv`
+- Base input is `v2_norm` (user request 2026-10-20, backed by `runs/robustness_v2norm/20261019-222018` and
+  `odd/tasks/gcb-v2-norm.md`): code is canonicalized with `models.logic_eval.canonical.canonicalize_code`
+  before DFG/tokenization, the single-window fit is judged on the canonical code, and a canonicalizer
+  failure falls back to raw code (counted in `stats.json`). Dedup shingles use the raw code (already
+  identifier-abstracted). The first full run on raw code was stopped and discarded.
 - Per problem keep up to 20 Accepted and 10 Wrong Answer that fit ONE `v2` window (no code or DFG
   truncation with `code_length=384`, `data_flow_length=128`).
 - Drop Wrong Answer with token-shingle Jaccard > 0.9 against any kept Accepted of the same problem.
