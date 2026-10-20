@@ -104,7 +104,7 @@ export function channelAMethod(report: ReportScoring): string {
     return report.engine === "legacy" ? "Legado (GraphCodeBERT sin calibrar)" : "—";
 }
 
-export const GCB_LABEL = "Exploratorio, zero-shot, no decide";
+export const GCB_LABEL = "Normalización de identificadores · exploratorio, zero-shot, no decide";
 
 /** Spec AR1.4: shown with every report; the backend sends the full text in etiqueta_validacion. */
 export const VALIDATION_LABEL = "No validado contra plagio derivado de la referencia";

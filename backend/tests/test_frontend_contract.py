@@ -82,7 +82,7 @@ def test_indicators_default_to_neutral_and_lookups_ignore_prototype_keys():
 def test_ui_shows_method_engine_calibration_gcb_and_label():
     texts = "\n".join(_all_sources().values())
     assert "Jaccard léxico, 5 tokens" in texts
-    assert "Exploratorio, zero-shot, no decide" in texts
+    assert "Normalización de identificadores · exploratorio, zero-shot, no decide" in texts
     assert "No validado contra plagio derivado de la referencia" in texts
     assert "STUB" in _read("pages/SimilarityReportModal.tsx")
     assert "estado_calibracion" in _read("pages/SimilarityReportModal.tsx")
