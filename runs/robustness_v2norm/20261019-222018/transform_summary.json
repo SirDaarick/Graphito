@@ -1,0 +1,36 @@
+{
+  "conditions": {
+    "T0": {
+      "n_files": 6797,
+      "n_applied_gt_0": 0,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T1": {
+      "n_files": 6797,
+      "n_applied_gt_0": 5826,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T5": {
+      "n_files": 6797,
+      "n_applied_gt_0": 6766,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T7@1.0": {
+      "n_files": 6797,
+      "n_applied_gt_0": 6766,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    }
+  }
+}

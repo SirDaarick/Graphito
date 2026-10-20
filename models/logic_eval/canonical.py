@@ -9,7 +9,7 @@ import tree_sitter as ts
 
 from models.evaluation.normalize import KEYWORDS
 from models.graphcodebert.v2.dfg import parse_source
-from models.robustness.transforms import _apply_byte_edits, _in_error_subtree
+from models.robustness.transforms import _apply_byte_edits, _in_error_subtree, _is_error
 
 STDLIB_SYMBOLS: Set[str] = {
     # stdio
@@ -77,7 +77,9 @@ def _find_identifiers_in_subtree(node: ts.Node, name: str, source: bytes) -> Lis
     stack = [node]
     while stack:
         curr = stack.pop()
-        if not _in_error_subtree(curr) and curr.type == "identifier":
+        if _is_error(curr):
+            continue  # every descendant is inside an error subtree too: prune (same result, O(n))
+        if curr.type == "identifier":
             if source[curr.start_byte:curr.end_byte].decode("utf-8", errors="replace") == name:
                 parent = curr.parent
                 if parent is not None and parent.type == "field_expression":
