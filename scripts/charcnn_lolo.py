@@ -1,4 +1,4 @@
-"""Leave-one-LLM-out experiment for CharCNN v2 (train on one generator, test on another).
+﻿"""Leave-one-LLM-out experiment for CharCNN v2 (train on one generator, test on another).
 
     python scripts/charcnn_lolo.py preregister --stamp S
     python scripts/charcnn_lolo.py run --condition D --seed 42 --root <corpus root> --stamp S
@@ -40,6 +40,11 @@ CONDITIONS: Dict[str, Dict[str, Any]] = {
           "seen": "qwen3", "unseen": "deepseek-chat"},
 }
 ROC_BOUND, RECALL_BOUND = 0.02, 0.10
+CAT_NAMES = {
+    "D": "D\nentrena: {seen}\nno visto: {unseen}",
+    "DM": "D-matched\nentrena: {seen}\n(mismo n que {unseen})",
+    "Q": "Q\nentrena: {seen}\nno visto: {unseen}",
+}
 
 PREREGISTRO = """## Diseño preregistrado
 
@@ -305,8 +310,8 @@ def write_report(path: Path, data: Dict[str, Any], smoke: bool) -> None:
           "por lo que no se evalúa sensibilidad al prompt.",
           "- Solo mide transferencia entre estos dos generadores; no permite concluir sobre otros LLM.",
           "- Los humanos de test son del mismo curso que los de entrenamiento.",
-          "- Con 100 archivos de qwen3 en test, el recall tiene una resolución de ±0.03 aproximadamente por archivo "
-          "(y la desviación entre 3 semillas es una estimación pobre de la varianza).",
+          "- Con 100 archivos de qwen3 en test, cada archivo equivale a 0.01 de recall, y la "
+          "desviación estándar entre 3 semillas es una estimación pobre de la varianza.",
           "- No se calculó IC bootstrap.", ""]
     path.write_text("\n".join(L), encoding="utf-8")
 
@@ -320,15 +325,15 @@ def write_figure(path: Path, data: Dict[str, Any]) -> None:
     cats: List[Dict[str, Any]] = []
     if data["reference"]:
         pg = data["reference"]["per_generator"]
-        cats.append({"name": "R. Referencia\n(todos los generadores)", "bars": [
+        cats.append({"name": "R. Referencia\n(modelo desplegado,\ntodos los generadores)", "bars": [
             ("deepseek", pg["deepseek-chat"], None, ref_c, ""), ("qwen3", pg["qwen3"], None, ref_c, "//")]})
     for cond in ("D", "DM", "Q"):
         c = data["conditions"].get(cond)
         if c:
-            cats.append({"name": c["label"].replace(": ", ":\n", 1), "bars": [
-                (f"visto\n({c['seen']})", c["summary"]["seen"], True, seen_c, ""),
-                (f"no visto\n({c['unseen']})", c["summary"]["unseen"], True, unseen_c, "")]})
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5.2))
+            cats.append({"name": CAT_NAMES[cond].format(**c), "bars": [
+                ("visto", c["summary"]["seen"], True, seen_c, ""),
+                ("no visto", c["summary"]["unseen"], True, unseen_c, "")]})
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
     for ax, key, ylab, lo in ((axes[0], "roc_auc", "ROC-AUC (eje desde 0.5)", 0.5),
                               (axes[1], "recall", "Recall con FPR humano ≈ 1% (umbral fpr_0.01)", 0.0)):
         x = 0
@@ -346,7 +351,7 @@ def write_figure(path: Path, data: Dict[str, Any]) -> None:
                 labels.append(label)
                 xs.append(x)
                 x += 1
-            ax.text(sum(xs) / len(xs), lo - (1 - lo) * 0.2, cat["name"], ha="center", va="top", fontsize=8.5,
+            ax.text(sum(xs) / len(xs), lo - (1 - lo) * 0.09, cat["name"], ha="center", va="top", fontsize=8.5,
                     fontweight="bold")
             x += 0.8
         ax.set_xticks(ticks)
@@ -355,11 +360,16 @@ def write_figure(path: Path, data: Dict[str, Any]) -> None:
         ax.set_ylabel(ylab)
         ax.grid(axis="y", alpha=0.25)
         ax.spines[["top", "right"]].set_visible(False)
+    from matplotlib.patches import Patch
+    fig.legend(handles=[Patch(color=seen_c, label="generador visto en entrenamiento"),
+                            Patch(color=unseen_c, label="generador no visto"),
+                            Patch(color=ref_c, label="referencia (todos los generadores)")],
+                   loc="lower center", bbox_to_anchor=(0.5, 0.035), ncol=3, fontsize=9, frameon=False)
     fig.suptitle("CharCNN v2: detección de generadores vistos y no vistos en entrenamiento "
                  "(test, IA contra todos los humanos)", fontsize=12)
     fig.text(0.5, 0.005, "Barras de error: desviación estándar entre 3 semillas. La referencia es un único modelo "
              "entrenado con todos los generadores.", ha="center", fontsize=8)
-    fig.tight_layout(rect=(0, 0.08, 1, 0.95))
+    fig.tight_layout(rect=(0, 0.09, 1, 0.95))
     fig.savefig(path, dpi=150)
     plt.close(fig)
 
