@@ -1,48 +1,13 @@
-import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, CheckCircle2, Download, PlayCircle, Settings, Sparkles, Info, ShieldCheck, UserCheck, Code2, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { ArrowLeft, Download, ShieldCheck, UserCheck, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { AuthCard } from "../components/layout/AuthCard";
 import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
 import { saveVerdict } from "../lib/verdicts";
-import {
-    GCB_LABEL,
-    VALIDATION_LABEL,
-    calibrationLabel,
-    channelAMethod,
-    describeDictamen,
-    engineLabel,
-    formatFlag,
-    formatNumber,
-    isAbstained,
-    toPct,
-} from "../lib/dictamen";
+import { evidenceByLine } from "../lib/evidence";
 import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
-import { EvidenceDrawer } from "../components/xai/EvidenceDrawer";
-
-// Helper hook for the typewriter effect (optimized for performance)
-function useTypewriter(text: string, speed: number = 15) {
-    const [displayedText, setDisplayedText] = useState("");
-
-    useEffect(() => {
-        setDisplayedText(""); // Reset when text changes
-        if (!text) return;
-        
-        let i = 0;
-        const interval = setInterval(() => {
-            if (i < text.length) {
-                setDisplayedText(text.slice(0, i + 1));
-                i++;
-            } else {
-                clearInterval(interval);
-            }
-        }, speed);
-
-        return () => clearInterval(interval);
-    }, [text, speed]);
-
-    return displayedText;
-}
+import { ReportMetrics } from "../components/report/ReportMetrics";
 
 export interface IndicadorItem {
     id?: number;
@@ -71,6 +36,20 @@ interface SimilarityReportModalProps {
     onSelectComparison?: (comparison: ComparisonData) => void;
 }
 
+interface CodeData {
+    reference_code: string;
+    student_code: string;
+    reference_author: string;
+    student_author: string;
+    language: string;
+    indicadores?: IndicadorIntegridad[];
+}
+
+const KBD = "px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700";
+
+const FOOTER_TOOLTIP =
+    "absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]";
+
 export function SimilarityReportModal({
     isOpen,
     onClose,
@@ -81,24 +60,7 @@ export function SimilarityReportModal({
     const [isAnimating, setIsAnimating] = useState(false);
     const [shouldRender, setShouldRender] = useState(isOpen);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-    const [viewMode, setViewMode] = useState<"report" | "code_diff">("report");
-    const [isUltraWide, setIsUltraWide] = useState(false);
-    const [highlightedLine, setHighlightedLine] = useState<number | null>(null);
-    const [codeData, setCodeData] = useState<{
-        reference_code: string;
-        student_code: string;
-        reference_author: string;
-        student_author: string;
-        language: string;
-        metricas_codigo?: {
-            total_lineas: number;
-            lineas_codigo: number;
-            lineas_comentarios: number;
-            densidad_comentarios: string;
-            complejidad_ciclomatica: number;
-        };
-        indicadores?: IndicadorIntegridad[];
-    } | null>(null);
+    const [codeData, setCodeData] = useState<CodeData | null>(null);
     const [isLoadingCode, setIsLoadingCode] = useState(false);
     const [comments, setComments] = useState<ComentarioRevisionItem[]>([]);
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -192,9 +154,7 @@ export function SimilarityReportModal({
                 fetchCode(repId);
             }
         } else {
-            setViewMode("report");
             setCodeData(null);
-            setHighlightedLine(null);
         }
     }, [isOpen, comparison?.id]);
 
@@ -248,7 +208,6 @@ export function SimilarityReportModal({
                 reference_author: data.reference_author || "Docente (Referencia)",
                 student_author: data.student_author || comparison?.title || "Estudiante",
                 language: data.language || "c",
-                metricas_codigo: data.metricas_codigo,
                 indicadores: data.indicadores,
             });
         } catch (err) {
@@ -317,23 +276,16 @@ int main() {
                 reference_author: "Prof. Manuel Portillo (ESCOM)",
                 student_author: comparison?.title || "Estudiante Evaluado",
                 language: "c",
-                metricas_codigo: {
-                    total_lineas: 28,
-                    lineas_codigo: 21,
-                    lineas_comentarios: 1,
-                    densidad_comentarios: "4.8%",
-                    complejidad_ciclomatica: 3,
-                },
                 indicadores: [
                     {
-                        tipo_alerta: "Patrón de Estructura Canónica",
+                        tipo_alerta: "Estructura idéntica a la referencia",
                         descripcion: "Bucle iterativo con cálculo de punto medio idéntico a la referencia.",
                         severidad: "MEDIA",
                         numero_linea: 7,
                         categoria: "ISOMORFISMO_DFG",
                     },
                     {
-                        tipo_alerta: "Estilo Sintáctico Generativo",
+                        tipo_alerta: "Estilo de código generado",
                         descripcion: "Nomenclatura y formateo afín a generadores LLM.",
                         severidad: "BAJA",
                         numero_linea: 4,
@@ -407,50 +359,18 @@ int main() {
 
         if (isOpen) {
             gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" });
-            gsap.fromTo(contentRef.current, { opacity: 0, scale: 0.95, y: 32 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "back.out(1.2)" });
+            gsap.fromTo(contentRef.current, { opacity: 0, scale: 0.97, y: 24 }, { opacity: 1, scale: 1, y: 0, duration: 0.35, ease: "power2.out" });
         } else {
             gsap.to(backdropRef.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
-            gsap.to(contentRef.current, { opacity: 0, scale: 0.95, y: 32, duration: 0.3, ease: "power2.in", onComplete: () => setShouldRender(false) });
+            gsap.to(contentRef.current, { opacity: 0, scale: 0.97, y: 24, duration: 0.3, ease: "power2.in", onComplete: () => setShouldRender(false) });
         }
     }, [isOpen, shouldRender]);
 
-    // Scores straight from the backend: null means "not evaluated" and is shown as a dash.
-    const semanticPct = toPct(comparison?.similitud_semantica);
-    const aiPct = toPct(comparison?.probabilidad_ia);
-    const abstained = comparison ? isAbstained(comparison) : false;
-    const auditInfo = describeDictamen(comparison?.dictamen, comparison?.estado);
-    const methodA = comparison ? channelAMethod(comparison) : "—";
-    const isStub = comparison?.engine === "stub";
-    const isDemo = comparison?.engine === "demo";
-    const keyA = comparison?.clave_umbral_a ? ` (${comparison.clave_umbral_a})` : "";
-    const keyB = comparison?.clave_umbral_b ? ` (${comparison.clave_umbral_b})` : "";
-    const channelBText = abstained
-        ? "ABSTENIDO: código demasiado corto para CharCNN; no aporta bandera."
-        : aiPct === null
-        ? `No evaluado (${comparison?.estado_canal_b ?? "sin estado"}).`
-        : `${aiPct}% calibrado, umbral ${formatNumber(comparison?.umbral_b)}${keyB}, bandera ${formatFlag(comparison?.flag_b)}.`;
-    const channelAText = semanticPct === null
-        ? `No evaluado (${comparison?.estado_canal_a ?? "sin estado"}).`
-        : `${semanticPct}% de similitud bruta, umbral calibrado ${formatNumber(comparison?.umbral_a)}${keyA}, bandera ${formatFlag(comparison?.flag_a)}.`;
-
-    // Typewriter effect description (built only from the report's fields and flags)
-    const fullInterpretationText = comparison?.dictamen
-        ? `Resumen de Soporte Docente: ${auditInfo.label}
-
-Canal A (${methodA}): ${channelAText}
-Canal B (CharCNN v2): ${channelBText}
-GraphCodeBERT: similitud estimada ${formatNumber(comparison.gcb_similarity)}.
-
-${auditInfo.flagged
-    ? 'Información: al menos un canal superó su umbral calibrado. Esta información apoya la revisión; la evaluación final corresponde al docente.'
-    : auditInfo.tone === 'clear'
-    ? 'Información: ningún canal superó su umbral calibrado. Esta información apoya la revisión; la evaluación final corresponde al docente.'
-    : 'Información: el sistema no emite resumen automático para esta entrega; revise el código directamente.'}
-
-${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
-        : `Este informe técnico proporciona evidencia cuantitativa para asistir la evaluación académica del docente. La resolución pedagógica final es potestad exclusiva de la cátedra.`;
-
-    const typewriterText = useTypewriter(isOpen ? fullInterpretationText : "", 3);
+    // Line-level evidence for the code view: the report's own rows, or the ones that came with the code.
+    const lineEvidence = useMemo(() => {
+        const own = comparison?.indicadores ?? [];
+        return evidenceByLine(own.length > 0 ? own : codeData?.indicadores ?? []);
+    }, [comparison?.indicadores, codeData?.indicadores]);
 
     const handleDownloadPdf = async () => {
         if (!comparison?.id) return;
@@ -470,593 +390,174 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
 
     if (!shouldRender || !comparison) return null;
 
-    // SVG Circle Graphic calculations
-    const radius = 90;
-    const circumference = 2 * Math.PI * radius;
-    const ringPct = semanticPct ?? 0; // an empty ring when Channel A was not evaluated
-    const strokeDashoffset = isAnimating ? circumference - (ringPct / 100) * circumference : circumference;
+    const isSample = comparison.engine === "stub" || comparison.engine === "demo";
+    const reportId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : (comparison.id ?? 1);
+    const navButton =
+        "p-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60";
 
     return (
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center ${viewMode === 'code_diff' ? 'p-2 sm:p-3 md:p-4' : 'p-4'}`}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
             {/* Backdrop */}
             <div
                 ref={backdropRef}
-                className={`absolute inset-0 bg-black/80 backdrop-blur-sm opacity-0`}
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm opacity-0"
                 onClick={onClose}
             />
 
             {/* Modal Content */}
             <div
                 ref={contentRef}
-                className={`w-full ${
-                    viewMode === 'code_diff'
-                        ? (isUltraWide ? 'w-[98vw] max-w-[99vw]' : 'w-[92vw] sm:w-[94vw] max-w-[96vw] 2xl:max-w-[2500px]')
-                        : 'max-w-5xl'
-                } opacity-0 transform translate-y-8 scale-95 transition-all duration-300`}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="report-modal-title"
+                className="relative w-full max-w-[1200px] opacity-0"
             >
-                <AuthCard className="w-full p-0 overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
-
-                    <div className={`flex flex-col h-full ${viewMode === 'code_diff' ? 'h-[95vh] max-h-[96vh]' : 'max-h-[92vh]'} relative`}>
+                <AuthCard className="w-full !p-0 !rounded-3xl overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
+                    <div className="flex flex-col max-h-[92dvh] relative">
                         {/* Floating Toast para Veredicto y Avance Ágil */}
                         {triageToast && (
-                            <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border flex items-center gap-2.5 backdrop-blur-md transition-all ${
-                                triageToast.type === "success"
-                                    ? "bg-emerald-950/95 text-emerald-200 border-emerald-500/50 shadow-emerald-950/60"
-                                    : "bg-amber-950/95 text-amber-200 border-amber-500/50 shadow-amber-950/60"
-                            }`}>
+                            <div
+                                role="status"
+                                className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border flex items-center gap-2.5 backdrop-blur-md transition-all ${
+                                    triageToast.type === "success"
+                                        ? "bg-emerald-950/95 text-emerald-200 border-emerald-500/50 shadow-emerald-950/60"
+                                        : "bg-amber-950/95 text-amber-200 border-amber-500/50 shadow-amber-950/60"
+                                }`}
+                            >
                                 {triageToast.type === "success" ? <ShieldCheck size={18} className="text-emerald-400" /> : <UserCheck size={18} className="text-amber-400" />}
                                 <span>{triageToast.message}</span>
-                                {hasNext && <span className="opacity-80 font-mono text-[10px] ml-1 bg-white/10 px-1.5 py-0.5 rounded">→ Pasando a siguiente entrega</span>}
+                                {hasNext && <span className="opacity-80 text-[10px] ml-1 bg-white/10 px-1.5 py-0.5 rounded">Pasando a la siguiente entrega</span>}
                             </div>
                         )}
 
-                        {/* Top Navigation Bar — Zen Unified Header */}
-                        <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-[#0f1422] shrink-0 gap-3">
-                            {/* Left: Volver */}
-                            <button
-                                onClick={onClose}
-                                aria-label="Volver a la biblioteca"
-                                className="group relative p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0"
-                            >
-                                <ArrowLeft size={16} />
-                                <div role="tooltip" className="absolute top-full left-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[120]">
-                                    <span>Volver a la biblioteca</span>
-                                    <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-white/10 rounded border border-white/20">Esc</kbd>
+                        {/* Top bar: back, title, submission carousel */}
+                        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-[#0f1422] shrink-0">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <button
+                                    onClick={onClose}
+                                    aria-label="Volver a la biblioteca"
+                                    className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60"
+                                >
+                                    <ArrowLeft size={18} />
+                                </button>
+                                <div className="min-w-0">
+                                    <h2 id="report-modal-title" className="text-lg sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                                        Reporte de similitud
+                                    </h2>
+                                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium truncate">
+                                        Entrega de {comparison.title}
+                                    </p>
                                 </div>
-                            </button>
+                            </div>
 
-                            {/* Center: In Diff Mode, show Agile Carousel */}
-                            {viewMode === "code_diff" ? (
-                                <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto py-0.5">
-                                    {submissions && submissions.length > 0 && currentIndex >= 0 && (
-                                        <div className="flex items-center gap-1.5 bg-slate-200/50 dark:bg-[#141b2a] px-2 py-1 rounded-xl border border-slate-300/40 dark:border-slate-800 shrink-0">
-                                            <button
-                                                onClick={() => navigateTo(currentIndex - 1)}
-                                                disabled={!hasPrev || isNavigating}
-                                                aria-label="Entrega anterior"
-                                                className="group relative p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                            >
-                                                <ChevronLeft size={14} />
-                                                <div role="tooltip" className="absolute top-full left-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
-                                                    <span>Entrega anterior</span>
-                                                    <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">←</kbd>
-                                                </div>
-                                            </button>
-                                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 px-1 font-mono">
-                                                {currentIndex + 1} / {submissions.length}
-                                            </span>
-                                            <span className="text-xs text-slate-500 dark:text-slate-400 max-w-[200px] truncate hidden sm:inline font-medium" title={comparison.title}>
-                                                {comparison.title}
-                                            </span>
-                                            <button
-                                                onClick={() => navigateTo(currentIndex + 1)}
-                                                disabled={!hasNext || isNavigating}
-                                                aria-label="Siguiente entrega"
-                                                className="group relative p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                            >
-                                                <ChevronRight size={14} />
-                                                <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
-                                                    <span>Siguiente entrega</span>
-                                                    <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">→</kbd>
-                                                </div>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                /* In Report Mode: Carousel */
-                                submissions && submissions.length > 0 && currentIndex >= 0 ? (
-                                    <div className="flex items-center gap-1.5 bg-slate-200/60 dark:bg-[#161d2d] px-2 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346]">
+                            <div className="flex items-center gap-2 shrink-0">
+                                {isSample && (
+                                    <span className="hidden sm:inline px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/40">
+                                        Datos de ejemplo
+                                    </span>
+                                )}
+                                {submissions && submissions.length > 0 && currentIndex >= 0 && (
+                                    <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-[#161d2d] px-1.5 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346]">
                                         <button
                                             onClick={() => navigateTo(currentIndex - 1)}
                                             disabled={!hasPrev || isNavigating}
-                                            aria-label="Entrega anterior"
-                                            className="group relative p-1.5 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                            aria-label="Entrega anterior (flecha izquierda)"
+                                            className={navButton}
                                         >
-                                            <ChevronLeft size={15} />
-                                            <div role="tooltip" className="absolute top-full left-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
-                                                <span>Entrega anterior</span>
-                                                <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">←</kbd>
-                                            </div>
+                                            <ChevronLeft size={16} />
                                         </button>
-                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 px-2 font-mono">
-                                            {currentIndex + 1} de {submissions.length} — {comparison.title}
+                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 px-1 tabular-nums">
+                                            {currentIndex + 1} de {submissions.length}
                                         </span>
                                         <button
                                             onClick={() => navigateTo(currentIndex + 1)}
                                             disabled={!hasNext || isNavigating}
-                                            aria-label="Siguiente entrega"
-                                            className="group relative p-1.5 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                            aria-label="Siguiente entrega (flecha derecha)"
+                                            className={navButton}
                                         >
-                                            <ChevronRight size={15} />
-                                            <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-[11px] font-sans font-medium whitespace-nowrap shadow-xl z-[120]">
-                                                <span>Siguiente entrega</span>
-                                                <kbd className="px-1 text-[9px] font-mono bg-white/10 rounded">→</kbd>
-                                            </div>
+                                            <ChevronRight size={16} />
                                         </button>
                                     </div>
-                                ) : null
-                            )}
-
-                            {/* Right Actions */}
-                            <div className="flex items-center gap-2 shrink-0">
-                                {viewMode === "code_diff" && (
-                                    <button
-                                        onClick={() => setIsUltraWide(!isUltraWide)}
-                                        aria-label={isUltraWide ? "Ajustar ancho a 94%" : "Expandir ancho a 98%"}
-                                        className="group relative p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-[#1a2234] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-sm"
-                                    >
-                                        {isUltraWide ? <Minimize2 size={16} className="text-cyan-400" /> : <Maximize2 size={16} className="text-cyan-400" />}
-                                        <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[120]">
-                                            <span>{isUltraWide ? "Ajustar ancho (94% pantalla)" : "Modo Ultra-Ancho (98% pantalla)"}</span>
-                                        </div>
-                                    </button>
                                 )}
-
-                                {/* Botón de alternancia entre reporte y visualizador diff */}
-                                <button
-                                    onClick={() => {
-                                        if (viewMode === "report") {
-                                            setViewMode("code_diff");
-                                            const repId = typeof comparison.id === "string" ? parseInt(comparison.id, 10) : comparison.id;
-                                            if (repId !== undefined && !isNaN(repId)) {
-                                                fetchCode(repId);
-                                            }
-                                        } else {
-                                            setViewMode("report");
-                                        }
-                                    }}
-                                    aria-label={viewMode === "report" ? "Abrir comparación diff" : "Ver reporte completo"}
-                                    className="group relative p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 active:scale-95 transition-all shadow-sm"
-                                >
-                                    {viewMode === "report" ? (
-                                        <Code2 size={16} className="text-cyan-500" />
-                                    ) : (
-                                        <FileText size={16} className="text-violet-400" />
-                                    )}
-                                    <div role="tooltip" className="absolute top-full right-0 mt-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#090e1a]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[120]">
-                                        <span>{viewMode === "report" ? "Abrir cotejo de código (Diff Synthwave '84)" : "Ver reporte técnico completo"}</span>
-                                    </div>
-                                </button>
                             </div>
                         </div>
 
-                        {/* Hero Metrics HUD Telemetry Bar (Exclusive in Code Diff Mode) */}
-                        {viewMode === "code_diff" && (
-                            <div className="px-5 sm:px-8 py-3 bg-slate-100/90 dark:bg-[#0a0f1d] border-b border-slate-200 dark:border-[#1a2337] flex items-center justify-between gap-4 overflow-x-auto shrink-0 scrollbar-none">
-                                <div className="flex items-center gap-5 sm:gap-8 lg:gap-10">
-                                    {/* Metric 1: Resumen de similitud (cada canal decide con su propia bandera) */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex flex-col">
-                                            <div className="flex items-baseline gap-2">
-                                                <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border font-sans ${
-                                                    auditInfo.flagged
-                                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                                        : auditInfo.tone === 'clear'
-                                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                                        : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
-                                                }`}>
-                                                    {auditInfo.label}
-                                                </span>
-                                                {(isStub || isDemo) && (
-                                                    <span className="text-[10px] font-extrabold font-mono px-2 py-0.5 rounded-md border bg-amber-500/15 text-amber-500 border-amber-500/40">
-                                                        {isStub ? "STUB" : "DEMO"}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                                Resumen de similitud (banderas calibradas)
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Metric 2: Canal A (Jaccard léxico) */}
-                                    <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-cyan-500 dark:text-cyan-400 tracking-tight">
-                                                {semanticPct === null ? "—" : `${semanticPct}%`}
-                                            </span>
-                                        </div>
-                                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Canal A · {methodA}
-                                        </span>
-                                    </div>
-
-                                    {/* Metric 3: Canal B (CharCNN v2) */}
-                                    <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-violet-500 dark:text-violet-400 tracking-tight">
-                                                {abstained ? "Abstenido" : aiPct === null ? "—" : `${aiPct}%`}
-                                            </span>
-                                        </div>
-                                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Canal B · CharCNN v2 (calibrado)
-                                        </span>
-                                    </div>
-
-                                    {/* Metric 4: GraphCodeBERT (secundaria, no decide) */}
-                                    <div className="flex flex-col border-l border-slate-300/70 dark:border-slate-800/90 pl-5 sm:pl-8">
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-xl sm:text-2xl lg:text-3xl font-black font-mono text-slate-400 tracking-tight">
-                                                {formatNumber(comparison.gcb_similarity, 2)}
-                                            </span>
-                                        </div>
-                                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                            GraphCodeBERT · {GCB_LABEL}
-                                        </span>
-                                    </div>
+                        {/* Body: metrics first on phones, code comparison large beside them on desktop */}
+                        <div
+                            ref={bodyContainerRef}
+                            className="flex-1 overflow-y-auto p-3 sm:p-5 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent"
+                        >
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
+                                <div className="order-1 lg:order-2 lg:col-span-4">
+                                    <ReportMetrics report={comparison} animate={isAnimating} />
                                 </div>
 
-                                {/* HITL Assistant Tag */}
-                                <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-200/50 dark:bg-[#12192b] border border-slate-300/50 dark:border-slate-800 text-[11px] text-slate-400 font-sans">
-                                    <Sparkles size={13} className="text-cyan-400 shrink-0" />
-                                    <span>Telemetría HITL</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Header (solo en modo reporte completo) */}
-                        {viewMode === "report" && (
-                            <div className="px-10 pt-8 pb-6 flex items-start justify-between shrink-0">
-                                <div>
-                                    <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white tracking-tight">
-                                        Reporte de similitud
-                                    </h2>
-                                    <div className="flex items-center gap-4 mt-2 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                                        <span>Proyecto: {comparison.title}</span>
-                                        <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-600"></span>
-                                        <span>14 de Abril, 2026</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {(isStub || isDemo) && (
-                                        <span className="px-3 py-1.5 rounded-full text-xs font-black font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
-                                            {isStub ? "STUB · no es un modelo" : "DEMO · datos de ejemplo"}
-                                        </span>
-                                    )}
-                                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-[#1a2031] border border-slate-200 dark:border-[#2b3346] px-4 py-2 rounded-full">
-                                        <div className="w-2 h-2 rounded-full bg-graphito-blue"></div>
-                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                            {comparison.estado && comparison.estado !== "COMPLETADO" ? `Análisis ${comparison.estado.toLowerCase()}` : "Análisis completado"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Body */}
-                        <div ref={bodyContainerRef} className={`flex-1 overflow-y-auto ${viewMode === 'code_diff' ? 'p-3' : 'px-10 pb-8'} scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent`}>
-                            {viewMode === "code_diff" ? (
-                                <div className="flex flex-col h-full">
-                                    {/* Visualizador Diff Synthwave '84 */}
+                                <div className="order-2 lg:order-1 lg:col-span-8 min-w-0">
                                     {isLoadingCode ? (
-                                        <div className="flex flex-col items-center justify-center py-28 text-slate-400">
-                                            <div className="w-8 h-8 border-2 border-fuchsia-400 border-t-transparent rounded-full animate-spin mb-3" />
-                                            <span className="text-xs font-mono">Cargando códigos fuente para cotejo diff...</span>
+                                        <div className="flex flex-col items-center justify-center py-24 text-slate-500 dark:text-slate-400" role="status">
+                                            <div className="w-8 h-8 border-2 border-graphito-blue border-t-transparent rounded-full animate-spin mb-3" />
+                                            <span className="text-sm">Cargando el código de la entrega...</span>
                                         </div>
                                     ) : (
-                                        <div className="flex-1 min-h-[520px]">
+                                        <div className="h-full">
                                             <SideBySideDiffViewer
                                                 referenceCode={codeData?.reference_code || ""}
                                                 studentCode={codeData?.student_code || ""}
                                                 referenceAuthor={codeData?.reference_author}
                                                 studentAuthor={codeData?.student_author}
                                                 language={codeData?.language || "c"}
-                                                reportId={typeof comparison.id === "string" ? parseInt(comparison.id, 10) : (comparison.id ?? 1)}
+                                                reportId={reportId}
                                                 comments={comments}
                                                 onAddComment={handleAddComment}
                                                 onDeleteComment={handleDeleteComment}
                                                 isSubmittingComment={isSubmittingComment}
-                                                highlightedLine={highlightedLine}
+                                                evidence={lineEvidence}
+                                                paneHeight="clamp(300px, 52vh, 560px)"
                                             />
+                                            {lineEvidence.size > 0 && (
+                                                <p className="mt-2 px-1 text-xs text-slate-500 dark:text-slate-400">
+                                                    Las líneas resaltadas en amarillo tienen una observación: pasa el cursor o enfócalas con el teclado para leerla.
+                                                </p>
+                                            )}
                                         </div>
                                     )}
                                 </div>
-                            ) : (
-                                <>
-                                    {/* DSS Institutional Banner */}
-                                    <div className="flex items-center gap-3 px-5 py-3 mb-6 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-xs font-medium text-blue-700 dark:text-blue-200">
-                                        <Info size={18} className="shrink-0 text-blue-500 dark:text-blue-400" />
-                                        <span><strong>Sistema de Soporte a la Decisión (HITL):</strong> Graphito provee indicadores de similitud automatizados sin emitir sentencias disciplinarias. La evaluación y calificación final corresponden al criterio pedagógico del profesor.</span>
-                                    </div>
-
-                                    {/* Procedencia: motor, calibración y etiqueta de validación (spec AR2.3) */}
-                                    <div className="flex flex-wrap items-center gap-2 mb-6 text-[11px] font-medium">
-                                        <span className={`px-2.5 py-1 rounded-full border font-mono font-bold ${
-                                            isStub || isDemo
-                                                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40"
-                                                : "bg-slate-100 dark:bg-[#1a2031] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#2b3346]"
-                                        }`}>
-                                            {engineLabel(comparison.engine)}
-                                        </span>
-                                        <span className="px-2.5 py-1 rounded-full border bg-slate-100 dark:bg-[#1a2031] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#2b3346]">
-                                            Calibración: {calibrationLabel(comparison.estado_calibracion)}
-                                        </span>
-                                        <span className="px-2.5 py-1 rounded-full border bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30">
-                                            {VALIDATION_LABEL}
-                                        </span>
-                                    </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-                                {/* Left Column: Big Chart */}
-                                <div className="lg:col-span-4 flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl h-full">
-
-                                    {/* Circular Graph */}
-                                    <div className="relative w-64 h-64 flex items-center justify-center">
-                                        {/* Background Circle */}
-                                        <svg className="w-full h-full transform -rotate-90">
-                                            <circle
-                                                cx="128"
-                                                cy="128"
-                                                r={radius}
-                                                className="stroke-slate-200 dark:stroke-[#2b3346] fill-none"
-                                                strokeWidth="16"
-                                            />
-
-                                            {/* Gradient defs */}
-                                            <defs>
-                                                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                    <stop offset="0%" stopColor="#3b82f6" />
-                                                    <stop offset="100%" stopColor="#a78bfa" />
-                                                </linearGradient>
-                                            </defs>
-
-                                            {/* Foreground Circle - Animated */}
-                                            <circle
-                                                cx="128"
-                                                cy="128"
-                                                r={radius}
-                                                className="fill-none transition-all duration-1000 ease-out"
-                                                stroke="url(#scoreGradient)"
-                                                strokeWidth="16"
-                                                strokeLinecap="round"
-                                                strokeDasharray={circumference}
-                                                strokeDashoffset={strokeDashoffset}
-                                            />
-                                        </svg>
-
-                                        {/* Score Text */}
-                                        <div className="absolute flex flex-col items-center justify-center text-center px-4">
-                                            <span className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                                                {semanticPct === null ? "—" : `${semanticPct}%`}
-                                            </span>
-                                            <span className={`text-xs font-bold uppercase tracking-wider mt-1.5 ${auditInfo.color}`}>
-                                                {auditInfo.label}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-2">Similitud léxica (Canal A)</h3>
-                                    <p className="text-sm text-center text-slate-600 dark:text-slate-400">
-                                        {methodA}: {channelAText}
-                                    </p>
-                                </div>
-
-                                {/* Right Column: Breakdown & Interpretation */}
-                                <div className="lg:col-span-8 flex flex-col gap-6">
-
-                                    {/* Top row: Two metric cards */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">
-
-                                        {/* Stylometry Card */}
-                                        <div className="bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 hover:bg-slate-100/50 dark:hover:bg-[#121827]/60 transition-colors">
-                                            <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 rounded-xl bg-graphito-violet/10 flex items-center justify-center text-graphito-violet">
-                                                    <Settings size={20} />
-                                                </div>
-                                                <h4 className="font-bold text-slate-900 dark:text-white">Análisis estilométrico</h4>
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
-                                                        <span>CharCNN v2 (puntaje calibrado)</span>
-                                                        {abstained ? (
-                                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-500/15 text-slate-500 dark:text-slate-300 border border-slate-500/30">
-                                                                ABSTENIDO
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-slate-900 dark:text-white">{aiPct === null ? "—" : `${aiPct}%`}</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-graphito-violet rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating && aiPct !== null ? `${aiPct}%` : '0%' }}
-                                                        ></div>
-                                                    </div>
-                                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{channelBText}</p>
-                                                </div>
-
-                                                <ul className="space-y-3 mt-6">
-                                                    {comparison.indicadores && comparison.indicadores.length > 0 ? (
-                                                        comparison.indicadores.map((ind, idx) => (
-                                                            <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                                <CheckCircle2 size={16} className={`${ind.severidad === 'ALTA' || ind.severidad === 'CRITICA' ? 'text-orange-500 dark:text-orange-400' : 'text-slate-400 dark:text-slate-500'} shrink-0 mt-0.5`} />
-                                                                <span><strong className="text-slate-900 dark:text-white">{ind.tipo_alerta}:</strong> {ind.descripcion}</span>
-                                                            </li>
-                                                        ))
-                                                    ) : (
-                                                        <>
-                                                            <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                                <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                                <span>Sin indicadores registrados para este reporte.</span>
-                                                            </li>
-                                                        </>
-                                                    )}
-                                                </ul>
-                                            </div>
-                                        </div>
-
-                                        {/* Semantic Card */}
-                                        <div className="bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 hover:bg-slate-100/50 dark:hover:bg-[#121827]/60 transition-colors">
-                                            <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 rounded-xl bg-graphito-blue/10 flex items-center justify-center text-graphito-blue">
-                                                    <PlayCircle size={20} />
-                                                </div>
-                                                <h4 className="font-bold text-slate-900 dark:text-white">Similitud con la referencia</h4>
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
-                                                        <span>Canal A · {methodA}</span>
-                                                        <span className="text-slate-900 dark:text-white">{semanticPct === null ? "—" : `${semanticPct}%`}</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#2b3346]/60 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-graphito-blue rounded-full transition-all duration-1000 ease-out"
-                                                            style={{ width: isAnimating && semanticPct !== null ? `${semanticPct}%` : '0%' }}
-                                                        ></div>
-                                                    </div>
-                                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{channelAText}</p>
-                                                </div>
-
-                                                <ul className="space-y-3 mt-6">
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                        <span>Máxima similitud Jaccard de shingles de 5 tokens normalizados contra las referencias del problema.</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                                                        <CheckCircle2 size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                                        <span>
-                                                            GraphCodeBERT ({GCB_LABEL}): {formatNumber(comparison.gcb_similarity)}
-                                                            {comparison.gcb_estado && comparison.gcb_estado !== "OK" ? ` · ${comparison.gcb_estado}` : ""}
-                                                        </span>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-
-                                    </div>
-
-                                    {/* Bottom row: AI Interpretation (Typewriter) */}
-                                    <div className="bg-slate-50 dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl p-6 flex-1 hover:border-slate-300 dark:hover:border-[#334155] transition-colors relative overflow-hidden group">
-                                        <div
-                                            className="absolute top-0 right-0 w-64 h-64 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                                            style={{
-                                                background: "radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.03) 40%, transparent 70%)"
-                                            }}
-                                        />
-
-                                        <div className="flex items-center gap-4 mb-4">
-                                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-graphito-blue to-graphito-violet flex items-center justify-center text-white shadow-lg shadow-graphito-blue/20">
-                                                <Sparkles size={24} />
-                                            </div>
-                                            <h4 className="text-lg font-bold text-slate-900 dark:text-white">Interpretación del análisis</h4>
-                                        </div>
-
-                                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed max-w-3xl whitespace-pre-line break-words format-text min-h-[120px]">
-                                            {typewriterText}
-                                            {/* Blinking cursor */}
-                                            <span className="inline-block w-1.5 h-4 bg-graphito-blue ml-1 animate-pulse align-middle"></span>
-                                        </div>
-                                    </div>
-
-                                </div>
                             </div>
-
-                            {/* Sección XAI: Desglose de Evidencias Técnicas */}
-                            <div className="mt-8">
-                                <EvidenceDrawer
-                                    semanticPct={semanticPct}
-                                    aiPct={aiPct}
-                                    flagA={comparison.flag_a}
-                                    flagB={comparison.flag_b}
-                                    estadoCanalA={comparison.estado_canal_a}
-                                    estadoCanalB={comparison.estado_canal_b}
-                                    umbralA={comparison.umbral_a}
-                                    umbralB={comparison.umbral_b}
-                                    indicadores={(
-                                        (comparison.indicadores && comparison.indicadores.length > 0)
-                                            ? comparison.indicadores
-                                            : (codeData?.indicadores && codeData.indicadores.length > 0)
-                                            ? codeData.indicadores
-                                            : []
-                                    ).map((ind, idx) => ({
-                                        id: ind.id ?? idx + 1,
-                                        tipo_alerta: ind.tipo_alerta,
-                                        descripcion: ind.descripcion,
-                                        severidad: (ind.severidad as "BAJA" | "MEDIA" | "ALTA" | "CRITICA") || "MEDIA",
-                                        numero_linea: ind.numero_linea ?? null,
-                                        // No default category: a row without origen "decision" is shown as a heuristic.
-                                        categoria: ind.categoria,
-                                        origen: ind.origen,
-                                    }))}
-                                    codeMetrics={codeData?.metricas_codigo}
-                                    onNavigateToLine={(lineNumber) => {
-                                        setHighlightedLine(lineNumber);
-                                        setViewMode("code_diff");
-                                    }}
-                                />
-                            </div>
-                        </>
-                    )}
-                </div>
+                        </div>
 
                         {/* Footer */}
-                        <div className={`flex items-center justify-between ${viewMode === 'code_diff' ? 'px-6 py-2.5 bg-slate-50 dark:bg-[#0f1422]' : 'px-10 py-5 bg-slate-50 dark:bg-black/40'} border-t border-slate-200 dark:border-[#2b3346]/40 mt-auto shrink-0`}>
-                            <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                                <span className="font-mono font-semibold text-slate-600 dark:text-slate-400">
-                                    {comparison.id ? `REP_${comparison.id}` : 'REP_LIVE-RUN'}
-                                </span>
-                                <div className="hidden md:flex items-center gap-2.5 text-[11px] text-slate-400 border-l border-slate-300 dark:border-slate-800 pl-4 font-mono">
-                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">←</kbd> <kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">→</kbd> navegar</span>
-                                    <span>•</span>
-                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">A</kbd> conforme</span>
-                                    <span>•</span>
-                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">R</kbd> aclaración</span>
-                                    <span>•</span>
-                                    <span><kbd className="px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700">Esc</kbd> cerrar</span>
-                                </div>
+                        <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-slate-50 dark:bg-[#0f1422] border-t border-slate-200 dark:border-[#2b3346]/40 shrink-0">
+                            <div className="hidden md:flex items-center gap-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                <span><kbd className={KBD}>←</kbd> <kbd className={KBD}>→</kbd> navegar</span>
+                                <span aria-hidden="true">•</span>
+                                <span><kbd className={KBD}>A</kbd> sin observaciones</span>
+                                <span aria-hidden="true">•</span>
+                                <span><kbd className={KBD}>R</kbd> aclarar</span>
+                                <span aria-hidden="true">•</span>
+                                <span><kbd className={KBD}>Esc</kbd> cerrar</span>
                             </div>
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2.5 ml-auto">
                                 {/* Validar Conforme */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("conforme")}
-                                    aria-label="Marcar sin observaciones (Atajo: A)"
-                                    className="group relative p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center"
+                                    aria-label="Marcar sin observaciones (tecla A)"
+                                    className="group relative p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                                 >
                                     <ShieldCheck size={19} />
-                                    <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-mono font-bold bg-emerald-500/30 text-emerald-700 dark:text-emerald-200 border border-emerald-500/50 rounded">A</span>
-                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-emerald-500/40 text-emerald-100 text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
+                                    <div role="tooltip" className={FOOTER_TOOLTIP}>
                                         <span>Marcar sin observaciones</span>
-                                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-emerald-500/30 text-emerald-200 rounded border border-emerald-500/40">A</kbd>
                                     </div>
                                 </button>
 
                                 {/* Citar a Aclaración */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("aclaracion")}
-                                    aria-label="Marcar para aclaración con el estudiante (Atajo: R)"
-                                    className="group relative p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center"
+                                    aria-label="Marcar para aclarar con el estudiante (tecla R)"
+                                    className="group relative p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
                                 >
                                     <UserCheck size={19} />
-                                    <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-mono font-bold bg-amber-500/30 text-amber-700 dark:text-amber-200 border border-amber-500/50 rounded">R</span>
-                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-amber-500/40 text-amber-100 text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
-                                        <span>Marcar para aclaración con el estudiante</span>
-                                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-amber-500/30 text-amber-200 rounded border border-amber-500/40">R</kbd>
+                                    <div role="tooltip" className={FOOTER_TOOLTIP}>
+                                        <span>Marcar para aclarar con el estudiante</span>
                                     </div>
                                 </button>
 
@@ -1065,33 +566,31 @@ ${comparison.etiqueta_validacion ?? VALIDATION_LABEL}`
                                     onClick={handleDownloadPdf}
                                     disabled={isDownloadingPdf || !comparison.id}
                                     aria-label="Descargar reporte en PDF"
-                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center"
+                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center"
                                 >
                                     {isDownloadingPdf ? (
                                         <div className="w-[19px] h-[19px] border-2 border-slate-400 dark:border-white/30 border-t-graphito-blue dark:border-t-white rounded-full animate-spin" />
                                     ) : (
                                         <Download size={19} />
                                     )}
-                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
-                                        <span>Descargar informe de similitud en PDF</span>
+                                    <div role="tooltip" className={FOOTER_TOOLTIP}>
+                                        <span>Descargar informe en PDF</span>
                                     </div>
                                 </button>
 
                                 {/* Cerrar */}
                                 <button
                                     onClick={onClose}
-                                    aria-label="Cerrar visor (Esc)"
-                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-rose-500 hover:border-rose-500/40 hover:bg-rose-500/10 active:scale-95 transition-all shadow-sm flex items-center justify-center"
+                                    aria-label="Cerrar (Esc)"
+                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-rose-500 hover:border-rose-500/40 hover:bg-rose-500/10 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
                                 >
                                     <X size={19} />
-                                    <div role="tooltip" className="absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]">
-                                        <span>Cerrar visor</span>
-                                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-white/10 text-white rounded border border-white/20">Esc</kbd>
+                                    <div role="tooltip" className={FOOTER_TOOLTIP}>
+                                        <span>Cerrar</span>
                                     </div>
                                 </button>
                             </div>
                         </div>
-
                     </div>
                 </AuthCard>
             </div>

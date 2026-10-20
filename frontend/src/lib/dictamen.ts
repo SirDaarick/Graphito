@@ -13,7 +13,7 @@ export interface ComparisonView extends ReportScoring {
     id: string | number;
     title: string;
     subtitle: string;
-    /** Channel A raw Jaccard as a whole percentage; null when not evaluated. */
+    /** Headline semantic similarity (GraphCodeBERT) as a whole percentage; null when not available. */
     similarity: number | null;
     indicadores?: IndicadorIntegridad[];
     grupo_id?: number;
@@ -25,7 +25,7 @@ export function toComparison(report: ReporteAnalisis, title: string, grupoId?: n
         id: String(report.id),
         title,
         subtitle: `Resumen de similitud: ${describeDictamen(report.dictamen, report.estado).label}`,
-        similarity: toPct(report.similitud_semantica),
+        similarity: gcbHeadline(report).pct,
         grupo_id: grupoId,
     };
 }
@@ -135,4 +135,50 @@ export function engineLabel(engine?: string | null): string {
 /** Channel B is abstained when the code is too short for CharCNN. */
 export function isAbstained(report: ReportScoring): boolean {
     return report.estado_canal_b === "ABSTENIDO";
+}
+
+/** Plain-language verdict for teachers: one sentence, built only from the backend verdict. */
+export interface PlainVerdict {
+    text: string;
+    tone: VerdictTone;
+    flagged: boolean;
+}
+
+const PLAIN_VERDICTS: Record<VerdictTone, string> = {
+    dual: "Conviene revisarla: se parece mucho a la referencia y su estilo es poco habitual.",
+    semantic: "Conviene revisarla: se parece mucho a la referencia.",
+    stylometric: "Conviene revisarla: su estilo de escritura es poco habitual.",
+    clear: "Sin señales de alerta en esta entrega.",
+    neutral: "No se pudo evaluar esta entrega con la información disponible.",
+    pending: "",
+};
+
+export function plainVerdict(dictamen?: string | null, estado?: string | null): PlainVerdict {
+    const info = describeDictamen(dictamen, estado);
+    const text = info.tone === "pending" ? `${info.label}.` : PLAIN_VERDICTS[info.tone];
+    return { text, tone: info.tone, flagged: info.flagged };
+}
+
+export interface GcbHeadline {
+    /** Whole percentage, or null when the measurement is not available (never 0 in that case). */
+    pct: number | null;
+    /** One plain sentence explaining why there is no number; null when there is one. */
+    reason: string | null;
+}
+
+const GCB_UNAVAILABLE: Record<string, string> = {
+    SIN_REFERENCIA: "Este problema todavía no tiene soluciones de referencia con las que comparar.",
+    SIN_INDICE: "Las referencias aún no están indexadas para esta medición.",
+    DESHABILITADO: "Esta medición está desactivada en este equipo.",
+    ERROR: "No se pudo calcular esta medición.",
+};
+
+const GCB_PENDING_REASON = "Aún no se calculó para esta entrega. Hay que reindexar las referencias y volver a analizar.";
+
+/** The headline semantic similarity (GraphCodeBERT). Unavailable is explicit, never a 0 %. */
+export function gcbHeadline(report: Pick<ReportScoring, "gcb_similarity" | "gcb_estado">): GcbHeadline {
+    const stateReason = lookupLabel(GCB_UNAVAILABLE, report.gcb_estado);
+    if (stateReason) return { pct: null, reason: stateReason };
+    const pct = toPct(report.gcb_similarity);
+    return pct === null ? { pct: null, reason: GCB_PENDING_REASON } : { pct, reason: null };
 }

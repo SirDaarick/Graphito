@@ -1,76 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { HEURISTIC_BADGE, channelText, indicatorBadge, isHeuristic } from "./evidence";
+import { evidenceByLine } from "./evidence";
 import type { IndicadorIntegridad } from "./api";
-
-const ON = "sobre el umbral";
-const OFF = "bajo el umbral";
-
-describe("channelText", () => {
-    it("follows a raised or cleared calibrated flag", () => {
-        expect(channelText({ score: 40, flag: true, estado: "EVALUADO", onFlag: ON, onClear: OFF })).toBe(ON);
-        expect(channelText({ score: 10, flag: false, estado: "EVALUADO", onFlag: ON, onClear: OFF })).toBe(OFF);
-    });
-
-    it("explains a scored channel without a flag as uncalibrated, never as not evaluated", () => {
-        const text = channelText({ score: 37, flag: null, estado: "NO_CALIBRADO", onFlag: ON, onClear: OFF });
-        expect(text).toMatch(/sin calibrar/i);
-        expect(text).not.toMatch(/no evaluado/i);
-    });
-
-    it("treats a legacy score with no flag and no state as uncalibrated", () => {
-        const text = channelText({ score: 0, flag: undefined, estado: undefined, onFlag: ON, onClear: OFF });
-        expect(text).toMatch(/sin calibrar/i);
-    });
-
-    it("treats an evaluated state without score or flag as uncalibrated", () => {
-        expect(channelText({ score: null, flag: null, estado: "NO_CALIBRADO", onFlag: ON, onClear: OFF })).toMatch(
-            /sin calibrar/i,
-        );
-    });
-
-    it("reports a channel without a score as not evaluated, with its state", () => {
-        const text = channelText({ score: null, flag: null, estado: "SIN_REFERENCIA", onFlag: ON, onClear: OFF });
-        expect(text).toMatch(/no evaluado/i);
-        expect(text).toContain("SIN_REFERENCIA");
-        expect(channelText({ score: null, flag: null, estado: null, onFlag: ON, onClear: OFF })).toContain("sin estado");
-    });
-});
 
 function ind(extra: Partial<IndicadorIntegridad>): IndicadorIntegridad {
     return { tipo_alerta: "X", descripcion: "d", severidad: "MEDIA", ...extra };
 }
 
-describe("indicatorBadge", () => {
-    it("gives the decision badge only to rows with origen decision", () => {
-        expect(indicatorBadge(ind({ categoria: "GENERAL", origen: "decision" })).label).toBe("Decisión (bandera calibrada)");
-        expect(indicatorBadge(ind({ categoria: "SIMILITUD_ARCHIVO", origen: "decision" })).label).toBe(
-            "Similitud léxica (archivo)",
-        );
+describe("evidenceByLine", () => {
+    it("keeps only indicators that point at a real line", () => {
+        const map = evidenceByLine([
+            ind({ numero_linea: 7, descripcion: "uno" }),
+            ind({ numero_linea: null }),
+            ind({ numero_linea: undefined }),
+            ind({ numero_linea: 0 }),
+            ind({ numero_linea: -3 }),
+            ind({ numero_linea: 2.5 }),
+        ]);
+        expect([...map.keys()]).toEqual([7]);
     });
 
-    it("defaults rows without categoria or origen to the neutral heuristic badge", () => {
-        expect(indicatorBadge(ind({}))).toEqual(HEURISTIC_BADGE);
-        expect(indicatorBadge(ind({ categoria: "GENERAL" }))).toEqual(HEURISTIC_BADGE);
-        expect(indicatorBadge(ind({ categoria: "GENERAL", origen: "heuristica" }))).toEqual(HEURISTIC_BADGE);
+    it("groups several indicators on the same line, most severe first", () => {
+        const map = evidenceByLine([
+            ind({ numero_linea: 4, severidad: "BAJA", tipo_alerta: "Baja", descripcion: "a" }),
+            ind({ numero_linea: 4, severidad: "CRITICA", tipo_alerta: "Crítica", descripcion: "b" }),
+            ind({ numero_linea: 4, severidad: "MEDIA", tipo_alerta: "Media", descripcion: "c" }),
+        ]);
+        expect(map.get(4)?.map((e) => e.title)).toEqual(["Crítica", "Media", "Baja"]);
     });
 
-    it("labels known heuristic categories", () => {
-        expect(indicatorBadge(ind({ categoria: "ESTILO_LLM", origen: "heuristica" })).label).toBe(
-            "Heurística: patrón de documentación",
-        );
+    it("drops exact duplicates on a line", () => {
+        const dup = ind({ numero_linea: 3, tipo_alerta: "T", descripcion: "mismo texto" });
+        expect(evidenceByLine([dup, { ...dup }]).get(3)).toHaveLength(1);
     });
 
-    it.each(["constructor", "toString", "__proto__"])("falls back for prototype key %s", (key) => {
-        expect(indicatorBadge(ind({ categoria: key }))).toEqual(HEURISTIC_BADGE);
-        expect(indicatorBadge(ind({ categoria: key, origen: "decision" }))).toEqual(HEURISTIC_BADGE);
+    it("strips the technical heuristic wording and the line prefix from the text", () => {
+        const [entry] = evidenceByLine([
+            ind({
+                numero_linea: 178,
+                tipo_alerta: "Heurística: Patrón de Documentación LLM",
+                descripcion: "Heurística (no es salida del modelo). Línea 178: comentarios paso a paso frecuentes en código generado.",
+            }),
+        ]).get(178)!;
+        expect(entry.title).toBe("Patrón de Documentación LLM");
+        expect(entry.text).toBe("Comentarios paso a paso frecuentes en código generado.");
     });
-});
 
-describe("isHeuristic", () => {
-    it("is false only for decision rows", () => {
-        expect(isHeuristic(ind({ origen: "decision" }))).toBe(false);
-        expect(isHeuristic(ind({ origen: "heuristica" }))).toBe(true);
-        expect(isHeuristic(ind({}))).toBe(true);
-        expect(isHeuristic(ind({ categoria: "GENERAL" }))).toBe(true);
+    it("treats an unknown severity as the lowest one without throwing", () => {
+        const map = evidenceByLine([
+            ind({ numero_linea: 1, severidad: "constructor", tipo_alerta: "raro" }),
+            ind({ numero_linea: 1, severidad: "ALTA", tipo_alerta: "alta" }),
+        ]);
+        expect(map.get(1)?.map((e) => e.title)).toEqual(["alta", "raro"]);
+    });
+
+    it("returns an empty map for no indicators", () => {
+        expect(evidenceByLine([]).size).toBe(0);
     });
 });
