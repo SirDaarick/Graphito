@@ -34,3 +34,12 @@ Sobre 200 segundos archivos de pares positivos muestreados con semilla 42 se inf
 - No se recalcula la TPR a umbral desplegado para v2_norm: no existe umbral calibrado de v2_norm.
 - Solo T0, T1, T5, T7@1.0.
 - La caché de embeddings de la corrida previa se reutiliza (clave por sha256 del contenido); el texto canonicalizado es un contenido nuevo y se incrusta con el mismo embebedor.
+
+
+## ADDENDUM (antes de calcular cualquier puntaje; el texto anterior no se modifica)
+
+- **T1 de la corrida previa:** la implementación iteraba un conjunto de cadenas (`names_in_func - shadowed`), por lo que su salida dependía de PYTHONHASHSEED. Los textos T1 de `runs/robustness/20261012-050941` son una realización no reproducible (1/100 archivos coinciden por sha256; T0, T5 y T7@1.0 coinciden 100/100).
+- **Corrección:** T1 ahora es determinista (`sorted(...)`), commit `fix(robustness): make T1 identifier renaming deterministic`. T0, T5 y T7@1.0 no cambian (sha256 idénticos a la corrida previa en la muestra de 100 archivos).
+- **Consecuencia:** v2 y jaccard en T1 se vuelven a medir en esta corrida; el valor previo de v2 en T1 (0,683) se informa como referencia histórica, no como objetivo de reproducción.
+- **Compuerta de reproducción (revisada):** aplica a T0 (v2 0,856; jaccard 0,945; tolerancia ±0,002) y a T5 y T7@1.0 de v2 y jaccard, cuyos textos transformados son idénticos a los previos. Si T0 no reproduce, se detiene el experimento.
+- **H1 (reafirmada tal como se operacionalizó):** la caída propia de v2_norm en T1, d = AUC_v2_norm(T1) − AUC_v2_norm(T0), cumple |d| < 0,01, evaluada sobre d con su IC95%. El contraste primario Δ = [AUC_v2_norm(T1) − AUC_v2_norm(T0)] − [AUC_v2(T1) − AUC_v2(T0)] se informa por separado. H2 y H3 sin cambios.
