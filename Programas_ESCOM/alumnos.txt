@@ -1,0 +1,3 @@
+Registro de Alumnos
+Rodrigo 9.5
+Mariana 8.0
