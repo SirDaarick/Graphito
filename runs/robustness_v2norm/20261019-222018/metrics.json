@@ -1,0 +1,4567 @@
+{
+  "T0": {
+    "v2_norm": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.9021850240076201,
+              "reason": null,
+              "ci95": [
+                0.8632090503978879,
+                0.9297848463605715
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.0013134887107784893,
+              "reason": null,
+              "ci95": [
+                0.0004918552553070584,
+                0.0032460509977120934
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.9021850240076201,
+            "reason": null,
+            "ci95": [
+              0.8632090503978879,
+              0.9297848463605715
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.0013134887107784893,
+            "reason": null,
+            "ci95": [
+              0.0004918552553070584,
+              0.0032460509977120934
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.9317640743331093,
+              "reason": null,
+              "ci95": [
+                0.8907920742808757,
+                0.9554056248752697
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.09978265470060169,
+              "reason": null,
+              "ci95": [
+                0.04927374886613478,
+                0.2057703806135967
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.9317640743331093,
+            "reason": null,
+            "ci95": [
+              0.8907920742808757,
+              0.9554056248752697
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.09978265470060169,
+            "reason": null,
+            "ci95": [
+              0.04927374886613478,
+              0.2057703806135967
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "v2": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.8558583378542135,
+              "reason": null,
+              "ci95": [
+                0.7959919058449569,
+                0.8925272777691468
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.0015339050086935818,
+              "reason": null,
+              "ci95": [
+                0.00033387819545296134,
+                0.005101249434314269
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 84,
+              "fp": 63291,
+              "fn": 254,
+              "tn": 1844916,
+              "tpr": 0.2485207100591716,
+              "fpr": 0.0331677852560021,
+              "observed": {
+                "view": "observed",
+                "tp": 84,
+                "fp": 63291,
+                "tn": 1844916,
+                "fn": 254,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0013254437869822486,
+                  "reason": null,
+                  "ci95": [
+                    0.000284166982106252,
+                    0.004590162290250281
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.2485207100591716,
+                  "reason": null,
+                  "ci95": [
+                    0.12262890681261703,
+                    0.33691163212216263
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.0331677852560021,
+                  "reason": null,
+                  "ci95": [
+                    0.01678171229642546,
+                    0.04706451954374809
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0026368245099116353,
+                  "reason": null,
+                  "ci95": [
+                    0.0005664144163088269,
+                    0.009026626481173984
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 237156.47928994085,
+                "fp": 31651.105355708256,
+                "tn": 922621.3946442916,
+                "fn": 717116.0207100593,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.8822536745105917,
+                  "reason": null,
+                  "ci95": [
+                    0.7621962450267243,
+                    0.9412193783734658
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.24852071005917156,
+                  "reason": null,
+                  "ci95": [
+                    0.122628906812617,
+                    0.33691163212216263
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.03316778525600209,
+                  "reason": null,
+                  "ci95": [
+                    0.01678171229642546,
+                    0.04706451954374808
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.38780204545420227,
+                  "reason": null,
+                  "ci95": [
+                    0.21308092464108283,
+                    0.49332116321797725
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.8558583378542135,
+            "reason": null,
+            "ci95": [
+              0.7959919058449569,
+              0.8925272777691468
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.0015339050086935818,
+            "reason": null,
+            "ci95": [
+              0.00033387819545296134,
+              0.005101249434314269
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.8833882589010982,
+              "reason": null,
+              "ci95": [
+                0.821757942264419,
+                0.9172019044410358
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.12766330578237206,
+              "reason": null,
+              "ci95": [
+                0.04334838147014389,
+                0.2174253770971641
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 84,
+              "fp": 804,
+              "fn": 254,
+              "tn": 1844916,
+              "tpr": 0.2485207100591716,
+              "fpr": 0.0004356023665561407,
+              "observed": {
+                "view": "observed",
+                "tp": 84,
+                "fp": 804,
+                "tn": 1844916,
+                "fn": 254,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0945945945945946,
+                  "reason": null,
+                  "ci95": [
+                    0.055821593833113504,
+                    0.19878881987577635
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.2485207100591716,
+                  "reason": null,
+                  "ci95": [
+                    0.12262890681261703,
+                    0.33691163212216263
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.0004356023665561407,
+                  "reason": null,
+                  "ci95": [
+                    0.00010997573735056159,
+                    0.0011637790785048701
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.1370309951060359,
+                  "reason": null,
+                  "ci95": [
+                    0.08107983674282017,
+                    0.18899638544270955
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 229391.82248520717,
+                "fp": 402.0736167999481,
+                "tn": 922626.9263832005,
+                "fn": 693637.1775147931,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.9982502859143766,
+                  "reason": null,
+                  "ci95": [
+                    0.9964568400399614,
+                    0.9993318528822457
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.24852071005917162,
+                  "reason": null,
+                  "ci95": [
+                    0.12262890681261703,
+                    0.3369116321221627
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.0004356023665561407,
+                  "reason": null,
+                  "ci95": [
+                    0.00010997573735056159,
+                    0.00116377907850487
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.3979654173435318,
+                  "reason": null,
+                  "ci95": [
+                    0.2184402941491047,
+                    0.5036585493699209
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.8833882589010982,
+            "reason": null,
+            "ci95": [
+              0.821757942264419,
+              0.9172019044410358
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.12766330578237206,
+            "reason": null,
+            "ci95": [
+              0.04334838147014389,
+              0.2174253770971641
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "jaccard": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.9445913395208265,
+              "reason": null,
+              "ci95": [
+                0.929574301532858,
+                0.9641122950296371
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.0019001484840584831,
+              "reason": null,
+              "ci95": [
+                0.00078511348534659,
+                0.004839901276194386
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.22187960848076002,
+              "reason": null,
+              "ci95": [
+                0.1982489744856944,
+                0.26121366216476155
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 196,
+              "fp": 67789,
+              "fn": 142,
+              "tn": 1840418,
+              "tpr": 0.5798816568047337,
+              "fpr": 0.03552497187150031,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1908186,
+                "tn": 21,
+                "fn": 0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00017710020937646055,
+                  "reason": null,
+                  "ci95": [
+                    7.022016937244843e-05,
+                    0.000355316613997897
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999889949046409,
+                  "reason": null,
+                  "ci95": [
+                    0.9999763338163822,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.00035413770089194504,
+                  "reason": null,
+                  "ci95": [
+                    0.00014043047767802285,
+                    0.000710380817866512
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 954272.5000000002,
+                "fp": 954261.9981401386,
+                "tn": 10.5018598611157,
+                "fn": 0.0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.500002751288979,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000059166159164
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999889949046409,
+                  "reason": null,
+                  "ci95": [
+                    0.9999763338163823,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666691122523846,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666719258600702
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.9445913395208265,
+            "reason": null,
+            "ci95": [
+              0.929574301532858,
+              0.9641122950296371
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.0019001484840584831,
+            "reason": null,
+            "ci95": [
+              0.00078511348534659,
+              0.004839901276194386
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.9747175409939285,
+              "reason": null,
+              "ci95": [
+                0.9667370300637461,
+                0.983202112483524
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.04657516032900694,
+              "reason": null,
+              "ci95": [
+                0.02115586507965313,
+                0.3029411892750698
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.19554110291654547,
+              "reason": null,
+              "ci95": [
+                0.16348445062873215,
+                0.24291789644142855
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 196,
+              "fp": 5302,
+              "fn": 142,
+              "tn": 1840418,
+              "tpr": 0.5798816568047337,
+              "fpr": 0.0028725917257222114,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1845699,
+                "tn": 21,
+                "fn": 0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00018309492171608694,
+                  "reason": null,
+                  "ci95": [
+                    7.304088354060378e-05,
+                    0.00036293303929579195
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999886223262466,
+                  "reason": null,
+                  "ci95": [
+                    0.9999754459325603,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.00036612280820526706,
+                  "reason": null,
+                  "ci95": [
+                    0.00014607109789298238,
+                    0.0007256027333840423
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 923029.0000000002,
+                "fp": 923018.4980771735,
+                "tn": 10.50192282686431,
+                "fn": 0.0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.5000028444346198,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000061385922236
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999886223262466,
+                  "reason": null,
+                  "ci95": [
+                    0.9999754459325603,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666691950482009,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666721231707574
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.9747175409939285,
+            "reason": null,
+            "ci95": [
+              0.9667370300637461,
+              0.983202112483524
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.04657516032900694,
+            "reason": null,
+            "ci95": [
+              0.02115586507965313,
+              0.3029411892750698
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    }
+  },
+  "T1": {
+    "v2_norm": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.9016821409191577,
+              "reason": null,
+              "ci95": [
+                0.8642642510404286,
+                0.9284679111247944
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.0012837183089571662,
+              "reason": null,
+              "ci95": [
+                0.0004911474002989592,
+                0.003198943383175797
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.9016821409191577,
+            "reason": null,
+            "ci95": [
+              0.8642642510404286,
+              0.9284679111247944
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.0012837183089571662,
+            "reason": null,
+            "ci95": [
+              0.0004911474002989592,
+              0.003198943383175797
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.9313016515611938,
+              "reason": null,
+              "ci95": [
+                0.8916143689947229,
+                0.9548873385370579
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.09509657855598952,
+              "reason": null,
+              "ci95": [
+                0.045062112006319446,
+                0.2082434296371871
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.9313016515611938,
+            "reason": null,
+            "ci95": [
+              0.8916143689947229,
+              0.9548873385370579
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.09509657855598952,
+            "reason": null,
+            "ci95": [
+              0.045062112006319446,
+              0.2082434296371871
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "jaccard": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.9445933566565072,
+              "reason": null,
+              "ci95": [
+                0.929572978910188,
+                0.9641134666831521
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.001900221037219089,
+              "reason": null,
+              "ci95": [
+                0.0007851456332964247,
+                0.004840431185607218
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.221875806981636,
+              "reason": null,
+              "ci95": [
+                0.19823849814287253,
+                0.2612176595726774
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 196,
+              "fp": 67792,
+              "fn": 142,
+              "tn": 1840415,
+              "tpr": 0.5798816568047337,
+              "fpr": 0.035526544027980195,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1908186,
+                "tn": 21,
+                "fn": 0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00017710020937646055,
+                  "reason": null,
+                  "ci95": [
+                    7.022016937244843e-05,
+                    0.000355316613997897
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999889949046409,
+                  "reason": null,
+                  "ci95": [
+                    0.9999763338163822,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.00035413770089194504,
+                  "reason": null,
+                  "ci95": [
+                    0.00014043047767802285,
+                    0.000710380817866512
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 954272.5000000002,
+                "fp": 954261.9981401386,
+                "tn": 10.5018598611157,
+                "fn": 0.0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.500002751288979,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000059166159164
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999889949046409,
+                  "reason": null,
+                  "ci95": [
+                    0.9999763338163823,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666691122523846,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666719258600702
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.9445933566565072,
+            "reason": null,
+            "ci95": [
+              0.929572978910188,
+              0.9641134666831521
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.001900221037219089,
+            "reason": null,
+            "ci95": [
+              0.0007851456332964247,
+              0.004840431185607218
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.9747178447512088,
+              "reason": null,
+              "ci95": [
+                0.9667396366302252,
+                0.9832016334968602
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.04659012045629356,
+              "reason": null,
+              "ci95": [
+                0.021163086553482265,
+                0.302940828665775
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.19553812610261784,
+              "reason": null,
+              "ci95": [
+                0.16346837654377108,
+                0.24292332068198189
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 196,
+              "fp": 5305,
+              "fn": 142,
+              "tn": 1840415,
+              "tpr": 0.5798816568047337,
+              "fpr": 0.002874217107686973,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1845699,
+                "tn": 21,
+                "fn": 0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00018309492171608694,
+                  "reason": null,
+                  "ci95": [
+                    7.304088354060378e-05,
+                    0.00036293303929579195
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999886223262466,
+                  "reason": null,
+                  "ci95": [
+                    0.9999754459325603,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.00036612280820526706,
+                  "reason": null,
+                  "ci95": [
+                    0.00014607109789298238,
+                    0.0007256027333840423
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 923029.0000000002,
+                "fp": 923018.4980771735,
+                "tn": 10.50192282686431,
+                "fn": 0.0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.5000028444346198,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000061385922236
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999886223262466,
+                  "reason": null,
+                  "ci95": [
+                    0.9999754459325603,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666691950482009,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666721231707574
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.9747178447512088,
+            "reason": null,
+            "ci95": [
+              0.9667396366302252,
+              0.9832016334968602
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.04659012045629356,
+            "reason": null,
+            "ci95": [
+              0.021163086553482265,
+              0.302940828665775
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "v2": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.6843597428241003,
+              "reason": null,
+              "ci95": [
+                0.5633378375371607,
+                0.7747454479139538
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.00027041154259005635,
+              "reason": null,
+              "ci95": [
+                0.0001189841822146234,
+                0.0005981984527440363
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 0,
+              "fp": 59514,
+              "fn": 338,
+              "tn": 1848693,
+              "tpr": 0.0,
+              "fpr": 0.031188440247834747,
+              "observed": {
+                "view": "observed",
+                "tp": 0,
+                "fp": 59514,
+                "tn": 1848693,
+                "fn": 338,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.031188440247834747,
+                  "reason": null,
+                  "ci95": [
+                    0.014913076024928529,
+                    0.045086027216534943
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 0.0,
+                "fp": 29762.270846401872,
+                "tn": 924510.229153598,
+                "fn": 954272.5000000002,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.03118844024783474,
+                  "reason": null,
+                  "ci95": [
+                    0.014913076024928525,
+                    0.04508602721653494
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.6843597428241003,
+            "reason": null,
+            "ci95": [
+              0.5633378375371607,
+              0.7747454479139538
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.00027041154259005635,
+            "reason": null,
+            "ci95": [
+              0.0001189841822146234,
+              0.0005981984527440363
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.7070490563679901,
+              "reason": null,
+              "ci95": [
+                0.5762543124148795,
+                0.80202804791653
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.0003724263707149566,
+              "reason": null,
+              "ci95": [
+                0.00019929862822962415,
+                0.0013061784700994729
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.9327143243718968,
+              "reason": null,
+              "ci95": [
+                0.9189292843035172,
+                0.9532034911194035
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 0,
+              "fp": 39,
+              "fn": 338,
+              "tn": 1845681,
+              "tpr": 0.0,
+              "fpr": 2.1129965541902345e-05,
+              "observed": {
+                "view": "observed",
+                "tp": 0,
+                "fp": 39,
+                "tn": 1845681,
+                "fn": 338,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 2.1129965541902345e-05,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    7.253900202584364e-05
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 0.0,
+                "fp": 19.50357096417658,
+                "tn": 923009.4964290361,
+                "fn": 923029.0000000002,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 2.1129965541902335e-05,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    7.253900202584366e-05
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.7070490563679901,
+            "reason": null,
+            "ci95": [
+              0.5762543124148795,
+              0.80202804791653
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.0003724263707149566,
+            "reason": null,
+            "ci95": [
+              0.00019929862822962415,
+              0.0013061784700994729
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    }
+  },
+  "T5": {
+    "v2_norm": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.7944801922439145,
+              "reason": null,
+              "ci95": [
+                0.6394191118199586,
+                0.8788047939474274
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.0005285982223644334,
+              "reason": null,
+              "ci95": [
+                0.00017044794668492224,
+                0.0017426637554582367
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.7944801922439145,
+            "reason": null,
+            "ci95": [
+              0.6394191118199586,
+              0.8788047939474274
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.0005285982223644334,
+            "reason": null,
+            "ci95": [
+              0.00017044794668492224,
+              0.0017426637554582367
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.7921834395506021,
+              "reason": null,
+              "ci95": [
+                0.6383979677975377,
+                0.8776517343186122
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.0005437728787280017,
+              "reason": null,
+              "ci95": [
+                0.00017390857135476606,
+                0.0018664090920871524
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.9385430040375937,
+              "reason": null,
+              "ci95": [
+                0.924872283951136,
+                0.9585770463834932
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.7921834395506021,
+            "reason": null,
+            "ci95": [
+              0.6383979677975377,
+              0.8776517343186122
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.0005437728787280017,
+            "reason": null,
+            "ci95": [
+              0.00017390857135476606,
+              0.0018664090920871524
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "v2": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.7684930937196929,
+              "reason": null,
+              "ci95": [
+                0.6398777176611076,
+                0.8520345797634726
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.00042168054271206205,
+              "reason": null,
+              "ci95": [
+                0.00018537876919297842,
+                0.0012000390816051586
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 0,
+              "fp": 93,
+              "fn": 338,
+              "tn": 1908114,
+              "tpr": 0.0,
+              "fpr": 4.8736850876241416e-05,
+              "observed": {
+                "view": "observed",
+                "tp": 0,
+                "fp": 93,
+                "tn": 1908114,
+                "fn": 338,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 4.8736850876241416e-05,
+                  "reason": null,
+                  "ci95": [
+                    9.678386448054138e-06,
+                    0.00012094001090455062
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 0.0,
+                "fp": 46.50823652779806,
+                "tn": 954225.9917634719,
+                "fn": 954272.5000000002,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 4.873685087624141e-05,
+                  "reason": null,
+                  "ci95": [
+                    9.678386448054138e-06,
+                    0.00012094001090455062
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.7684930937196929,
+            "reason": null,
+            "ci95": [
+              0.6398777176611076,
+              0.8520345797634726
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.00042168054271206205,
+            "reason": null,
+            "ci95": [
+              0.00018537876919297842,
+              0.0012000390816051586
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.7698632151311968,
+              "reason": null,
+              "ci95": [
+                0.6422786179355249,
+                0.8547964244791395
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.00044073090356298405,
+              "reason": null,
+              "ci95": [
+                0.000198677943240486,
+                0.0013164994952743114
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.9360793677667358,
+              "reason": null,
+              "ci95": [
+                0.9219028545629504,
+                0.9557079691079051
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 0,
+              "fp": 31,
+              "fn": 338,
+              "tn": 1845689,
+              "tpr": 0.0,
+              "fpr": 1.6795613635871097e-05,
+              "observed": {
+                "view": "observed",
+                "tp": 0,
+                "fp": 31,
+                "tn": 1845689,
+                "fn": 338,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 1.6795613635871097e-05,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    5.76592067384911e-05
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 0.0,
+                "fp": 15.50283845870446,
+                "tn": 923013.4971615416,
+                "fn": 923029.0000000002,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 1.6795613635871087e-05,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    5.7659206738491104e-05
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.7698632151311968,
+            "reason": null,
+            "ci95": [
+              0.6422786179355249,
+              0.8547964244791395
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.00044073090356298405,
+            "reason": null,
+            "ci95": [
+              0.000198677943240486,
+              0.0013164994952743114
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "jaccard": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.9504331900428986,
+              "reason": null,
+              "ci95": [
+                0.9334952619306708,
+                0.9640453437684217
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.0029959031113019527,
+              "reason": null,
+              "ci95": [
+                0.0009671016298303243,
+                0.019398632088554524
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.16104938261956883,
+              "reason": null,
+              "ci95": [
+                0.14199802134149786,
+                0.19032570931784418
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 0,
+              "fp": 22666,
+              "fn": 338,
+              "tn": 1885541,
+              "tpr": 0.0,
+              "fpr": 0.011878166257643956,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1908176,
+                "tn": 31,
+                "fn": 0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00017710113732464106,
+                  "reason": null,
+                  "ci95": [
+                    7.022049655062206e-05,
+                    0.0003553186551690582
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999837543830412,
+                  "reason": null,
+                  "ci95": [
+                    0.9999638291972263,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0003541395561311197,
+                  "reason": null,
+                  "ci95": [
+                    0.00014043113194246344,
+                    0.0007103848973094615
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 954272.5000000002,
+                "fp": 954256.9972544904,
+                "tn": 15.502745509266031,
+                "fn": 0.0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.5000040614372301,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000090428642373
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999837543830412,
+                  "reason": null,
+                  "ci95": [
+                    0.9999638291972264,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666702768233185,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666747047197529
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.9504331900428986,
+            "reason": null,
+            "ci95": [
+              0.9334952619306708,
+              0.9640453437684217
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.0029959031113019527,
+            "reason": null,
+            "ci95": [
+              0.0009671016298303243,
+              0.019398632088554524
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.9702068992623523,
+              "reason": null,
+              "ci95": [
+                0.9595309184905901,
+                0.9778215102695318
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.028643555616705414,
+              "reason": null,
+              "ci95": [
+                0.010549756544439882,
+                0.1322128797819737
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.14899545236277972,
+              "reason": null,
+              "ci95": [
+                0.1272777004776108,
+                0.18120439249250844
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 0,
+              "fp": 542,
+              "fn": 338,
+              "tn": 1845178,
+              "tpr": 0.0,
+              "fpr": 0.0002936523416336172,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1845689,
+                "tn": 31,
+                "fn": 0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00018309591354839338,
+                  "reason": null,
+                  "ci95": [
+                    7.304123258290071e-05,
+                    0.00036293309396883967
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999832043863641,
+                  "reason": null,
+                  "ci95": [
+                    0.9999624810942549,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.00036612479114367955,
+                  "reason": null,
+                  "ci95": [
+                    0.00014607179587561027,
+                    0.0007256028426507648
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 923029.0000000002,
+                "fp": 923013.4971615416,
+                "tn": 15.50283845870446,
+                "fn": 0.0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.5000041989386709,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000093799023981
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999832043863641,
+                  "reason": null,
+                  "ci95": [
+                    0.999962481094255,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666703990461482,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666750043055497
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.9702068992623523,
+            "reason": null,
+            "ci95": [
+              0.9595309184905901,
+              0.9778215102695318
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.028643555616705414,
+            "reason": null,
+            "ci95": [
+              0.010549756544439882,
+              0.1322128797819737
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    }
+  },
+  "T7@1.0": {
+    "jaccard": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.9314248607981799,
+              "reason": null,
+              "ci95": [
+                0.9124122432699359,
+                0.9493463057562292
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.001597599919632188,
+              "reason": null,
+              "ci95": [
+                0.0006632988700374436,
+                0.007234280101921495
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.14726045208476934,
+              "reason": null,
+              "ci95": [
+                0.12908653222090188,
+                0.1745539099313908
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 1,
+              "fp": 21983,
+              "fn": 337,
+              "tn": 1886224,
+              "tpr": 0.0029585798816568047,
+              "fpr": 0.01152023863239156,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1908149,
+                "tn": 58,
+                "fn": 0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00017710364283330199,
+                  "reason": null,
+                  "ci95": [
+                    7.022137994730751e-05,
+                    0.00035532416645134556
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999696049747223,
+                  "reason": null,
+                  "ci95": [
+                    0.9999276176363837,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.00035414456537398664,
+                  "reason": null,
+                  "ci95": [
+                    0.0001404328984876797,
+                    0.0007103959120454737
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 954272.5000000002,
+                "fp": 954243.4948632403,
+                "tn": 29.005136759271927,
+                "fn": 0.0,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.5000075988718036,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000180962458287
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999696049747223,
+                  "reason": null,
+                  "ci95": [
+                    0.9999276176363837,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666734211851632,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666827520244579
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.9314248607981799,
+            "reason": null,
+            "ci95": [
+              0.9124122432699359,
+              0.9493463057562292
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.001597599919632188,
+            "reason": null,
+            "ci95": [
+              0.0006632988700374436,
+              0.007234280101921495
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.9585846055233236,
+              "reason": null,
+              "ci95": [
+                0.9383249655552797,
+                0.9715163324927807
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.009590171415504436,
+              "reason": null,
+              "ci95": [
+                0.004623845804244491,
+                0.0490908493218286
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.13399193280381938,
+              "reason": null,
+              "ci95": [
+                0.11354580529595204,
+                0.16457537464758268
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.000588235294117647,
+              "tp": 1,
+              "fp": 417,
+              "fn": 337,
+              "tn": 1845303,
+              "tpr": 0.0029585798816568047,
+              "fpr": 0.00022592809310187893,
+              "observed": {
+                "view": "observed",
+                "tp": 338,
+                "fp": 1845662,
+                "tn": 58,
+                "fn": 0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.00018309859154929577,
+                  "reason": null,
+                  "ci95": [
+                    7.304217501376614e-05,
+                    0.00036293324158935775
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 0.9999685759486813,
+                  "reason": null,
+                  "ci95": [
+                    0.9999251705574883,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0003661301451846845,
+                  "reason": null,
+                  "ci95": [
+                    0.0001460736804620256,
+                    0.0007256031376774872
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 923029.0000000002,
+                "fp": 922999.9946893357,
+                "tn": 29.005310664672862,
+                "fn": 0.0,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.5000078561362654,
+                  "reason": null,
+                  "ci95": [
+                    0.49999999999999994,
+                    0.5000187080605852
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 1.0,
+                  "reason": null,
+                  "ci95": [
+                    1.0,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 0.9999685759486813,
+                  "reason": null,
+                  "ci95": [
+                    0.9999251705574883,
+                    1.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.6666736498623286,
+                  "reason": null,
+                  "ci95": [
+                    0.6666666666666666,
+                    0.6666832958464536
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.9585846055233236,
+            "reason": null,
+            "ci95": [
+              0.9383249655552797,
+              0.9715163324927807
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.009590171415504436,
+            "reason": null,
+            "ci95": [
+              0.004623845804244491,
+              0.0490908493218286
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "v2_norm": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.7084251405273,
+              "reason": null,
+              "ci95": [
+                0.5301638727203174,
+                0.8226907429896269
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.00043973347983676807,
+              "reason": null,
+              "ci95": [
+                0.00012587153399602551,
+                0.002156350624948572
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.7084251405273,
+            "reason": null,
+            "ci95": [
+              0.5301638727203174,
+              0.8226907429896269
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.00043973347983676807,
+            "reason": null,
+            "ci95": [
+              0.00012587153399602551,
+              0.002156350624948572
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.7136591321717014,
+              "reason": null,
+              "ci95": [
+                0.5352643525951509,
+                0.8267795068633769
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.0004936536180398081,
+              "reason": null,
+              "ci95": [
+                0.00013567784718392315,
+                0.0028108478659072227
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.9376266391566461,
+              "reason": null,
+              "ci95": [
+                0.9246839097676175,
+                0.9566309592531455
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {},
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.7136591321717014,
+            "reason": null,
+            "ci95": [
+              0.5352643525951509,
+              0.8267795068633769
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.0004936536180398081,
+            "reason": null,
+            "ci95": [
+              0.00013567784718392315,
+              0.0028108478659072227
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    },
+    "v2": {
+      "views": {
+        "all": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1908545,
+          "n_pos": 338,
+          "n_neg": 1908207,
+          "prevalence_observed": 0.00017709826071693357,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.7142643064448899,
+              "reason": null,
+              "ci95": [
+                0.5551210922391827,
+                0.81418270328959
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "value": 0.00031623520469382834,
+              "reason": null,
+              "ci95": [
+                0.00012322871130195418,
+                0.0009120976091177224
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1908545,
+              "n_pos": 338,
+              "n_neg": 1908207,
+              "view": "observed",
+              "n_bins": 15,
+              "value": null,
+              "reason": "scores_not_probabilities",
+              "ci95": null,
+              "ci_reason": null,
+              "n_boot_valid": 0,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 0,
+              "fp": 117,
+              "fn": 338,
+              "tn": 1908090,
+              "tpr": 0.0,
+              "fpr": 6.131410271527146e-05,
+              "observed": {
+                "view": "observed",
+                "tp": 0,
+                "fp": 117,
+                "tn": 1908090,
+                "fn": 338,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.00017709826071693357,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 6.131410271527146e-05,
+                  "reason": null,
+                  "ci95": [
+                    2.1456529875602606e-05,
+                    0.00013025993012627543
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 0.0,
+                "fp": 58.51036208335885,
+                "tn": 954213.9896379162,
+                "fn": 954272.5000000002,
+                "n": 1908545,
+                "n_pos": 338,
+                "n_neg": 1908207,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 6.131410271527146e-05,
+                  "reason": null,
+                  "ci95": [
+                    2.1456529875602606e-05,
+                    0.00013025993012627543
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [
+            "scores_not_probabilities: ECE and reliability are not computed"
+          ],
+          "roc_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.7142643064448899,
+            "reason": null,
+            "ci95": [
+              0.5551210922391827,
+              0.81418270328959
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1908545,
+            "n_pos": 338,
+            "n_neg": 1908207,
+            "view": "observed",
+            "value": 0.00031623520469382834,
+            "reason": null,
+            "ci95": [
+              0.00012322871130195418,
+              0.0009120976091177224
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        },
+        "no_identical": {
+          "schema": "graphito.metrics/v1",
+          "channel": "robustness",
+          "split": "test",
+          "mode": "robustness",
+          "n": 1846058,
+          "n_pos": 338,
+          "n_neg": 1845720,
+          "prevalence_observed": 0.00018309283890321972,
+          "views": [
+            "observed",
+            "balanced"
+          ],
+          "natural_prevalence": null,
+          "threshold_free": {
+            "roc_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.7229630173026559,
+              "reason": null,
+              "ci95": [
+                0.5661571442344229,
+                0.8224038577931634
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "pr_auc": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "value": 0.00035952481208348136,
+              "reason": null,
+              "ci95": [
+                0.0001389142668410854,
+                0.0010646081322812047
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            },
+            "ece": {
+              "n": 1846058,
+              "n_pos": 338,
+              "n_neg": 1845720,
+              "view": "observed",
+              "n_bins": 15,
+              "value": 0.9352813539926124,
+              "reason": null,
+              "ci95": [
+                0.9227327480035423,
+                0.9538976147915125
+              ],
+              "ci_reason": null,
+              "n_boot_valid": 1000,
+              "skipped_resamples": 0
+            }
+          },
+          "operating_points": {
+            "deployed": {
+              "threshold": 0.9978561196814738,
+              "tp": 0,
+              "fp": 31,
+              "fn": 338,
+              "tn": 1845689,
+              "tpr": 0.0,
+              "fpr": 1.6795613635871097e-05,
+              "observed": {
+                "view": "observed",
+                "tp": 0,
+                "fp": 31,
+                "tn": 1845689,
+                "fn": 338,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.00018309283890321972,
+                "precision": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                },
+                "recall": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "observed",
+                  "value": 1.6795613635871097e-05,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    5.76592067384911e-05
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "observed",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                }
+              },
+              "balanced": {
+                "view": "balanced",
+                "tp": 0.0,
+                "fp": 15.50283845870446,
+                "tn": 923013.4971615416,
+                "fn": 923029.0000000002,
+                "n": 1846058,
+                "n_pos": 338,
+                "n_neg": 1845720,
+                "prevalence": 0.5,
+                "precision": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                },
+                "recall": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "fpr": {
+                  "view": "balanced",
+                  "value": 1.6795613635871087e-05,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    5.7659206738491104e-05
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 1000,
+                  "skipped_resamples": 0
+                },
+                "f1": {
+                  "view": "balanced",
+                  "value": 0.0,
+                  "reason": null,
+                  "ci95": [
+                    0.0,
+                    0.0
+                  ],
+                  "ci_reason": null,
+                  "n_boot_valid": 646,
+                  "skipped_resamples": 354
+                }
+              }
+            }
+          },
+          "per_group": {},
+          "bootstrap": {
+            "n_boot": 1000,
+            "seed": 42,
+            "alpha": 0.05,
+            "unit": "group",
+            "n_units": 14
+          },
+          "warnings": [],
+          "roc_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.7229630173026559,
+            "reason": null,
+            "ci95": [
+              0.5661571442344229,
+              0.8224038577931634
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          },
+          "pr_auc": {
+            "n": 1846058,
+            "n_pos": 338,
+            "n_neg": 1845720,
+            "view": "observed",
+            "value": 0.00035952481208348136,
+            "reason": null,
+            "ci95": [
+              0.0001389142668410854,
+              0.0010646081322812047
+            ],
+            "ci_reason": null,
+            "n_boot_valid": 1000,
+            "skipped_resamples": 0
+          }
+        }
+      }
+    }
+  }
+}

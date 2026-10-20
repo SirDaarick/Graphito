@@ -1,0 +1,93 @@
+{
+  "n_sampled": 200,
+  "n_equal": 188,
+  "fraction_equal": 0.94,
+  "n_t1_applied": 200,
+  "n_mismatch": 12,
+  "mismatches": [
+    {
+      "id": "data/raw/src/A2016/Z4/Z2/student2749.c",
+      "lang": "c",
+      "line": 133,
+      "canon_orig": "    int pozicija=0;",
+      "canon_t1": "    int v3=0;"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z2/student5624.c",
+      "lang": "c",
+      "line": 15,
+      "canon_orig": "void f2(char *string, char *v1){ //funkcija koja sifrira string",
+      "canon_t1": "void f2(char *v1, char *v2){ //funkcija koja sifrira string"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z2/student9071.c",
+      "lang": "c",
+      "line": 3,
+      "canon_orig": "char *f1(char *string,char *v1)\t//naizgled radi",
+      "canon_t1": "char *f1(char *v1,char *v2)\t//naizgled radi"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z2/student7457.c",
+      "lang": "c",
+      "line": 27,
+      "canon_orig": "char* kodiraj(char* v1, char* v2){",
+      "canon_t1": "char* f_6(char* v1, char* v2){"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z1/student4420.c",
+      "lang": "c",
+      "line": 13,
+      "canon_orig": "char* f2(char* string) {",
+      "canon_t1": "char* f2(char* v1) {"
+    },
+    {
+      "id": "data/raw/src/B2016/Z3/Z2/student5496.cpp",
+      "lang": "cpp",
+      "line": 20,
+      "canon_orig": "            auto p(v2.find(v5));",
+      "canon_t1": "            auto v6(v2.find(v5));"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z1/student4420.c",
+      "lang": "c",
+      "line": 13,
+      "canon_orig": "char* f2(char* string) {",
+      "canon_t1": "char* f2(char* v1) {"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z1/student3756.c",
+      "lang": "c",
+      "line": 11,
+      "canon_orig": "char* f2(char* string) {",
+      "canon_t1": "char* f2(char* v1) {"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z2/student5624.c",
+      "lang": "c",
+      "line": 15,
+      "canon_orig": "void f2(char *string, char *v1){ //funkcija koja sifrira string",
+      "canon_t1": "void f2(char *v1, char *v2){ //funkcija koja sifrira string"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z1/student4420.c",
+      "lang": "c",
+      "line": 13,
+      "canon_orig": "char* f2(char* string) {",
+      "canon_t1": "char* f2(char* v1) {"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z2/student5624.c",
+      "lang": "c",
+      "line": 15,
+      "canon_orig": "void f2(char *string, char *v1){ //funkcija koja sifrira string",
+      "canon_t1": "void f2(char *v1, char *v2){ //funkcija koja sifrira string"
+    },
+    {
+      "id": "data/raw/src/A2016/Z4/Z2/student9931.c",
+      "lang": "c",
+      "line": 3,
+      "canon_orig": "char *f1(char *string,char *v1){",
+      "canon_t1": "char *f1(char *v1,char *v2){"
+    }
+  ]
+}

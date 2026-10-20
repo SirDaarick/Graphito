@@ -1,0 +1,39 @@
+{
+  "tolerance": 0.002,
+  "reference_run": "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito\\runs\\robustness\\20261012-050941",
+  "ok": true,
+  "rows": [
+    {
+      "method": "v2",
+      "condition": "T0",
+      "new": 0.8558583378542135,
+      "reference": 0.8558583378542135,
+      "diff": 0.0,
+      "ok": true
+    },
+    {
+      "method": "v2",
+      "condition": "T1",
+      "new": 0.6843597428241003,
+      "reference": 0.6832885856357185,
+      "diff": 0.0010711571883817994,
+      "ok": true
+    },
+    {
+      "method": "jaccard",
+      "condition": "T0",
+      "new": 0.9445913395208265,
+      "reference": 0.9445913395208265,
+      "diff": 0.0,
+      "ok": true
+    },
+    {
+      "method": "jaccard",
+      "condition": "T1",
+      "new": 0.9445933566565072,
+      "reference": 0.9445932884366994,
+      "diff": 6.821980780280512e-08,
+      "ok": true
+    }
+  ]
+}
