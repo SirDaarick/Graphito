@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://graphito:graphitosecret@localhost:5432/graphito_db"
 
+    # true when DATABASE_URL points at a transaction-mode pooler (Supabase port 6543 / pgbouncer).
+    # Leave false for the session pooler (port 5432) or a direct connection.
+    DB_POOLER_COMPAT: bool = False
+
     # Vector Store (ChromaDB)
     CHROMA_HOST: str = "localhost"
     CHROMA_PORT: int = 8001

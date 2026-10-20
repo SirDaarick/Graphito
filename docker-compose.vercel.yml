@@ -1,0 +1,80 @@
+# Production topology for the Vercel frontend:
+#   Vercel (SPA) -> ngrok static domain -> backend (REAL models) -> Supabase Postgres + local Chroma
+# There is no local Postgres (Supabase) and no frontend container (Vercel).
+#
+#   cp .env.vercel.example .env.vercel     # fill in every value
+#   docker compose -f docker-compose.vercel.yml --env-file .env.vercel up -d --build
+#
+# Full runbook: docs/DEPLOY_VERCEL_SUPABASE_NGROK.md
+
+services:
+  chroma:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - graphito-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      chroma:
+        condition: service_healthy
+    volumes:
+      # Verified deploy bundle (manifest + calibrations + CharCNN v2); the backend checks every sha256.
+      - ./models/deploy:/models/deploy:ro
+      - hf_cache:/hf_cache
+    env_file:
+      - .env.vercel
+    environment:
+      - APP_ENV=production
+      - INFERENCE_MODE=REAL
+      - ALLOW_UNCALIBRATED=false
+      - USE_CHROMA_SERVER=true
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - HF_HOME=/hf_cache
+    ports:
+      # Loopback only: the public entry point is the ngrok tunnel, never this port.
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      # /health answers 200 even when degraded; inference_ready is checked in the runbook.
+      test: ["CMD-SHELL", "curl -fs http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
+    networks:
+      - graphito-net
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    command: ["http", "--url=https://${NGROK_DOMAIN}", "backend:8000"]
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - graphito-net
+
+networks:
+  graphito-net:
+    driver: bridge
+
+volumes:
+  chroma_data:
+  hf_cache:

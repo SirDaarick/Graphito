@@ -51,6 +51,7 @@ runs/
 .env.*
 !.env.example
 !.env.production.example
+!.env.vercel.example
 .dockerignore
 data/.env
 
