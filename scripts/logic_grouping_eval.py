@@ -100,6 +100,17 @@ def parse_args():
     parser.add_argument("--lang", default="en", choices=["en", "es"], help="Figure label language")
     parser.add_argument("--run-dir", default=None, help="Existing run directory (with --only-cluster-figure/--only-figures)")
     parser.add_argument(
+        "--method",
+        default="v2",
+        choices=["v2", "v2_norm"],
+        help="Embedding used by --only-cluster-figure: v2, or v2_norm (v2 after canonical identifier renaming)",
+    )
+    parser.add_argument(
+        "--reuse-selection-from",
+        default=None,
+        help="cluster_showcase JSON whose tasks and external point are drawn as-is (keeps figures comparable)",
+    )
+    parser.add_argument(
         "--figure-out",
         default="Documentacion/Documento/figuras/clusters_canal_a.png",
         help="Output PNG path for --only-cluster-figure",
@@ -129,6 +140,11 @@ def passing_flags(entries: List[Dict[str, Any]], stats_dir: Path) -> List[bool]:
     return flags
 
 
+def cluster_showcase_json_name(method: str) -> str:
+    """Metadata file name of the cluster showcase for an embedding method."""
+    return "cluster_showcase.json" if method == "v2" else f"cluster_showcase_{method.replace('_', '')}.json"
+
+
 def run_only_cluster_figure(args) -> None:
     """Rebuild the v2 embeddings of an existing run (from cache) and redraw the showcase figure."""
     if not args.run_dir:
@@ -153,23 +169,37 @@ def run_only_cluster_figure(args) -> None:
     file_embedder = V2FileEmbedder(embedder, use_dfg=True)
     cached = CachedEmbedder(file_embedder, EmbeddingCache(Path(args.cache_dir), file_embedder.key_fields()))
 
+    method = getattr(args, "method", "v2")
     vectors = []
     for item in e1_sample:
         code = read_file_text(Path.cwd(), item["id"])
+        if method == "v2_norm":
+            code = canonicalize_code(code, lang=item.get("lang", "c"))
         sha = hashlib.sha256(code.encode("utf-8")).hexdigest()
         res = cached.embed(sha, code, item.get("lang", "c"))
         vec = res.vectors.get("mean")
         vectors.append(vec if vec is not None else np.zeros(768, dtype=np.float32))
     labels = [item.get("block") or item.get("assignment") for item in e1_sample]
 
+    fixed_selection = None
+    reuse_from = getattr(args, "reuse_selection_from", None)
+    if reuse_from:
+        ref = json.loads(Path(reuse_from).read_text(encoding="utf-8"))
+        fixed_selection = {
+            "panel_a_tasks": ref["distinct_triplet"]["tasks"],
+            "panel_b_tasks": ref["similar_pair"]["tasks"],
+            "external_index": ref["external_point"]["solution_index"],
+        }
+
     info = plot_cluster_showcase(
         embeddings=np.stack(vectors, axis=0),
         labels=labels,
         out_path=Path(args.figure_out),
-        json_path=run_dir / "cluster_showcase.json",
+        json_path=run_dir / cluster_showcase_json_name(method),
         seeds=(42, 7, 123),
         dpi=300,
         passing=passing_flags(e1_sample, Path(args.stats_dir)),
+        fixed_selection=fixed_selection,
     )
     print(json.dumps(info, indent=2, ensure_ascii=False))
     print(f"Figure written to: {args.figure_out}")
