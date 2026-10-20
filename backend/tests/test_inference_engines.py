@@ -17,7 +17,7 @@ from app.domain.ports.inference_port import StylometryResult
 from app.infrastructure.artifacts import load_bundle
 from app.infrastructure.inference import get_inference_engine, real_engine, runtime as rt
 from app.infrastructure.inference import stub_engine
-from app.infrastructure.inference.real_engine import RealBimodalInferenceEngine, embedding_fingerprint
+from app.infrastructure.inference.real_engine import RealBimodalInferenceEngine, embedding_fingerprint, pipeline_fingerprint
 from app.infrastructure.inference.stub_engine import STUB_MIN_NON_WS_CHARS, StubInferenceEngine
 
 FAKE_GCB_FIELDS = {
@@ -181,7 +181,7 @@ def test_gcb_settings_must_match_the_manifest(fake_artifacts, override):
 
 def test_embedding_fingerprint_is_canonical_and_verified(fake_artifacts):
     engine = _engine(fake_artifacts)
-    assert engine.embedding_fingerprint == fake_gcb_fingerprint(FAKE_GCB_FIELDS)
+    assert engine.embedding_fingerprint == pipeline_fingerprint(fake_gcb_fingerprint(FAKE_GCB_FIELDS), "identifiers_v1")
     assert embedding_fingerprint({**FAKE_GCB_FIELDS, "pooling": "cls"}) != engine.embedding_fingerprint
     doc = fake_artifacts.read()
     doc["gcb"]["fingerprint"] = "0" * 64
