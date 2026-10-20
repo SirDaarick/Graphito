@@ -1,0 +1,25 @@
+{
+  "n_texts": {
+    "ai": 1413,
+    "human": 17757
+  },
+  "offending_ids": {},
+  "passed": true,
+  "schema": "graphito.charcnn_leak_guard/v1",
+  "scope": "normalized representatives of train/val/test; gated on humans",
+  "shares": {
+    "course_marker": 5.631581911358901e-05,
+    "non_alphabet": 0.0
+  },
+  "shares_by_class": {
+    "ai": {
+      "course_marker": 0.0,
+      "non_alphabet": 0.0
+    },
+    "human": {
+      "course_marker": 5.631581911358901e-05,
+      "non_alphabet": 0.0
+    }
+  },
+  "threshold": 0.001
+}

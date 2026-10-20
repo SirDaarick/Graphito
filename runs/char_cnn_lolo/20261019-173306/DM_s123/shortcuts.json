@@ -1,0 +1,165 @@
+{
+  "length_buckets": [
+    "<512",
+    "512-1023",
+    "1024-2047",
+    "2048-4095",
+    ">=4096"
+  ],
+  "note": "report-only: shares of files per class; never used for training or scoring",
+  "patterns": {
+    "autotest": "(?i)autotest\\w*",
+    "bits_include": "#\\s*include\\s*<bits/",
+    "control": "[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]",
+    "course_marker": "(?i)\\b(?:zada(?:ca|ća|tak|a{1,2})|tutorijal)\\b",
+    "cr": "\\r",
+    "non_ascii": "[^\\x00-\\x7f]",
+    "non_code_first_line": "first non-empty line does not start with '#' and has none of ;{}()",
+    "std_prefix": "\\bstd::",
+    "tab": "\\t",
+    "using_namespace": "\\busing\\s+namespace\\b"
+  },
+  "schema": "graphito.charcnn_shortcuts/v1",
+  "sets": {
+    "test": {
+      "ai": {
+        "length_buckets": {
+          "1024-2047": 0.42424242424242425,
+          "2048-4095": 0.1696969696969697,
+          "512-1023": 0.25757575757575757,
+          "<512": 0.11515151515151516,
+          ">=4096": 0.03333333333333333
+        },
+        "n": 330,
+        "normalized": {
+          "autotest": 0.0,
+          "bits_include": 0.0030303030303030303,
+          "control": 0.0,
+          "course_marker": 0.0,
+          "cr": 0.0,
+          "non_ascii": 0.0,
+          "non_code_first_line": 0.0030303030303030303,
+          "std_prefix": 0.23636363636363636,
+          "tab": 0.0,
+          "using_namespace": 0.3
+        },
+        "raw": {
+          "autotest": 0.0,
+          "bits_include": 0.0030303030303030303,
+          "control": 0.0,
+          "course_marker": 0.0,
+          "cr": 0.0,
+          "non_ascii": 0.24242424242424243,
+          "non_code_first_line": 0.03939393939393939,
+          "std_prefix": 0.24242424242424243,
+          "tab": 0.0,
+          "using_namespace": 0.3
+        }
+      },
+      "human": {
+        "length_buckets": {
+          "1024-2047": 0.24256129492977863,
+          "2048-4095": 0.39728636039038323,
+          "512-1023": 0.15972387526779339,
+          "<512": 0.06498452749345394,
+          ">=4096": 0.1354439419185908
+        },
+        "n": 4201,
+        "normalized": {
+          "autotest": 0.0,
+          "bits_include": 0.0,
+          "control": 0.0,
+          "course_marker": 0.0,
+          "cr": 0.0,
+          "non_ascii": 0.0,
+          "non_code_first_line": 0.0016662699357295882,
+          "std_prefix": 0.4603665793858605,
+          "tab": 0.0,
+          "using_namespace": 0.07022137586288979
+        },
+        "raw": {
+          "autotest": 0.18114734587003095,
+          "bits_include": 0.0,
+          "control": 0.3839562009045465,
+          "course_marker": 0.42299452511306834,
+          "cr": 0.4351344917876696,
+          "non_ascii": 0.4408474172815996,
+          "non_code_first_line": 0.39109735777195903,
+          "std_prefix": 0.46179481075934303,
+          "tab": 0.847179243037372,
+          "using_namespace": 0.07045941442513687
+        }
+      }
+    },
+    "train": {
+      "ai": {
+        "length_buckets": {
+          "1024-2047": 0.34439359267734554,
+          "2048-4095": 0.17848970251716248,
+          "512-1023": 0.2585812356979405,
+          "<512": 0.12929061784897025,
+          ">=4096": 0.08924485125858124
+        },
+        "n": 874,
+        "normalized": {
+          "autotest": 0.0,
+          "bits_include": 0.0,
+          "control": 0.0,
+          "course_marker": 0.0,
+          "cr": 0.0,
+          "non_ascii": 0.0,
+          "non_code_first_line": 0.0,
+          "std_prefix": 0.11212814645308924,
+          "tab": 0.0,
+          "using_namespace": 0.36384439359267734
+        },
+        "raw": {
+          "autotest": 0.0,
+          "bits_include": 0.0,
+          "control": 0.0,
+          "course_marker": 0.003432494279176201,
+          "cr": 0.0,
+          "non_ascii": 0.2208237986270023,
+          "non_code_first_line": 0.05034324942791762,
+          "std_prefix": 0.12242562929061784,
+          "tab": 0.0,
+          "using_namespace": 0.36384439359267734
+        }
+      },
+      "human": {
+        "length_buckets": {
+          "1024-2047": 0.28293413173652693,
+          "2048-4095": 0.15830838323353294,
+          "512-1023": 0.26394086826347307,
+          "<512": 0.09318862275449102,
+          ">=4096": 0.20162799401197604
+        },
+        "n": 10688,
+        "normalized": {
+          "autotest": 9.356287425149701e-05,
+          "bits_include": 9.356287425149701e-05,
+          "control": 0.0,
+          "course_marker": 0.0,
+          "cr": 0.0,
+          "non_ascii": 0.0,
+          "non_code_first_line": 0.001403443113772455,
+          "std_prefix": 0.41308008982035926,
+          "tab": 0.0,
+          "using_namespace": 0.0658682634730539
+        },
+        "raw": {
+          "autotest": 0.17992140718562874,
+          "bits_include": 9.356287425149701e-05,
+          "control": 0.35095434131736525,
+          "course_marker": 0.38005239520958084,
+          "cr": 0.3373877245508982,
+          "non_ascii": 0.39511601796407186,
+          "non_code_first_line": 0.3063248502994012,
+          "std_prefix": 0.4140157185628742,
+          "tab": 0.8423465568862275,
+          "using_namespace": 0.06624251497005988
+        }
+      }
+    }
+  }
+}

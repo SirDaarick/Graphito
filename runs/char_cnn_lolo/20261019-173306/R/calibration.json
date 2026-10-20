@@ -1,0 +1,56 @@
+{
+  "channel": "char_cnn",
+  "fit_set": {
+    "ids_labels_sha256": "9db0a8fb17a92172d526abb74b588f17674e0b816ecda237a9b362605ea2dc19",
+    "n": 3077,
+    "n_neg": 2868,
+    "n_pos": 209,
+    "split": "val"
+  },
+  "manifest": {
+    "path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito/data/splits/split_v1.json.gz",
+    "sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f"
+  },
+  "method": "platt",
+  "params": {
+    "a": 1.2602552661584627,
+    "b": -3.0863758512910366,
+    "eps": 1e-07
+  },
+  "primary": "fpr_0.05",
+  "provenance": {
+    "dirty": true,
+    "git_sha": "9cce24adeacacda88d07f78564390cebef2139dd",
+    "seed": 42
+  },
+  "schema": "graphito.calibration/v1",
+  "score_name": "p_synthetic_raw",
+  "seed": 42,
+  "space": "calibrated",
+  "thresholds": {
+    "fpr_0.01": {
+      "achieved_fpr": 0.009762900976290097,
+      "low_support": false,
+      "min_negatives": 1000,
+      "n_neg": 2868,
+      "n_pos": 209,
+      "reason": null,
+      "target_fpr": 0.01,
+      "threshold": 0.1715360690019589,
+      "tpr": 0.9712918660287081,
+      "unachievable": false
+    },
+    "fpr_0.05": {
+      "achieved_fpr": 0.049860529986053,
+      "low_support": false,
+      "min_negatives": 200,
+      "n_neg": 2868,
+      "n_pos": 209,
+      "reason": null,
+      "target_fpr": 0.05,
+      "threshold": 0.007522660500229816,
+      "tpr": 1.0,
+      "unachievable": false
+    }
+  }
+}

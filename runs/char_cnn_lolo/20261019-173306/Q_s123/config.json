@@ -1,0 +1,212 @@
+{
+  "argv": [
+    "-m",
+    "models.char_cnn.v2.train",
+    "--root",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito",
+    "--manifest",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito-worktrees\\exp-charcnn-lolo\\data\\splits\\split_v1.json.gz",
+    "--expected-sha256",
+    "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f",
+    "--seed",
+    "123",
+    "--run-dir",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito-worktrees\\exp-charcnn-lolo\\runs\\char_cnn_lolo\\20261019-173306\\Q_s123",
+    "--no-save-checkpoint",
+    "--train-ai-models",
+    "qwen3"
+  ],
+  "best_sha256": "b3167ce46b1add9dcd4b23045f69cd6e7be16e6fbabaab60153a27d5a9905928",
+  "calibration_path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito-worktrees/exp-charcnn-lolo/runs/char_cnn_lolo/20261019-173306/Q_s123/calibration.json",
+  "calibration_sha256": "6b9f373c519f26494745fcb23c542db37a00eff6878bc29b6ba8dd2dfdb4a3d6",
+  "channel": "char_cnn",
+  "config": {
+    "alphabet": "\n !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+    "arch_version": 2,
+    "conv_filters": [
+      64,
+      64,
+      64,
+      64
+    ],
+    "conv_kernel_sizes": [
+      3,
+      5,
+      7,
+      9
+    ],
+    "data_root": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito",
+    "device": "cuda",
+    "dropout": 0.4,
+    "embedding_dim": 128,
+    "fc_units": 1024,
+    "hyperparams": {
+      "batch_size": 128,
+      "early_stop": 7,
+      "epochs": 50,
+      "eval_batch_size": 32,
+      "limit_per_class": null,
+      "lr": 0.001,
+      "lr_factor": 0.5,
+      "lr_patience": 3,
+      "match_ai_groups_to": null,
+      "n_boot": 1000,
+      "seed": 123,
+      "subsample_seed": null,
+      "train_ai_fraction": 1.0,
+      "train_ai_models": [
+        "qwen3"
+      ],
+      "weight_decay": 0.0001
+    },
+    "max_windows": 8,
+    "min_non_ws_chars": 60,
+    "norm": "layernorm_channels",
+    "num_classes": 2,
+    "pad_idx": 0,
+    "preproc_version": 2,
+    "stride": 2048,
+    "torch_version": "2.13.0+cu126",
+    "unk_idx": 1,
+    "vocab_size": 98,
+    "window": 4096
+  },
+  "created_at": "2026-10-20T00:12:22.449822+00:00",
+  "data_summary": {
+    "test": {
+      "n": 4531,
+      "n_ai": 330,
+      "n_empty_after_normalize": 0,
+      "n_human": 4201
+    },
+    "test_all": {
+      "n": 9649,
+      "n_ai": 331,
+      "n_empty_after_normalize": 0,
+      "n_human": 9318
+    },
+    "train": {
+      "n": 10928,
+      "n_ai": 240,
+      "n_empty_after_normalize": 0,
+      "n_human": 10688
+    },
+    "val": {
+      "n": 2931,
+      "n_ai": 63,
+      "n_empty_after_normalize": 0,
+      "n_human": 2868
+    }
+  },
+  "dirty": false,
+  "failure": null,
+  "git_sha": "3708cf9265513ba9149454c59a09bba05c54a071",
+  "leak_guard": {
+    "passed": true,
+    "path": "leak_guard.json",
+    "shares": {
+      "course_marker": 5.631581911358901e-05,
+      "non_alphabet": 0.0
+    }
+  },
+  "lolo": {
+    "after": {
+      "train": {
+        "files_by_model": {
+          "qwen3": 240
+        },
+        "groups_by_model": {
+          "qwen3": 240
+        },
+        "n_human": 10688
+      },
+      "val": {
+        "files_by_model": {
+          "qwen3": 63
+        },
+        "groups_by_model": {
+          "qwen3": 63
+        },
+        "n_human": 2868
+      }
+    },
+    "before": {
+      "train": {
+        "files_by_model": {
+          "deepseek-chat": 632,
+          "gemini-flash": 1,
+          "llama4": 1,
+          "qwen3": 240
+        },
+        "groups_by_model": {
+          "deepseek-chat": 632,
+          "gemini-flash": 1,
+          "llama4": 1,
+          "qwen3": 240
+        },
+        "n_human": 10688
+      },
+      "val": {
+        "files_by_model": {
+          "codestral": 1,
+          "deepseek-chat": 144,
+          "mistral-small": 1,
+          "qwen3": 63
+        },
+        "groups_by_model": {
+          "codestral": 1,
+          "deepseek-chat": 144,
+          "mistral-small": 1,
+          "qwen3": 63
+        },
+        "n_human": 2868
+      }
+    },
+    "match_ai_groups_to": null,
+    "train_ai_models": [
+      "qwen3"
+    ]
+  },
+  "manifest_path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito-worktrees/exp-charcnn-lolo/data/splits/split_v1.json.gz",
+  "manifest_sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f",
+  "mode": "representatives",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.5",
+  "run_id": "char_cnn/Q_s123",
+  "sampling": {
+    "human_shortfall": 0,
+    "n_ai": 240,
+    "n_batches": 4,
+    "n_human": 240,
+    "n_human_available": 10688,
+    "ratio": "1:1"
+  },
+  "schema": "graphito.run_config/v1",
+  "seed": 123,
+  "selection": {
+    "checkpoint": "best.pth",
+    "epoch": 25,
+    "epochs_run": 33,
+    "rule": "max (val_roc_auc, val_pr_auc); ties -> earlier epoch; null AUC never selected",
+    "stopped_early": true,
+    "val_pr_auc": 0.9605593395059943,
+    "val_roc_auc": 0.9989207677492197
+  },
+  "split": "test",
+  "status": "complete",
+  "subsample": {
+    "fraction": 1.0,
+    "n_ai_original": 240,
+    "n_ai_subsampled": 240,
+    "seed": null
+  },
+  "threshold_source": "calibration:6b9f373c519f26494745fcb23c542db37a00eff6878bc29b6ba8dd2dfdb4a3d6",
+  "thresholds": {},
+  "versions": {
+    "matplotlib": "3.11.0",
+    "numpy": "2.4.4",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "torch": "2.13.0+cu126"
+  }
+}
