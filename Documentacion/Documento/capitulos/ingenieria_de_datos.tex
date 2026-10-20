@@ -93,7 +93,7 @@ Al explorar los archivos se identificaron tres limitaciones:
 
 \begin{enumerate}
     \item \textbf{Código en serbocroata.}
-    Los estudiantes escribieron variables, mensajes y comentarios en serbocroata con caracteres latinos (por ejemplo, \texttt{unos} para entrada, \texttt{broj} para número o \texttt{niz} para arreglo). Si el código de IA se generara en inglés, un modelo podría aprender a distinguir idiomas en lugar de estilos de programación. Es como separar dos grupos de alumnos solo porque unos escriben en inglés y otros en español.
+    Los estudiantes escribieron variables, mensajes y comentarios en serbocroata con caracteres latinos (por ejemplo, \texttt{unos} para entrada, \texttt{broj} para número o \texttt{niz} para arreglo). Si el código de IA se generara en inglés, un modelo podría aprender a distinguir idiomas en lugar de estilos de programación.
 
     \item \textbf{Ausencia de enunciados.}
     Las carpetas contienen las soluciones, organizadas por tarea (por ejemplo, \texttt{A2016/Z1/Z1}), pero no la descripción de los problemas. Sin el enunciado no era posible pedir a una IA que resolviera el mismo ejercicio.
@@ -106,7 +106,7 @@ Al explorar los archivos se identificaron tres limitaciones:
 \subsection{Reconstrucción de Enunciados}
 \label{subsec:ingenieria_inversa}
 
-Para recuperar los enunciados se aplicó una especie de ingeniería inversa: a partir de varias soluciones correctas de una misma tarea, un modelo de lenguaje deduce qué se pedía. La Figura~\ref{fig:reconstruccion_enunciado} ilustra la idea. Es como inferir la pregunta de un examen leyendo varias respuestas bien resueltas.
+Para recuperar los enunciados se aplicó una especie de ingeniería inversa: a partir de varias soluciones correctas de una misma tarea, un modelo de lenguaje deducen las indicaciones que siguieron los alumnos para generar los códigos. La Figura~\ref{fig:reconstruccion_enunciado} ilustra la idea. 
 
 \begin{figure}[H]
     \centering
@@ -139,7 +139,7 @@ El procedimiento fue el siguiente:
 \begin{enumerate}
     \item \textbf{Muestreo por tarea.} Para cada tarea se tomaron de 2 a 3 códigos de estudiantes distintos que compilaban y pasaban las pruebas del curso.
     \item \textbf{Análisis con un modelo de lenguaje.} Se envió ese grupo de códigos a un modelo de lenguaje (por defecto, \textit{GPT-4o-mini}) con la instrucción de comparar las soluciones y redactar el enunciado, con sus reglas de entrada y salida.
-    \item \textbf{Dos versiones del catálogo.} Una versión en español, para que docentes y evaluadores comprendan cada ejercicio, y otra en serbocroata, usada como entrada para generar el código de IA y mantener la paridad de idioma con el código original.
+    \item \textbf{Dos versiones del catálogo.} Una versión en español, para poder comprender que pide cada ejercicio, y otra en serbocroata, usada como entrada para generar el código de IA y mantener la paridad de idioma con el código original.
     \item \textbf{Puntos de control.} El proceso guarda su avance para retomarse ante fallas de red o límites de la API.\footnote{Implementado en \texttt{data/extraer\_enunciados.py}.}
 \end{enumerate}
 
@@ -165,14 +165,14 @@ La Tabla~\ref{tab:ejemplos_enunciados_inferidos} muestra ejemplos de los enuncia
 \subsection{Generación de la Contraparte de IA}
 \label{subsec:generacion_ia}
 
-Con los enunciados disponibles, se pidió a modelos de lenguaje que resolvieran cada tarea como lo haría un estudiante. En total se generaron 1,520 archivos, de los cuales 1,453 permanecieron tras la limpieza.\footnote{Implementado en \texttt{data/generar\_referencias.py}.} Se tomaron tres decisiones para evitar atajos.
+Con los enunciados disponibles, se pidió a modelos de lenguaje que resolvieran cada tarea como lo haría un estudiante. La cantidad de código a generar no se tomó como una meta fija, sino que se justificó con un criterio de paro basado en una curva de aprendizaje (Sección~\ref{subsec:justificacion_tamano_sintetico}). Se tomaron tres decisiones para evitar atajos.
 
 \subsubsection{Control del Sesgo de Idioma}
-Las instrucciones se redactaron en serbocroata y pedían que variables, funciones y mensajes también lo estuvieran (nombres como \texttt{broj}, \texttt{zbir} o \texttt{unos}). Así, el idioma deja de ser una pista para distinguir las clases.
+Las instrucciones se redactaron en serbocroata y se le pidió al modelo que las variables, funciones y mensajes también lo estuvieran (nombres como \texttt{broj}, \texttt{zbir} o \texttt{unos}). Así, el idioma deja de ser una pista para distinguir las clases.
 
 \subsubsection{Perfiles de Estudiante y Cuota de Comentarios}
-Las IA suelen escribir comentarios extensos por defecto, mientras que muchos estudiantes no comentan. Se observó que alrededor del 38\,\% de los códigos humanos del conjunto base incluía comentarios. % TODO verificar: cifra heredada del texto anterior y del comentario en generar_referencias.py; no reproducida con una medición propia.
-Para no dejar la presencia de comentarios como pista fácil, se definieron seis perfiles de generación que se turnan, resumidos en la Tabla~\ref{tab:perfiles_generacion}. En el conjunto final, los perfiles con comentarios suman 433 de los 1,453 archivos (cerca del 30\,\%), algo por debajo de la cuota objetivo.
+Los modelos generadores de código suelen escribir comentarios extensos y bien redactados por defecto, mientras que muchos estudiantes no comentan. Se observó que alrededor del 38\,\% de los códigos humanos del conjunto base incluía comentarios. % TODO verificar: cifra heredada del texto anterior y del comentario en generar_referencias.py; no reproducida con una medición propia.
+Para no dejar la presencia de comentarios como pista fácil, se definieron seis perfiles de generación que se turnan, resumidos en la Tabla~\ref{tab:perfiles_generacion}. 
 
 \begin{table}[H]
     \centering
@@ -193,8 +193,115 @@ Para no dejar la presencia de comentarios como pista fácil, se definieron seis 
 La temperatura ($T$) es un parámetro del modelo de lenguaje: valores altos producen respuestas más variadas y valores bajos, más conservadoras.
 
 \subsubsection{Variedad de Generadores}
-El código de IA no proviene de un solo modelo, pero sí está muy concentrado. De los 1,453 archivos finales, 1,021 provienen de \textit{DeepSeek-Chat} y 424 de \textit{Qwen3}; los 8 restantes provienen de otros cinco modelos (Codestral, Gemini Flash, Llama 4, Kimi y Mistral Small). Es decir, más del 99\,\% del código de IA viene de dos generadores. Esto es una limitación importante: aún no se sabe qué tan bien se reconocerá código de IA producido por otros modelos. Se retoma en los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
+El código de IA no proviene de un solo modelo. Los códigos finales archivos finales provienen de \textit{DeepSeek-Chat} y de \textit{Qwen3}. Esto es una limitación importante: aún no se sabe qué tan bien se reconocerá código de IA producido por otros modelos. Se retoma en los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
 
+% ----------------------------------------------------------------------
+\subsection{Criterio de Paro de la Generación: Curva de Aprendizaje}
+\label{subsec:justificacion_tamano_sintetico}
+
+Generar código con modelos de lenguaje cuesta tiempo y dinero. Para optimizar estos recursos nos hicimos la siguiente pregunta: ¿conviene seguir generando códigos con IA? Ya que al entrenar un modelo los primeros ejemplos le enseñan mucho, pero cada ejemplo parecido adicional va aportando cada vez menos. Puesto que la planeación inicial contemplaba un corpus de 20,000 códigos (10,000 por clase), decidimos realizar un experimento que funcionara como criterio de paro: ir evaluando el rendimiento del modelo a medida que aumentaba progresivamente la cantidad de códigos de IA generados, y detener el proceso cuando la mejora marginal se volviera pequeña. Se fue entrenando el modelo a la par que los códigos de IA fueron generados, analizando la mejora en la curva de aprendizaje para evaluar si aún valía la pena continuar con la generación.
+
+Antes del experimento: cuatro conceptos que se usan en esta sección. La Tabla~\ref{tab:conceptos_curva} explica los términos que aparecen en los resultados.
+
+\begin{table}[H]
+    \centering
+    \caption{Conceptos necesarios para leer la curva de aprendizaje.}
+    \label{tab:conceptos_curva}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        \textbf{Concepto} & \textbf{Qué significa} & \textbf{Por qué se usa aquí} \\ \hline
+        Familias &
+        Conjunto de archivos que comparten al menos el 85\,\% de sus fragmentos de código (Sección~\ref{subsec:deduplicacion}). &
+        Una familia cuenta como \textbf{un solo ejemplo}. Si no, el modelo vería la misma solución muchas veces y la memorizaría en lugar de aprender a distinguir estilos. \\ \hline
+        Semilla &
+        Número que fija los sucesos aleatorios de un entrenamiento (qué ejemplos se eligen, cómo empiezan los pesos). &
+        Cambiar la semilla da un resultado ligeramente distinto. Se repite cada punto con 5 semillas y se reporta la media, para no confundir suerte con mejora. \\ \hline
+        PR-AUC &
+        Se ordenan los archivos del más al menos sospechoso de ser IA y se mide si los que realmente son IA quedan arriba, sin muchos humanos mezclados. Va de 0 a 1; 1 es perfecto. &
+        Aquí hay pocos casos de IA entre 6,808 humanos. PR-AUC castiga falsos positivos. ROC-AUC lo diluye porque divide entre todos los humanos \cite{McDermott2024AUROC}. \\ \hline
+    \end{tabularx}
+\end{table}
+
+En la \ref{tab:embudo_humano} se muestra como se repartieron los códigos de autoría humana para el experimento.
+
+\begin{table}[H]
+    \centering
+    \caption{Del código humano original a los ejemplos usados en el experimento.}
+    \label{tab:embudo_humano}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{0.27\textwidth}|>{\centering\arraybackslash}p{0.14\textwidth}|X|}
+        \hline
+        \textbf{Etapa} & \textbf{Archivos humanos} & \textbf{Qué ocurre} \\ \hline
+        Entregas originales & 43,771 & Conjunto público de la Universidad de Sarajevo (Sección~\ref{subsec:seleccion_dataset_ieee}). \\ \hline
+        Tras la limpieza y la deduplicación entre particiones & 40,936 & Se excluyen vacíos, muy cortos, copias y duplicados que cruzarían particiones. \\ \hline
+        Asignados a entrenamiento & 24,810 & El resto se reparte por tarea: 6,808 a validación y 9,318 a prueba. \\ \hline
+        Ejemplos únicos de entrenamiento & 10,688 & Los 24,810 archivos forman 10,688 familias de casi-copias; cada familia cuenta una vez. \\ \hline
+    \end{tabularx}
+\end{table}
+
+Se utilizó la red convolucional de caracteres CharCNN (Capítulo~\ref{cap:modelado}). La parte de código generado por humanos se mantuvo fija, siempre los mismos 10,688 ejemplos únicos de entrenamiento. Lo que se varió fue la cantidad de código de generado por IA de entrenamiento, en lotes incrementales que representan el 5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90 y 100\,\% del conjunto final. Así, cualquier cambio en el resultado se debe a la cantidad de IA y no a cambios en el código humano. Para controlar la variabilidad en los resultados se tomaron las siguientes medidas:
+
+\begin{enumerate}
+    \item \textbf{Submuestras anidadas por familia.} Los archivos de IA se eligieron por familia de casi-copias y por tarea. Con una misma semilla, cada subconjunto contiene al anterior (el de 20\,\% incluye al de 15\,\%), de manera que los cambios no se deben a un reparto distinto de los datos.
+    \item \textbf{Repeticiones.} Cada fracción se entrenó con 5 semillas independientes \cite{Bouthillier2021Variance}: 12 fracciones por 5 semillas dan 60 entrenamientos.
+    \item \textbf{Evaluación en validación.} Las métricas se calcularon en el conjunto de validación completo (6,808 archivos humanos y 225 de IA), que conserva la proporción real de un aula; el conjunto de prueba no se tocó. La métrica principal fue PR-AUC (Tabla~\ref{tab:conceptos_curva}), elegida por el uso previsto, que es encontrar pocos casos de IA con pocas falsas alarmas, y no solo por el desbalance de clases \cite{McDermott2024AUROC}.
+\end{enumerate}
+
+La Figura~\ref{fig:curva_aprendizaje_charcnn} muestra cómo cambia PR-AUC conforme se aumentó la cantidad de código de IA. Cada punto de la línea es el promedio de las 5 semillas.  La línea sólida es la media de 5 semillas (banda sombreada: $\pm 1\,\sigma$) y los puntos semitransparentes son ejecuciones con semillas individuales. El eje horizontal está en escala logarítmica, por lo que cada duplicación de datos ocupa el mismo ancho, lo que permite ver el salto inicial y el aplanamiento posterior.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figuras/curva_aprendizaje_charcnn.png}
+    \caption{Curva de aprendizaje de CharCNN según la cantidad de grupos únicos de IA de entrenamiento. El eje horizontal está en escala logarítmica: cada duplicación de datos ocupa el mismo ancho, lo que permite ver el salto inicial y el aplanamiento posterior.}
+    \label{fig:curva_aprendizaje_charcnn}
+\end{figure}
+
+Antes de empezar se fijó una regla para decidir cuándo dejar de generar código. Se dice que la curva está \textbf{saturada} (es decir, que más datos ya no ayudan) si, al pasar de la mitad de los ejemplos de IA (439) a todos (874), PR-AUC mejora menos de $0.01$ y menos que la variación normal entre repeticiones. Los resultados fueron (el valor después de $\pm$ indica cuánto varía el resultado entre las 5 repeticiones):
+
+\begin{itemize}
+    \item \textbf{Con muy pocos datos} (5\,\%, 55 ejemplos), el modelo es inestable: PR-AUC $= 0.5546 \pm 0.2988$. El resultado depende mucho de la suerte del sorteo.
+    \item \textbf{Con una cantidad moderada} (20\,\% y 30\,\%, 182 y 256 ejemplos), el modelo ya es estable y acierta casi siempre: PR-AUC de $0.9240$ y $0.9522$.
+    \item \textbf{De la mitad al total} (50\,\% a 100\,\%), PR-AUC sube de $0.9667$ a $0.9816$, una ganancia de $0.0148$.
+\end{itemize}
+
+La ganancia ($0.0148$) supera por poco el umbral ($0.01$), así que, en sentido estricto, la curva \textit{todavía no está saturada}: más datos siguen ayudando un poco. Pero la mejora es pequeña. Pasar de 256 a 874 ejemplos (más del triple de datos) solo subió PR-AUC en $0.0294$. La Figura~\ref{fig:mejora_marginal_charcnn} muestra cuánto se gana en cada paso: mucho al principio y poco después, lo que sugiere que triplicar los datos de IA aportaría poco más.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figuras/mejora_marginal_charcnn_lc.png}
+    \caption{Mejora marginal de PR-AUC en validación entre fracciones consecutivas de datos de IA. Las tres primeras transiciones superan el ruido promedio entre semillas (línea punteada); las siguientes quedan por debajo de él.}
+    \label{fig:mejora_marginal_charcnn}
+\end{figure}
+
+En los últimos pasos, cada mejora fue menor que la variación normal entre repeticiones; es decir, ya no se distingue de un simple efecto del azar. Con esto se decidió dejar de generar código.
+
+Al detenerse, se habían generado 1,520 archivos de IA, pero la curva llega solo hasta 874 ejemplos (su 100\,\%). La diferencia no se debe a que se descartara código, sino a tres pasos que se explican en la Sección~\ref{sec:preparacion_datos} y se resumen en la Tabla~\ref{tab:conteo_ia}:
+
+\begin{enumerate}
+    \item \textbf{Limpieza (1,520 $\rightarrow$ 1,453).} Se excluyeron 67 archivos: 55 generaciones fallidas o casi vacías y 12 duplicados que habrían quedado repartidos entre entrenamiento y prueba. Se aplicó el mismo criterio que al código humano.
+    \item \textbf{Partición (1,453 $\rightarrow$ 897).} Los 1,453 archivos se reparten por tarea entre entrenamiento (897), validación (225) y prueba (331). Solo el entrenamiento puede usarse para enseñar al modelo; la validación sirve para medir la curva de aprendizaje y la prueba se reserva intacta para la evaluación final del Capítulo~\ref{cap:modelado}. 
+    \item \textbf{Duplicados internos (897 $\rightarrow$ 874).} Algunos de los 897 archivos de entrenamiento son prácticamente iguales entre sí. Cada familia de casi-copias cuenta como un solo ejemplo, porque repetir el mismo código no enseña nada nuevo. Quedan 874 ejemplos únicos.
+\end{enumerate}
+
+\begin{table}[H]
+    \centering
+    \caption{De los archivos de IA generados a los ejemplos usados en la curva de aprendizaje.}
+    \label{tab:conteo_ia}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\textwidth}{|l|c|X|}
+        \hline
+        \textbf{Etapa} & \textbf{Archivos de IA} & \textbf{Motivo} \\ \hline
+        Generados & 1,520 & Total producido por los modelos de lenguaje al momento del paro. \\ \hline
+        Tras la limpieza & 1,453 & Se excluyen 67: generaciones fallidas o casi vacías (55) y duplicados entre particiones (12). \\ \hline
+        En entrenamiento & 897 & El resto (225 en validación y 331 en prueba) no se usa para entrenar. \\ \hline
+        Ejemplos únicos en entrenamiento & 874 & Las casi-copias cuentan como un solo ejemplo. \\ \hline
+    \end{tabularx}
+\end{table}
+
+De este modo, cuando la curva habla del 100\,\% se refiere al 100\,\% de los ejemplos de IA disponibles para entrenar (874 grupos únicos tomados de los 897 archivos de entrenamiento), no al total bruto generado.
+
+Existen dos cosas a tener en cuenta con estos resultados. Primero, el conjunto de validación también se usó para decidir cuándo detener cada entrenamiento, así que los valores absolutos pueden ser algo optimistas por lo que el sesgo afecta por igual a todos los puntos de la curva. Segundo, el experimento solo cambia la cantidad de código de un mismo generador. En este conjunto, el límite parece ser la diversidad de modelos generadores y no el volumen. Con esta evidencia se decidió no seguir generando código de IA y conservar los 1,520 archivos (874 ejemplos únicos de entrenamiento, Tabla~\ref{tab:conteo_ia}) en lugar de alcanzar la meta planificada de 10,000; esa es la razón de que el corpus tenga el tamaño que tiene.
 % ----------------------------------------------------------------------
 \subsection{Ejemplo Comparativo: Código Humano frente a Código de IA}
 \label{subsec:caso_estudio_comparativo}
@@ -282,79 +389,12 @@ Con el mismo enunciado y las mismas condiciones, aparecen diferencias de estruct
 
 Como indica la Tabla~\ref{tab:caso_estudio_humano_ia}, un solo rasgo no basta para valorar un código: la lógica de ambos programas converge, mientras que los hábitos de escritura son claramente distintos.
 
-% ----------------------------------------------------------------------
-\subsection{¿Cuántos Ejemplos de IA Bastan? Curva de Aprendizaje}
-\label{subsec:justificacion_tamano_sintetico}
-
-Generar código con modelos de lenguaje cuesta tiempo y dinero. La pregunta práctica fue: ¿conviene seguir generando ejemplos de IA o ya se alcanzó una zona de rendimientos decrecientes? Es como estudiar para un examen: los primeros ejemplos enseñan mucho, pero cada ejemplo parecido adicional enseña menos. La planeación inicial contemplaba un corpus de 20,000 códigos (10,000 por clase); se diseñó un experimento pre-registrado para decidir si era necesario llegar a esa meta.
-
-Antes de describir el experimento conviene aclarar por qué la curva llega a 874 ejemplos de IA y no a los 1,520 que se generaron. La diferencia no se debe a que se descartara código de forma arbitraria, sino a tres pasos que se explican con detalle en la Sección~\ref{sec:preparacion_datos} y que se resumen en la Tabla~\ref{tab:conteo_ia}:
-
-\begin{enumerate}
-    \item \textbf{Limpieza (1,520 $\rightarrow$ 1,453).} Se excluyeron 67 archivos: 55 generaciones fallidas o casi vacías y 12 duplicados que habrían quedado repartidos entre entrenamiento y prueba. Se aplicó el mismo criterio que al código humano.
-    \item \textbf{Partición (1,453 $\rightarrow$ 897).} Los 1,453 archivos se reparten por tarea entre entrenamiento (897), validación (225) y prueba (331). Solo el entrenamiento puede usarse para enseñar al modelo; la validación sirve para medir la curva y la prueba se reserva intacta para la evaluación final del Capítulo~\ref{cap:modelado}. Usar esos archivos aquí sería como dejar que el alumno vea las preguntas del examen.
-    \item \textbf{Duplicados internos (897 $\rightarrow$ 874).} Algunos de los 897 archivos de entrenamiento son prácticamente iguales entre sí. Cada familia de casi-copias cuenta como un solo ejemplo, porque repetir el mismo código no enseña nada nuevo. Quedan 874 ejemplos únicos.
-\end{enumerate}
-
-\begin{table}[H]
-    \centering
-    \caption{De los archivos de IA generados a los ejemplos usados en la curva de aprendizaje.}
-    \label{tab:conteo_ia}
-    \renewcommand{\arraystretch}{1.25}
-    \begin{tabularx}{\textwidth}{|l|c|X|}
-        \hline
-        \textbf{Etapa} & \textbf{Archivos de IA} & \textbf{Motivo} \\ \hline
-        Generados & 1,520 & Total producido por los modelos de lenguaje. \\ \hline
-        Tras la limpieza & 1,453 & Se excluyen 67: generaciones fallidas o casi vacías (55) y duplicados entre particiones (12). \\ \hline
-        En entrenamiento & 897 & El resto (225 en validación y 331 en prueba) no se usa para entrenar. \\ \hline
-        Ejemplos únicos en entrenamiento & 874 & Las casi-copias cuentan como un solo ejemplo. \\ \hline
-    \end{tabularx}
-\end{table}
-
-Así, cuando la curva habla del 100\,\% se refiere al 100\,\% de los ejemplos de IA \emph{disponibles para entrenar} (874), no al total generado.
-
-El experimento usó la red convolucional de caracteres \textit{MultiScaleCharCNN} (Capítulo~\ref{cap:modelado}). Se mantuvo intacto el código humano de entrenamiento (10,688 ejemplos únicos, uno por familia de casi-copias, de los 24,810 archivos humanos de entrenamiento) y se varió la cantidad de código de IA de entrenamiento en 12 fracciones: 5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90 y 100\,\%. Eso corresponde a entre 55 y 874 grupos únicos de IA, tomados de los 897 archivos de IA de entrenamiento. Para controlar la variabilidad:
-
-\begin{enumerate}
-    \item \textbf{Submuestras anidadas por grupo.} Los archivos se eligieron por grupo de duplicados (\texttt{dup\_group}, Sección~\ref{subsec:deduplicacion}) y por tarea. Con una misma semilla, cada subconjunto contiene al anterior, así los cambios no se deben a un reparto distinto de los datos.
-    \item \textbf{Repeticiones.} Cada fracción se entrenó con 5 semillas independientes \cite{Bouthillier2021Variance}, es decir, 60 entrenamientos en total.
-    \item \textbf{Evaluación en validación.} Las métricas se calcularon en el conjunto de validación completo (6,808 archivos humanos y 225 de IA); el conjunto de prueba no se tocó. Como las clases están muy desbalanceadas, la métrica principal fue PR-AUC, elegida por el uso previsto (encontrar pocos casos de IA con pocas falsas alarmas) y no solo por el desbalance \cite{McDermott2024AUROC}; resume qué tan bien el modelo encuentra los casos de IA sin generar demasiadas falsas alarmas (1 es perfecto; vale más cuanto más cerca de 1).
-\end{enumerate}
-
-La Figura~\ref{fig:curva_aprendizaje_charcnn} muestra la curva observada.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.88\textwidth]{figuras/curva_aprendizaje_charcnn.png}
-    \caption{Curva de aprendizaje de MultiScaleCharCNN según la cantidad de grupos únicos de IA de entrenamiento. La línea sólida es la media de 5 semillas (banda sombreada: $\pm 1\,\sigma$) y los puntos semitransparentes son corridas individuales. El 100\,\% equivale a 874 grupos únicos, tomados de los 897 archivos de IA de entrenamiento.}
-    \label{fig:curva_aprendizaje_charcnn}
-\end{figure}
-
-El criterio de saturación pre-registrado consideraba la curva saturada si la ganancia media de PR-AUC entre el 50\,\% ($n=439$) y el 100\,\% ($n=874$) era menor que $0.01$ y menor que la desviación estándar del 100\,\%. Los resultados fueron:
-
-\begin{itemize}
-    \item Con el 5\,\% de los datos ($n=55$), el resultado es muy inestable (PR-AUC $= 0.5546 \pm 0.2988$).
-    \item Con el 20\,\% ($n=182$) y el 30\,\% ($n=256$) el modelo se estabiliza: PR-AUC de $0.9240 \pm 0.0108$ y $0.9522 \pm 0.0113$.
-    \item Entre el 50\,\% ($0.9667 \pm 0.0074$) y el 100\,\% ($0.9816 \pm 0.0038$), la ganancia es de $0.0148$, con una desviación del 100\,\% de $0.0038$.
-\end{itemize}
-
-Como $0.0148 > 0.01$, el criterio clasifica la curva como \textit{aún no saturada en sentido estricto}: el modelo sigue mejorando un poco con más ejemplos. Aun así, el avance se vuelve pequeño. Del 30\,\% al 100\,\% se agregan 618 grupos y PR-AUC mejora solo $0.0294$. La Figura~\ref{fig:mejora_marginal_charcnn} muestra la ganancia en cada paso: es grande al principio y pequeña después, lo que sugiere que triplicar los datos de IA aportaría poco.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.88\textwidth]{figuras/mejora_marginal_charcnn_lc.png}
-    \caption{Mejora marginal de PR-AUC en validación entre fracciones consecutivas de datos de IA. Las tres primeras transiciones superan el ruido promedio entre semillas (línea punteada); las siguientes quedan por debajo de él.}
-    \label{fig:mejora_marginal_charcnn}
-\end{figure}
-
-Dos advertencias acompañan estos resultados. Primero, el conjunto de validación también se usó para decidir cuándo detener cada entrenamiento, así que los valores absolutos pueden ser algo optimistas; el sesgo afecta por igual a todos los puntos de la curva. Segundo, el experimento solo cambia la \emph{cantidad} de código de un mismo generador. En este conjunto, el límite parece ser la \textbf{diversidad} de generadores y no el volumen. Con esta evidencia se decidió no seguir generando código de IA y conservar los 1,520 archivos ya generados (874 ejemplos únicos de entrenamiento, Tabla~\ref{tab:conteo_ia}) en lugar de perseguir la meta planificada de 10,000; se remite la pregunta de la generalización a otros modelos a los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
-
 % ======================================================================
 \section{Preparación y Preprocesamiento de Datos}
 \label{sec:preparacion_datos}
 % ======================================================================
 
-Antes de enseñar a los modelos, hay que asegurarse de que el examen sea justo. Esta sección describe cuatro pasos: limpiar los archivos, retirar duplicados, dividir el conjunto sin fuga de información y adaptar el texto a cada canal. La Figura~\ref{fig:embudo_datos} anticipa el efecto de los dos primeros pasos sobre el número de archivos.
+Antes de entrenar los modelos, hay que buscar tener calidad en los datos. Esta sección describe cuatro pasos: limpiar los archivos, retirar duplicados, dividir el conjunto sin fuga de información y adaptar el texto a cada canal. La Figura~\ref{fig:embudo_datos} muestra el resultado de los dos primeros pasos sobre la cantidad de archivos.
 
 \begin{figure}[H]
     \centering
@@ -376,9 +416,9 @@ Antes de enseñar a los modelos, hay que asegurarse de que el examen sea justo. 
 \subsection{Limpieza Simétrica y Aprendizaje de Atajos}
 \label{subsec:limpieza_simetrica}
 
-La limpieza se aplica con el mismo criterio al código humano y al de IA. Se descartan los archivos vacíos, los demasiado cortos (menos de 50 caracteres efectivos), los que son copias por nombre de archivo y las generaciones fallidas. En total se excluyeron 2,835 archivos humanos y 67 de IA, incluidos los duplicados que se describen en la Sección~\ref{subsec:deduplicacion}.
+La limpieza se aplica con el mismo criterio al código humano y al de IA. Se descartan los archivos vacíos, los demasiado cortos (menos de 50 caracteres), los que tienen el mismo nombre de archivo y las generaciones fallidas. En total se excluyeron 2,835 archivos humanos y 67 de IA, incluidos los duplicados que se describen en la Sección~\ref{subsec:deduplicacion}.
 
-Además se eliminan las pistas que no tienen que ver con el estilo de programación. El ejemplo principal es la cabecera del curso: líneas como ``Zadaca 6'' o ``Tutorijal 13'' aparecían en cerca de la mitad de los archivos humanos de una muestra revisada y en casi ninguno de los de IA. Si se dejaran, un modelo podría clasificar mirando esa línea. Este fenómeno se conoce como \textit{aprendizaje de atajos} (\textit{shortcut learning}) \cite{Geirhos2020Shortcut}: es el alumno que aprueba reconociendo la letra del examen en lugar de entender la materia. Lo mismo ocurre con los comentarios y con la sangría, que dependen del editor que se use y no del autor. Por eso estos elementos se neutralizan para ambas clases, como se detalla en la Sección~\ref{subsec:prep_estilometria}.
+Además se eliminan las pistas que no tienen que ver con el estilo de programación. El ejemplo principal es la cabecera del curso: líneas como ``Zadaca 6'' o ``Tutorijal 13'' aparecían en cerca de la mitad de los archivos humanos de una muestra revisada y en casi ninguno de los de IA. Si se dejaran, un modelo podría clasificar mirando únicamente esa línea, ignorando el resto del código. Este fenómeno se conoce como aprendizaje de atajos (\textit{shortcut learning}) \cite{Geirhos2020Shortcut}. Lo mismo ocurre con los comentarios y con la sangría, que dependen del editor que se use y no del autor. Por eso estos elementos se neutralizan para ambas clases, como se detalla en la Sección~\ref{subsec:prep_estilometria}.
 
 % ----------------------------------------------------------------------
 \subsection{Eliminación de Duplicados}
@@ -391,18 +431,20 @@ En cursos introductorios muchas entregas son idénticas o casi idénticas. Si un
     \item \textbf{Duplicados casi exactos.} Dentro de cada tarea se comparan los archivos por fragmentos de cinco elementos consecutivos, ignorando los nombres de variables. Si comparten al menos el 85\,\% de sus fragmentos (similitud de Jaccard sobre fragmentos \cite{Broder1997Resemblance}), se agrupan, práctica habitual para evitar que los duplicados distorsionen la evaluación \cite{Lee2022Dedup}.\footnote{La búsqueda emplea MinHash con bandas (LSH) \cite{Broder1997Resemblance} para evitarse comparar todos los pares de archivos (\texttt{models/evaluation/dedup.py}). Se midió la sensibilidad con los umbrales 0.80, 0.85 y 0.90.}
 \end{itemize}
 
-Cada conjunto de archivos equivalentes forma un \textbf{grupo de duplicados} (\texttt{dup\_group}), que es como una ``familia'' de entregas. Una familia nunca se reparte entre particiones. Si una familia aparece en tareas asignadas a particiones distintas, se conserva en la partición más reservada (prueba antes que validación y esta antes que entrenamiento) y se excluyen sus demás miembros. En total se excluyeron 236 archivos por esta causa (224 humanos y 12 de IA).
+Cada conjunto de archivos equivalentes forma un \textbf{grupo de duplicados} (\texttt{dup\_group}), que es como una ``familia'' de entregas casi idénticas. El objetivo es que una familia nunca quede repartida entre entrenamiento, validación y prueba, porque entonces el modelo se evaluaría con código que ya vio.
+
+Esto puede pasar porque el conjunto se divide por tarea (Sección~\ref{subsec:particion_datos}) y una misma solución puede aparecer en tareas distintas. Por ejemplo, si una familia tiene un archivo en una tarea de entrenamiento y otro en una de prueba, la familia se queda en la partición que debe estar más aislada del aprendizaje (prueba, luego validación, luego entrenamiento) y se \textbf{excluyen} los miembros que estaban en las otras particiones. Así, el modelo no entrena con una copia de lo que luego se le pide evaluar. Por esta causa se excluyeron 236 archivos (224 humanos y 12 de IA).
 
 % ----------------------------------------------------------------------
-\subsection{Partición \texttt{split\_v1} para Evitar Fuga de Información}
+\subsection{Partición para Evitar Fuga de Información}
 \label{subsec:particion_datos}
 
-Dividir los archivos al azar es un error habitual. Allamanis \cite{Allamanis2019Adverse} mostró que la duplicación entre entrenamiento y prueba puede inflar de forma artificial las métricas de modelos de código, porque el modelo ya vio versiones casi idénticas de lo que se le pide evaluar. Esa situación se llama \textbf{fuga de información} \cite{Kapoor2023Leakage}. Equivale a estudiar con las mismas preguntas del examen.
+Dividir los archivos al azar es un error que cometimos en primeras versiones del modelo. Allamanis \cite{Allamanis2019Adverse} mostró que la duplicación entre entrenamiento y prueba puede inflar de forma artificial las métricas de modelos de código, porque el modelo ya vio versiones casi idénticas de lo que se le pide evaluar. Esa situación se llama fuga de información \cite{Kapoor2023Leakage}.
 
-Para evitarla, la partición \texttt{split\_v1} se hace por \textbf{tarea} y no por archivo (Figura~\ref{fig:esquema_particion}):
+Para evitar este problema, la partición se hace por tarea y no por archivo (Figura~\ref{fig:esquema_particion}):
 
 \begin{itemize}
-    \item Una tarea se identifica por la letra del curso y los códigos \texttt{Zx/Zy}; así, las entregas de 2016 y de 2017 de una misma tarea forman un solo \textbf{bloque}. Se obtienen 48 bloques.
+    \item Una tarea se identifica por la letra del curso y los códigos \texttt{Zx/Zy}; así, las entregas de 2016 y de 2017 de una misma tarea forman un solo bloque. Se obtienen 48 bloques.
     \item Cada bloque, con todo su código humano y de IA, se asigna completo a entrenamiento (30 bloques), validación (8) o prueba (10).
     \item Las proporciones objetivo son 20\,\% de los bloques para prueba y 15\,\% para validación, por letra de curso, con semilla 42.
     \item El resultado se guarda en un archivo con huella digital (sha256) para que cualquiera pueda comprobar que se usa la misma partición.\footnote{Construida con \texttt{scripts/build\_split.py} y registrada en \texttt{data/splits/split\_v1.json.gz}.}
@@ -426,7 +468,7 @@ Para evitarla, la partición \texttt{split\_v1} se hace por \textbf{tarea} y no 
         \draw[arrow] (blocks.south) -- (te.north);
         \draw[arrow] (te.south) -- (lock.north);
     \end{tikzpicture}
-    \caption{Esquema de la partición \texttt{split\_v1}: cada tarea, con sus dos años y sus dos clases, pertenece a una sola partición.}
+    \caption{Esquema de la partición: cada tarea, con sus dos años y sus dos clases, pertenece a una sola partición.}
     \label{fig:esquema_particion}
 \end{figure}
 
@@ -436,7 +478,7 @@ La partición por tarea evita que el mismo problema aparezca en dos particiones,
 \subsection{Preparación para Cada Canal}
 \label{subsec:bifurcacion_pipeline}
 
-Graphito analiza cada archivo con dos canales que miran cosas distintas: el \textbf{Canal A} compara la similitud semántica (qué hace el programa) y el \textbf{Canal B} produce un indicador estilométrico (cómo está escrito). Cada uno lee el código a su manera, como dos lectores: uno busca la idea del texto y otro, la caligrafía. La Figura~\ref{fig:bifurcacion_preprocesamiento} muestra cómo se bifurca la preparación y la Tabla~\ref{tab:pipeline_dual_preprocesamiento} compara ambos tratamientos.
+Graphito analiza cada archivo con dos canales que miran cosas distintas. El Canal A compara la similitud semántica (qué hace el programa) y el Canal B produce un indicador estilométrico (cómo está escrito). La Figura~\ref{fig:bifurcacion_preprocesamiento} muestra cómo se divide la preparación y la Tabla~\ref{tab:pipeline_dual_preprocesamiento} compara ambos tratamientos.
 
 \begin{figure}[H]
     \centering
@@ -465,7 +507,7 @@ Graphito analiza cada archivo con dos canales que miran cosas distintas: el \tex
         \draw[arrow] (a2.east) -- (a3.west);
         \draw[arrow] (a3.east) -- (a4.west);
     \end{tikzpicture}
-    \caption{Bifurcación del preprocesamiento: un mismo archivo se prepara de forma distinta para el Canal B (texto de caracteres) y para el Canal A (estructura y flujo de datos).}
+    \caption{Procesamiento dividido: un mismo archivo se prepara de forma distinta para el Canal B (texto de caracteres) y para el Canal A (estructura y flujo de datos).}
     \label{fig:bifurcacion_preprocesamiento}
 \end{figure}
 
@@ -500,7 +542,7 @@ El Canal B trata el código como una secuencia de caracteres. Antes de leerlo se
     \item Se normaliza el espacio en blanco, como se indica en la Tabla~\ref{tab:pipeline_dual_preprocesamiento}.
 \end{enumerate}
 
-El texto resultante se convierte en números. El alfabeto contiene el salto de línea y los 95 caracteres ASCII imprimibles; el valor 0 se reserva para el relleno (\textit{padding}) y el 1 para cualquier carácter desconocido, de modo que no se confunden. Como la red necesita entradas de tamaño fijo, los archivos largos se leen por \textbf{ventanas} de 4,096 caracteres que se traslapan a la mitad (hasta 8). Es como leer un documento largo por páginas que repiten la mitad de la anterior. Los archivos cortos se completan con relleno.\footnote{Implementado en \texttt{models/char\_cnn/v2/preprocess.py} y \texttt{config.py}. Una comprobación adicional verifica que no sobreviva ninguna marca del curso ni caracteres fuera del alfabeto.}
+El texto resultante se convierte en números. El alfabeto contiene el salto de línea y los 95 caracteres ASCII imprimibles, el valor 0 se reserva para el relleno (\textit{padding}) y el 1 para cualquier carácter desconocido, de modo que no se confunden. Como la red necesita entradas de tamaño fijo, los archivos largos se leen por ventanas de 4,096 caracteres que se traslapan a la mitad (hasta 8). Es como leer un documento largo por páginas que repiten la mitad de la anterior. Los archivos cortos se completan con relleno.\footnote{Implementado en \texttt{models/char\_cnn/v2/preprocess.py} y \texttt{config.py}. Una comprobación adicional verifica que no sobreviva ninguna marca del curso ni caracteres fuera del alfabeto.}
 
 \subsubsection{Canal A: Estructura y Flujo de Datos para GraphCodeBERT}
 \label{subsec:prep_semantica}
@@ -509,12 +551,12 @@ El Canal A busca qué hace el programa, no cómo está escrito. Los pasos son:
 
 \begin{enumerate}
     \item \textbf{Eliminación de comentarios,} respetando el contenido de las cadenas de texto.
-    \item \textbf{Árbol sintáctico.} El analizador \textbf{Tree-sitter} \cite{Brunsfeld2021Treesitter} reconoce la estructura del programa (funciones, ciclos, condiciones). Tolera código incompleto o con errores locales, algo común en trabajos de estudiantes.
+    \item \textbf{Árbol sintáctico.} El analizador Tree-sitter \cite{Brunsfeld2021Treesitter} reconoce la estructura del programa (funciones, ciclos, condiciones). Tolera código incompleto o con errores locales, algo común en trabajos de estudiantes.
     \item \textbf{Grafo de flujo de datos (DFG).} Es un esquema que indica ``qué variable le pasa su valor a cuál''. Se construye una sola vez sobre el archivo completo.
     \item \textbf{Subtokens y ventanas.} El código se divide en subtokens, es decir, trozos de palabra. Si no cabe en una sola entrada, se corta en ventanas de 382 subtokens que se traslapan a la mitad, hasta 16 ventanas. Cada ventana conserva los nodos del grafo que quedan dentro de ella.
 \end{enumerate}
 
-En esta versión los identificadores \textbf{no se renombran} (no se sustituyen por nombres genéricos). Por eso el Canal A es sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}.\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+En esta versión los identificadores no se renombran (no se sustituyen por nombres genéricos). Por eso el Canal A es sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}.\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
 
 % ----------------------------------------------------------------------
 \subsection{Composición Final del Conjunto}
@@ -524,7 +566,7 @@ Tras la limpieza, la eliminación de duplicados y la partición, el conjunto con
 
 \begin{table}[H]
     \centering
-    \caption{Composición del conjunto de datos particionado por tarea (\texttt{split\_v1}).}
+    \caption{Composición del conjunto de datos particionado por tarea.}
     \label{tab:particion_corpus}
     \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
         \hline
@@ -541,7 +583,7 @@ En el conjunto, solo cerca del 3\,\% de los archivos son de IA. Este desbalance 
 
 \begin{itemize}
     \item \textbf{Durante el entrenamiento, los datos se balancean.} Si el modelo aprendiera con 97 ejemplos humanos por cada 3 de IA, le bastaría con responder casi siempre ``humano'' para acertar la mayoría de las veces, sin aprender a reconocer el código de IA. Para evitarlo, en cada época (cada pasada completa de entrenamiento) el modelo ve todos los ejemplos de IA de entrenamiento y la misma cantidad de códigos humanos, elegidos al azar. En la siguiente época se eligen otros códigos humanos. Así, cada época está balanceada (mitad y mitad) y, a lo largo del entrenamiento, el modelo recorre la variedad de los 10,688 ejemplos humanos únicos de entrenamiento (uno por familia de casi-copias) en lugar de descartarlos.
-    \item \textbf{Durante la validación y la prueba, se conserva el desbalance.} Estos conjuntos no se modifican, porque deben parecerse a un aula real, donde la gran mayoría del código es de autoría humana. Medir con datos balanceados haría que el modelo pareciera mejor de lo que sería en la práctica. Por eso, en los capítulos siguientes, además de ROC-AUC, se reporta PR-AUC, que se enfoca en qué tan bien se encuentran los pocos casos de IA sin generar muchas falsas alarmas.
+    \item \textbf{Durante la validación y la prueba, se conserva el desbalance.} Estos conjuntos no se modifican, porque deben parecerse a un aula real, donde la gran mayoría del código es de autoría humana. Medir con datos balanceados haría que el modelo pareciera mejor de lo que sería en la práctica: con la misma tasa de errores, habría muchos menos humanos que acusar por error, y las falsas alarmas se verían menos graves de lo que serían en un aula real. La métrica debe elegirse según el uso previsto del modelo y no solo por la proporción de clases \cite{McDermott2024AUROC}. Por eso, en los capítulos siguientes, además de ROC-AUC, se reporta PR-AUC, que se enfoca en qué tan bien se encuentran los pocos casos de IA sin generar muchas falsas alarmas.
 \end{itemize}
 
 % ======================================================================

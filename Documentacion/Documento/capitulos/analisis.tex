@@ -929,9 +929,11 @@ El desarrollo de Graphito comprende actividades de análisis, diseño, programac
 
 La estimación de los costos de recursos humanos se presenta en la Tabla~\ref{tab:costos_rh}, considerando las actividades realizadas, las horas de trabajo correspondientes y la tarifa utilizada para la valoración económica de cada actividad. La tarifa se determina a partir de una referencia documentada o de un costo real, cuando existe una contratación asociada. En los casos en los que el trabajo es realizado por los integrantes del proyecto como parte de su formación académica, las horas se registran como esfuerzo de desarrollo y no se consideran automáticamente un desembolso económico.
 
-{\footnotesize
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.60\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|>{\raggedright\arraybackslash\hsize=0.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|}
+\begin{landscape}
+{\small
+\renewcommand{\arraystretch}{1.6}
+\setlength{\tabcolsep}{7pt}
+\begin{xltabular}{\linewidth}{|>{\raggedright\arraybackslash\hsize=1.60\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|>{\raggedright\arraybackslash\hsize=0.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|}
     \caption{Estimación de costos de recursos humanos de Graphito.}\label{tab:costos_rh}\\
     \hline
     \textbf{Actividad} & \textbf{Perfil responsable} & \textbf{Horas dedicadas} & \textbf{Tarifa por hora (MXN)} & \textbf{Fuente de la tarifa} & \textbf{Costo estimado (MXN)} \\ \hline
@@ -950,6 +952,7 @@ La estimación de los costos de recursos humanos se presenta en la Tabla~\ref{ta
     \textbf{Total} & & 1\,072 & & & 194,300.00 \\ \hline
 \end{xltabular}
 }
+\end{landscape}
 
 Las horas se estimaron a partir de una dedicación promedio por integrante de 10 horas semanales durante TT1 (20 semanas) y 14 horas semanales durante TT2 (24 semanas), incluyendo el periodo vacacional en el que se continuó el trabajo, lo que da 536 horas por integrante y 1\,072 horas en total. La tarifa de 181.25~MXN por hora se obtuvo del punto medio del rango salarial de un ingeniero junior en México (20\,000 a 38\,000~MXN mensuales brutos)\footnote{JobRise, `Salarios Ingenieros México vs España 2026'', \url{https://jobrise.io/es/blog/salarios-ingenieros-mexico-vs-espana/}.}, dividido entre 160 horas laborales al mes. Dado que el trabajo fue realizado por los propios integrantes como parte de su formación académica, este importe constituye un costo imputado y no un desembolso económico.
 
@@ -961,9 +964,11 @@ La infraestructura tecnológica comprende los equipos de cómputo y los recursos
 
 La Tabla~\ref{tab:costos_infra} presenta los recursos tecnológicos utilizados, sus características, la modalidad de uso y el costo asociado. Para los equipos que ya se encontraban disponibles, se distingue entre su adquisición previa y el costo atribuible a su utilización durante el proyecto. Cuando no existe un desembolso adicional por el uso de un recurso, este se registra de acuerdo con su condición real, sin atribuirle un costo de adquisición inexistente.
 
-{\footnotesize
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.20\hsize}X|>{\raggedright\arraybackslash\hsize=1.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
+\begin{landscape}
+{\small
+\renewcommand{\arraystretch}{1.6}
+\setlength{\tabcolsep}{7pt}
+\begin{xltabular}{\linewidth}{|>{\raggedright\arraybackslash\hsize=1.20\hsize}X|>{\raggedright\arraybackslash\hsize=1.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
     \caption{Estimación de costos de infraestructura tecnológica.}\label{tab:costos_infra}\\
     \hline
     \textbf{Recurso tecnológico} & \textbf{Características o especificaciones} & \textbf{Cantidad} & \textbf{Modalidad de uso} & \textbf{Periodo de utilización} & \textbf{Costo unitario (MXN)} & \textbf{Costo estimado (MXN)} \\ \hline
@@ -978,6 +983,7 @@ La Tabla~\ref{tab:costos_infra} presenta los recursos tecnológicos utilizados, 
     \textbf{Total} & & & & & & 9\,750.00 \\ \hline
 \end{xltabular}
 }
+\end{landscape}
 
 Los equipos de cómputo son propiedad de los integrantes, por lo que su uso no generó un desembolso adicional y el importe se clasifica como costo imputado. La columna de costo unitario muestra el precio de adquisición estimado (22\,000~MXN para el equipo de escritorio, que incluye la ampliación posterior de memoria RAM, y 10\,500~MXN para la laptop, tomando como referencia los precios de oferta publicados en México para ese modelo). El costo estimado corresponde al cargo atribuible a los 12 meses de uso, calculado con la tasa anual de depreciación del 30\% establecida para equipo de cómputo en el artículo 34 de la Ley del Impuesto sobre la Renta. Se emplea como criterio de asignación del costo de uso durante el proyecto y no como valor en libros de los equipos.
 
@@ -989,9 +995,11 @@ Graphito requiere herramientas de desarrollo, bibliotecas de aprendizaje automá
 
 La Tabla~\ref{tab:costos_software} presenta las herramientas y los servicios relacionados con la implementación del sistema, especificando su función, modalidad de acceso y costo. Se distingue entre el software de uso gratuito o de código abierto, las herramientas cubiertas por licencias institucionales y los servicios externos que generan un cargo por suscripción, procesamiento o consumo.
 
-{\footnotesize
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
+\begin{landscape}
+{\small
+\renewcommand{\arraystretch}{1.6}
+\setlength{\tabcolsep}{7pt}
+\begin{xltabular}{\linewidth}{|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=1.10\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.60\hsize}X|>{\raggedright\arraybackslash\hsize=0.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
     \caption{Estimación de costos de herramientas de software y servicios externos.}\label{tab:costos_software}\\
     \hline
     \textbf{Herramienta o servicio} & \textbf{Función dentro de Graphito} & \textbf{Modalidad de acceso o licencia} & \textbf{Unidad de cálculo} & \textbf{Cantidad o consumo} & \textbf{Costo unitario (MXN)} & \textbf{Costo estimado (MXN)} \\ \hline
@@ -1011,6 +1019,7 @@ La Tabla~\ref{tab:costos_software} presenta las herramientas y los servicios rel
     \textbf{Total} & & & & & & 3\,083.93 \\ \hline
 \end{xltabular}
 }
+\end{landscape}
 
 Los dos únicos conceptos con desembolso real fueron la suscripción anual de Overleaf, a la tarifa publicada del plan Standard en pesos mexicanos, y la recarga de 10~USD en OpenRouter, convertida con el tipo de cambio FIX de Banxico del 16 de octubre de 2026 (18.4930~MXN/USD) como referencia. El resto de los componentes se distribuye bajo licencias de código abierto o de acceso libre, por lo que su costo es nulo.
 
@@ -1022,9 +1031,11 @@ Los costos indirectos corresponden a los recursos auxiliares que intervienen en 
 
 La Tabla~\ref{tab:costos_indirectos} presenta los conceptos indirectos considerados en la estimación. La asignación económica se basa en información disponible sobre el costo del servicio, el periodo de utilización y la proporción atribuible al proyecto. Cuando no existe información suficiente para determinar una proporción verificable, el concepto se identifica sin asignarle un importe arbitrario.
 
-{\footnotesize
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.00\hsize}X|>{\raggedright\arraybackslash\hsize=1.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=1.00\hsize}X|}
+\begin{landscape}
+{\small
+\renewcommand{\arraystretch}{1.6}
+\setlength{\tabcolsep}{7pt}
+\begin{xltabular}{\linewidth}{|>{\raggedright\arraybackslash\hsize=1.00\hsize}X|>{\raggedright\arraybackslash\hsize=1.80\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.70\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=1.00\hsize}X|}
     \caption{Estimación de costos indirectos del proyecto.}\label{tab:costos_indirectos}\\
     \hline
     \textbf{Concepto} & \textbf{Descripción} & \textbf{Periodo considerado} & \textbf{Costo total de referencia (MXN)} & \textbf{Proporción atribuible a Graphito} & \textbf{Costo asignado al proyecto (MXN)} & \textbf{Fuente de información} \\ \hline
@@ -1038,6 +1049,7 @@ La Tabla~\ref{tab:costos_indirectos} presenta los conceptos indirectos considera
     \textbf{Total} & & & & & 1\,649.19 & \\ \hline
 \end{xltabular}
 }
+\end{landscape}
 
 La estimación de costos indirectos complementa el presupuesto de Graphito mediante la identificación de los recursos auxiliares utilizados durante su desarrollo. Los importes asignados corresponden únicamente a la parte justificable de cada concepto, con el propósito de evitar la sobreestimación del presupuesto y mantener la relación entre los costos reportados y los recursos realmente utilizados.
 
@@ -1047,9 +1059,11 @@ El concentrado general integra los resultados obtenidos en las estimaciones de r
 
 La Tabla~\ref{tab:costos_concentrado} presenta el resumen presupuestal de Graphito. Los importes se incorporan a partir de los resultados de las tablas anteriores, manteniendo los mismos criterios de cálculo para evitar duplicidades en la contabilización de los recursos.
 
-{\footnotesize
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
+\begin{landscape}
+{\small
+\renewcommand{\arraystretch}{1.6}
+\setlength{\tabcolsep}{7pt}
+\begin{xltabular}{\linewidth}{|>{\raggedright\arraybackslash\hsize=1.40\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|>{\raggedright\arraybackslash\hsize=0.90\hsize}X|}
     \caption{Concentrado general de costos de Graphito.}\label{tab:costos_concentrado}\\
     \hline
     \textbf{Categoría} & \textbf{Costos directos (MXN)} & \textbf{Costos imputados (MXN)} & \textbf{Costo total por categoría (MXN)} & \textbf{Observaciones} \\ \hline
@@ -1064,6 +1078,7 @@ La Tabla~\ref{tab:costos_concentrado} presenta el resumen presupuestal de Graphi
     \textbf{Total general} & 3\,083.93 & 205\,699.19 & 208\,783.12 & \\ \hline
 \end{xltabular}
 }
+\end{landscape}
 
 El costo total estimado de Graphito asciende a \$208\,783.12~MXN, de los cuales \$3\,083.93~MXN corresponden a costos directos y \$205\,699.19~MXN a costos imputados. Esta distribución permite diferenciar el desembolso económico asociado con el proyecto del valor atribuido a los recursos disponibles que fueron utilizados durante su desarrollo.
 

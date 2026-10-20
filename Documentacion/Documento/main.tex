@@ -25,6 +25,7 @@
 \usepackage{tabularx}    % Tablas con ancho fijo
 \usepackage{longtable}   % Tablas largas
 \usepackage{xltabular}   % El "héroe" que combina tabularx y longtable
+\usepackage{pdflscape}   % Paginas horizontales para tablas anchas
 \usepackage{caption}     % Mejora los títulos de tablas y figuras
 \graphicspath{{./figs/}{./figuras/}}
 
@@ -72,6 +73,19 @@
 % Configuración de niveles de títulos (Hasta #.#.#.#)
 \setcounter{secnumdepth}{3}
 \setcounter{tocdepth}{3}
+
+% Desactiva las notas al pie (superíndice y texto al pie de página).
+% Para restaurarlas, elimina estas dos líneas.
+\renewcommand{\footnote}[2][]{}
+\renewcommand{\footnotemark}[1][]{}
+
+% Capítulos compactos: "Capítulo N" y título más pequeños y pegados al borde superior
+\titleformat{\chapter}[hang]
+  {\normalfont\bfseries\fontsize{20}{24}\selectfont}
+  {\chaptertitlename\ \thechapter:}
+  {0.4em}
+  {}
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
 
 \titleformat{\section}{\normalfont\bfseries\fontsize{14}{16}\selectfont}{\thesection}{1em}{}
 \titleformat{\subsection}{\normalfont\bfseries\fontsize{12}{14}\selectfont}{\thesubsection}{1em}{}

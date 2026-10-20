@@ -1,9 +1,9 @@
 \chapter{Modelización}
 \label{cap:modelado}
 
-Con los datos listos (Capítulo~\ref{cap:ingenieria_datos}), la metodología \textbf{Komorebi} \cite{verges_como_2023} pasa a la fase de \textbf{Modelización}: construir los modelos y ponerlos a prueba. La Sección~\ref{sec:entrenamiento_modelos} explica qué se construyó; la Sección~\ref{sec:evaluacion_modelos} mide qué tan bien funciona y qué límites tiene.
+Con los datos listos (Capítulo~\ref{cap:ingenieria_datos}), la metodología Komorebi \cite{verges_como_2023} pasa a la fase de \textbf{Modelización}: construir los modelos y ponerlos a prueba. La Sección~\ref{sec:entrenamiento_modelos} explica qué se construyó; la Sección~\ref{sec:evaluacion_modelos} mide qué tan bien funciona y qué límites tiene.
 
-Graphito usa dos ``lectores'' del código que miran cosas distintas, más una regla simple de comparación como vara de medir (Figura~\ref{fig:panorama_modelos}). El \textbf{Canal A} mide qué tan parecida es una entrega a la solución de referencia en lo que hace el programa. El \textbf{Canal B} estima si la forma de escribir se parece más a la de código generado por IA. La \textbf{línea base léxica} compara fragmentos de texto y no usa aprendizaje automático. Ninguna salida es un veredicto: son datos para que el docente decida qué revisar primero.
+Graphito usa dos modelos que analizan el código de formas distintas, más una regla simple de comparación como vara de medir (Figura~\ref{fig:panorama_modelos}). El Canal Semántico mide qué tan parecida es una entrega a la solución de referencia en lo que hace el programa. El Canal Estilométrico estima si la forma de escribir se parece más a la de código generado por IA. La línea base léxica compara fragmentos de texto y no usa aprendizaje automático. Ninguna salida es un veredicto: son datos para que el docente decida qué revisar primero.
 
 La pregunta guía del Canal A es: \emph{¿qué tan semántica es la similitud?}, es decir, si el modelo capta qué hace el programa o solo cómo se ve. La evidencia indica que capta bien la estructura general, pero depende de los nombres de las variables y no supera a la línea base léxica. Se reporta tal cual: un resultado negativo bien medido también es un resultado.
 
@@ -45,14 +45,14 @@ La pregunta guía del Canal A es: \emph{¿qué tan semántica es la similitud?},
 \label{sec:entrenamiento_modelos}
 % ======================================================================
 
-Esta sección describe cada componente en orden: el Canal B (CharCNN), el Canal A (GraphCodeBERT), la línea base léxica y la calibración, que convierte las puntuaciones crudas en umbrales interpretables. Solo el CharCNN se entrena en este proyecto; GraphCodeBERT se usa tal como viene preentrenado.
+Esta sección describe cada componente en orden: el Canal B (CharCNN), el Canal A (GraphCodeBERT), la línea base léxica y la calibración, que convierte las puntuaciones crudas en umbrales interpretables. Solo CharCNN se entrena en este proyecto; GraphCodeBERT se usa tal como viene preentrenado.
 
 % ----------------------------------------------------------------------
 \subsection{Canal B: CharCNN}
 \label{subsec:modelado_charcnn}
 
 \subsubsection{Idea General}
-Una \textbf{red neuronal convolucional} sobre caracteres lee el texto del código como una secuencia de letras y símbolos. Funciona como un conjunto de lupas que se deslizan sobre el texto. Cada lupa se fija en un tamaño de fragmento y aprende a reconocer hábitos de escritura: cómo se abren las llaves, cómo se nombran las variables, qué palabras se repiten. El enfoque sigue a Zhang et al. \cite{Zhang2015CharCNN} (clasificar texto leyendo caracteres, sin separar palabras) y a Kim \cite{Kim2014CNN} (usar varias lupas de tamaños distintos en paralelo). Las lupas de Graphito miran fragmentos de 3, 5, 7 y 9 caracteres. Las cortas captan detalles como operadores; las largas, trozos de palabras clave.
+Una  red neuronal convolucional sobre caracteres lee el texto del código como una secuencia de letras y símbolos. Su pieza central es el \textbf{kernel}, que puede imaginarse como una lupa que se desliza sobre el texto y examina a la vez un fragmento de tamaño fijo (por ejemplo, 3 caracteres seguidos). Al avanzar por todo el archivo, cada kernel aprende a reconocer hábitos de escritura: cómo se abren las llaves, cómo se nombran las variables o qué palabras se repiten. El enfoque sigue a Zhang et al. \cite{Zhang2015CharCNN} (clasificar texto leyendo caracteres, sin separar palabras) y a Kim \cite{Kim2014CNN} (usar varios kernels de tamaños distintos en paralelo). Los kernels de Graphito miran fragmentos de 3, 5, 7 y 9 caracteres. Las cortas captan detalles como operadores; las largas, trozos de palabras clave.
 
 La Figura~\ref{fig:arquitectura_charcnn} muestra el recorrido de un archivo por la red. Cada bloque lleva una descripción en lenguaje llano.
 
@@ -68,11 +68,11 @@ La Figura~\ref{fig:arquitectura_charcnn} muestra el recorrido de un archivo por 
     ]
         \node[io] (txt) {\textbf{Texto normalizado}\\Hasta 4,096 caracteres por ventana; cada carácter es un número entre 0 y 97};
         \node[blk, below=of txt] (emb) {\textbf{Embedding de caracteres}\\Cada carácter se convierte en una lista de 128 números (su ``ficha'' de identidad)};
-        \node[br, below=0.9cm of emb, xshift=-5.1cm] (b1) {\textbf{Lupa de 3}\\64 filtros\\+ normalización\\+ ReLU};
-        \node[br, below=0.9cm of emb, xshift=-1.7cm] (b2) {\textbf{Lupa de 5}\\64 filtros\\+ normalización\\+ ReLU};
-        \node[br, below=0.9cm of emb, xshift=1.7cm] (b3) {\textbf{Lupa de 7}\\64 filtros\\+ normalización\\+ ReLU};
-        \node[br, below=0.9cm of emb, xshift=5.1cm] (b4) {\textbf{Lupa de 9}\\64 filtros\\+ normalización\\+ ReLU};
-        \node[blk, below=0.9cm of b2, xshift=1.7cm] (pool) {\textbf{Resumen de cada lupa}\\El valor máximo y el promedio, solo sobre caracteres reales (se ignora el relleno): 4 lupas $\times$ 128 = 512 números};
+        \node[br, below=0.9cm of emb, xshift=-5.1cm] (b1) {\textbf{Kernel de 3}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[br, below=0.9cm of emb, xshift=-1.7cm] (b2) {\textbf{Kernel de 5}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[br, below=0.9cm of emb, xshift=1.7cm] (b3) {\textbf{Kernel de 7}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[br, below=0.9cm of emb, xshift=5.1cm] (b4) {\textbf{Kernel de 9}\\64 filtros\\+ normalización\\+ ReLU};
+        \node[blk, below=0.9cm of b2, xshift=1.7cm] (pool) {\textbf{Resumen de cada kernel}\\El valor máximo y el promedio, solo sobre caracteres reales (se ignora el relleno): 4 kernels $\times$ 128 = 512 números};
         \node[blk, below=of pool] (drop) {\textbf{Dropout (0.4)}\\Durante el entrenamiento se apaga al azar el 40\,\% de las conexiones, para que la red no memorice};
         \node[blk, below=of drop] (fc) {\textbf{Capa densa: 1,024 números}\\La ``huella de estilo'' del fragmento};
         \node[outb, below=of fc] (out) {\textbf{Salida: 2 puntuaciones}\\Una para ``humano'' y otra para ``IA''};
@@ -85,11 +85,11 @@ La Figura~\ref{fig:arquitectura_charcnn} muestra el recorrido de un archivo por 
         \draw[arrow] (drop.south) -- (fc.north);
         \draw[arrow] (fc.south) -- (out.north);
     \end{tikzpicture}
-    \caption{Arquitectura del CharCNN v2: del texto a una puntuación de estilo. Cada bloque indica en lenguaje llano qué hace.}
+    \caption{Arquitectura del CharCNN: del texto a una puntuación de estilo. Cada bloque indica en lenguaje llano qué hace.}
     \label{fig:arquitectura_charcnn}
 \end{figure}
 
-Un \textbf{filtro} detecta un patrón concreto de caracteres (cada lupa tiene 64). La \textbf{normalización} estabiliza el entrenamiento y \textbf{ReLU} deja pasar solo los valores positivos. El \emph{pooling} (``resumen'') condensa lo que cada lupa encontró en dos números por filtro, sin contar el relleno de los archivos cortos.
+Un filtro detecta un patrón concreto de caracteres (cada kernel tiene 64). La normalización estabiliza el entrenamiento y ReLU deja pasar solo los valores positivos. El pooling (``resumen'') condensa lo que cada kernel encontró en dos números por filtro, sin contar el relleno de los archivos cortos.
 
 \subsubsection{Archivos Largos: Ventanas}
 La red recibe 4,096 caracteres a la vez. Los archivos más largos se leen por \textbf{ventanas} de 4,096 que avanzan de 2,048 en 2,048 (hasta 8), como leer por páginas que repiten la mitad de la anterior (Figura~\ref{fig:ventanas_charcnn}, con un archivo de 8,192 caracteres). Cada ventana produce dos puntuaciones; se promedian las de todas las ventanas y el promedio se convierte en una probabilidad. En el entrenamiento se usa un solo recorte aleatorio por archivo.
@@ -114,17 +114,17 @@ La red recibe 4,096 caracteres a la vez. Los archivos más largos se leen por \t
         \draw[arrow] (4.5,-1.6) -- (4.5,0 |- r.north);
         \draw[arrow] (9,-2.3) -- (9,0 |- r.north);
     \end{tikzpicture}
-    \caption{Lectura por ventanas con traslape: cada ventana se puntúa por separado y los resultados se promedian.}
+    \caption{Lectura por ventanas con traslape, cada ventana se puntúa por separado y los resultados se promedian.}
     \label{fig:ventanas_charcnn}
 \end{figure}
 
 \subsubsection{Hiperparámetros y Entrenamiento}
-Un \textbf{hiperparámetro} es un ajuste que se fija antes de entrenar, como el número de lupas o el ritmo de aprendizaje. La Tabla~\ref{tab:hiperparametros_charcnn} agrupa los principales en cuatro familias.
+Un hiperparámetro es un ajuste que se fija antes de entrenar, como el número de kernels o el ritmo de aprendizaje. La Tabla~\ref{tab:hiperparametros_charcnn} agrupa los principales en cuatro familias.
 
 {\small
 \renewcommand{\arraystretch}{1.2}
 \begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
-    \caption{Organizador de hiperparámetros del CharCNN v2.}\label{tab:hiperparametros_charcnn}\\
+    \caption{Organizador de hiperparámetros de CharCNN.}\label{tab:hiperparametros_charcnn}\\
     \hline
     \textbf{Parámetro} & \textbf{Valor} & \textbf{Qué significa} \\ \hline
     \endfirsthead
@@ -136,7 +136,7 @@ Un \textbf{hiperparámetro} es un ajuste que se fija antes de entrenar, como el 
     Ventana y paso & 4,096 y 2,048 caracteres (hasta 8 ventanas) & Cuánto texto lee la red de una vez y cuánto avanza en archivos largos. \\ \hline
     \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Arquitectura}} \\ \hline
     Embedding & 128 números por carácter & Tamaño de la ``ficha'' de cada carácter. \\ \hline
-    Lupas \cite{Kim2014CNN} & 3, 5, 7 y 9; 64 filtros cada una & Fragmentos de distinto alcance: 256 detectores en total. \\ \hline
+    Kernels \cite{Kim2014CNN} & 3, 5, 7 y 9; 64 filtros cada una & Fragmentos de distinto alcance: 256 detectores en total. \\ \hline
     Dropout & 0.4 & Fracción de conexiones apagadas al azar al entrenar, para reducir la memorización. \\ \hline
     Capa densa & 1,024 & Tamaño de la ``huella de estilo''. \\ \hline
     \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Entrenamiento}} \\ \hline
@@ -192,7 +192,7 @@ La Figura~\ref{fig:curvas_charcnn} muestra la evolución real. A la izquierda, l
 \label{subsec:modelado_graphcodebert}
 
 \subsubsection{Idea General}
-\textbf{GraphCodeBERT} \cite{Guo2021GraphCodeBERT} es un modelo preentrenado con millones de programas. Es como un lector que ya revisó muchísimo código antes de llegar a Graphito. Su resultado para un fragmento de código es un \textbf{vector}: una lista de 768 números que resume qué hace el código. Dos códigos que hacen cosas parecidas deberían producir vectores que apunten en direcciones parecidas.
+GraphCodeBERT \cite{Guo2021GraphCodeBERT} es un modelo preentrenado con millones de programas. Es como un lector que ya revisó muchísimo código antes de llegar a Graphito. Su resultado para un fragmento de código es un \textbf{vector}: una lista de 768 números que resume qué hace el código. Dos códigos que hacen cosas parecidas deberían producir vectores que apunten en direcciones parecidas.
 
 Para medir esa cercanía se usa la \textbf{similitud del coseno}. Imagine dos flechas que salen del mismo punto, como agujas de una brújula. Si apuntan casi hacia el mismo lado, el ángulo es pequeño y el coseno es cercano a 1. Si apuntan a lados distintos, el ángulo crece y el coseno baja (Figura~\ref{fig:coseno_intuicion}). La fórmula es:
 \begin{equation}
@@ -224,7 +224,7 @@ Se lee así: se mide qué tan alineados están los vectores $a$ y $b$, sin impor
 \end{figure}
 
 \subsubsection{Cómo se Obtiene el Vector de un Archivo}
-La Figura~\ref{fig:flujo_graphcodebert} muestra el recorrido. Se eliminan los comentarios, el código se divide en \textbf{subtokens} (trozos de palabra) y se construye el \textbf{grafo de flujo de datos} (DFG), un esquema de ``qué variable le pasa su valor a cuál''. GraphCodeBERT recibe ambos. Los archivos largos se cortan en ventanas de 382 subtokens que se traslapan a la mitad; el vector de cada ventana es el promedio de sus subtokens de código, y el vector del archivo, el promedio de sus ventanas. El coseno entre el vector de la entrega y el de la referencia es la similitud que Graphito informa.
+La Figura~\ref{fig:flujo_graphcodebert} muestra el recorrido. Se eliminan los comentarios, el código se divide en subtokens (trozos de palabra) y se construye el grafo de flujo de datos (DFG), un esquema de ``qué variable le pasa su valor a cuál''. GraphCodeBERT recibe ambos. Los archivos largos se cortan en ventanas de 382 subtokens que se traslapan a la mitad, el vector de cada ventana es el promedio de sus subtokens de código, y el vector del archivo, el promedio de sus ventanas. El coseno entre el vector de la entrega y el de la referencia es la similitud que Graphito informa.
 
 \begin{figure}[H]
     \centering
@@ -343,7 +343,7 @@ Los apuntadores tienen un límite. El grafo sigue las variables por su nombre, i
 Conviene precisar qué se adaptó: la \emph{entrada} (el grafo), no el modelo. GraphCodeBERT nunca vio C ni C++ durante su preentrenamiento (Sección~\ref{subsec:limitaciones}).
 
 \subsubsection{Por Qué no se Entrena (\textit{Zero-Shot})}
-\textit{Zero-shot} significa usar un modelo tal como viene. Se evaluó la alternativa, un adaptador \textbf{LoRA} \cite{Hu2022LoRA} que reentrena solo una parte pequeña del modelo, pero con el protocolo anterior empeoró levemente el resultado (ROC-AUC de 0.646 a 0.630), así que no se usa. Lo que sí se corrigió fue la entrada: la versión actual (``v2'') reconstruye el grafo y la entrada de forma fiel al original, y el ROC-AUC en pares de plagio pasó de 0.741 a 0.856 (Sección~\ref{subsec:pares_plagio}). Es una mejora de implementación, no de método; el recorrido está en la Sección~\ref{subsec:evolucion_modelos}.
+\textit{Zero-shot} significa usar un modelo tal como viene. Se evaluó la alternativa, un adaptador \textbf{LoRA} \cite{Hu2022LoRA} que reentrena solo una parte pequeña del modelo, pero no mejoró el resultado, así que no se usa. Lo que sí se cuidó fue la entrada: la versión actual (``v2'') reconstruye el grafo y la entrada de forma fiel al original, y su resultado en pares de plagio se reporta en la Sección~\ref{subsec:pares_plagio}.
 
 % ----------------------------------------------------------------------
 \subsection{Línea Base Léxica: Jaccard}
@@ -397,8 +397,9 @@ Las puntuaciones crudas de un modelo no se interpretan solas: un 0.7 puede ser m
     \caption{Organizador de calibración y umbrales, ajustados solo con datos de validación.}
     \label{tab:calibracion_umbrales}
     \renewcommand{\arraystretch}{1.25}
-    \small
-    \begin{tabularx}{\textwidth}{|l|l|X|c|c|X|}
+    \footnotesize
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}p{1.6cm}|>{\centering\arraybackslash}p{1.6cm}|>{\raggedright\arraybackslash}X|}
         \hline
         \textbf{Canal} & \textbf{Método} & \textbf{Ajustado en} & \texttt{fpr\_0.05} & \texttt{fpr\_0.01} & \textbf{Nota} \\ \hline
         B (CharCNN) & Platt (curva en S) & 2,868 humanos y 209 de IA de validación & 0.0075 & 0.1715 & Umbral desplegado: \texttt{fpr\_0.01}. \\ \hline
@@ -408,71 +409,17 @@ Las puntuaciones crudas de un modelo no se interpretan solas: un 0.7 puede ser m
 
 La calibración de \textbf{Platt} \cite{Platt1999Probabilistic} ajusta una curva en forma de S que transforma la puntuación en probabilidad. La \textbf{isotónica} \cite{Zadrozny2002Transforming} ajusta una función escalonada que solo puede crecer. En el Canal A el valor de \texttt{fpr\_0.05} es una probabilidad calibrada de que un par sea de plagio; es baja porque estos pares son muy raros entre todos los pares posibles. Con ese umbral, el Canal A detectó cerca del 49\,\% de los pares anotados en validación, con 4\,\% de falsas alarmas.
 
-% ----------------------------------------------------------------------
-\subsection{Evolución de los Modelos: de la Primera Versión a la Final}
-\label{subsec:evolucion_modelos}
-
-Los modelos de esta sección son la versión final de un proceso de iteración. Las primeras versiones (septiembre de 2026) reportaron cifras muy altas; al evaluarlas con un protocolo más riguroso aparecieron fugas de información y errores de implementación. Las cifras de cada versión anterior se midieron con \emph{su} protocolo, así que \textbf{no son comparables} con las de la Sección~\ref{sec:evaluacion_modelos}: es como comparar la nota de un examen cuyas preguntas el alumno ya conocía con la de uno que no vio antes.
-
-\begin{figure}[H]
-    \centering
-    \begin{tikzpicture}[
-        dt/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=2.6cm, align=center, inner sep=5pt, font=\small},
-        ms/.style={rectangle, draw=black!60, rounded corners=3pt, text width=9.6cm, align=left, inner sep=5pt, font=\small},
-        arrow/.style={->, >=stealth, thick, draw=black!75}
-    ]
-        \node[dt] (d1) at (0,0) {\textbf{Septiembre 2026}};
-        \node[ms, fill=orange!15, right=0.8cm of d1] (m1) {\textbf{Primeras versiones.} CharCNN y GraphCodeBERT con adaptador, más una fusión de ambos canales; cifras muy altas con el protocolo anterior.};
-        \node[dt, below=0.7cm of d1] (d2) {\textbf{Inicio de octubre}};
-        \node[ms, fill=cyan!10, right=0.8cm of d2] (m2) {\textbf{Auditoría y nuevo protocolo.} Se detecta que el conjunto de prueba anterior reutilizaba muestras de entrenamiento; se construye una evaluación sin fugas.};
-        \node[dt, below=0.7cm of d2] (d3) {\textbf{10 de octubre}};
-        \node[ms, fill=orange!15, right=0.8cm of d3] (m3) {\textbf{CharCNN v2.} Limpieza simétrica, normalización por capas y calibración en validación.};
-        \node[dt, below=0.7cm of d3] (d4) {\textbf{11 de octubre}};
-        \node[ms, fill=cyan!10, right=0.8cm of d4] (m4) {\textbf{GraphCodeBERT v2.} Entrada fiel al modelo original, sin adaptador (\textit{zero-shot}).};
-        \node[dt, below=0.7cm of d4] (d5) {\textbf{Sistema final}};
-        \node[ms, fill=green!12, right=0.8cm of d5] (m5) {\textbf{Dos canales por separado}, con umbrales calibrados y sin fusión.};
-        \draw[arrow] (d1.south) -- (d2.north);
-        \draw[arrow] (d2.south) -- (d3.north);
-        \draw[arrow] (d3.south) -- (d4.north);
-        \draw[arrow] (d4.south) -- (d5.north);
-    \end{tikzpicture}
-    \caption{Línea de tiempo de la evolución de los modelos: de las primeras versiones al sistema final.}
-    \label{fig:linea_tiempo_modelos}
-\end{figure}
-
-La Tabla~\ref{tab:evolucion_versiones} resume cada versión, su problema y su solución.
-
-{\small
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{1.3cm}|>{\raggedright\arraybackslash}p{1.9cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
-    \caption{Evolución de los modelos. Las cifras del protocolo anterior no son comparables con las del actual.}\label{tab:evolucion_versiones}\\
-    \hline
-    \textbf{Canal} & \textbf{Versión} & \textbf{Resultado} & \textbf{Problema} & \textbf{Solución} \\ \hline
-    \endfirsthead
-    \hline
-    \textbf{Canal} & \textbf{Versión} & \textbf{Resultado} & \textbf{Problema} & \textbf{Solución} \\ \hline
-    \endhead
-    Ambos & Evaluación anterior & Cifras muy altas (anterior). & El examen reutilizaba 1,825 de 2,621 muestras de entrenamiento. & Partición por tarea y calibración en validación. \\ \hline
-    B & V1 & ROC-AUC 0.999 y F1 0.992 (anterior). & Fugas de etiqueta y falsas alarmas por el formato del código. & Formato único; luego reconstrucción. \\ \hline
-    B & Formato canónico & ROC-AUC 0.996, F1 cercano a 0.88 (anterior). & Bajó la detección; no atacaba las causas. & Corregir las causas (V2). \\ \hline
-    B & V2 (final) & ROC-AUC 0.994 y F1 0.884 (actual). & Atajos pequeños y dos generadores. & Trabajo futuro. \\ \hline
-    A & V1 & ROC-AUC 0.630 con adaptador y 0.646 sin él (anterior). & Entrada desordenada y similitudes saturadas. & Reconstruir la entrada; quitar el adaptador. \\ \hline
-    A & V2 (final) & ROC-AUC de 0.741 a 0.856 (actual). & Por debajo de Jaccard (0.945). & Entrenamiento contrastivo (futuro). \\ \hline
-    A + B & Fusión & ROC-AUC 0.874, peor que el Canal B solo (anterior). & Pesos elegidos a mano. & Se mantiene como investigación. \\ \hline
-\end{xltabular}
-}
-
-La lección es que las cifras más altas del principio estaban infladas por fugas de información. Una evaluación rigurosa cambia números llamativos por números confiables, y eso permite al docente apoyarse en ellos con criterio.
-
 % ======================================================================
 \section{Evaluación de Modelos}
 \label{sec:evaluacion_modelos}
 % ======================================================================
 
+Esta sección responde dos preguntas muy importantes ¿qué tan bueno es CharCNN detectando código genrado por IA? y ¿qué tan bueno es GraphCodeBERT para detectar cuando dos códigos se parecen lógicamente? Todas las pruebas se hicieron con la versión final de cada modelo usando entregas que nunca vieron durante su entrenamiento.
+
 \subsection{Protocolo de Evaluación}
 \label{subsec:protocolo_evaluacion}
 
-Las reglas se fijaron antes de ver los resultados (Figura~\ref{fig:protocolo_evaluacion}). Es la lógica de un examen: el \textbf{entrenamiento} sirve para aprender, la \textbf{validación} para decidir y la \textbf{prueba} para medir una sola vez, sin ajustarla después de ver las respuestas. Esto sigue la recomendación de evitar la fuga de información \cite{Allamanis2019Adverse,Kapoor2023Leakage}; la partición por tarea (\texttt{split\_v1}) se explicó en el Capítulo~\ref{cap:ingenieria_datos}.
+Para asegurarnos de que la evaluacion fue lo más justa posible, las reglas se fijaron antes de ver los resultados (Figura~\ref{fig:protocolo_evaluacion}). Los datos de entrenamiento sirven para que el modelo aprenda, los de validación son un simulacro para ajustar detalles, y los de prueba son la prueba definitiva de que tan bueno es el modelo, que se aplica una sola vez sin hacer cambios posteriores. Esta separación evita la fuga de información \cite{Allamanis2019Adverse,Kapoor2023Leakage}, siguiendo la partición por tarea explicada en el Capítulo~\ref{cap:ingenieria_datos}.
 
 \begin{figure}[H]
     \centering
@@ -484,320 +431,243 @@ Las reglas se fijaron antes de ver los resultados (Figura~\ref{fig:protocolo_eva
         \node[st, fill=blue!8] (tr) at (-4.9,0) {\textbf{Entrenamiento}\\Aprender: ajustar los pesos del CharCNN};
         \node[st, fill=cyan!10] (va) at (0,0) {\textbf{Validación}\\Decidir: época, \textit{pooling}, calibración y umbrales};
         \node[st, fill=orange!15] (te) at (4.9,0) {\textbf{Prueba}\\Medir una sola vez; nunca se usa para decidir};
-        \node[note] (n1) at (-3.2,-2.1) {\textbf{Intervalos de confianza al 95\,\%}\\Se repite la medición con muestras ligeramente distintas (1,000 veces) para ver cuánto varía el resultado};
-        \node[note] (n2) at (3.2,-2.1) {\textbf{Hipótesis registradas}\\Se escribió qué se esperaba y cómo se juzgaría antes de ver los resultados};
+        \node[note] (n1) at (-3.2,-2.1) {\textbf{Intervalos de confianza al 95\,\%}\\Se repite la medición 1,000 veces con muestras distintas para ver cuánto varía el resultado};
+        \node[note] (n2) at (3.2,-2.1) {\textbf{Hipótesis registradas}\\Se definió qué se esperaba y cómo se juzgaría antes de ver los resultados};
         \draw[arrow] (tr.east) -- (va.west);
         \draw[arrow] (va.east) -- (te.west);
     \end{tikzpicture}
-    \caption{Protocolo de evaluación: cada partición tiene un único rol, y cada cifra se acompaña de su intervalo de confianza.}
+    \caption{Protocolo de evaluación: cada grupo de datos tiene un único rol para evitar sesgos.}
     \label{fig:protocolo_evaluacion}
 \end{figure}
 
-Un \textbf{intervalo de confianza} (IC) del 95\,\% es un rango razonable para el valor real, calculado con \textit{bootstrap} \cite{Efron1993Bootstrap}. Si dos intervalos se traslapan mucho, la diferencia puede deberse al azar. La Tabla~\ref{tab:glosario_metricas} define cada métrica con la pregunta que responde.
+En las tablas, las cifras incluyen entre corchetes su intervalo de confianza (IC) al 95\,\%, calculado mediante \textit{bootstrap} \cite{Efron1993Bootstrap}. Este rango indica dónde se encuentra razonablemente el valor real: si los intervalos de dos métodos se cruzan mucho, su diferencia puede deberse a la suerte. La Tabla~\ref{tab:glosario_metricas} traduce las métricas técnicas a preguntas cotidianas.
 
 \begin{table}[H]
     \centering
-    \caption{Glosario de métricas: qué pregunta responde cada una.}
+    \caption{Guía rápida de las métricas utilizadas y cómo interpretarlas.}
     \label{tab:glosario_metricas}
     \renewcommand{\arraystretch}{1.25}
     \small
-    \begin{tabularx}{\textwidth}{|l|X|}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{3.8cm}|}
         \hline
-        \textbf{Métrica} & \textbf{Qué pregunta responde} \\ \hline
-        ROC-AUC & Si se toman un caso positivo y uno negativo al azar, ¿con qué frecuencia el positivo recibe la puntuación más alta? (0.5 es azar; 1 es perfecto). \\ \hline
-        PR-AUC & ¿Qué tan bien se encuentran los casos positivos sin generar muchas falsas alarmas cuando son pocos? (el azar equivale a la proporción de positivos). Su conveniencia frente a ROC-AUC depende del uso previsto del modelo \cite{McDermott2024AUROC}. \\ \hline
-        Precisión & De los archivos marcados, ¿qué fracción era realmente de IA? \\ \hline
-        Recall (exhaustividad) & De los archivos de IA, ¿qué fracción se marcó? \\ \hline
-        $F_1$ & Un solo número que resume precisión y recall (alto solo si ambas lo son). \\ \hline
-        FPR (falsas alarmas) & De los archivos humanos, ¿qué fracción se marcó por error? \\ \hline
-        ECE \cite{SilvaFilho2023Calibration} & ¿Las probabilidades del modelo coinciden con la frecuencia real? (0 es calibración perfecta). \\ \hline
-        MAP@R \cite{Musgrave2020Reality} & Al ordenar las demás entregas por parecido, ¿qué tan arriba aparecen las de la misma tarea? \\ \hline
-        Recall@1 & ¿La entrega más parecida a una dada es de la misma tarea? \\ \hline
+        \textbf{Métrica} & \textbf{Qué pregunta responde} & \textbf{Cómo leerla} \\ \hline
+        Tasa de Falsos Positivos (FPR) & De los archivos escritos por alumnos, ¿cuántos se marcaron por error como IA? & Menos es mejor. 0.01 es 1 error por cada 100 humanos. \\ \hline
+        Detección (\textit{recall}) & De todos los archivos hechos con IA, ¿cuántos logró atrapar el modelo? & Más es mejor. 0.90 significa que atrapa 9 de cada 10. \\ \hline
+        Precisión & Cuando el modelo lanza una alerta de IA, ¿qué tan seguido tiene razón? & Más es mejor. 0.90 significa que 9 de cada 10 alertas son reales. \\ \hline
+        $F_1$ & Un balance general entre detección y precisión. & Solo es alto si el modelo detecta mucho y se equivoca poco. \\ \hline
+        ROC-AUC y PR-AUC & ¿Qué tan bien distingue el modelo entre humanos e IA en general, sin importar el límite elegido? \cite{McDermott2024AUROC} & 1.0 es una separación perfecta; 0.5 en ROC-AUC equivale a lanzar una moneda. \\ \hline
     \end{tabularx}
 \end{table}
 
 % ----------------------------------------------------------------------
-\subsection{Canal B: Resultados del CharCNN}
+\subsection{Canal B: Detección de Código de IA (CharCNN)}
 \label{subsec:resultados_charcnn}
 
-La evaluación usa el conjunto de prueba, con tareas que el modelo no vio: 4,531 archivos representativos (4,201 humanos y 330 de IA, uno por familia de casi-copias). Con las puntuaciones calibradas en validación, el ROC-AUC fue de 0.9937 (IC 95\,\%: 0.9909 a 0.9965) y el PR-AUC, de 0.9581 (0.9437 a 0.9726). Un clasificador al azar obtendría un PR-AUC cercano a 0.07, la proporción de código de IA en esta prueba. La Figura~\ref{fig:roc_pr_charcnn} muestra las curvas.
+En problemas nuevos, el Canal B detecta casi 9 de cada 10 códigos de IA y solo confunde a 1 de cada 100 estudiantes humanos.
+
+La prueba se realizó con 4,531 archivos de tareas que el modelo no conocía (4,201 de estudiantes y 330 generados por IA). Como Graphito busca apoyar al profesor y no acusar injustamente al alumno, el sistema se configuró con una Tasa de Falsos Positivos estricta (\texttt{fpr\_0.01}), diseñado para no superar un 1\,\% de falsas alarmas. 
+
+Con este ajuste, el modelo acertó en 4,161 archivos humanos y solo se equivocó en 40; al mismo tiempo, descubrió 293 de los 330 archivos de IA (Figura~\ref{fig:matriz_confusion_charcnn}).
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_roc.png}\hspace{0.04\textwidth}\includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_pr.png}
-    \caption{Curvas ROC (izquierda) y de precisión-recall (derecha) del CharCNN v2 en el conjunto de prueba (\textit{TPR}: tasa de verdaderos positivos; \textit{FPR}: tasa de falsos positivos; AP: precisión promedio).}
-    \label{fig:roc_pr_charcnn}
+    \includegraphics[width=0.55\textwidth]{figuras/matriz_confusion_charcnn.png}
+    \caption{Aciertos y errores de CharCNN en la prueba usando el ajuste estricto (\texttt{fpr\_0.01}).}
+    \label{fig:matriz_confusion_charcnn}
 \end{figure}
 
-En la práctica hay que elegir un umbral. La Tabla~\ref{tab:puntos_operacion} compara dos y la Figura~\ref{fig:matriz_confusion_charcnn} muestra la matriz de confusión del desplegado (\texttt{fpr\_0.01}).
+Si quisieramos aumentar los códigos de IA que detecta CharCNN ¿Qué pasaría? La Tabla~\ref{tab:puntos_operacion} compara nuestro ajuste actual con uno más permisivo (\texttt{fpr\_0.05}, que tolera hasta 5\,\% de falsas alarmas). Aunque el modo permisivo atrapa el 97.3\,\% de la IA, hace que casi 4 de cada 10 alertas sean falsos positivos contra alumnos reales, lo que confirma que el ajuste estricto es mucho más adecuado para apoyar en el análisis de tareas de estudiantes.
 
 \begin{table}[H]
     \centering
-    \caption{Resultados del CharCNN en la prueba en los dos puntos de operación (IC 95\,\% entre corchetes).}
+    \caption{Desempeño del CharCNN según qué tan estricto se configure (IC 95\,\% entre corchetes).}
     \label{tab:puntos_operacion}
     \renewcommand{\arraystretch}{1.25}
     \small
     \begin{tabularx}{\textwidth}{|l|c|c|X|}
         \hline
-        \textbf{Métrica} & \texttt{fpr\_0.01} (desplegado) & \texttt{fpr\_0.05} & \textbf{Lectura} \\ \hline
-        Precisión & 0.880 [0.840, 0.912] & 0.626 [0.583, 0.669] & Con el umbral más permisivo, casi 4 de cada 10 marcas son falsas. \\ \hline
-        Recall & 0.888 [0.858, 0.922] & 0.973 [0.956, 0.989] & El umbral permisivo detecta casi toda la IA. \\ \hline
-        $F_1$ & 0.884 [0.860, 0.909] & 0.762 [0.729, 0.793] & Resumen de lo anterior. \\ \hline
-        FPR & 0.0095 [0.0069, 0.0128] & 0.0457 [0.0397, 0.0518] & Coincide con lo buscado (1 y 5 por cada 100). \\ \hline
+        \textbf{Métrica} & \texttt{fpr\_0.01} (En uso) & \texttt{fpr\_0.05} (Permisivo) & \textbf{Qué significa en la práctica} \\ \hline
+        Precisión & 0.880 [0.840, 0.912] & 0.626 [0.583, 0.669] & En modo permisivo, casi 4 de cada 10 alertas son falsas. \\ \hline
+        Recall & 0.888 [0.858, 0.922] & 0.973 [0.956, 0.989] & El modo permisivo casi no deja escapar código de IA. \\ \hline
+        $F_1$ & 0.884 [0.860, 0.909] & 0.762 [0.729, 0.793] & El modo en uso logra mejor equilibrio general. \\ \hline
+        FPR & 0.0095 [0.0069, 0.0128] & 0.0457 [0.0397, 0.0518] & Cumple la meta de 1 y 5 falsas alarmas por cada 100 humanos. \\ \hline
     \end{tabularx}
 \end{table}
 
+Al evaluar la capacidad global del modelo para separar ambos grupos, el resultado fue muy bueno, alcanzó un ROC-AUC de 0.994 y un PR-AUC de 0.958 (frente a 0.07 que lograría el azar). Además, sus porcentajes son sumamente confiables: cuando el sistema indica un 80\,\% de probabilidad de IA, realmente acierta en 8 de cada 10 casos (error de calibración de apenas 0.0088). La Figura~\ref{fig:roc_pr_charcnn} ilustra este comportamiento.
+
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.55\textwidth]{figuras/matriz_confusion_charcnn.png}
-    \caption{Matriz de confusión del CharCNN v2 en la prueba con el umbral desplegado (\texttt{fpr\_0.01}).}
-    \label{fig:matriz_confusion_charcnn}
+    \includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_roc.png}\hspace{0.04\textwidth}\includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_pr.png}
+    \caption{Curvas de desempeño de CharCNN. En la izquierda (ROC), mientras más se pegue la curva a la esquina superior izquierda, más IA se detecta cometer errrores. En la derecha (PR), la línea se mantiene alta casi hasta el final, mostrando que las alertas siguen siendo certeras incluso siendo estricto con la precisión.}
+    \label{fig:roc_pr_charcnn}
 \end{figure}
 
-De 4,201 archivos humanos, 4,161 se reconocieron como humanos y 40 se marcaron por error; de 330 de IA, 293 se detectaron y 37 pasaron como humanos. Bajar el umbral detecta más IA, pero marca más archivos humanos; como Graphito apoya la revisión y no la sanciona, el punto desplegado prioriza pocas falsas alarmas. La \textbf{precisión} depende de cuánta IA haya: aquí es cerca del 7\,\% de los archivos, y en un aula con menos IA una fracción mayor de las marcas serían falsas. Las probabilidades son confiables: el ECE fue de 0.0088 (0.0069 a 0.0123), muy cercano a 0.
-
-\paragraph{Por generador.} La IA de la prueba proviene casi toda de dos generadores: para \textit{DeepSeek-Chat} (227 archivos) el ROC-AUC fue de 0.992 y la detección en el umbral desplegado, de 0.881; para \textit{Qwen3} (100 archivos), de 0.997 y 0.900. Los demás tienen un archivo o ninguno. Por curso, el ROC-AUC se mantuvo entre 0.995 y 0.999. Una versión anterior con cifras aún más altas (cercanas a 0.999) estaba contaminada y no se compara. Los límites de estas cifras se reúnen en la Sección~\ref{subsec:limitaciones}.
+Apesar de estos resultados sobresalientes, conviene tener presentes dos matices importantes. El primero, en esta prueba el 7\,\% de los archivos eran de IA, en un grupo escolar donde casi nadie use IA, el porcentaje de falsas positivos entre los sospechosos parecerá mayor. Segundo, los códigos de IA provienen de \textit{DeepSeek-Chat} y \textit{Qwen3} (con tasas de detección del 88\,\% y 90\,\% en experimentos entrenando con un modelo y probando con el otro), por lo que su eficacia ante otros modelos queda abierta a estudio.
 
 % ----------------------------------------------------------------------
-\subsection{Canal A: ¿Qué tan Semántica es la Similitud?}
+\subsection{Canal A: Similitud entre Programas (GraphCodeBERT)}
 \label{subsec:canal_a_semantica}
 
-Esta es la pregunta guía del Canal A. Se responde con cuatro mediciones: si ordena bien los pares de plagio anotados, si resiste cambios de estructura, si agrupa las entregas por problema y si se relaciona con la corrección (resumen en la Sección~\ref{subsec:hallazgos_canal_a}). En todas se compara GraphCodeBERT (``v2'') con la línea base léxica de Jaccard. Dos variantes se probaron y no cambiaron la conclusión: quitar el grafo de flujo de datos (0.851 frente a 0.856, sin diferencia medible) y normalizar los nombres de variables (no ayudó).
+GraphCodeBERT entiende la estructura del código y no se deja engañar si cambian los bucles o el orden, pero pierde precisión cuando se cambian los nombres de las variables, en este conjunto, una comparación directa de texto (Jaccard) resulta más efectiva.
 
-\subsubsection{Pares de Plagio}
+Para saber si el Canal A realmente comprende la lógica de los programas, se puso a prueba en cuatro escenarios contra una regla sencilla (Jaccard), la cual solo cuenta qué porcentaje de fragmentos de texto comparten dos archivos. Se usó GraphCodeBERT de fábrica (\textit{zero-shot}, sin reentrenamiento).
+
+\subsubsection{Detección de pares de plagio}
 \label{subsec:pares_plagio}
-En el conjunto de prueba hay 6,797 programas de 14 asignaciones, con 1,908,545 pares posibles; 338 están anotados como plagio. La tarea es dar más similitud a esos pares que al resto. Las anotaciones tienen ruido (se hicieron por asignación), por lo que se interpretan con cautela.
+Entre casi dos millones de combinaciones posibles de 6,797 programas, se evaluó qué tan bien cada método coloca en los primeros lugares a los 338 pares previamente identificados como plagio en \textit{Programming Homework Dataset for Plagiarism Detection} \cite{Ljubovic2020} (Tabla~\ref{tab:pares_plagio}).
 
 \begin{table}[H]
     \centering
-    \caption{Pares de plagio en la prueba: ROC-AUC (IC 95\,\%).}
+    \caption{Capacidad para identificar pares de plagio conocidos (ROC-AUC con IC 95\,\%).}
     \label{tab:pares_plagio}
     \renewcommand{\arraystretch}{1.2}
     \small
     \begin{tabularx}{\textwidth}{|l|c|X|}
         \hline
-        \textbf{Método} & \textbf{ROC-AUC} & \textbf{Comentario} \\ \hline
-        Jaccard (línea base léxica) & 0.945 [0.930, 0.964] & Mejor resultado. \\ \hline
-        GraphCodeBERT v2 & 0.856 [0.796, 0.893] & Por debajo de la línea base. \\ \hline
-        Pipeline anterior & 0.741 [0.653, 0.800] & Mejorado por la corrección de implementación. \\ \hline
-        Azar & 0.500 & Referencia. \\ \hline
+        \textbf{Método} & \textbf{ROC-AUC} & \textbf{Qué significa} \\ \hline
+        Jaccard (comparación de texto) & 0.945 [0.930, 0.964] & Ordena correctamente 95 de cada 100 comparaciones. \\ \hline
+        GraphCodeBERT & 0.856 [0.796, 0.893] & Ordena correctamente 86 de cada 100 comparaciones. \\ \hline
+        Azar & 0.500 & Equivale a adivinar (50 de cada 100). \\ \hline
     \end{tabularx}
 \end{table}
 
-GraphCodeBERT zero-shot no supera a la línea base léxica y los intervalos no se traslapan. No es un error de implementación: al excluir los pares idénticos la brecha persiste (0.883 contra 0.975). La corrección del pipeline sí mejoró el resultado frente al anterior.
+Como muestra la tabla, la comparación simple de texto supera a GraphCodeBERT, incluso si se retiran de la prueba las copias idénticas (0.975 frente a 0.883). Quitar el grafo de flujo de datos o normalizar nombres antes de pasar por el modelo tampoco cambió este resultado.
 
-\subsubsection{Robustez ante Cambios en el Código}
+\subsubsection{Resistencia a trucos de modificación (Robustez)}
 \label{subsec:robustez_canal_a}
-Una similitud verdaderamente semántica debería mantenerse si el programa se reescribe sin cambiar lo que hace. Se aplicaron siete transformaciones automáticas, con \texttt{tree-sitter}, a los 6,797 programas de la prueba, más la identidad como control (Tabla~\ref{tab:transformaciones}).
+Cuando un alumno copia código, suele disfrazarlo haciendo cambios superficiales. Usando \texttt{tree-sitter}, aplicamos automáticamente trucos comunes a los 6,797 programas: cambiar bucles \texttt{for} por \texttt{while}, desordenar líneas independientes, invertir condiciones \texttt{if}, renombrar variables e insertar ``código muerto'' (líneas que no hacen nada, como \texttt{if (0) \{ ; \}}). La Tabla~\ref{tab:robustez_canal_a} y la Figura~\ref{fig:robustez_degradacion_canal_a} muestran cómo resistió cada método.
 
 \begin{table}[H]
     \centering
-    \caption{Transformaciones del protocolo de robustez, con un ejemplo de cada una.}
-    \label{tab:transformaciones}
-    \renewcommand{\arraystretch}{1.2}
-    \small
-    \begin{tabularx}{\textwidth}{|l|l|X|}
-        \hline
-        \textbf{Clave} & \textbf{Nombre} & \textbf{Qué hace (ejemplo)} \\ \hline
-        $T_0$ & Identidad & No cambia nada; es el control. \\ \hline
-        $T_1$ & Renombrado & \texttt{suma} pasa a \texttt{var\_1}. \\ \hline
-        $T_2$ & Bucles & Cambia un \texttt{for} por un \texttt{while} equivalente. \\ \hline
-        $T_3$ & Reordenamiento & \texttt{a = 1; b = 2;} pasa a \texttt{b = 2; a = 1;}. \\ \hline
-        $T_4$ & Operadores & \texttt{x += 1} pasa a \texttt{x = x + 1}. \\ \hline
-        $T_5$ & Código muerto & Inserta instrucciones inútiles: \texttt{if (0) \{ ; \}}. \\ \hline
-        $T_6$ & Inversión de \texttt{if} & Niega la condición e intercambia los bloques. \\ \hline
-        $T_7$ & Cascada & Aplica $T_2$ a $T_5$ en secuencia, con intensidad 0.25, 0.50 o 1.00. \\ \hline
-    \end{tabularx}
-\end{table}
-
-La Tabla~\ref{tab:robustez_canal_a} muestra el ROC-AUC en cada condición y la Figura~\ref{fig:robustez_degradacion_canal_a} lo presenta en curvas.
-
-\begin{table}[H]
-    \centering
-    \caption{ROC-AUC [IC 95\,\%] en pares de plagio de la prueba bajo cada transformación.}
+    \caption{Desempeño (ROC-AUC [IC 95\,\%]) después de aplicar trucos para disfrazar la copia.}
     \label{tab:robustez_canal_a}
     \renewcommand{\arraystretch}{1.2}
     \small
-    \begin{tabular}{|l|c|c|}
+    \begin{tabularx}{\textwidth}{|X|c|c|}
         \hline
-        \textbf{Condición} & \textbf{Jaccard} & \textbf{GraphCodeBERT v2} \\ \hline
-        $T_0$ (Identidad) & 0.945 [0.930, 0.964] & 0.856 [0.796, 0.893] \\ \hline
-        $T_1$ (Renombrado) & 0.945 [0.930, 0.964] & 0.683 [0.562, 0.774] \\ \hline
-        $T_5$ (Código muerto) & 0.950 [0.935, 0.964] & 0.768 [0.645, 0.849] \\ \hline
-        $T_2$, $T_3$, $T_4$, $T_6$ (estructura) & 0.937 a 0.943 & 0.850 a 0.854 \\ \hline
-        $T_7@0.25$ & 0.942 [0.928, 0.959] & 0.857 [0.790, 0.895] \\ \hline
-        $T_7@0.50$ & 0.944 [0.927, 0.960] & 0.795 [0.695, 0.853] \\ \hline
-        $T_7@1.00$ & 0.931 [0.912, 0.949] & 0.714 [0.555, 0.814] \\ \hline
-    \end{tabular}
+        \textbf{Modificación aplicada al código} & \textbf{Jaccard (Texto)} & \textbf{GraphCodeBERT v2} \\ \hline
+        Código original (sin cambios) & 0.945 [0.930, 0.964] & 0.856 [0.796, 0.893] \\ \hline
+        Cambios de estructura (bucles, orden, operadores, \texttt{if}) & 0.937 a 0.943 & 0.850 a 0.854 \\ \hline
+        Renombrar todas las variables & 0.945 [0.930, 0.964] & 0.683 [0.562, 0.774] \\ \hline
+        Insertar código muerto (basura) & 0.950 [0.935, 0.964] & 0.768 [0.645, 0.849] \\ \hline
+        Todos los trucos combinados al máximo & 0.931 [0.912, 0.949] & 0.714 [0.555, 0.814] \\ \hline
+    \end{tabularx}
 \end{table}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.88\textwidth]{figuras/robustez_degradacion_canal_a.png}
-    \caption{Degradación del ROC-AUC del Canal A en las condiciones del protocolo de robustez.}
+    \caption{Caída de rendimiento a medida que el código se modifica más intensamente (de 0 a 1). Las líneas superiores (métodos de texto como Jaccard y \textit{winnowing}) se mantienen casi planas, demostrando gran resistencia. Las líneas inferiores (GraphCodeBERT) caen notablemente cuando se acumulan todos los cambios.}
     \label{fig:robustez_degradacion_canal_a}
 \end{figure}
 
-GraphCodeBERT resiste los cambios de estructura: con $T_2$, $T_3$, $T_4$ y $T_6$ el ROC-AUC cambia como máximo 0.006. En cambio, es sensible al renombrado ($0.856 \rightarrow 0.683$) y al código muerto ($0.856 \rightarrow 0.768$). Jaccard casi no se mueve (entre 0.927 y 0.950). Una explicación posible es que los nombres aportan información al modelo y que el código muerto diluye el resumen del archivo; ambas son hipótesis que este experimento no prueba.
+El hallazgo con este experimento es muy revelador y refutó nuestra hipótesis inicial. Esperábamos que el método de texto fallara más ante cambios combinados, pero ocurrió lo contrario. GraphCodeBERT es inmune a los cambios de estructura (su puntaje casi no se mueve si cambias un \texttt{for} por un \texttt{while}), pero depende mucho de los nombres de las variables (cae de 0.856 a 0.683 al renombrarlas) y se distrae con el código basura (baja a 0.768). En cambio, como la comparación de texto normaliza los identificadores antes de comparar, el renombrado no le afecta en absoluto.
 
-Las tres hipótesis registradas antes de ejecutar el protocolo se resolvieron así:
-\begin{itemize}
-    \item \textbf{H1 (refutada).} Se esperaba que Jaccard se degradara más que GraphCodeBERT con la cascada completa. Ocurrió lo contrario: GraphCodeBERT cayó 0.142 y Jaccard, 0.014.
-    \item \textbf{H2 (control de Jaccard ante el renombrado).} Se esperaba que no cambiara. El verificador automático la marcó como fallida porque exige una caída exactamente nula y observó 0.000002, compatible con ruido numérico. En la práctica, Jaccard no cambia con el renombrado.
-    \item \textbf{H3 (no concluyente).} Se esperaba que el grafo de flujo de datos diera ventaja ante el reordenamiento. La diferencia fue de $+0.0005$, y su intervalo incluye el cero.
-\end{itemize}
-
-\subsubsection{Agrupamiento por Lógica (E1)}
+\subsubsection{Reconocimiento de problemas correctos (Agrupamiento)}
 \label{subsec:agrupamiento_e1}
-La tercera pregunta es si las entregas de una misma tarea quedan cerca entre sí. Se evaluaron 2,842 entregas de 48 tareas. Como el Canal A no se entrena con estos datos, no hay fuga de entrenamiento posible. El \textit{Silhouette} indica si las entregas de una tarea forman un grupo compacto y separado (1 es muy separado; 0, sin separación clara).
+Aquí evaluamos si el modelo es capaz de notar que dos alumnos están resolviendo la misma tarea, aunque cada quien programe a su manera. Se analizaron 2,842 entregas de 48 tareas distintas usando dos medidas, \textbf{Recall@1} (¿el código más parecido de toda la base de datos es de esta misma tarea?) y \textbf{MAP@R} \cite{Musgrave2020Reality} (al ordenar todos los archivos por similitud, ¿qué tan arriba quedan todos los compañeros que hicieron esa misma tarea correctamente?, donde 1.0 es perfecto).
 
 \begin{table}[H]
     \centering
-    \caption{Agrupamiento por tarea (E1) en el espacio original de los vectores.}
+    \caption{Capacidad para agrupar entregas que resuelven el mismo problema.}
     \label{tab:resultados_agrupamiento_logico}
     \renewcommand{\arraystretch}{1.2}
     \small
-    \begin{tabularx}{\textwidth}{|l|c|c|c|c|}
+    \begin{tabularx}{\textwidth}{|X|c|c|}
         \hline
-        \textbf{Método} & \textbf{MAP@R (IC 95\,\%)} & \textbf{Recall@1} & \textbf{ROC-AUC} & \textbf{Silhouette} \\ \hline
-        Jaccard & \textbf{0.450} [0.406, 0.499] & \textbf{0.847} & \textbf{0.873} & \textbf{0.059} \\ \hline
-        GraphCodeBERT v2 & 0.387 [0.341, 0.443] & 0.825 & 0.805 & $-0.002$ \\ \hline
-        Azar & 0.002 & 0.021 & -- & -- \\ \hline
+        \textbf{Método} & \textbf{MAP@R (Orden general)} & \textbf{Recall@1 (Vecino más cercano)} \\ \hline
+        Jaccard (Texto) & \textbf{0.450} [0.406, 0.499] & \textbf{0.847} (85\,\%) \\ \hline
+        GraphCodeBERT v2 & 0.387 [0.341, 0.443] & 0.825 (83\,\%) \\ \hline
+        Azar & 0.002 & 0.021 (2\,\%) \\ \hline
     \end{tabularx}
 \end{table}
 
-Las hipótesis se registraron antes de ejecutar. GraphCodeBERT agrupa por tarea muy por encima del azar (MAP@R de 0.387 frente a 0.002; hipótesis confirmada), pero Jaccard lo hace algo mejor (0.450; la diferencia, $-0.064$ con IC 95\,\% de $-0.083$ a $-0.044$, refuta que v2 lo iguale). Normalizar los nombres tampoco ayudó, lo que concuerda con la sensibilidad al renombrado. El \textit{Silhouette} cercano a 0 sugiere que las tareas se traslapan, quizá por rutinas comunes a varios ejercicios. Las Figuras~\ref{fig:map_at_r_eval}, \ref{fig:clusters_canal_a} y~\ref{fig:heatmap_logico} lo ilustran.
-
-\paragraph{Recall@1 frente al azar.} Se toma una entrega y se busca, entre las otras 2,841, la que el modelo considera más parecida. El modelo no conoce la tarea de cada entrega, solo compara vectores. Con 48 tareas de entre 43 y 60 entregas, una vecina al azar sería de la misma tarea solo el 2.1\,\% de las veces.\footnote{Probabilidad calculada con el tamaño de cada tarea: $\sum_t n_t(n_t-1) / \big(N(N-1)\big)$, con $N = 2{,}842$ entregas y $n_t$ entregas en la tarea $t$.} GraphCodeBERT acierta el 82.5\,\%, unas 40 veces más. En unas 4 de cada 5 entregas, lo más parecido es otra solución del mismo ejercicio, aunque la haya escrito otro estudiante; esto sugiere que los vectores capturan, en buena medida, \emph{qué problema resuelve} el programa. El 84.7\,\% de Jaccard es algo mayor, y los casos restantes se explican por ejercicios con rutinas parecidas (Figura~\ref{fig:clusters_canal_a}\,(b)).
+Ambos métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). En más de 4 de cada 5 entregas (82.5\,\%), el archivo que GraphCodeBERT considera más parecido pertenece al mismo ejercicio, lo que confirma que sí logra capturar qué problema resuelve el código. Sin embargo, Jaccard logra grupos más definidos, como se aprecia visualmente en las Figuras~\ref{fig:heatmap_logico} y~\ref{fig:clusters_canal_a}.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{figuras/g3_map_at_r.png}
-    \caption{MAP@R de cada método con IC 95\,\% y línea base aleatoria (0.002).}
+    \includegraphics[width=0.80\textwidth]{figuras/g3_map_at_r.png}
+    \caption{Comparación de agrupamiento (MAP@R). Mientras más alta, mejor agrupa el método las soluciones de una misma tarea. Todos superan ampliamente la línea punteada del azar.}
     \label{fig:map_at_r_eval}
-\end{figure}
-
-La Figura~\ref{fig:clusters_canal_a} es una proyección en dos dimensiones (t-SNE) de los vectores. Deforma las distancias \cite{Chari2023Specious}, por lo que solo ilustra; las conclusiones se basan en las métricas del espacio original. En (a), tres problemas distintos forman grupos separados; en (b), dos problemas con lógica similar se mezclan.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\textwidth]{figuras/clusters_canal_a.png}
-    \caption{Proyección t-SNE de los vectores de GraphCodeBERT: problemas distintos (a) y problemas similares que se superponen (b). La estrella marca la solución de referencia.}
-    \label{fig:clusters_canal_a}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figuras/g1_heatmap.png}
-    \caption{Matrices de similitud del coseno ordenadas por tarea. Los bloques densos sobre la diagonal indican que las entregas de una misma tarea son más parecidas entre sí.}
+    \caption{Mapa de calor de similitud entre tareas. Amarillo indica alta similitud y morado, baja. Los cuatro bloques cuadrados en la diagonal son entregas de una misma tarea. Jaccard (izquierda) los separa con nitidez; GraphCodeBERT (centro y derecha) pinta casi todo de amarillo porque tiende a dar puntajes altos a cualquier código en C/C++.}
     \label{fig:heatmap_logico}
 \end{figure}
 
-\subsubsection{Similitud y Corrección (E2)}
-\label{subsec:similitud_correccion_e2}
-La cuarta pregunta es si una entrega más parecida a una solución aprobada tiende a ser correcta. Como el conjunto no incluye soluciones del docente (Capítulo~\ref{cap:ingenieria_datos}), la referencia es una entrega de estudiante que aprobó todas las pruebas unitarias. Se consideraron 14 tareas y 543 entregas. El ROC-AUC fue de 0.560 (IC 95\,\%: 0.520 a 0.602): hay señal, pero débil. Al comparar una entrega aprobada con una reprobada, la aprobada queda primero el 56\,\% de las veces.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figuras/clusters_canal_a.png}
+    \caption{Mapa visual (proyección t-SNE \cite{Chari2023Specious}) de cómo GraphCodeBERT organiza las entregas. Cada punto es un programa y cada color una tarea. En (a) logra separar tres tareas con lógica distinta, pero en (b) mezcla dos tareas que usan rutinas similares.}
+    \label{fig:clusters_canal_a}
+\end{figure}
 
-Los métodos empatan: Jaccard obtuvo 0.563 y v2, 0.560, con una diferencia de $-0.003$ (IC 95\,\%: $-0.052$ a $+0.036$). La correlación de Spearman con el resultado de las pruebas es modesta (0.107 y 0.077). La Figura~\ref{fig:correctness_eval} muestra que las similitudes de GraphCodeBERT quedan comprimidas cerca de 1, mientras que las de Jaccard se distribuyen en un rango amplio. La similitud con una solución aprobada puede ayudar a priorizar la revisión, pero no sustituye las pruebas unitarias.
+\subsubsection{¿Parecerse a una buena solución significa que el código funciona?}
+\label{subsec:similitud_correccion_e2}
+Finalmente, probamos en 543 entregas si parecerse al código de un compañero que sacó 10 (aprobó todas las pruebas unitarias) garantiza que la entrega también sea correcta. La relación resultó muy débil, tanto GraphCodeBERT (ROC-AUC de 0.560) como Jaccard (0.563) están apenas por encima de lanzar una moneda (0.500). 
+
+Como se ve en la Figura~\ref{fig:correctness_eval}, un programa que falla todas las pruebas puede lucir casi idéntico a uno perfecto (en ocaciones un signo < en lugar de un > basta para fallar todas las pruebas). Por tanto, la similitud sirve para organizar la revisión del profesor, pero jamás reemplaza ejecutar las pruebas unitarias.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figuras/g4_correctness.png}
-    \caption{Similitud con la solución de referencia según el resultado de las pruebas unitarias (pasa todas, parcial, falla todas), para tres métodos.}
+    \caption{Similitud frente a una solución correcta según las pruebas unitarias aprobadas. Si la similitud predijera la calificación, las cajas descenderían en escalera de izquierda a derecha, sin embargo, se mantienen casi a la misma altura tanto para quienes aprueban todo como para quienes fallan.}
     \label{fig:correctness_eval}
 \end{figure}
 
-\subsubsection{Resumen de Hallazgos}
-\label{subsec:hallazgos_canal_a}
-La Tabla~\ref{tab:hallazgos} reúne los resultados principales de ambos canales y qué significan para el docente.
+% ----------------------------------------------------------------------
+\subsection{Explicabilidad y Limitaciones del Estudio}
+\label{subsec:explicabilidad}
+\label{subsec:limitaciones}
+
+Para que el docente confíe en la herramienta y le resule útil, necesita entender el significado de las métricas. Aunque las redes neuronales y transformers no explican por que toman las decisiones de forma entendible, Graphito ofrece transparencia práctica de tres maneras:
+\begin{itemize}
+    \item \textbf{Evidencia directa en texto:} La métrica de Jaccard es transparente por naturaleza (\textit{``estos dos archivos comparten el X\,\% de sus fragmentos''}) y permite mostrar cuál es la entrega más parecida.
+    \item \textbf{Reglas visibles en pantalla:} La interfaz resalta líneas sospechosas mediante reglas fijas y las etiqueta claramente como indicadores de apoyo para no confundirlas con el veredicto del modelo.
+    \item \textbf{Mapas de comportamiento:} Las gráficas de agrupamiento y resistencia permiten al docente conocer de antemano en qué casos el sistema es fuerte y cuándo puede dudar.
+\end{itemize}
+
+Asimismo, toda evaluación honesta debe señalar las fronteras de sus datos. Los resultados de este capítulo deben leerse considerando tres limitaciones principales:
+\begin{enumerate}
+    \item \textbf{Un modelo que no está entrenado para C/C++:} GraphCodeBERT fue entrenado originalmente con otros seis lenguajes (como Python y Java) y con variables en inglés \cite{Guo2021GraphCodeBERT}, además de estar diseñado para autocompletar código y no para medir plagio. Por eso acumula similitudes altas cerca de 1.0, pierde precisión con apuntadores (véase la Sección~\ref{subsubsec:adaptacion_c_cpp}) y se confunde al cambiar los nombres de las variables (que en este conjunto están en serbocroata).
+    \item \textbf{Variedad en modelos de IA generadores de código y posibles ``atajos'':} El detector aprendió de dos modelos específicos (\textit{DeepSeek-Chat} y \textit{Qwen3}). Además, las redes suelen aprovechar pistas rápidas \cite{Geirhos2020Shortcut}: por ejemplo, la línea \texttt{using namespace} aparece en el 30\,\% del código de IA frente al 7\,\% del humano, un detalle que el modelo podría usar a su favor.
+    \item \textbf{Contexto de los datos:} Los programas base provienen de cursos de la Universidad de Sarajevo (2016--2017) y se compararon contra entregas aprobadas de alumnos, no contra soluciones oficiales del profesor. Validar el sistema con entregas reales de la ESCOM es el paso natural siguiente.
+\end{enumerate}
+
+Superar estas barreras abre rutas claras para el trabajo futuro que se detalla en el Capítulo~\ref{cap:conclusiones}: desde entrenar a GraphCodeBERT específicamente para separar copias (\textit{entrenamiento contrastivo}, cuya implementación está avanzada dentro del proyecto), utilizar un LLM clasificador de frontera como Jev para complementar las métricas, hasta incorporar mapas de calor palabra por palabra (\textit{saliencia}) y un modelo de lenguaje que explique los hallazgos en lenguaje natural.
+
+% ----------------------------------------------------------------------
+\subsection{Discusión y Resumen}
+\label{subsec:discusion_modelado}
+
+Los experimentos demuestran que ambos canales se complementan porque ven cosas distintas. Una prueba preliminar intentando fusionar ambos puntajes en un solo número redujo el rendimiento (ROC-AUC de 0.874), lo que confirmó la mejor decisión de diseño para Graphito: mantener ambos canales como indicadores independientespue para que el profesor tenga el panorama completo. La Tabla~\ref{tab:hallazgos} condensa todo lo aprendido en esta sección y cómo debe interpretarse en la práctica.
 
 \begin{table}[H]
     \centering
-    \caption{Organizador de hallazgos: pregunta, resultado y significado para el docente.}
+    \caption{Resumen ejecutivo de la evaluación: qué se probó, qué se obtuvo y qué significa en el aula.}
     \label{tab:hallazgos}
     \renewcommand{\arraystretch}{1.25}
     \small
-    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
         \hline
-        \textbf{Pregunta} & \textbf{Resultado} & \textbf{Qué significa para el docente} \\ \hline
-        ¿El CharCNN distingue código de IA en tareas no vistas? & ROC-AUC de 0.994; con 1 falsa alarma por cada 100 humanos, detecta el 89\,\% de la IA. & Es un indicador de apoyo, no una prueba de autoría. La generalización a otros generadores no está medida. \\ \hline
-        ¿Ordena bien GraphCodeBERT los pares de plagio? & ROC-AUC de 0.856 frente a 0.945 de Jaccard. & Ayuda, pero una regla léxica simple lo hace mejor en este dataset. \\ \hline
-        ¿Resiste cambios de estructura? & Con bucles, reordenamiento, operadores e \texttt{if} cambia como máximo 0.006. & Un cambio de forma sin tocar nombres no esconde una copia al Canal A. \\ \hline
-        ¿Y los nombres y el código muerto? & Renombrado: 0.856 a 0.683. Código muerto: 0.856 a 0.768. & Renombrar variables sí reduce la similitud que ve el Canal A. \\ \hline
-        ¿Agrupa las entregas por problema (E1)? & MAP@R de 0.387 (azar 0.002), Recall@1 de 0.825; Jaccard, 0.450. & Reconoce qué entregas resuelven el mismo problema; Jaccard lo hace algo mejor. \\ \hline
-        ¿Se relaciona con la corrección (E2)? & ROC-AUC de 0.560; empate con Jaccard. & Señal débil; sirve para ordenar la revisión, no para decidir si una entrega es correcta. \\ \hline
+        \textbf{Pregunta evaluada} & \textbf{Resultado clave} & \textbf{Utilidad práctica para el docente} \\ \hline
+        ¿El Canal B distingue código hecho por IA? & Detecta el 89\,\% de la IA equivocándose solo en 1 de cada 100 humanos (ROC-AUC de 0.994). & Excelente filtro de alerta temprana, siempre como apoyo y no como sanción automática. \\ \hline
+        ¿El Canal A detecta copias entre alumnos? & Ordena bien el 86\,\% de los casos, pero la comparación de texto (Jaccard) llega al 95\,\%. & Conviene apoyarse primero en el indicador de texto y usar el Canal A como respaldo estructural. \\ \hline
+        ¿Qué pasa si disfrazan la copia cambiando el código? & Resiste cambios de bucles y orden, pero baja su precisión si renombran todas las variables (de 0.86 a 0.68). & Si un alumno cambia la estructura sin renombrar variables, el Canal A lo detectará sin problema. \\ \hline
+        ¿Reconoce qué tarea resuelve cada entrega? & Acierta el ejercicio en el 83\,\% de los casos (40 veces mejor que el azar). & Agrupa bien las entregas por lógica para revisar soluciones parecidas en bloque. \\ \hline
+        ¿Sirve la similitud para calificar si el código funciona? & Señal muy débil (0.560, casi equivalente al azar). & Ayuda a ordenar qué revisar primero, pero no sustituye las pruebas unitarias. \\ \hline
     \end{tabularx}
 \end{table}
-
-% ----------------------------------------------------------------------
-\subsection{Explicabilidad}
-\label{subsec:explicabilidad}
-
-\textbf{Explicabilidad} es la capacidad de mostrar por qué un modelo da cierta salida. Graphito \textbf{no} explica las decisiones internas de los modelos (no hay mapas de atención ni de saliencia). Ofrece tres apoyos:
-\begin{itemize}
-    \item \textbf{Visualización y robustez.} El mapa de calor y la proyección t-SNE (Figuras~\ref{fig:clusters_canal_a} y~\ref{fig:heatmap_logico}) muestran cómo organiza el modelo las soluciones, y la robustez, a qué es sensible.
-    \item \textbf{Indicadores de la interfaz.} Cada entrega muestra su similitud a nivel de archivo (Jaccard y la referencia más cercana) y líneas marcadas por reglas fijas, rotuladas ``no es salida del modelo''.
-    \item \textbf{Jaccard.} Es explicable por construcción: ``comparten el X\,\% de los fragmentos''.
-\end{itemize}
-Los mapas de saliencia quedan como idea no explorada (Sección~\ref{subsec:limitaciones}).
-
-% ----------------------------------------------------------------------
-\subsection{Limitaciones e Ideas no Exploradas}
-\label{subsec:limitaciones}
-
-La Tabla~\ref{tab:limitaciones} reúne los límites conocidos de los resultados y la Tabla~\ref{tab:ideas_no_exploradas}, ideas que podrían superarlos. Estas ideas son propuestas para trabajo futuro (Capítulo~\ref{cap:conclusiones}); no se ejecutaron.
-
-{\small
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{1.5cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
-    \caption{Limitaciones de los resultados.}\label{tab:limitaciones}\\
-    \hline
-    \textbf{Canal} & \textbf{Limitación} & \textbf{Qué implica} \\ \hline
-    \endfirsthead
-    \hline
-    \textbf{Canal} & \textbf{Limitación} & \textbf{Qué implica} \\ \hline
-    \endhead
-    A & GraphCodeBERT se preentrenó con CodeSearchNet (Python, Java, JavaScript, PHP, Ruby y Go) \cite{Guo2021GraphCodeBERT}: nunca vio C ni C++. & Se adaptó la entrada, no el modelo; su lectura de C y C++ es menos fiable. \\ \hline
-    A & Se preentrenó para completar código y aprender relaciones del grafo, no para medir parecido entre programas. & Las similitudes se acumulan cerca de 1 y separan poco. \\ \hline
-    A & Aprendió sobre todo nombres en inglés; aquí están en serbocroata. & Es sensible al renombrado (0.856 a 0.683). \\ \hline
-    A & Los apuntadores se siguen por nombre, sin análisis de alias (Sección~\ref{subsubsec:adaptacion_c_cpp}). & El grafo puede registrar mal el flujo de datos con apuntadores. \\ \hline
-    A & La referencia de la evaluación es una entrega aprobada de un estudiante, no del docente. & Mide parecido con un compañero, no con la solución del docente. \\ \hline
-    B & El modelo se ajusta a la tarea; el límite son los datos: un curso, un país y dos generadores de IA con datos suficientes (\textit{deepseek-chat} y \textit{qwen3}). Quedan atajos pequeños: \texttt{using namespace} aparece en el 7\,\% del código humano y en el 30\,\% del de IA \cite{Geirhos2020Shortcut}. & No se midió la generalización a otros generadores; el modelo podría apoyarse en atajos. \\ \hline
-    Ambos & Los datos son de 2016 a 2017 de la Universidad de Sarajevo, y un estudiante puede aparecer en varias particiones. & No se midió con estudiantes de la ESCOM; las cifras pueden ser algo optimistas. \\ \hline
-\end{xltabular}
-}
-
-{\small
-\renewcommand{\arraystretch}{1.25}
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{3.2cm}|}
-    \caption{Ideas no exploradas (propuestas para trabajo futuro).}\label{tab:ideas_no_exploradas}\\
-    \hline
-    \textbf{Idea} & \textbf{Qué resolvería} & \textbf{Estado} \\ \hline
-    \endfirsthead
-    \hline
-    \textbf{Idea} & \textbf{Qué resolvería} & \textbf{Estado} \\ \hline
-    \endhead
-    Entrenamiento contrastivo de GraphCodeBERT & Enseñaría al modelo a separar programas parecidos de distintos. & Script preparado, nunca ejecutado. \\ \hline
-    Modelos con C y C++ en su preentrenamiento (por ejemplo, UniXcoder) & Una lectura nativa de C y C++. & Propuesta. \\ \hline
-    Métrica de contención & Agregar código extra no bajaría la similitud. & Propuesta. \\ \hline
-    Más generadores de IA en el dataset & Medir la generalización del Canal B. & Propuesta. \\ \hline
-    Mapas de saliencia & Mostrar qué partes del código pesan en la salida. & Propuesta. \\ \hline
-    Un LLM local como juez & Una segunda opinión explicada en lenguaje natural. & Propuesta. \\ \hline
-\end{xltabular}
-}
-
-% ----------------------------------------------------------------------
-\subsection{Discusión}
-\label{subsec:discusion_modelado}
-
-Los dos canales aportan cosas distintas. El \textbf{Canal B} detecta bien, en este dataset, el estilo de dos generadores de IA con pocas falsas alarmas. El \textbf{Canal A} capta que dos programas comparten estructura y resiste reescrituras de forma, pero depende de los nombres de las variables y no supera a una regla léxica simple. Eso no invalida el canal, pero relativiza su costo.
-
-Las explicaciones de por qué ocurre así (nombres que aportan información, código muerto que diluye el resumen, ejercicios simples donde basta el texto) son hipótesis, no causas medidas. Tampoco se midió que el CharCNN capte el ``estilo de IA'' en general. Las mejoras posibles se tratan en el Capítulo~\ref{cap:conclusiones}.
 
 % ======================================================================
 \section{Conclusión del capítulo}
 \label{sec:conclusion_modelado}
 % ======================================================================
 
-Este capítulo describió los modelos de Graphito y la evidencia sobre su funcionamiento. El CharCNN v2 se entrenó con una arquitectura multiescala y alcanzó, en tareas no vistas, un ROC-AUC de 0.994 y una $F_1$ de 0.884 en el umbral desplegado. GraphCodeBERT se usa sin entrenamiento adicional; capta estructura y agrupa por problema, pero depende de los nombres y no supera a la línea base léxica. Se dijeron con claridad tanto los aciertos como los resultados negativos, y los límites: dos generadores, atajos residuales y una referencia que es una entrega de alumno.
+Este capítulo presentó la arquitectura y la validación empírica de los modelos que dan vida a Graphito. Los resultados muestran un contraste claro y valioso: mientras que el Canal B (CharCNN) logra una precisión sobresaliente para identificar el estilo de generación de IA con un mínimo de falsas alarmas, el Canal A (GraphCodeBERT) demuestra que un modelo complejo sin ajuste específico puede capturar la estructura lógica del código, pero sigue siendo superado por métodos clásicos de comparación de texto cuando los alumnos renombran variables en C y C++. Reportar con transparencia tanto estos aciertos como sus límites técnicos garantiza que la herramienta se utilice con el rigor que merece.
 
-El Capítulo~\ref{cap:despliegue} describe cómo se integran estos componentes en una plataforma que el docente puede usar, con la información de ambos canales presentada como apoyo a su criterio.
+En el Capítulo~\ref{cap:despliegue} se muestra cómo estos modelos se integran dentro de una plataforma web ágil, presentando sus indicadores de forma clara para acompañar el criterio del profesor.
