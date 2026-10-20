@@ -204,7 +204,7 @@ def t1_rename_identifiers(code: str, lang: str, p: float = 1.0, seed: int = 0) -
                     if curr.type != "function_definition" or curr.id == body.id:
                         decl_stack.extend(reversed(curr.children))
 
-            for sname in (names_in_func - shadowed):
+            for sname in sorted(names_in_func - shadowed):
                 if sname not in declared_functions and sname != "main" and sname not in type_names:
                     spans = _find_identifiers_in_subtree(n, sname, source)
                     if spans:
