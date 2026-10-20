@@ -54,3 +54,8 @@ def test_v2_norm_deterministic():
 def test_length_mismatch_rejected():
     with pytest.raises(ValueError):
         texts_for_method("v2_norm", ["int x;"], [], ["c"])
+
+
+def test_canonicalize_tolerates_broken_code_and_is_stable():
+    broken = "int f(int a){ int b = a +; return b; } int g(){return f(1)}"
+    assert canonicalize_code(broken, "c") == canonicalize_code(broken, "c")

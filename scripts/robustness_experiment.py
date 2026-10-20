@@ -162,6 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--local-files-only", action="store_true", default=True, help="Disallow network HF downloads.")
     p.add_argument("--root", default=str(ROOT), help="Repository root.")
     p.add_argument("--runs-root", default="runs", help="Root directory for runs.")
+    p.add_argument("--skip-validity", action="store_true", help="Skip parse/compile/edit-ratio validity metrics (scores are unaffected).")
+    p.add_argument("--prefill-shard", default=None, help="K/N: only warm the embedding cache for shard K of N, then exit.")
     p.add_argument("--run-dir", default=None, help="Exact output directory for a fresh run (default: <runs-root>/robustness/<timestamp>).")
     p.add_argument("--reference-run", default="runs/robustness/20261012-050941", help="Earlier robustness run for the v2_norm reproduction check.")
     return p
@@ -176,11 +178,18 @@ def _transform_one_file(
     lang: str,
     cond: str,
     base_seed: int,
+    skip_validity: bool = False,
 ) -> Dict[str, Any]:
     orig_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
     t_seed = derive_seed(base_seed, orig_sha, cond, 1.0)
     res = apply_condition(text, lang, cond, seed=t_seed)
     trans_sha = hashlib.sha256(res.code.encode("utf-8")).hexdigest()
+    if skip_validity:
+        return {
+            "id": sample_id, "condition": cond, "sha256_in": orig_sha, "sha256_out": trans_sha,
+            "code_out": res.code, "n_eligible": res.n_eligible, "n_applied": res.n_applied,
+            "parse_ok": True, "compile_ok": None, "edit_tokens": 0.0, "edit_abstract": 0.0,
+        }
 
     # Parse validity check
     orig_tree = parse_source(text.encode("utf-8"), lang)
@@ -993,7 +1002,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for cond in conditions:
         for s in ep.samples:
             if (s.id, cond) not in transformed_records:
-                tasks_to_run.append((s.id, files[s.id].text, s.lang, cond, args.seed))
+                tasks_to_run.append((s.id, files[s.id].text, s.lang, cond, args.seed, args.skip_validity))
 
     if tasks_to_run:
         _log(f"Applying {len(tasks_to_run)} transformations across {len(conditions)} conditions...")
@@ -1046,6 +1055,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for m in embedding_methods_active:
         cached_embedders[m] = CachedEmbedder(embedders[m], EmbeddingCache(cache_root, embedders[m].key_fields()))
 
+    if args.prefill_shard:
+        # Cache warm-up for one shard of the unique texts (run several shards in parallel processes).
+        k_s, n_s = (int(x) for x in args.prefill_shard.split("/"))
+        langs_all = [s.lang for s in ep.samples]
+        orig_all = [files[s.id].text for s in ep.samples]
+        todo: Dict[str, Tuple[str, str, str]] = {}
+        for m in embedding_methods_active:
+            for cond in conditions:
+                t_texts = []
+                for s, o in zip(ep.samples, orig_all):
+                    r = transformed_records[(s.id, cond)]
+                    t_texts.append(r["code_out"] if "code_out" in r else o)
+                o_t, t_t = texts_for_method(m, orig_all, t_texts, langs_all)
+                for txt, lg in list(zip(o_t, langs_all)) + list(zip(t_t, langs_all)):
+                    sh = hashlib.sha256(txt.encode("utf-8")).hexdigest()
+                    if int(sh[:8], 16) % n_s == k_s:
+                        todo[f"{m}:{sh}"] = (m, txt, lg)
+        _log(f"Prefill shard {k_s}/{n_s}: {len(todo)} unique texts")
+        for i, (key, (m, txt, lg)) in enumerate(todo.items()):
+            cached_embedders[m].embed(key.split(":", 1)[1] if m in EMBEDDER_ALIAS else hashlib.sha256(txt.encode("utf-8")).hexdigest(), txt, lg)
+            if i % 100 == 0:
+                _log(f"  prefill {i}/{len(todo)}")
+        _log("Prefill shard done.")
+        return 0
     # 8. STAGE: Scoring
     # Store scores: scores_matrix[cond][method] -> 1D array of pair scores
     scores_by_cond_method: Dict[str, Dict[str, np.ndarray]] = {c: {} for c in conditions}

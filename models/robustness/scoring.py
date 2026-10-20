@@ -389,6 +389,18 @@ def paired_bootstrap(
 
 
 NORMALIZED_METHODS = ("v2_norm",)
+_CANON_MEMO: Dict[Tuple[str, str], str] = {}
+
+
+def _canonical(text: str, lang: str) -> str:
+    """canonicalize_code with a per-process memo (identical text and language give identical output)."""
+    key = (lang, text)
+    hit = _CANON_MEMO.get(key)
+    if hit is None:
+        from models.logic_eval.canonical import canonicalize_code
+
+        hit = _CANON_MEMO[key] = canonicalize_code(text, lang)
+    return hit
 
 
 def texts_for_method(
@@ -403,9 +415,7 @@ def texts_for_method(
         raise ValueError("orig_texts, trans_texts and langs must have the same length")
     if method not in NORMALIZED_METHODS:
         return list(orig_texts), list(trans_texts)
-    from models.logic_eval.canonical import canonicalize_code
-
     return (
-        [canonicalize_code(t, l) for t, l in zip(orig_texts, langs)],
-        [canonicalize_code(t, l) for t, l in zip(trans_texts, langs)],
+        [_canonical(t, l) for t, l in zip(orig_texts, langs)],
+        [_canonical(t, l) for t, l in zip(trans_texts, langs)],
     )
