@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.services.xai_service import XAIService
 from app.domain.errors import InferenceError
 from app.domain.ports.calibration_port import CalibrationPort
-from app.domain.ports.inference_port import InferencePort
+from app.domain.ports.inference_port import CANONICALIZATION_FALLBACK, InferencePort
 from app.domain.ports.lexical_similarity_port import LexicalSimilarityPort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.domain.scoring import (
@@ -51,6 +51,7 @@ from app.infrastructure.database.models import (
 logger = logging.getLogger(__name__)
 
 GCB_OK = "OK"
+GCB_OK_RAW = "OK_SIN_NORM"  # embedded on raw code: identifier canonicalization failed for this file
 GCB_ERROR = "ERROR"
 GCB_DISABLED = "DESHABILITADO"
 GCB_NO_REFERENCES = "SIN_REFERENCIA"
@@ -151,7 +152,9 @@ class ScoringService:
         if not has_references:
             return None, GCB_NO_REFERENCES
         try:
+            CANONICALIZATION_FALLBACK.set(False)
             vector = await self.inference.extract_semantic_embedding(code, lang=language)
+            raw_fallback = CANONICALIZATION_FALLBACK.get()
             matches = await self.vector_store.query_nearest(embedding=vector, problema_id=problema_id, top_k=1)
         except InferenceError as exc:
             if exc.reason == "gcb_disabled":
@@ -163,7 +166,7 @@ class ScoringService:
             return None, GCB_ERROR
         if not matches:
             return None, GCB_NOT_INDEXED
-        return _round(matches[0]["similarity"]), GCB_OK
+        return _round(matches[0]["similarity"]), (GCB_OK_RAW if raw_fallback else GCB_OK)
 
     # --- public API -------------------------------------------------------------------------
 

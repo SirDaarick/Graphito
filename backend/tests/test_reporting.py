@@ -165,6 +165,7 @@ async def test_real_report_has_every_field_and_manifest_shas(client, fake_artifa
     assert (body["umbral_a"], body["umbral_b"]) == (0.5, 0.1715)
     assert body["versiones_modelo"] == {
         "charcnn_arch_version": 2, "charcnn_preproc_version": 2, "gcb_input_version": "v2", "gcb_pooling": "mean",
+        "gcb_canonicalization": "identifiers_v1",
     }
     assert body["canal_a_metodo"] == "jaccard" and body["reference_id"] == body["referencia_id"]
     assert body["probabilidad_ia"] != 0.05

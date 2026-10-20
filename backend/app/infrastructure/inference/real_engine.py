@@ -1,16 +1,20 @@
-"""REAL inference engine: CharCNN v2 (Channel B) and zero-shot GraphCodeBERT v2 (secondary).
+"""REAL inference engine: CharCNN v2 (Channel B) and zero-shot GraphCodeBERT v2_norm (secondary).
 
 Fail closed (spec AS6.1): any load or configuration problem raises `InferenceError` with a stable
 reason code; there is no fallback to fake values. Models load from the verified deploy bundle
 (the CharCNN checkpoint listed in the manifest) and GraphCodeBERT is built as v2 with mean
-pooling, zero-shot, never with a fine-tuned add-on.
+pooling, zero-shot, never with a fine-tuned add-on. Code is canonicalized (user identifiers renamed,
+`models/logic_eval/canonical.py`) right before embedding, in `extract_semantic_embedding` only, so
+single, async, batch, reference creation and the reindex script all inherit it. If canonicalization
+raises, the file is embedded raw and `CANONICALIZATION_FALLBACK` is set for the caller.
 
 Torch never runs on the event loop (AS9.1, D10): loading and every prediction go through a
 dedicated `ThreadPoolExecutor(max_workers=INFERENCE_WORKERS, thread_name_prefix="inference")`.
 
 The embedding fingerprint (D12) is the sha256 of the canonical JSON of the embedding pipeline
 fields from the manifest; it must equal the manifest's own fingerprint and selects the Chroma
-collection, so embeddings from different pipelines never mix.
+collection, so embeddings from different pipelines never mix. The manifest fingerprint covers the
+model pipeline; the engine fingerprint (collection name) also folds in the canonicalization version.
 """
 
 import asyncio
@@ -22,12 +26,14 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from app.domain.errors import InferenceError
-from app.domain.ports.inference_port import InferencePort, Readiness, StylometryResult
+from app.domain.ports.inference_port import CANONICALIZATION_FALLBACK, InferencePort, Readiness, StylometryResult
 from app.infrastructure.artifacts.models_path import ensure_on_path
 
 logger = logging.getLogger(__name__)
 
 CHARCNN_ARCH_VERSION = 2
+# Version of the identifier canonicalization applied before embedding (GraphCodeBERT `v2_norm`).
+CANONICALIZATION_VERSION = "identifiers_v1"
 EMBEDDING_DIM = 768
 FINGERPRINT_FIELDS = (
     "model_name", "model_revision", "input_version", "walker_version", "pooling", "use_dfg",
@@ -41,6 +47,22 @@ def embedding_fingerprint(fields: Mapping[str, Any]) -> str:
     """sha256 of the canonical JSON of the embedding pipeline fields (design D12)."""
     canonical = json.dumps({k: fields.get(k) for k in FINGERPRINT_FIELDS}, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def pipeline_fingerprint(manifest_fingerprint: str, canonicalization: str) -> str:
+    """Engine fingerprint: the manifest pipeline fingerprint plus the canonicalization version."""
+    canonical = json.dumps(
+        {"canonicalization": canonicalization, "pipeline": manifest_fingerprint}, sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def load_canonicalizer() -> Callable[[str, str], str]:
+    """`canonicalize_code(code, lang)` (runs on an inference thread)."""
+    ensure_on_path()
+    from models.logic_eval.canonical import canonicalize_code
+
+    return canonicalize_code
 
 
 def load_charcnn(checkpoint_path: Path):
@@ -70,13 +92,17 @@ class RealBimodalInferenceEngine(InferencePort):
         *,
         charcnn_factory: Optional[Callable[[Path], Any]] = None,
         gcb_factory: Optional[Callable[[Dict[str, Any]], Any]] = None,
+        canonicalizer: Optional[Callable[[str, str], str]] = None,
     ):
         self.workers = int(settings.INFERENCE_WORKERS)
         self.gcb_enabled = bool(settings.GCB_SECONDARY_ENABLED)
         self.gcb_fields = self._gcb_fields(bundle.gcb, settings)
-        self.embedding_fingerprint = embedding_fingerprint(self.gcb_fields)
-        if bundle.gcb.get("fingerprint") != self.embedding_fingerprint:
+        manifest_fingerprint = embedding_fingerprint(self.gcb_fields)
+        if bundle.gcb.get("fingerprint") != manifest_fingerprint:
             raise InferenceError("gcb_fingerprint_mismatch", "manifest gcb fingerprint differs from its fields")
+        self.canonicalization = CANONICALIZATION_VERSION
+        self.embedding_fingerprint = pipeline_fingerprint(manifest_fingerprint, self.canonicalization)
+        self._canonicalize = canonicalizer
         self._executor = ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="inference")
         try:
             self.charcnn = self._executor.submit(
@@ -89,12 +115,16 @@ class RealBimodalInferenceEngine(InferencePort):
                 kwargs = {k: self.gcb_fields[k] for k in GCB_CONFIG_FIELDS}
                 self.gcb = self._executor.submit(self._load, "gcb_load_failed", gcb_factory or load_gcb, kwargs).result()
                 self._check_revision()
+                if self._canonicalize is None:
+                    self._canonicalize = self._executor.submit(
+                        self._load, "canonicalizer_load_failed", lambda _: load_canonicalizer(), None
+                    ).result()
         except BaseException:
             self._executor.shutdown(wait=False)
             raise
         logger.info(
-            "Real engine ready: CharCNN v%s, GraphCodeBERT %s (fingerprint %s), %d inference worker(s).",
-            CHARCNN_ARCH_VERSION, "v2/mean" if self.gcb_enabled else "disabled", self.embedding_fingerprint[:12], self.workers,
+            "Real engine ready: CharCNN v%s, GraphCodeBERT %s+%s (fingerprint %s), %d inference worker(s).",
+            CHARCNN_ARCH_VERSION, "v2/mean" if self.gcb_enabled else "disabled", self.canonicalization, self.embedding_fingerprint[:12], self.workers,
         )
 
     @staticmethod
@@ -133,6 +163,7 @@ class RealBimodalInferenceEngine(InferencePort):
             "charcnn_preproc_version": getattr(self.charcnn, "preproc_version", None),
             "gcb_input_version": self.gcb_fields["input_version"] if self.gcb_enabled else None,
             "gcb_pooling": self.gcb_fields["pooling"] if self.gcb_enabled else None,
+            "gcb_canonicalization": self.canonicalization if self.gcb_enabled else None,
         }
 
     def readiness(self) -> Readiness:
@@ -141,13 +172,26 @@ class RealBimodalInferenceEngine(InferencePort):
     async def _run(self, fn, *args):
         return await asyncio.get_running_loop().run_in_executor(self._executor, fn, *args)
 
+    def _canonical_predict(self, code: str, lang: str):
+        """Canonicalize then embed (inference thread). Returns `(result, fell_back_to_raw)`."""
+        fell_back = False
+        try:
+            canonical = self._canonicalize(code, lang)
+            if not isinstance(canonical, str):
+                raise TypeError("canonicalizer returned a non-string")
+        except Exception as exc:
+            logger.warning("Identifier canonicalization failed (%s); embedding raw code.", type(exc).__name__)
+            canonical, fell_back = code, True
+        return self.gcb.predict_code(canonical, lang), fell_back
+
     async def extract_semantic_embedding(self, code: str, lang: str = "c") -> List[float]:
         if self.gcb is None:
             raise InferenceError("gcb_disabled", "GraphCodeBERT secondary signal is disabled")
         try:
-            res = await self._run(self.gcb.predict_code, code, lang)
+            res, fell_back = await self._run(self._canonical_predict, code, lang)
         except Exception as exc:
             raise InferenceError("gcb_failed", f"{type(exc).__name__}: {exc}") from exc
+        CANONICALIZATION_FALLBACK.set(fell_back)
         embedding = res.get("embedding") if isinstance(res, dict) else None
         if not (isinstance(res, dict) and res.get("success") and isinstance(embedding, list)):
             raise InferenceError("gcb_embedding_failed", "GraphCodeBERT returned no embedding")

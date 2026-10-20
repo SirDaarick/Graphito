@@ -74,6 +74,11 @@ Run these in order. Each step depends on the one before it.
    `true`. If an artifact is missing or its sha256 differs, the backend reports
    `inference_ready=false` with a reason and analysis returns 503; it never falls back to the stub.
 4. **Reindex references** into the fingerprinted collection, dry run first:
-   `python scripts/reindex_references.py --mode gcb-v2`, then the same with `--apply`. Until it
-   completes, `gcb_similarity` (secondary, never deciding) is null; Channel A (Jaccard) reads
+   `python scripts/reindex_references.py --mode gcb-v2`, then the same with `--apply`. With
+   GraphCodeBERT `v2_norm` (identifiers canonicalized with `identifiers_v1` before embedding) the
+   engine fingerprint includes the canonicalization version, so the collection name CHANGES
+   (previously `gcb_v2_mean_359032419bac`; the new name is logged at startup and shown by the
+   reindex report). The old collection is never read again, so the reindex is REQUIRED after this
+   deploy: references embedded without normalization must not be mixed with normalized
+   submissions. Until it completes, `gcb_similarity` (secondary, never deciding) is null; Channel A (Jaccard) reads
    references from Postgres and is unaffected.

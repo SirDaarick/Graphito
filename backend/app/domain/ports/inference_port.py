@@ -6,8 +6,13 @@ embedding are gone from the port. Engines run torch off the event loop (AS9.1) a
 """
 
 from abc import ABC, abstractmethod
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import List, Mapping, Optional
+
+# Set to True by an engine, in the caller's context, when the last embedding was computed on RAW code
+# because identifier canonicalization failed. Callers reset it before embedding and read it after.
+CANONICALIZATION_FALLBACK: ContextVar[bool] = ContextVar("gcb_canonicalization_fallback", default=False)
 
 
 @dataclass(frozen=True)
