@@ -31,9 +31,16 @@ Inline: the work is one script plus one test file, written from a bounded read o
 `v2/embed.py`, `v2/baselines.py`. The Agent tool is restricted to explicit user requests here.
 
 ## Tasks
-- [ ] T1 Pure helpers + tests (test-first): `split_problems`, `near_duplicate`, `fits_one_window`
-- [ ] T2 `scripts/prepare_codenet_contrastive.py`: selection, dedup vs ESCOM, manifest, `v2` input cache
-- [ ] T3 Run F0 on the full benchmark; record counts per stage in `stats.json` and below
+- [x] T1 Pure helpers + tests (test-first): `split_problems`, `near_duplicate`, `fits_one_window`, `canonicalize_or_raw` (29335be, 0b76c82)
+- [x] T2 `scripts/prepare_codenet_contrastive.py`: selection, dedup vs ESCOM, manifest, `v2_norm` input cache
+- [x] T3 Run F0 on the full benchmark (v2_norm input, 3242 s); counts below
 
 ## Evidence
-(pending)
+`tests/test_prepare_codenet_contrastive.py`: 13 passed. Full run, `C:\Users\edani\datasets\codenet\f0\stats.json`:
+- Problems: 1000 scanned, 988 kept (12 dropped for < 2 single-window Accepted).
+- Samples kept: train 15 412 Accepted + 6 589 Wrong Answer (790 problems); val 1 920 + 846 (99); test 1 903 + 794 (99).
+- Dropped: 25 933 not single-window or empty; 41 Wrong Answer near-identical (> 0.9) to an Accepted; 0 vs ESCOM
+  (max Jaccard to ESCOM 0.455, p99 0.271, threshold 0.8); canonicalizer fallback in kept samples: 0.
+- Caveat: the single-window filter keeps only short programs (<= 384 code subtokens); CodeNet samples are
+  biased toward short code, similar in size to ESCOM programs (~620 bytes) but not verified token-wise.
+- Open for F1: confirm pooling `mean` in the baseline run config; measure real training throughput (fp32 only).
