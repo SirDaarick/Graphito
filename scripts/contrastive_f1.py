@@ -116,36 +116,35 @@ def load_roberta(device):
 # --- baseline -----------------------------------------------------------------------------------
 
 
-def run_baseline(args) -> None:
+def embed_rows(roberta, rows: Sequence[dict], device, batch_size: int = 16) -> np.ndarray:
+    """L2-normalized `mean`-pooled embeddings `[N, H]` (float64) of cached rows, eval mode."""
     import torch
 
-    from models.graphcodebert.v2.model import check_mask_honoured, forward_hidden
-    from models.logic_eval.grouping import compute_map_at_r
+    from models.graphcodebert.v2.model import forward_hidden
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    rows = load_cache(args.f0 / f"cache_{args.split}.pkl")
-    roberta = load_roberta(device).eval()
-    check_mask_honoured(roberta)
     embs = []
-    t0 = time.time()
     with torch.no_grad():
-        for i in range(0, len(rows), args.batch_size):
-            chunk = rows[i : i + args.batch_size]
+        for i in range(0, len(rows), batch_size):
+            chunk = rows[i : i + batch_size]
             ids, pos, mask = batch_tensors([r["features"] for r in chunk], device)
             hidden = forward_hidden(roberta, ids, pos, mask)
             embs.append(mean_pool_positions(hidden, [r["features"]["n_code_kept"] for r in chunk]).cpu())
-    emb = torch.nn.functional.normalize(torch.cat(embs), dim=-1).numpy().astype(np.float64)
+    return torch.nn.functional.normalize(torch.cat(embs), dim=-1).numpy().astype(np.float64)
+
+
+def val_metrics(emb: np.ndarray, rows: Sequence[dict]) -> dict:
+    """MAP@R among Accepted, Accepted-vs-WA AUC and the cosine statistics of the cached rows."""
+    from models.logic_eval.grouping import compute_map_at_r
+
     sim = emb @ emb.T
     problems = [r["problem"] for r in rows]
     roles = [r["role"] for r in rows]
-
     acc_idx = [i for i, r in enumerate(roles) if r == "accepted"]
     map_res = compute_map_at_r(sim[np.ix_(acc_idx, acc_idx)], [problems[i] for i in acc_idx])
-    same = np.equal.outer(problems, problems) & ~np.eye(len(rows), dtype=bool)
+    eye = np.eye(len(rows), dtype=bool)
+    same = np.equal.outer(problems, problems) & ~eye
     iu = np.triu_indices(len(rows), 1)
-    result = {
-        "split": args.split,
-        "input": "v2_norm, pooling mean, zero-shot",
+    return {
         "n_samples": len(rows),
         "n_problems": len(set(problems)),
         "map_at_r_accepted": map_res["value"],
@@ -153,9 +152,26 @@ def run_baseline(args) -> None:
         "accepted_vs_wa_auc": accepted_vs_wa_auc(sim, problems, roles),
         "cosine": {
             "mean_same_problem": float(sim[same].mean()),
-            "mean_different_problem": float(sim[~same & ~np.eye(len(rows), dtype=bool)].mean()),
+            "mean_different_problem": float(sim[~same & ~eye].mean()),
             "mean_all_pairs": float(sim[iu].mean()),
         },
+    }
+
+
+def run_baseline(args) -> None:
+    import torch
+
+    from models.graphcodebert.v2.model import check_mask_honoured
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    rows = load_cache(args.f0 / f"cache_{args.split}.pkl")
+    roberta = load_roberta(device).eval()
+    check_mask_honoured(roberta)
+    t0 = time.time()
+    result = {
+        "split": args.split,
+        "input": "v2_norm, pooling mean, zero-shot",
+        **val_metrics(embed_rows(roberta, rows, device, args.batch_size), rows),
         "elapsed_s": round(time.time() - t0, 1),
     }
     out = args.f0 / f"f1_baseline_{args.split}.json"
