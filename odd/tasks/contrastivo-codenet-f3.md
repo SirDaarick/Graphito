@@ -15,6 +15,28 @@ same-problem Wrong Answer negatives) and B (with them), 2 seeds each, and pick t
 - Run order: B_s0, A_s0, B_s1, A_s1. Outputs and logs: `C:\Users\edani\datasets\codenet\f3\<run>\` and `<run>.log`.
 - The Windows power plan is not changed by the agent; the machine must not sleep during the runs.
 
+## Selection criterion (changed 2026-10-21, user decision, after B_s0 finished and before A_s0 results)
+At deployment a submission is compared only with the reference of its own problem, so what matters is the
+within-problem ordering of "similar to the reference" (correct above incorrect), not separation between problems.
+MAP@R on CodeNet val (and E1) measure cross-problem retrieval and become secondary diagnostics. The primary metric
+to choose between A and B, and to read the checkpoints, is the within-problem Accepted-vs-Wrong-Answer ROC-AUC on
+CodeNet val (`val_auc` in `val_log.jsonl`, logged every 1 000 steps). Per-seed comparison, A vs B; no ESCOM data.
+Checkpoint note: `adapter_best` is still the best by MAP@R and `adapter` is the final step; read `val_log.jsonl` to
+see whether the AUC peaked elsewhere (for B_s0 AUC is flat at the end: 0.634 at step 9 000, 0.633 at 9 375).
+
+Why this matters, measured on CodeNet val (mean cosine of an Accepted anchor to ...):
+
+| | other Accepted, same problem | Wrong Answer, same problem | other problems |
+|---|---|---|---|
+| zero-shot `v2_norm` | 0.972 | 0.970 | 0.956 |
+| B_s0 `adapter_best` | 0.787 | 0.728 | 0.270 |
+
+The Wrong Answer is not pushed away like an unrelated program (0.73 vs 0.27), but only about 0.06 below the
+correct solutions, hence the modest AUC (0.54 -> 0.63). CodeNet has no usable partial-credit label: 91% of the
+Wrong Answer rows in a sample have `accuracy` 0 and 2% have >= 0.5. Graded correctness exists only in ESCOM
+(`last_test_results`), evaluated in F4 (E2). A within-problem-only loss (no cross-problem negatives) is a possible
+configuration C after A vs B; it is not run now.
+
 ## Tasks
 - [x] T1 Make training resumable, add periodic CodeNet-val selection and `--skip-escom` (smoke: killed after the first
   checkpoint, resumed from step 10 and finished with the expected `result.json`)
