@@ -188,8 +188,9 @@ def run_train(args) -> None:
     rng = random.Random(args.seed)
 
     acc, wa = group_rows(f1.load_cache(args.f0 / "cache_train.pkl"))
-    eligible = sorted(p for p, v in acc.items() if len(v) >= 2 and (args.no_wa or wa.get(p)))
-    chosen = rng.sample(eligible, args.problems)
+    # Same problem set for configurations A and B: the ablation must isolate the Wrong Answer negatives.
+    eligible = sorted(p for p, v in acc.items() if len(v) >= 2 and wa.get(p))
+    chosen = eligible if args.problems == 0 else rng.sample(eligible, args.problems)
     steps = math.ceil(args.triplets / args.pairs)
     batches = problem_batches(chosen, args.pairs, steps, rng)
     print(f"problems={len(chosen)} of {len(eligible)} eligible, steps={steps}, sequences/step={(2 if args.no_wa else 3) * args.pairs}", flush=True)
@@ -206,10 +207,32 @@ def run_train(args) -> None:
     inner.train()
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr, weight_decay=0.01)
     sched = get_linear_schedule_with_warmup(opt, max(1, int(0.05 * steps)), steps)
-    log = open(args.out / "train_log.jsonl", "w", encoding="utf-8")
+
+    from peft import get_peft_model_state_dict, set_peft_model_state_dict
+
+    state_path = args.out / "state.pt"
+    start, best, elapsed_before = 0, {"val_map_at_r": -1.0, "step": 0}, 0.0
+    if state_path.exists():  # resume an interrupted run: weights, optimizer, scheduler, RNG and best-so-far
+        st = torch.load(state_path, weights_only=False)
+        set_peft_model_state_dict(model, st["adapter"])
+        opt.load_state_dict(st["opt"])
+        sched.load_state_dict(st["sched"])
+        rng.setstate(st["rng"])
+        start, best, elapsed_before = st["step"], st["best"], st["elapsed_s"]
+        print(f"resumed from step {start} (best val MAP@R so far {best['val_map_at_r']:.4f} at step {best['step']})", flush=True)
+    log = open(args.out / "train_log.jsonl", "a" if start else "w", encoding="utf-8")
+    val_rows = f1.load_cache(args.f0 / "cache_val.pkl")[: args.val_max or None] if args.val_every else None
+
+    def save_state(step: int) -> None:
+        tmp = state_path.with_suffix(".tmp")
+        torch.save({"adapter": get_peft_model_state_dict(model), "opt": opt.state_dict(), "sched": sched.state_dict(),
+                    "rng": rng.getstate(), "step": step, "best": best, "elapsed_s": elapsed_before + time.time() - t0}, tmp)
+        tmp.replace(state_path)
 
     t0 = time.time()
     for step, batch in enumerate(batches, 1):
+        if step <= start:
+            continue
         triplets = []
         for p in batch:
             a, pos = rng.sample(acc[p], 2)
@@ -227,17 +250,36 @@ def run_train(args) -> None:
         sched.step()
         if step % 10 == 0 or step == steps:
             elapsed = time.time() - t0
-            rec = {"step": step, "loss": round(float(loss), 4), "lr": sched.get_last_lr()[0], "elapsed_s": round(elapsed),
-                   "eta_s": round(elapsed / step * (steps - step))}
+            rec = {"step": step, "loss": round(float(loss), 4), "lr": sched.get_last_lr()[0],
+                   "elapsed_s": round(elapsed_before + elapsed), "eta_s": round(elapsed / (step - start) * (steps - step))}
             log.write(json.dumps(rec) + "\n")
             log.flush()
             print(json.dumps(rec), flush=True)
-        if step % 200 == 0:
-            model.save_pretrained(args.out / "adapter")
+        if args.val_every and (step % args.val_every == 0 or step == steps):
+            inner.eval()
+            v = f1.val_metrics(f1.embed_rows(inner, val_rows, device), val_rows)  # CodeNet val only: ESCOM stays untouched
+            inner.train()
+            rec = {"step": step, "val_map_at_r": v["map_at_r_accepted"], "val_auc": v["accepted_vs_wa_auc"]["pooled_auc"],
+                   "cos_same": v["cosine"]["mean_same_problem"], "cos_diff": v["cosine"]["mean_different_problem"]}
+            with open(args.out / "val_log.jsonl", "a", encoding="utf-8") as vf:
+                vf.write(json.dumps(rec) + "\n")
+            print(json.dumps(rec), flush=True)
+            if rec["val_map_at_r"] > best["val_map_at_r"]:
+                best = {"val_map_at_r": rec["val_map_at_r"], "step": step}
+                model.save_pretrained(args.out / "adapter_best")
+            save_state(step)
+        elif step % 200 == 0:
+            save_state(step)
     model.save_pretrained(args.out / "adapter")
-    train_s = round(time.time() - t0)
+    train_s = round(elapsed_before + time.time() - t0)
     if args.skip_eval:
         print(f"trained in {train_s}s; adapter saved, evaluation skipped")
+        return
+    if args.skip_escom:  # F3: selection uses CodeNet val only; the single ESCOM evaluation is F4
+        result = {"mode": "f3_val_only", "best": best, "n_problems": len(chosen), "steps": steps,
+                  "train": {**{k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}, "train_s": train_s}}
+        (args.out / "result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+        print(json.dumps(result["best"]))
         return
 
     merged = model.merge_and_unload().eval()
@@ -277,6 +319,9 @@ def main() -> None:
     t.add_argument("--seed", type=int, default=0)
     t.add_argument("--no-wa", action="store_true", help="configuration A: no same-problem hard negatives")
     t.add_argument("--skip-eval", action="store_true", help="smoke runs: stop after saving the adapter")
+    t.add_argument("--skip-escom", action="store_true", help="F3: no ESCOM evaluation (the single one is F4)")
+    t.add_argument("--val-every", type=int, default=0, help="evaluate CodeNet val every N steps and keep adapter_best")
+    t.add_argument("--val-max", type=int, default=0, help="smoke runs only: cap the val rows")
     sub.choices["eval"].add_argument("--adapter", type=Path, default=None)
     args = ap.parse_args()
     run_train(args) if args.cmd == "train" else run_eval(args)
