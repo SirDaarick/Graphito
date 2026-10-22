@@ -41,9 +41,31 @@ configuration C after A vs B; it is not run now.
 - [x] T1 Make training resumable, add periodic CodeNet-val selection and `--skip-escom` (smoke: killed after the first
   checkpoint, resumed from step 10 and finished with the expected `result.json`)
 - [x] T2 `scripts/run_f3.ps1` runner for the four runs
-- [ ] T3 Four runs finished; compare A vs B on val per seed and pick the configuration for F4
-- [ ] T4 Record results below
+- [x] T3 Four runs finished; compare A vs B on val per seed and pick the configuration for F4
+- [x] T4 Record results below
 
 ## Evidence
-Started 2026-10-21 01:47. First ETA for B_s0: about 8.2 h (29 400 s); estimate for the four runs about 30 h
-(B about 9 h, A about 6 h each, from the 14 seq/s measured in the pilot).
+Started 2026-10-21 01:47, finished 2026-10-22 07:20 (about 29.5 h wall clock including two interruptions: the
+runner and the training processes disappeared at 14:10 on 10-21 and at 20:58 on 10-21 with no system event or error;
+both resumed from `state.pt`, losing under 10 minutes of training each).
+
+CodeNet val (99 held-out problems, 2 766 samples), final step 9 375 of each run; zero-shot reference AUC 0.542,
+MAP@R 0.182:
+
+| run | within-problem Accepted-vs-WA AUC | MAP@R | best AUC in the log |
+|---|---|---|---|
+| B_s0 (with Wrong Answer negatives) | 0.633 | 0.812 | 0.634 (step 9 000) |
+| B_s1 | 0.634 | 0.810 | 0.634 (step 9 375) |
+| A_s0 (without them) | 0.606 | 0.844 | 0.608 (step 8 000) |
+| A_s1 | 0.607 | 0.850 | 0.609 (step 7 000) |
+
+- Seeds agree within 0.001-0.003 AUC inside each configuration; B beats A by about 0.027 AUC, A beats B by about
+  0.035 MAP@R. By the selection criterion above B wins.
+- A's AUC is flat from step 2 000 (about 0.60); B keeps rising until about step 7 000.
+
+## Frozen for F4 (decided 2026-10-22, before any F4 number exists)
+- Configuration B. Headline adapter: B_s1 `adapter` (final step; highest final val AUC, 0.634 vs 0.633, a tie-break
+  between statistically indistinguishable seeds). `adapter_best` is NOT used for B: it is selected by MAP@R.
+- Per the guide ("all conditions and ablations are reported, no cherry-picking"), F4 also evaluates B_s0 `adapter`,
+  A_s0 `adapter` and A_s1 `adapter`, reports all four, and draws H1-H3 only from the headline adapter.
+- No retraining or recalibration after seeing ESCOM results.
