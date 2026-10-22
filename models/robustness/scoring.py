@@ -389,6 +389,9 @@ def paired_bootstrap(
 
 
 NORMALIZED_METHODS = ("v2_norm",)
+# Methods named `ft_<name>` score a LoRA adapter (models.graphcodebert.v2.adapter) on the canonicalized text,
+# like v2_norm: the adapters were trained on `v2_norm` inputs.
+ADAPTER_PREFIX = "ft_"
 _CANON_MEMO: Dict[Tuple[str, str], str] = {}
 
 
@@ -413,7 +416,7 @@ def texts_for_method(
     the transform; every other method gets the texts unchanged."""
     if not (len(orig_texts) == len(trans_texts) == len(langs)):
         raise ValueError("orig_texts, trans_texts and langs must have the same length")
-    if method not in NORMALIZED_METHODS:
+    if method not in NORMALIZED_METHODS and not method.startswith(ADAPTER_PREFIX):
         return list(orig_texts), list(trans_texts)
     return (
         [_canonical(t, l) for t, l in zip(orig_texts, langs)],
