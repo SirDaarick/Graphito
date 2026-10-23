@@ -1,0 +1,14 @@
+{
+  "headline": "ft_B_s1",
+  "adapters": {
+    "ft_B_s1": "b5842ab13eaa271841067fbbe67eddeb85815136a1593381ae58464116c2c099",
+    "ft_B_s0": "b1de44508e380a320274a12f8f55b2e6113cd5f155241cfb5b7157c292e3ddcd",
+    "ft_A_s0": "d53fc5a963fc0a26a5c0205089261d360c1c425260de23c491d555255ed7c932",
+    "ft_A_s1": "9a1227b34e709541bb2b1aff473cd757faae69519f532a5b0464c2993a127374"
+  },
+  "baseline": "v2_norm",
+  "n_boot": 1000,
+  "seed": 42,
+  "conditions": "T0,T1,T2,T3,T4,T5,T6,T7@0.25,T7@0.5,T7@1.0",
+  "created_at": "2026-10-22T12:16:39"
+}

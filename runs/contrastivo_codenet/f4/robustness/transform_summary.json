@@ -1,0 +1,84 @@
+{
+  "conditions": {
+    "T0": {
+      "n_files": 6797,
+      "n_applied_gt_0": 0,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T1": {
+      "n_files": 6797,
+      "n_applied_gt_0": 5826,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T2": {
+      "n_files": 6797,
+      "n_applied_gt_0": 4433,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T3": {
+      "n_files": 6797,
+      "n_applied_gt_0": 5442,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T4": {
+      "n_files": 6797,
+      "n_applied_gt_0": 4955,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T5": {
+      "n_files": 6797,
+      "n_applied_gt_0": 6766,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T6": {
+      "n_files": 6797,
+      "n_applied_gt_0": 4000,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T7@0.25": {
+      "n_files": 6797,
+      "n_applied_gt_0": 6766,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T7@0.5": {
+      "n_files": 6797,
+      "n_applied_gt_0": 6766,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    },
+    "T7@1.0": {
+      "n_files": 6797,
+      "n_applied_gt_0": 6766,
+      "parse_ok_rate": 1.0,
+      "compile_ok_rate": null,
+      "mean_edit_tokens": 0.0,
+      "mean_edit_abstract": 0.0
+    }
+  }
+}

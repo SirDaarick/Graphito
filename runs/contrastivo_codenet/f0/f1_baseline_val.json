@@ -1,0 +1,19 @@
+{
+  "split": "val",
+  "input": "v2_norm, pooling mean, zero-shot",
+  "n_samples": 2766,
+  "n_problems": 99,
+  "map_at_r_accepted": 0.1819052957524396,
+  "map_at_r_n_queries": 1920,
+  "accepted_vs_wa_auc": {
+    "pooled_auc": 0.5421761266947103,
+    "mean_problem_auc": 0.5409009887935328,
+    "n_problems": 99
+  },
+  "cosine": {
+    "mean_same_problem": 0.9703828109625119,
+    "mean_different_problem": 0.9557811366839983,
+    "mean_all_pairs": 0.955927909667728
+  },
+  "elapsed_s": 56.4
+}

@@ -1,0 +1,17 @@
+{
+ "train": {
+  "problemas": 790,
+  "aceptados": 15412,
+  "wrong_answer": 6588
+ },
+ "val": {
+  "problemas": 99,
+  "aceptados": 1920,
+  "wrong_answer": 846
+ },
+ "test": {
+  "problemas": 99,
+  "aceptados": 1903,
+  "wrong_answer": 794
+ }
+}

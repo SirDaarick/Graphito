@@ -1,0 +1,139 @@
+{
+  "argv": [
+    "--methods",
+    "jaccard,v2_norm,ft_B_s1,ft_B_s0,ft_A_s0,ft_A_s1",
+    "--skip-validity",
+    "--root",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito",
+    "--manifest",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito\\data\\splits\\split_v1.json.gz",
+    "--cache-dir",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito\\runs\\graphcodebert\\_cache",
+    "--source-run",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito\\runs\\graphcodebert\\20261011-082155",
+    "--deploy-calibration",
+    "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito\\models\\deploy\\channel_a\\calibration.json",
+    "--n-boot",
+    "1000",
+    "--n-boot-secondary",
+    "1000",
+    "--split",
+    "test",
+    "--confirm-test",
+    "--conditions",
+    "T0,T1,T2,T3,T4,T5,T6,T7@0.25,T7@0.5,T7@1.0",
+    "--run-dir",
+    "C:\\Users\\edani\\datasets\\codenet\\f4\\robustness",
+    "--adapter",
+    "ft_B_s1=C:\\Users\\edani\\datasets\\codenet\\f3\\B_s1\\adapter",
+    "--adapter",
+    "ft_B_s0=C:\\Users\\edani\\datasets\\codenet\\f3\\B_s0\\adapter",
+    "--adapter",
+    "ft_A_s0=C:\\Users\\edani\\datasets\\codenet\\f3\\A_s0\\adapter",
+    "--adapter",
+    "ft_A_s1=C:\\Users\\edani\\datasets\\codenet\\f3\\A_s1\\adapter"
+  ],
+  "calibration_path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito/models/deploy/channel_a/calibration.json",
+  "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367",
+  "channel": "robustness",
+  "config": {
+    "adapters": {
+      "ft_A_s0": {
+        "path": "C:\\Users\\edani\\datasets\\codenet\\f3\\A_s0\\adapter",
+        "sha256": "d53fc5a963fc0a26a5c0205089261d360c1c425260de23c491d555255ed7c932"
+      },
+      "ft_A_s1": {
+        "path": "C:\\Users\\edani\\datasets\\codenet\\f3\\A_s1\\adapter",
+        "sha256": "9a1227b34e709541bb2b1aff473cd757faae69519f532a5b0464c2993a127374"
+      },
+      "ft_B_s0": {
+        "path": "C:\\Users\\edani\\datasets\\codenet\\f3\\B_s0\\adapter",
+        "sha256": "b1de44508e380a320274a12f8f55b2e6113cd5f155241cfb5b7157c292e3ddcd"
+      },
+      "ft_B_s1": {
+        "path": "C:\\Users\\edani\\datasets\\codenet\\f3\\B_s1\\adapter",
+        "sha256": "b5842ab13eaa271841067fbbe67eddeb85815136a1593381ae58464116c2c099"
+      }
+    },
+    "channel": "robustness",
+    "conditions": [
+      "T0",
+      "T1",
+      "T2",
+      "T3",
+      "T4",
+      "T5",
+      "T6",
+      "T7@0.25",
+      "T7@0.5",
+      "T7@1.0"
+    ],
+    "deploy_calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367",
+    "device": "cuda",
+    "limit_assignments": null,
+    "manifest_sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f",
+    "methods": [
+      "jaccard",
+      "v2_norm",
+      "ft_B_s1",
+      "ft_B_s0",
+      "ft_A_s0",
+      "ft_A_s1"
+    ],
+    "mode": "robustness",
+    "n_boot": 1000,
+    "n_boot_secondary": 1000,
+    "poolings": {
+      "ft_A_s0": "mean",
+      "ft_A_s1": "mean",
+      "ft_B_s0": "mean",
+      "ft_B_s1": "mean",
+      "legacy": "cls",
+      "v2": "mean",
+      "v2_nodfg": "mean",
+      "v2_norm": "mean"
+    },
+    "seed": 42,
+    "split": "test",
+    "val_thresholds": {
+      "jaccard": 0.6490727532097005,
+      "legacy": 0.9920259610704351,
+      "v2": 0.9978561196814738,
+      "v2_nodfg": 0.9980120060778417,
+      "winnowing": 0.6222910216718266
+    },
+    "versions": {
+      "numpy": "2.4.4",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.18.1",
+      "torch": "2.13.0+cu126",
+      "transformers": "5.14.0",
+      "tree-sitter": "0.26.0",
+      "tree-sitter-c": "0.24.2",
+      "tree-sitter-cpp": "0.23.4"
+    }
+  },
+  "created_at": "2026-10-22T20:49:02.306072+00:00",
+  "dirty": false,
+  "failure": null,
+  "git_sha": "001e96a7303cbd9e7c553a979f62452aa3580113",
+  "manifest_path": "C:/Users/edani/OneDrive/Documents/Proyectos/Graphito/data/splits/split_v1.json.gz",
+  "manifest_sha256": "e835362d2e7a4153ef97204d4b30e769759a0f8f54f7db67b9e1fb2639e5238f",
+  "mode": "robustness",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.5",
+  "run_id": "robustness/robustness",
+  "schema": "graphito.run_config/v1",
+  "seed": 42,
+  "split": "test",
+  "status": "complete",
+  "threshold_source": "calibration:077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367",
+  "thresholds": {},
+  "versions": {
+    "matplotlib": "3.11.0",
+    "numpy": "2.4.4",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "torch": "2.13.0+cu126"
+  }
+}

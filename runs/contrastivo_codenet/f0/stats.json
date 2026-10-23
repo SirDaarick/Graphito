@@ -1,0 +1,46 @@
+{
+  "params": {
+    "accepted_per_problem": 20,
+    "wa_per_problem": 10,
+    "seed": 0,
+    "wa_vs_accepted_threshold": 0.9,
+    "escom_threshold": 0.8,
+    "max_accepted_scanned": 150,
+    "code_length": 384,
+    "data_flow_length": 128
+  },
+  "problems_total": 1000,
+  "dropped": {
+    "not_single_window_or_empty": 25933,
+    "escom_near_duplicate": 0,
+    "wa_near_duplicate_of_accepted": 41
+  },
+  "problems_dropped_lt2_accepted": 12,
+  "problems_kept": 988,
+  "input": "v2_norm (identifiers_v1 canonical renaming, then v2 DFG features)",
+  "canonicalization_fallback_kept": 0,
+  "by_split": {
+    "train": {
+      "problems": 790,
+      "accepted": 15412,
+      "wrong_answer": 6589
+    },
+    "val": {
+      "problems": 99,
+      "accepted": 1920,
+      "wrong_answer": 846
+    },
+    "test": {
+      "problems": 99,
+      "accepted": 1903,
+      "wrong_answer": 794
+    }
+  },
+  "escom_max_similarity_accepted": {
+    "n": 19241,
+    "p50": 0.1171875,
+    "p99": 0.2708333333333333,
+    "max": 0.4550898203592814
+  },
+  "elapsed_s": 3241.7
+}
