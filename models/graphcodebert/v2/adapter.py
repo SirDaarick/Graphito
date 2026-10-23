@@ -63,12 +63,21 @@ class AdapterFileEmbedder(V2FileEmbedder):
         return fields
 
 
-def build_embedder(adapter: Path | None, device="cpu", batch_size: int = 16, local_files_only: bool = True):
-    """`GraphCodeBERTV2Embedder` over the base encoder with `adapter` merged (zero-shot when None)."""
+def build_embedder(
+    adapter: Path | None,
+    device="cpu",
+    batch_size: int = 16,
+    local_files_only: bool = True,
+    config: GCBV2Config | None = None,
+):
+    """`GraphCodeBERTV2Embedder` over the base encoder with `adapter` merged (zero-shot when None).
+
+    The adapter is merged with `lora_merge.merge_lora` (no `peft` needed, equal to its merge)."""
     import torch
     from transformers import RobertaModel, RobertaTokenizer
 
     from models.graphcodebert.v2.embed import GraphCodeBERTV2Embedder
+    from models.graphcodebert.v2.lora_merge import merge_lora
     from models.graphcodebert.v2.model import DEFAULT_MODEL, GraphCodeBERTV2Encoder
 
     roberta = RobertaModel.from_pretrained(
@@ -76,9 +85,7 @@ def build_embedder(adapter: Path | None, device="cpu", batch_size: int = 16, loc
     )
     revision = getattr(roberta.config, "_commit_hash", None)
     if adapter is not None:
-        from peft import PeftModel
-
-        roberta = PeftModel.from_pretrained(roberta, str(adapter)).merge_and_unload()
+        merge_lora(roberta, adapter)
     tokenizer = RobertaTokenizer.from_pretrained(DEFAULT_MODEL, local_files_only=local_files_only)
     encoder = GraphCodeBERTV2Encoder(roberta, device=device, batch_size=batch_size)
-    return GraphCodeBERTV2Embedder(tokenizer, encoder, GCBV2Config(), model_revision=revision)
+    return GraphCodeBERTV2Embedder(tokenizer, encoder, config or GCBV2Config(), model_revision=revision)
