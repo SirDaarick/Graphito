@@ -143,7 +143,7 @@ class PdfReportService:
              _threshold(report.umbral_a, report.clave_umbral_a, report.estado_canal_a, report.flag_a)),
             ("Canal B: estilometria", "Legado: CharCNN sin calibrar" if legacy else "CharCNN v2 (caracteres)", b_value,
              _threshold(report.umbral_b, report.clave_umbral_b, report.estado_canal_b, report.flag_b)),
-            ("Senal secundaria", "GraphCodeBERT con normalizacion de identificadores (exploratorio, zero-shot, no decide)", gcb_value, "no interviene en el dictamen"),
+            ("Senal secundaria", "GraphCodeBERT con normalizacion de identificadores (exploratorio, no decide)", gcb_value, "no interviene en el dictamen"),
         ]
         versions = report.versiones_modelo or {}
         version_text = ", ".join(f"{k}={v}" for k, v in versions.items() if v is not None) or "-"

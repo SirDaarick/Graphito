@@ -11,10 +11,12 @@ Calibrations are applied with `models.evaluation.calibration` (numpy only; sciki
 are imported there only when fitting, never when loading or applying).
 """
 
+import hashlib
 import importlib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Mapping, Optional, Tuple, Union
 
 import numpy as np
 
@@ -76,10 +78,14 @@ class ArtifactBundle:
     checkpoint_path: Path
     checkpoint_sha256: str
     gcb: Dict[str, Any]
+    # The trained GraphCodeBERT LoRA adapter (`gcb.adapter`), verified; None for the zero-shot bundle.
+    gcb_adapter_dir: Optional[Path] = None
+    gcb_adapter_sha256: Optional[str] = None
+    gcb_adapter_name: Optional[str] = None
 
     def summary(self) -> Dict[str, Any]:
         """Path-free description for `/health` and reports."""
-        return {
+        out = {
             "manifest_sha256": self.manifest_sha256,
             "channel_a": {"threshold_key": self.channel_a.threshold_key, "threshold": self.channel_a.threshold,
                           "calibration_sha256": self.channel_a.calibration_sha256},
@@ -87,6 +93,9 @@ class ArtifactBundle:
                           "calibration_sha256": self.channel_b.calibration_sha256,
                           "checkpoint_sha256": self.checkpoint_sha256},
         }
+        if self.gcb_adapter_sha256 is not None:
+            out["gcb_adapter"] = {"name": self.gcb_adapter_name, "sha256": self.gcb_adapter_sha256}
+        return out
 
 
 def _entry(manifest: DeployManifest, section: Dict[str, Any], key: str, channel: str) -> str:
@@ -141,6 +150,42 @@ def _load_channel(manifest: DeployManifest, name: str, key: str, configured: Opt
     )
 
 
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+ADAPTER_FILES = ("adapter_config.json", "adapter_model.safetensors")
+
+
+def _load_gcb_adapter(manifest: DeployManifest) -> Tuple[Optional[Path], Optional[str], Optional[str]]:
+    """The `gcb.adapter` section, checked: its files are listed (and, through `verify_files`, hashed) in the
+    manifest and its identity equals `models.graphcodebert.v2.adapter.adapter_sha256` of them. Only `hashlib`
+    is used here: loading a bundle must not import torch. Returns `(directory, identity, name)`."""
+    section = (manifest.doc.get("gcb") or {}).get("adapter")
+    if section is None:
+        return None, None, None
+    if not isinstance(section, Mapping):
+        raise ArtifactError("manifest_invalid", "gcb.adapter must be an object")
+    name, rel_dir, identity = section.get("name"), section.get("dir"), section.get("sha256")
+    if not isinstance(name, str) or not name:
+        raise ArtifactError("manifest_invalid", "gcb.adapter.name must be a non-empty string")
+    if not isinstance(identity, str) or not _SHA256.match(identity):
+        raise ArtifactError("manifest_invalid", "gcb.adapter.sha256 must be a sha256 hex digest")
+    if not isinstance(rel_dir, str) or not rel_dir:
+        raise ArtifactError("manifest_invalid", "gcb.adapter.dir must be a relative path")
+    directory = manifest.resolve(rel_dir)  # refuses paths that leave the deploy directory
+    digest = hashlib.sha256()
+    for fname in ADAPTER_FILES:
+        rel = f"{rel_dir}/{fname}"
+        if rel not in manifest.files:
+            raise ArtifactError("not_in_manifest", f"gcb.adapter file {rel} is not listed in the manifest files")
+        data = manifest.resolve(rel).read_bytes()
+        if hashlib.sha256(data).hexdigest() != manifest.files[rel]:
+            raise ArtifactError("sha_mismatch", f"gcb.adapter file {rel} changed after verification")
+        digest.update(fname.encode())
+        digest.update(data)
+    if digest.hexdigest() != identity:
+        raise ArtifactError("manifest_inconsistent", "gcb.adapter.sha256 differs from the hash of its files")
+    return directory, identity, name
+
+
 def load_bundle(
     manifest_path: PathLike,
     *,
@@ -167,6 +212,7 @@ def load_bundle(
     for channel in (channel_a, channel_b):
         if channel.split_manifest_sha256 != split:
             raise ArtifactError("split_mismatch", f"{channel.name} calibration was fitted on another split manifest")
+    adapter_dir, adapter_sha, adapter_name = _load_gcb_adapter(manifest)
     return ArtifactBundle(
         manifest_path=manifest.path,
         manifest_sha256=manifest.sha256,
@@ -177,6 +223,9 @@ def load_bundle(
         checkpoint_path=manifest.resolve(checkpoint_rel),
         checkpoint_sha256=manifest.files[checkpoint_rel],
         gcb=dict(manifest.doc.get("gcb") or {}),
+        gcb_adapter_dir=adapter_dir,
+        gcb_adapter_sha256=adapter_sha,
+        gcb_adapter_name=adapter_name,
     )
 
 

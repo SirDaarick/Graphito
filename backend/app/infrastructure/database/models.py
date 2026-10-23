@@ -187,7 +187,7 @@ class ReporteAnalisis(Base):
     calibracion_sha_b = Column(String(64), nullable=True)
     checkpoint_sha_b = Column(String(64), nullable=True)
     manifest_sha = Column(String(64), nullable=True)
-    # GraphCodeBERT v2 zero-shot cosine: exploratory, never decides (spec AS8).
+    # GraphCodeBERT v2_norm cosine (with the trained adapter when the bundle lists it): exploratory, never decides (spec AS8).
     gcb_similarity = Column(Float, nullable=True)
     gcb_estado = Column(String(20), nullable=True)
     estado = Column(Enum(EstadoAnalisisEnum), nullable=False, default=EstadoAnalisisEnum.COMPLETADO)

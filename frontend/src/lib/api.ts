@@ -188,7 +188,7 @@ export interface ReportScoring {
     calibracion_sha_b?: string | null;
     checkpoint_sha_b?: string | null;
     manifest_sha?: string | null;
-    /** GraphCodeBERT zero-shot cosine: exploratory, never decides. */
+    /** GraphCodeBERT cosine (identifier normalization, trained adapter when deployed): exploratory, never decides. */
     gcb_similarity?: number | null;
     gcb_estado?: string | null;
     versiones_modelo?: Record<string, string | number | null> | null;

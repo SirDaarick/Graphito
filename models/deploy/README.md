@@ -82,3 +82,18 @@ Run these in order. Each step depends on the one before it.
    deploy: references embedded without normalization must not be mixed with normalized
    submissions. Until it completes, `gcb_similarity` (secondary, never deciding) is null; Channel A (Jaccard) reads
    references from Postgres and is unaffected.
+
+   **Trained adapter (`gcb.adapter`).** The bundle also lists the LoRA adapter `B_s1` frozen in F3/F4 of the
+   contrastive CodeNet work (`odd/tasks/contrastivo-codenet-f3.md`, `-f4.md`; evidence in
+   `runs/contrastivo_codenet/`). Its files are in `models/deploy/gcb_adapter/` with their sha256 in `files`, and
+   `gcb.adapter.sha256` is its identity. The engine merges it into the encoder (no `peft` needed in the image) and
+   folds the identity into the fingerprint, so the collection is now `gcb_v2_mean_f540d15ff74f` (zero-shot
+   `v2_norm` was `gcb_v2_mean_5ae0c89a3576`, the earlier one `gcb_v2_mean_359032419bac`). Run step 4 again:
+   vectors of the adapter and of the zero-shot model must never be mixed. The cosine scale changes (unrelated
+   programs now sit near 0.3 instead of near 0.9), which only matters to anyone reading the raw number.
+   To go back to zero-shot without touching the bundle set `GCB_ADAPTER_ENABLED=false` and reindex again (the
+   collection returns to `gcb_v2_mean_5ae0c89a3576`). The adapter is installed with
+   `python scripts/add_gcb_adapter_to_deploy.py --adapter <dir> --name B_s1 --source <evidence dir>`, which leaves
+   the Channel A/B calibrations and the CharCNN checkpoint byte-identical. A rebuild with
+   `build_deploy_artifacts.py` drops the adapter: run that script again afterwards. `/health` and every report
+   carry `gcb_adapter` and `gcb_adapter_sha256` in the model versions.
