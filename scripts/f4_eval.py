@@ -267,6 +267,10 @@ def robustness_command(paths: Mapping[str, Path], repo: Path, out: Path, smoke: 
         cmd += ["--split", "val", "--conditions", "T0,T1", "--limit-assignments", "2", "--n-boot", "50", "--n-boot-secondary", "50"]
     else:
         cmd += ["--split", "test", "--confirm-test", "--conditions", "T0,T1" if gate else CONDITIONS]
+    if not gate:
+        # Embeddings and scores only: the metrics/contrasts come from `robustness_lean` (exactly the same
+        # paired bootstrap, from one sort per column; the per-method metrics stage would take days here).
+        cmd += ["--stage", "scores"]
     cmd += ["--resume", str(run_dir)] if resume and (run_dir / "config.json").is_file() else ["--run-dir", str(run_dir)]
     for name, path in paths.items():
         cmd += ["--adapter", f"{name}={path}"]
@@ -292,6 +296,37 @@ def robustness_summary(out: Path, repo: Path, run_name: str = "robustness") -> D
     }
     res["reproduction_ok"] = all(reproduces(v["new"], v["reference"], REPRO_TOL_AUC) for v in res["reproduction"].values())
     return res
+
+
+def robustness_lean(out: Path, repo: Path, paths: Mapping[str, Path], smoke: bool) -> Dict[str, Any]:
+    """Paired bootstrap (AUC, delta vs T0, difference-in-differences between methods) over the saved score
+    files, with `paired_bootstrap(fast_grouped=True)`: the same resamples and midrank AUC as the original
+    implementation (verified bit-identical on the real F4 columns), from one sort per column."""
+    from models.evaluation.manifest import load_manifest
+    from models.graphcodebert.v2.pairs import EvalPairs
+    from models.robustness.scoring import paired_bootstrap
+
+    manifest = load_manifest(repo / "data" / "splits" / "split_v1.json.gz")
+    ep = EvalPairs.from_manifest(manifest, "val" if smoke else "test", limit_assignments=2 if smoke else None)
+    mask = ep.view_mask("all")
+    y, groups = ep.pairs.label.astype(np.int64)[mask], ep.assignments[mask]
+    conditions = ["T0", "T1"] if smoke else CONDITIONS.split(",")
+    methods = ["jaccard", BASELINE, *paths]
+    scores = {}
+    for cond in conditions:
+        for m in methods:
+            scores[(m, cond)] = np.load(out / "robustness" / "scores" / f"{cond}__{m}.npz")["scores"][mask]
+    res = paired_bootstrap(y, scores, groups=groups, n_boot=N_BOOT if not smoke else 50, seed=SEED, fast_grouped=True)
+    write(out / "robustness_contrasts.json", res)
+    ref = json.loads((repo / REFERENCE_ROBUSTNESS_RUN / "metrics.json").read_text(encoding="utf-8-sig"))
+    summary: Dict[str, Any] = {
+        "auc": {c: {m: res[f"auc__{m}__{c}"]["value"] for m in methods} for c in conditions},
+        "auc_ci95": {c: {m: res[f"auc__{m}__{c}"]["ci95"] for m in methods} for c in conditions},
+        "did_vs_v2_norm": {n: {c: res.get(f"did__{c}__{n}__{BASELINE}") for c in conditions if c != "T0"} for n in paths},
+        "reproduction": {c: {"new": res[f"auc__{BASELINE}__{c}"]["value"], "reference": ref[c][BASELINE]["views"]["all"]["roc_auc"]["value"]} for c in ("T0", "T1")},
+    }
+    summary["reproduction_ok"] = all(reproduces(v["new"], v["reference"], REPRO_TOL_AUC) for v in summary["reproduction"].values())
+    return summary
 
 
 def write(path: Path, doc: Any) -> None:
@@ -401,11 +436,13 @@ def run_eval(args) -> None:
     # 3. Robustness of the adapters (T0-T7 on the test pairs).
     rob = None
     if not args.skip_robustness:
-        if not (out / "robustness" / "metrics.json").exists():
-            print("[robustness] starting", flush=True)
-            run_robustness(robustness_command(paths, repo, out, args.smoke, args.resume), out / "robustness.log")
-        rob = robustness_summary(out, repo)
+        print("[robustness] scores", flush=True)
+        run_robustness(robustness_command(paths, repo, out, args.smoke, args.resume), out / "robustness.log")
+        print("[robustness] bootstrap contrasts", flush=True)
+        rob = robustness_lean(out, repo, paths, args.smoke)
         write(out / "robustness_summary.json", rob)
+        if not args.smoke and not rob["reproduction_ok"]:
+            raise SystemExit(f"zero-shot robustness in the full run does not reproduce {REFERENCE_ROBUSTNESS_RUN}: {rob['reproduction']}")
     summary = final_summary(out, stages["e1"], stages["e2"], rob)
     print(json.dumps({k: summary[k] for k in ("H1", "H2", "H3") if k in summary}, indent=2, default=float))
 

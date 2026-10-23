@@ -163,8 +163,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--stage",
         default="all",
-        choices=["all", "transform", "embed", "score", "report"],
-        help="Execution stage.",
+        choices=["all", "transform", "embed", "score", "scores", "report"],
+        help="Execution stage. 'scores' stops once every score file exists (no metrics/contrasts).",
     )
     p.add_argument("--resume", default=None, help="Directory of a previous run to continue.")
     p.add_argument("--seed", type=int, default=42, help="Random seed for bootstrap.")
@@ -1197,6 +1197,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 pairs_b=ep.pairs.b,
                 label=ep.pairs.label,
             )
+
+    if args.stage == "scores":
+        set_run_status(run_dir, STATUS_COMPLETE)
+        _log("Stage 'scores' complete.")
+        return 0
 
     y_all = ep.pairs.label.astype(np.int64)
     assignments = ep.assignments

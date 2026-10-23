@@ -195,6 +195,80 @@ def _resample_chunk(
     return stats, skipped
 
 
+def _bootstrap_counts(n_units: int, n_boot: int, seed: int) -> np.ndarray:
+    """`[n_boot, n_units]` how many times each group is drawn in each resample: the same draws, in the
+    same chunks and with the same seeds, as `_resample_chunk` makes for `paired_bootstrap`."""
+    workers = min(4, os.cpu_count() or 4) if n_boot >= 100 else 1
+    if workers > 1:
+        sizes = [n_boot // workers] * workers
+        for i in range(n_boot % workers):
+            sizes[i] += 1
+        plan = [(seed + i * 10007, size) for i, size in enumerate(sizes) if size > 0]
+    else:
+        plan = [(seed, n_boot)]
+    rows = []
+    for chunk_seed, n_chunk in plan:
+        rng = np.random.default_rng(chunk_seed)
+        for _ in range(n_chunk):
+            rows.append(np.bincount(rng.integers(0, n_units, n_units), minlength=n_units))
+    return np.asarray(rows, dtype=np.float64).reshape(-1, n_units)
+
+
+def _group_auc_table(y: np.ndarray, s: np.ndarray, codes: np.ndarray, n_units: int):
+    """One sort per score column. For every positive: the number of negatives of each group strictly
+    below its score plus half of those tied with it. A resample that draws group g `c_g` times turns
+    these counts into its exact midrank AUC (see `_grouped_aucs`)."""
+    order = np.argsort(s, kind="stable")
+    s_sorted, y_sorted, g_sorted = s[order], y[order], codes[order]
+    n = s.size
+    pos_idx = np.flatnonzero(y_sorted == 1)
+    if pos_idx.size == 0:
+        return None
+    starts = np.r_[0, np.flatnonzero(np.diff(s_sorted)) + 1]
+    ends = np.r_[starts[1:], n]
+    block_of = np.repeat(np.arange(starts.size), ends - starts)[pos_idx]
+    lo, hi = starts[block_of], ends[block_of]
+    neg = y_sorted == 0
+    half_tied_below = np.empty((pos_idx.size, n_units), dtype=np.float64)
+    for g in range(n_units):
+        cum = np.concatenate(([0], np.cumsum(neg & (g_sorted == g))))
+        half_tied_below[:, g] = cum[lo] + 0.5 * (cum[hi] - cum[lo])
+    n_pos = np.bincount(codes[y == 1], minlength=n_units).astype(np.float64)
+    n_neg = np.bincount(codes[y == 0], minlength=n_units).astype(np.float64)
+    return g_sorted[pos_idx], half_tied_below, n_pos, n_neg
+
+
+def _grouped_aucs(table, counts: np.ndarray) -> np.ndarray:
+    """AUC of every resample (rows of `counts`), NaN where it has no positive or no negative."""
+    pos_group, score, n_pos, n_neg = table
+    w_pos, w_neg = counts @ n_pos, counts @ n_neg
+    numerator = (counts[:, pos_group].T * (score @ counts.T)).sum(axis=0)
+    out = np.full(counts.shape[0], np.nan)
+    ok = (w_pos > 0) & (w_neg > 0)
+    out[ok] = numerator[ok] / (w_pos[ok] * w_neg[ok])
+    return out
+
+
+def _grouped_fast_stats(y, S, codes, n_units, recipes, n_boot, seed):
+    counts = _bootstrap_counts(n_units, n_boot, seed)
+    aucs = np.full((S.shape[1], counts.shape[0]), np.nan)
+    for k in range(S.shape[1]):
+        table = _group_auc_table(y, S[:, k], codes, n_units)
+        if table is not None:
+            aucs[k] = _grouped_aucs(table, counts)
+    stats: Dict[str, List[float]] = {name: [] for name in recipes}
+    skipped: Dict[str, int] = {name: 0 for name in recipes}
+    for b in range(counts.shape[0]):
+        col_aucs = [None if math.isnan(v) else float(v) for v in aucs[:, b]]
+        for name, recipe in recipes.items():
+            val = _eval_recipe(recipe, col_aucs)
+            if val is not None:
+                stats[name].append(val)
+            else:
+                skipped[name] += 1
+    return stats, skipped
+
+
 def paired_bootstrap(
     y: Sequence[int],
     scores_dict: Mapping[Any, Any],
@@ -204,6 +278,7 @@ def paired_bootstrap(
     alpha: float = 0.05,
     contrasts: Optional[Mapping[str, Tuple[str, str, str]]] = None,
     min_valid: Optional[int] = None,
+    fast_grouped: bool = False,
 ) -> Dict[str, Dict]:
     """Compute paired percentile bootstrap CIs for delta vs T0 and DiD between methods.
 
@@ -223,6 +298,8 @@ def paired_bootstrap(
         contrasts: Optional explicit mapping of contrast_name -> (cond, method_a, method_b).
         min_valid: Minimum number of valid resamples required to compute CI.
     """
+    if fast_grouped and groups is None:
+        raise ValueError("fast_grouped requires groups (the grouped bootstrap is what it accelerates)")
     flat = _parse_scores_dict(scores_dict)
     if not flat:
         return {}
@@ -298,7 +375,10 @@ def paired_bootstrap(
     groups_data = (by_group, group_of_sorted, n_units) if groups is not None else None
 
     workers = min(4, os.cpu_count() or 4) if n_boot >= 100 else 1
-    if workers > 1:
+    if fast_grouped:
+        # Same resamples and same AUC as the branches below, from one sort per column (exact, much faster).
+        stats, skipped = _grouped_fast_stats(y_arr, S, codes, n_units, recipes, n_boot, seed) if n else (stats, skipped)
+    elif workers > 1:
         chunk_size = n_boot // workers
         chunks = [chunk_size] * workers
         remainder = n_boot % workers

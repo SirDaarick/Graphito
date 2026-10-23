@@ -36,6 +36,18 @@ number exists on ESCOM data. **Status: pipeline built and smoke-tested; the real
 - Always reported, whatever the outcome: all four adapters, Jaccard, per-assignment values, the A vs B ablation on
   ESCOM. No retraining, recalibration or checkpoint change after seeing the results.
 
+## Deviation declared on 2026-10-23, before any adapter robustness number was read
+The robustness run produced all 60 score files (10 conditions x 6 methods, 12:16-22:04 on 10-22) but its
+per-method metrics stage (`compute_metrics`, 1 000 resamples x 2 views per file, plus the PR-AUC and operating
+points that H3 does not use) had run 3 h 10 min without finishing one of its 60 tasks, so it was stopped. The
+quantities the pre-registration fixes are unchanged: the ROC-AUC (view `all`), the paired bootstrap stratified by
+assignment with n_boot = 1 000 and seed 42, and the difference-in-differences CI95 of H3. They are now computed by
+`paired_bootstrap(..., fast_grouped=True)` over the saved scores: the same resample draws (same chunks and seeds)
+and the same midrank AUC, obtained from one sort per column. Equivalence was tested on synthetic data with ties and
+undefined resamples (7 tests) and on real F4 columns, where it was bit-identical (max difference 0.0; 192 s against
+9.6 s on 4 columns x 40 resamples). Dropped: the per-method PR-AUC and operating-point metrics of the robustness
+report; the score files remain, so they can be computed later.
+
 ## Tasks
 - [x] T1 `models/graphcodebert/v2/adapter.py` (adapter identity, cache key, merged embedder), 8 tests including
   train/eval consistency (cosine > 0.9999 between the windowed pipeline and the cached training inputs)
