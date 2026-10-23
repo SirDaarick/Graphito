@@ -55,8 +55,38 @@ report; the score files remain, so they can be computed later.
   `models/robustness/scoring.py`; verified with a null adapter (untrained LoRA): AUC identical to `v2_norm`
 - [x] T3 `scripts/f4_eval.py` (`plan`, `run`, gates, verdicts) with 11 tests; full smoke run with null adapters on
   subsets: every stage and output produced, null adapters equal the zero-shot, gates correctly fail on subsets
-- [ ] T4 Run `python scripts/f4_eval.py run` (user go-ahead needed; the real evaluation is one-shot)
-- [ ] T5 Record results here and write them up in the thesis
+- [x] T4 Run `python scripts/f4_eval.py run` (started 2026-10-22 12:16, finished 2026-10-23 02:10; resumed once)
+- [x] T5 Record results here (below)
+- [ ] T6 Write the results up in the thesis
+
+## Results (frozen run; outputs in `C:\Users\edani\datasets\codenet\f4\`)
+Gates: zero-shot `v2_norm` reproduced the earlier ESCOM runs exactly (E1 0.37900444, E2 0.55504899, robustness
+T0/T1 0.90219/0.90168).
+
+| method | E1 MAP@R | E2 Macro-AUC [CI95] |
+|---|---|---|
+| Jaccard | 0.4497 | 0.5631 [0.520, 0.611] |
+| `v2_norm` zero-shot | 0.3790 | 0.5550 [0.505, 0.609] |
+| `ft_B_s1` (headline) | 0.4306 | 0.5860 [0.545, 0.626] |
+| `ft_B_s0` | 0.4313 | 0.5976 [0.553, 0.641] |
+| `ft_A_s0` | 0.4346 | 0.6002 [0.553, 0.651] |
+| `ft_A_s1` | 0.4387 | 0.6133 [0.561, 0.666] |
+
+Verdicts (headline `ft_B_s1` against zero-shot `v2_norm`):
+- H1 (E2): **inconclusive**, +0.0310, CI95 [-0.014, 0.086] over 14 assignments. Only `ft_A_s1` has a CI above 0
+  (+0.058 [0.002, 0.129]). The guide's solid-result target (0.65-0.70) was not reached.
+- H2 (E1): **confirmed**, +0.0506, CI95 [0.028, 0.077] over 48 blocks; all four adapters improve by about 0.05.
+  No adapter beats Jaccard on E1 (headline -0.0215, CI [-0.045, 0.004]).
+- H3 (robustness): **confirmed**: no condition has a difference-in-differences CI entirely below 0 for the
+  headline (nor for any of the other three adapters). Headline DiD CI above 0 in T5 (+0.071 [0.001, 0.203]) and
+  T7@1.0 (+0.121 [0.020, 0.264]): dead-code insertion and the combined transformation hurt the adapter less than
+  `v2_norm`. Point estimates below 0 but with CIs including 0: T2 (-0.007) and T7@0.25 (-0.026 [-0.044, 0.005]).
+- Robustness ROC-AUC, T0 -> T7@1.0: Jaccard 0.945 -> 0.931, `v2_norm` 0.902 -> 0.708, `ft_B_s1` 0.902 -> 0.830.
+  Jaccard stays above every neural method in every condition.
+
+Caveats: A configurations score higher than B on E2 (point estimates, inside the noise) although B was better on
+the CodeNet within-problem AUC used to freeze the headline; the headline was not changed after seeing ESCOM.
+E2 has 14 assignments (low power) and uses passing student submissions as references, not teacher solutions.
 
 ## Sizes (from `f4_eval.py plan`, no model results)
 E1: 2 842 files x 5 neural models. E2: 543 submissions x 5 neural models. Earlier single-model passes took
