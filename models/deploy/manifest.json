@@ -47,9 +47,24 @@
   "files": {
     "channel_a/calibration.json": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367",
     "channel_b/best.pth": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-    "channel_b/calibration.json": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+    "channel_b/calibration.json": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195",
+    "gcb_adapter/adapter_config.json": "291eefa14ad2f16bfe65a7f9a498c5283d0d11f31030111c3c0fbebdc63c2af4",
+    "gcb_adapter/adapter_model.safetensors": "9e3998eb3b1fe2a9deeccb26d0080b4061fd98a2e22f4f8fefa5dfc9ad7d9639"
   },
   "gcb": {
+    "adapter": {
+      "alpha": 32,
+      "dir": "gcb_adapter",
+      "name": "B_s1",
+      "rank": 16,
+      "sha256": "b5842ab13eaa271841067fbbe67eddeb85815136a1593381ae58464116c2c099",
+      "source": "runs/contrastivo_codenet/f3/B_s1",
+      "target_modules": [
+        "query",
+        "value"
+      ],
+      "type": "lora"
+    },
     "code_length": 384,
     "data_flow_length": 128,
     "dtype": "float32",
