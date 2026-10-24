@@ -1,0 +1,20 @@
+% Generado por scripts/generate_codenet_figures.py: no editar a mano.
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|p{9cm}|}
+\hline
+\textbf{Parámetro} & \textbf{Valor} \\ \hline
+Modelo base & microsoft/graphcodebert-base (125 M parámetros) \\ \hline
+Adaptación & LoRA, rango 16, en las proyecciones \texttt{query} y \texttt{value} \\ \hline
+Pérdida & InfoNCE, temperatura 0.05 \\ \hline
+Problemas por lote & 16 (cada uno aporta ancla, positivo y negativo difícil) \\ \hline
+Tripletas totales & 150\,000 (9\,375 pasos, 3 épocas) \\ \hline
+Tasa de aprendizaje & 0.0001, calentamiento del 5 \% y decaimiento lineal \\ \hline
+Precisión & fp32, atención con máscara guiada por el grafo de flujo de datos \\ \hline
+Entrada & código con identificadores canónicos, una ventana de 384 + 128 tokens \\ \hline
+Selección del punto de control & AUC dentro del problema en validación de CodeNet; ESCOM no se usa \\ \hline
+\end{tabular}
+\caption{Configuración del ajuste contrastivo de GraphCodeBERT.}
+\label{tab:hiperparametros}
+\end{table}
