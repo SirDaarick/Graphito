@@ -12,7 +12,6 @@ import importlib.util
 from typing import Any, Dict, Optional, Sequence, Tuple
 
 import numpy as np
-from scipy import sparse
 
 from models.evaluation.dedup import MERSENNE_PRIME, SHINGLE_K, shingle_hashes, token_ids
 from models.evaluation.normalize import shingle_tokens
@@ -100,6 +99,8 @@ class SetSimilarity:
         sizes = np.array([s.size for s in block], dtype=np.float64)
         if n == 0 or sizes.sum() == 0:
             return np.zeros((n, n))
+        from scipy import sparse  # lazy: the production image has no scipy and only needs V2FileEmbedder
+
         values = np.concatenate(block)
         _, cols = np.unique(values, return_inverse=True)
         rows = np.repeat(np.arange(n), sizes.astype(np.int64))
