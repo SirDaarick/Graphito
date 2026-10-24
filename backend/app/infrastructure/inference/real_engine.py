@@ -1,9 +1,12 @@
-"""REAL inference engine: CharCNN v2 (Channel B) and zero-shot GraphCodeBERT v2_norm (secondary).
+"""REAL inference engine: CharCNN v2 (Channel B) and GraphCodeBERT v2_norm (secondary).
 
 Fail closed (spec AS6.1): any load or configuration problem raises `InferenceError` with a stable
 reason code; there is no fallback to fake values. Models load from the verified deploy bundle
-(the CharCNN checkpoint listed in the manifest) and GraphCodeBERT is built as v2 with mean
-pooling, zero-shot, never with a fine-tuned add-on. Code is canonicalized (user identifiers renamed,
+(the CharCNN checkpoint listed in the manifest) and GraphCodeBERT is built as v2 with mean pooling.
+When the bundle lists a trained LoRA adapter (`gcb.adapter`, installed by
+`scripts/add_gcb_adapter_to_deploy.py`) and `GCB_ADAPTER_ENABLED` is true, the adapter is merged into the
+encoder (`models.graphcodebert.v2.finetuned`) and its identity enters the engine fingerprint; otherwise the
+zero-shot facade is used, which never loads an adapter. Code is canonicalized (user identifiers renamed,
 `models/logic_eval/canonical.py`) right before embedding, in `extract_semantic_embedding` only, so
 single, async, batch, reference creation and the reindex script all inherit it. If canonicalization
 raises, the file is embedded raw and `CANONICALIZATION_FALLBACK` is set for the caller.
@@ -49,12 +52,14 @@ def embedding_fingerprint(fields: Mapping[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def pipeline_fingerprint(manifest_fingerprint: str, canonicalization: str) -> str:
-    """Engine fingerprint: the manifest pipeline fingerprint plus the canonicalization version."""
-    canonical = json.dumps(
-        {"canonicalization": canonicalization, "pipeline": manifest_fingerprint}, sort_keys=True, separators=(",", ":")
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+def pipeline_fingerprint(manifest_fingerprint: str, canonicalization: str, adapter_sha256: Optional[str] = None) -> str:
+    """Engine fingerprint: the manifest pipeline fingerprint plus the canonicalization version and, when the
+    trained adapter is used, its identity. Without an adapter the value is the one computed before adapters
+    existed, so the zero-shot Chroma collection keeps its name."""
+    fields = {"canonicalization": canonicalization, "pipeline": manifest_fingerprint}
+    if adapter_sha256 is not None:
+        fields["adapter"] = adapter_sha256
+    return hashlib.sha256(json.dumps(fields, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def load_canonicalizer() -> Callable[[str, str], str]:
@@ -82,6 +87,16 @@ def load_gcb(config_kwargs: Dict[str, Any]):
     return GraphCodeBERTInference(config=GraphCodeBERTConfig(**config_kwargs))
 
 
+def load_gcb_adapter(args: Dict[str, Any]):
+    """GraphCodeBERT v2 with the trained LoRA adapter merged in (runs on an inference thread).
+    `args` is `{"config": <GraphCodeBERTConfig kwargs>, "adapter_dir": <verified adapter directory>}`."""
+    ensure_on_path()
+    from models.graphcodebert.config import GraphCodeBERTConfig
+    from models.graphcodebert.v2.finetuned import FineTunedGraphCodeBERT
+
+    return FineTunedGraphCodeBERT(args["adapter_dir"], config=GraphCodeBERTConfig(**args["config"]))
+
+
 class RealBimodalInferenceEngine(InferencePort):
     engine = "real"
 
@@ -92,6 +107,7 @@ class RealBimodalInferenceEngine(InferencePort):
         *,
         charcnn_factory: Optional[Callable[[Path], Any]] = None,
         gcb_factory: Optional[Callable[[Dict[str, Any]], Any]] = None,
+        gcb_adapter_factory: Optional[Callable[[Dict[str, Any]], Any]] = None,
         canonicalizer: Optional[Callable[[str, str], str]] = None,
     ):
         self.workers = int(settings.INFERENCE_WORKERS)
@@ -101,7 +117,11 @@ class RealBimodalInferenceEngine(InferencePort):
         if bundle.gcb.get("fingerprint") != manifest_fingerprint:
             raise InferenceError("gcb_fingerprint_mismatch", "manifest gcb fingerprint differs from its fields")
         self.canonicalization = CANONICALIZATION_VERSION
-        self.embedding_fingerprint = pipeline_fingerprint(manifest_fingerprint, self.canonicalization)
+        # The trained adapter is used when the verified bundle lists it and the setting allows it.
+        use_adapter = self.gcb_enabled and bool(getattr(settings, "GCB_ADAPTER_ENABLED", True)) and getattr(bundle, "gcb_adapter_dir", None) is not None
+        self.adapter_name = bundle.gcb_adapter_name if use_adapter else None
+        self.adapter_sha256 = bundle.gcb_adapter_sha256 if use_adapter else None
+        self.embedding_fingerprint = pipeline_fingerprint(manifest_fingerprint, self.canonicalization, self.adapter_sha256)
         self._canonicalize = canonicalizer
         self._executor = ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="inference")
         try:
@@ -113,7 +133,13 @@ class RealBimodalInferenceEngine(InferencePort):
             self.gcb = None
             if self.gcb_enabled:
                 kwargs = {k: self.gcb_fields[k] for k in GCB_CONFIG_FIELDS}
-                self.gcb = self._executor.submit(self._load, "gcb_load_failed", gcb_factory or load_gcb, kwargs).result()
+                if use_adapter:
+                    adapter_args = {"config": kwargs, "adapter_dir": bundle.gcb_adapter_dir}
+                    self.gcb = self._executor.submit(
+                        self._load, "gcb_adapter_load_failed", gcb_adapter_factory or load_gcb_adapter, adapter_args
+                    ).result()
+                else:
+                    self.gcb = self._executor.submit(self._load, "gcb_load_failed", gcb_factory or load_gcb, kwargs).result()
                 self._check_revision()
                 if self._canonicalize is None:
                     self._canonicalize = self._executor.submit(
@@ -123,8 +149,9 @@ class RealBimodalInferenceEngine(InferencePort):
             self._executor.shutdown(wait=False)
             raise
         logger.info(
-            "Real engine ready: CharCNN v%s, GraphCodeBERT %s+%s (fingerprint %s), %d inference worker(s).",
-            CHARCNN_ARCH_VERSION, "v2/mean" if self.gcb_enabled else "disabled", self.canonicalization, self.embedding_fingerprint[:12], self.workers,
+            "Real engine ready: CharCNN v%s, GraphCodeBERT %s+%s%s (fingerprint %s), %d inference worker(s).",
+            CHARCNN_ARCH_VERSION, "v2/mean" if self.gcb_enabled else "disabled", self.canonicalization,
+            f"+adapter {self.adapter_name}" if self.adapter_name else "", self.embedding_fingerprint[:12], self.workers,
         )
 
     @staticmethod
@@ -158,13 +185,17 @@ class RealBimodalInferenceEngine(InferencePort):
 
     @property
     def model_versions(self) -> Dict[str, Any]:
-        return {
+        versions = {
             "charcnn_arch_version": getattr(self.charcnn, "arch_version", None),
             "charcnn_preproc_version": getattr(self.charcnn, "preproc_version", None),
             "gcb_input_version": self.gcb_fields["input_version"] if self.gcb_enabled else None,
             "gcb_pooling": self.gcb_fields["pooling"] if self.gcb_enabled else None,
             "gcb_canonicalization": self.canonicalization if self.gcb_enabled else None,
         }
+        if self.adapter_sha256 is not None:  # absent (not null) without the adapter: older reports keep their shape
+            versions["gcb_adapter"] = self.adapter_name
+            versions["gcb_adapter_sha256"] = self.adapter_sha256
+        return versions
 
     def readiness(self) -> Readiness:
         return Readiness(ready=True, details={"gcb_enabled": self.gcb_enabled, **self.model_versions})
@@ -199,6 +230,8 @@ class RealBimodalInferenceEngine(InferencePort):
             raise InferenceError("gcb_embedding_failed", f"embedding has {len(embedding)} dims")
         if res.get("input_version") != self.gcb_fields["input_version"] or res.get("pooling") != self.gcb_fields["pooling"]:
             raise InferenceError("gcb_config_mismatch", "embedding came from another input version or pooling")
+        if self.adapter_sha256 is not None and res.get("adapter_loaded") is not True:
+            raise InferenceError("gcb_config_mismatch", "embedding was not produced with the deployed adapter")
         return [float(v) for v in embedding]
 
     async def predict_stylometry(self, code: str) -> StylometryResult:

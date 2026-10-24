@@ -1,0 +1,16 @@
+{
+  "escom_files": 43895,
+  "codenet_samples": 27464,
+  "threshold": 0.8,
+  "flagged_samples": 1,
+  "candidate_pairs": 411881,
+  "max_similarity_among_flagged": 1.0,
+  "elapsed_s": 844.4,
+  "flagged": [
+    [
+      "p03089",
+      "s242226451"
+    ]
+  ],
+  "applied": true
+}

@@ -1,0 +1,21 @@
+% Generado por scripts/generate_codenet_figures.py: no editar a mano.
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|r|r|r|c|}
+\hline
+\textbf{Condición} & \textbf{Jaccard} & \textbf{Sin entrenar} & \textbf{Ajustado (titular)} & \textbf{Diferencia de degradación [IC95 \%]} \\ \hline
+Original & 0.945 & 0.902 & 0.902 & -- \\ \hline
+T1 Renombrar identificadores & 0.945 & 0.902 & 0.902 & +0.000 [-0.001, 0.003] \\ \hline
+T2 for $\leftrightarrow$ while & 0.943 & 0.897 & 0.890 & -0.007 [-0.021, 0.002] \\ \hline
+T3 Reordenar sentencias & 0.943 & 0.899 & 0.902 & +0.003 [-0.000, 0.006] \\ \hline
+T4 Operadores equivalentes & 0.937 & 0.893 & 0.894 & +0.000 [-0.007, 0.007] \\ \hline
+T5 Código muerto & 0.950 & 0.794 & 0.865 & +0.071 [0.001, 0.203] \\ \hline
+T6 Invertir if/else & 0.942 & 0.899 & 0.898 & -0.000 [-0.003, 0.002] \\ \hline
+T7 combinado 25 \% & 0.942 & 0.901 & 0.875 & -0.026 [-0.044, 0.005] \\ \hline
+T7 combinado 50 \% & 0.944 & 0.836 & 0.847 & +0.011 [-0.030, 0.087] \\ \hline
+T7 combinado 100 \% & 0.931 & 0.708 & 0.829 & +0.121 [0.020, 0.264] \\ \hline
+\end{tabular}
+\caption{AUC bajo transformaciones que conservan el comportamiento (pares de plagio de la partición de prueba) y diferencia de degradación del modelo ajustado frente al no entrenado.}
+\label{tab:robustez_auc}
+\end{table}

@@ -94,9 +94,12 @@ def _engine(fake_artifacts, *, charcnn=None, gcb=None, threads=None, **overrides
 # --- fail closed (AS6.1) --------------------------------------------------------------------------
 
 
-def test_real_engine_source_has_no_stub_and_no_adapter():
+def test_real_engine_source_has_no_stub_and_no_unverified_adapter():
+    """Policy since 2026-10-23: a trained adapter is allowed only when it comes from the verified deploy bundle
+    (`bundle.gcb_adapter_dir`, hashed in the manifest). The legacy adapter options stay out of the engine."""
     assert not re.search(r"stub", REAL_ENGINE_SOURCE, re.IGNORECASE)
-    assert not re.search(r"adapter_path|lora|adaptador", REAL_ENGINE_SOURCE, re.IGNORECASE)
+    assert not re.search(r"adapter_path|adaptador|SHIPPED_ADAPTER", REAL_ENGINE_SOURCE, re.IGNORECASE)
+    assert "bundle.gcb_adapter_dir" in REAL_ENGINE_SOURCE
     assert "best_model.pth" not in REAL_ENGINE_SOURCE
 
 

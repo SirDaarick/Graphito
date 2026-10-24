@@ -86,7 +86,7 @@ class ReporteAnalisisResponse(BaseModel):
     calibracion_sha_b: Optional[str] = None
     checkpoint_sha_b: Optional[str] = None
     manifest_sha: Optional[str] = None
-    # GraphCodeBERT v2 zero-shot cosine: exploratory, never decides (spec AS8).
+    # GraphCodeBERT v2_norm cosine (with the trained adapter when the bundle lists it): exploratory, never decides (spec AS8).
     gcb_similarity: Optional[float] = None
     gcb_estado: Optional[str] = None
     # Resolved from the running engine when the report's manifest is the loaded one (the manifest

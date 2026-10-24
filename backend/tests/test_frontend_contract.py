@@ -3,7 +3,7 @@
 The UI must not invent scores (62/85 fallbacks), must not send thresholds, must not show the
 deprecated discrepancy as a result, and must never map an unknown or missing verdict to
 "Conforme". It must show Channel A's method, the engine (stub marker), the calibration state,
-GraphCodeBERT as exploratory zero-shot and the validation label.
+GraphCodeBERT as exploratory (never decisive) and the validation label.
 """
 
 import re
@@ -82,7 +82,8 @@ def test_indicators_default_to_neutral_and_lookups_ignore_prototype_keys():
 def test_ui_shows_method_engine_calibration_gcb_and_label():
     texts = "\n".join(_all_sources().values())
     assert "Jaccard léxico, 5 tokens" in texts
-    assert "Normalización de identificadores · exploratorio, zero-shot, no decide" in texts
+    assert "Normalización de identificadores · exploratorio, no decide" in texts
+    assert "zero-shot" not in texts  # the deployed model may carry the trained adapter: the label must not claim otherwise
     assert "No validado contra plagio derivado de la referencia" in texts
     assert "STUB" in _read("pages/SimilarityReportModal.tsx")
     assert "estado_calibracion" in _read("pages/SimilarityReportModal.tsx")

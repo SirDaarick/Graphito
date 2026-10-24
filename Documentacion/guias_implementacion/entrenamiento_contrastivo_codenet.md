@@ -2,7 +2,7 @@
 
 > **Estado:** planificado, no ejecutado. Esta guía es el pre-registro del experimento: hipótesis, criterio de decisión y análisis quedan fijados aquí **antes** de entrenar o mirar resultados sobre ESCOM.
 > **Alcance:** ajuste contrastivo (LoRA) del Canal A con datos externos (Project CodeNet). La evaluación se hace únicamente sobre datos de ESCOM, en local.
-> **Línea base:** `v2` zero-shot (DFG, pooling `mean`), sin adaptador.
+> **Línea base y entrada:** `v2_norm` zero-shot: renombrado canónico de identificadores (`models/logic_eval/canonical.py`, `identifiers_v1`) y luego `v2` (DFG, pooling `mean`), sin adaptador. Es la entrada desplegada del Canal A (`odd/tasks/gcb-v2-norm.md`): en `runs/robustness_v2norm/20261019-222018`, ROC-AUC bajo T1 (renombrado) 0.684 → 0.902 y en T0 0.856 → 0.902; en E1 no hay diferencia significativa. Las menciones de `v2` que quedan en la sección 0 describen resultados ya medidos con esa entrada.
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Pregunta | Respuesta |
 |---|---|
-| ¿Qué se entrena? | Un adaptador LoRA sobre GraphCodeBERT con entrada `v2`, usando InfoNCE. |
+| ¿Qué se entrena? | Un adaptador LoRA sobre GraphCodeBERT con entrada `v2_norm` (identificadores canónicos + DFG), usando InfoNCE. |
 | ¿Con qué datos? | Project CodeNet C++1000: envíos humanos con estado verificado por un juez (Accepted / Wrong Answer). |
 | ¿Dónde se evalúa? | En ESCOM (E1, E2 y robustez T1–T7), una sola vez, con la configuración congelada. |
 | ¿Cuándo se detiene? | Si el piloto (F2) no cumple el criterio de continuación. Se reporta como resultado negativo. |
@@ -28,7 +28,7 @@ El Canal A convierte cada entrega en un vector y lo compara por coseno con la **
 - En E2, parecerse a la referencia predice la corrección solo débilmente: Macro-AUC = 0.5598, IC95 [0.5199, 0.6015] (mismo reporte, línea 18).
 - Bajo ofuscación, Jaccard no se degradó más que `v2`; H1 quedó refutada (`Documentacion/REPORTE_EXPERIMENTO_ROBUSTEZ_CANAL_A.md:18`).
 
-**Pregunta:** ¿un objetivo contrastivo que enseñe explícitamente "resuelve el mismo problema = vectores cercanos" mejora la similitud con la referencia en ESCOM respecto a `v2` zero-shot?
+**Pregunta:** ¿un objetivo contrastivo que enseñe explícitamente "resuelve el mismo problema = vectores cercanos" mejora la similitud con la referencia en ESCOM respecto a `v2_norm` zero-shot?
 
 ### Qué significa "parecido" en este experimento
 
@@ -46,9 +46,9 @@ El objetivo **no es detectar plagio** sino medir qué tan cerca está una entreg
 
 | Hipótesis | Enunciado | Se confirma si | Se refuta si |
 |---|---|---|---|
-| **H1** (primaria) | El ajuste mejora la relación entre similitud y corrección. | Macro-AUC de E2 (contrastivo) − Macro-AUC de E2 (`v2`) > 0, con IC95 que excluye 0. | El IC95 excluye 0 con signo opuesto. Si contiene 0: **no concluyente**. |
-| **H2** | El ajuste mejora el agrupamiento por tarea. | ΔMAP@R de E1 (contrastivo − `v2`) > 0, con IC95 que excluye 0. | El IC95 excluye 0 con signo opuesto. |
-| **H3** (no regresión) | El ajuste no reduce la robustez ante ofuscación. | ΔAUC bajo T1–T7 no es peor que el de `v2` (IC95 de la diferencia contiene 0 o es favorable). | El IC95 excluye 0 en contra del modelo ajustado. |
+| **H1** (primaria) | El ajuste mejora la relación entre similitud y corrección. | Macro-AUC de E2 (contrastivo) − Macro-AUC de E2 (`v2_norm`) > 0, con IC95 que excluye 0. | El IC95 excluye 0 con signo opuesto. Si contiene 0: **no concluyente**. |
+| **H2** | El ajuste mejora el agrupamiento por tarea. | ΔMAP@R de E1 (contrastivo − `v2_norm`) > 0, con IC95 que excluye 0. | El IC95 excluye 0 con signo opuesto. |
+| **H3** (no regresión) | El ajuste no reduce la robustez ante ofuscación. | ΔAUC bajo T1–T7 no es peor que el de `v2_norm` (IC95 de la diferencia contiene 0 o es favorable). | El IC95 excluye 0 en contra del modelo ajustado. |
 
 Reglas fijadas de antemano:
 
@@ -88,21 +88,21 @@ Reglas fijadas de antemano:
 3. Conservar solo los que caben en **una ventana `v2`**: ≤384 tokens de código + 128 de DFG (`models/graphcodebert/config.py:31-32`). Así cada muestra cuesta un solo forward.
 4. Dividir por problema (80/10/10).
 5. Deduplicar contra ESCOM.
-6. Precalcular y cachear las entradas `v2` (tokens + DFG).
+6. Precalcular y cachear las entradas `v2_norm` (código con identificadores canónicos; tokens + DFG).
 
 **Resultado:** manifiesto reproducible (semilla fija) y caché de entradas.
 
 ### F1: Línea base y benchmark de velocidad (medio día)
 
-1. Medir `v2` zero-shot en la validación de CodeNet: MAP@R y AUC Accepted vs WA.
-2. Medir `v2` zero-shot en ESCOM: E1 y E2. Son las líneas base de H1 y H2.
+1. Medir `v2_norm` zero-shot en la validación de CodeNet: MAP@R y AUC Accepted vs WA.
+2. Medir `v2_norm` zero-shot en ESCOM: E1 y E2. Son las líneas base de H1 y H2.
 3. Correr ~200 pasos de entrenamiento y medir **secuencias por segundo reales**. Ese dato reemplaza la estimación de la sección 5.
 
 ### F2: Piloto, punto de decisión (1 noche)
 
 - 200 problemas, 1 época.
-- LoRA r=16 sobre `query`/`value`, con la **misma entrada y pooling que `v2`**.
-- Migrar `models/graphcodebert/contrastive_graphcodebert.py` a la entrada `v2`: hoy usa la codificación legacy, triplet loss y negativos de otro problema.
+- LoRA r=16 sobre `query`/`value`, con la **misma entrada y pooling que `v2_norm`**.
+- Migrar `models/graphcodebert/contrastive_graphcodebert.py` a la entrada `v2_norm`: hoy usa la codificación legacy, triplet loss y negativos de otro problema.
 - **Pérdida:** InfoNCE, temperatura ~0.05.
 
 | Rol | Muestra |
@@ -183,10 +183,10 @@ Precios de referencia de octubre de 2026; verificarlos en vivo antes de pagar.
 
 ## 6. Checklist
 
-- [ ] F0: manifiesto de CodeNet dividido por problema, deduplicado contra ESCOM, caché `v2` generada.
+- [ ] F0: manifiesto de CodeNet dividido por problema, deduplicado contra ESCOM, caché `v2_norm` generada.
 - [ ] Licencia de CodeNet verificada.
-- [ ] F1: líneas base de `v2` registradas (CodeNet val, E1, E2) y velocidad real medida.
-- [ ] `contrastive_graphcodebert.py` migrado a la entrada `v2`.
+- [ ] F1: líneas base de `v2_norm` registradas (CodeNet val, E1, E2) y velocidad real medida.
+- [ ] `contrastive_graphcodebert.py` migrado a la entrada `v2_norm`.
 - [ ] F2: criterio de continuación evaluado y registrado (continuar o detener).
 - [ ] F3: configuraciones A y B, 2 semillas cada una.
 - [ ] Referencias del docente escritas para las 14 tareas de E2.

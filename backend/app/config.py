@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     GCB_POOLING: str = "mean"
     # GraphCodeBERT is a non-deciding secondary signal; when enabled, a failed load blocks readiness.
     GCB_SECONDARY_ENABLED: bool = True
+    # Use the trained LoRA adapter listed in the deploy manifest (`gcb.adapter`). False falls back to zero-shot
+    # `v2_norm` without touching the bundle; the Chroma collection then returns to the zero-shot name and the
+    # references must be reindexed (see models/deploy/README.md).
+    GCB_ADAPTER_ENABLED: bool = True
     INFERENCE_WORKERS: int = 1
     # Development only (with INFERENCE_MODE=REAL): score a channel without calibration, unflagged.
     ALLOW_UNCALIBRATED: bool = False

@@ -1,0 +1,27 @@
+{
+  "mode": "f3_val_only",
+  "best": {
+    "val_map_at_r": 0.8123560677064686,
+    "step": 9000
+  },
+  "n_problems": 778,
+  "steps": 9375,
+  "train": {
+    "cmd": "train",
+    "f0": "C:\\Users\\edani\\datasets\\codenet\\f0",
+    "out": "C:\\Users\\edani\\datasets\\codenet\\f3\\B_s0",
+    "repo_root": "C:\\Users\\edani\\OneDrive\\Documents\\Proyectos\\Graphito",
+    "problems": 0,
+    "triplets": 150000,
+    "pairs": 16,
+    "lr": 0.0001,
+    "rank": 16,
+    "seed": 0,
+    "no_wa": false,
+    "skip_eval": false,
+    "skip_escom": true,
+    "val_every": 1000,
+    "val_max": 0,
+    "train_s": 29324
+  }
+}

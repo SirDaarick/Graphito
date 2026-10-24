@@ -80,6 +80,13 @@ from models.robustness.validity import (
     syntax_check,
     token_edit_ratio,
 )
+from models.graphcodebert.v2.adapter import (
+    AdapterFileEmbedder,
+    adapter_sha256,
+    build_embedder,
+    is_adapter_method,
+    parse_adapter_specs,
+)
 from models.graphcodebert.v2.dfg import parse_source
 
 CHANNEL = "robustness"
@@ -88,6 +95,14 @@ LEXICAL_METHODS = ("jaccard", "winnowing")
 EMBEDDING_METHODS = ("v2", "v2_nodfg", "legacy", "v2_norm")
 # v2_norm reuses the v2 embedder (same cache key); only the text fed to it differs.
 EMBEDDER_ALIAS = {"v2_norm": "v2"}
+
+
+def _text_keyed(method: str) -> bool:
+    """Canonicalized-text methods (v2_norm and the `ft_<name>` adapters) are cached by the sha256 of the
+    text actually embedded, not by the file sha."""
+    return method in EMBEDDER_ALIAS or is_adapter_method(method)
+
+
 LEXICAL_FNS: Dict[str, Callable[[str], np.ndarray]] = {
     "jaccard": jaccard_set,
     "winnowing": winnowing_set,
@@ -148,8 +163,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--stage",
         default="all",
-        choices=["all", "transform", "embed", "score", "report"],
-        help="Execution stage.",
+        choices=["all", "transform", "embed", "score", "scores", "report"],
+        help="Execution stage. 'scores' stops once every score file exists (no metrics/contrasts).",
     )
     p.add_argument("--resume", default=None, help="Directory of a previous run to continue.")
     p.add_argument("--seed", type=int, default=42, help="Random seed for bootstrap.")
@@ -166,6 +181,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--prefill-shard", default=None, help="K/N: only warm the embedding cache for shard K of N, then exit.")
     p.add_argument("--run-dir", default=None, help="Exact output directory for a fresh run (default: <runs-root>/robustness/<timestamp>).")
     p.add_argument("--reference-run", default="runs/robustness/20261012-050941", help="Earlier robustness run for the v2_norm reproduction check.")
+    p.add_argument(
+        "--adapter",
+        action="append",
+        default=[],
+        metavar="ft_NAME=PATH",
+        help="LoRA adapter to score as an extra method named ft_NAME (also list it in --methods). Repeatable.",
+    )
     return p
 
 
@@ -828,10 +850,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("ERROR: evaluating on 'test' requires explicit --confirm-test flag", file=sys.stderr)
         return REFUSED_EXIT
 
+    try:
+        adapters = parse_adapter_specs(args.adapter)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return REFUSED_EXIT
     methods = [m.strip() for m in args.methods.split(",") if m.strip()]
     for m in methods:
-        if m not in ALL_METHODS:
-            print(f"ERROR: unknown method {m!r} (must be among {ALL_METHODS})", file=sys.stderr)
+        if m not in ALL_METHODS and m not in adapters:
+            print(f"ERROR: unknown method {m!r} (must be among {ALL_METHODS} or a --adapter name)", file=sys.stderr)
             return REFUSED_EXIT
 
     conditions = [c.strip() for c in args.conditions.split(",") if c.strip()]
@@ -923,14 +950,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     poolings.setdefault("v2_nodfg", "mean")
     poolings.setdefault("legacy", "cls")
     poolings.setdefault("v2_norm", poolings["v2"])
+    for m in methods:
+        if is_adapter_method(m):
+            poolings[m] = "mean"  # the adapters were trained and selected with mean pooling
 
     # 4. Prepare Embedders if neural methods selected
-    embedding_methods_active = [m for m in methods if m in EMBEDDING_METHODS]
+    embedding_methods_active = [m for m in methods if m in EMBEDDING_METHODS or is_adapter_method(m)]
     embedders, statuses = {}, {}
     device = resolve_device(args.device) if embedding_methods_active else "cpu"
     if embedding_methods_active:
         embedders, statuses = load_embedders(
-            sorted({EMBEDDER_ALIAS.get(m, m) for m in embedding_methods_active}),
+            sorted({EMBEDDER_ALIAS.get(m, m) for m in embedding_methods_active if not is_adapter_method(m)}),
             model_name=DEFAULT_MODEL,
             local_files_only=args.local_files_only,
             device=device,
@@ -939,6 +969,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for m_alias, m_base in EMBEDDER_ALIAS.items():
             if m_alias in embedding_methods_active:
                 embedders[m_alias] = embedders[m_base]
+        adapter_shas: Dict[str, str] = {}
+        for m in embedding_methods_active:
+            if is_adapter_method(m):
+                adapter_shas[m] = adapter_sha256(adapters[m])
+                embedders[m] = AdapterFileEmbedder(
+                    build_embedder(adapters[m], device=device, batch_size=args.batch_size, local_files_only=args.local_files_only),
+                    adapter_shas[m],
+                )
+                _log(f"Adapter {m}: {adapters[m]} sha256={adapter_shas[m][:16]}")
 
     # 5. Initialize or Resume Run Context
     cache_root = Path(args.cache_dir)
@@ -954,6 +993,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "n_boot": args.n_boot,
             "n_boot_secondary": args.n_boot_secondary,
             "methods": methods,
+            "adapters": {m: {"path": str(p), "sha256": adapter_sha256(p)} for m, p in adapters.items() if m in methods},
             "conditions": conditions,
             "poolings": poolings,
             "val_thresholds": val_thresholds,
@@ -1073,7 +1113,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         todo[f"{m}:{sh}"] = (m, txt, s.lang)
         _log(f"Prefill shard {k_s}/{n_s}: {len(todo)} unique texts")
         for i, (key, (m, txt, lg)) in enumerate(todo.items()):
-            cached_embedders[m].embed(key.split(":", 1)[1] if m in EMBEDDER_ALIAS else hashlib.sha256(txt.encode("utf-8")).hexdigest(), txt, lg)
+            cached_embedders[m].embed(key.split(":", 1)[1] if _text_keyed(m) else hashlib.sha256(txt.encode("utf-8")).hexdigest(), txt, lg)
             if i % 100 == 0:
                 _log(f"  prefill {i}/{len(todo)}")
         _log("Prefill shard done.")
@@ -1091,7 +1131,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         pool = poolings[m]
         cached = cached_embedders[m]
         o_texts, _ = texts_for_method(m, [r.text for r in orig_records], [r.text for r in orig_records], [r.lang for r in orig_records])
-        if m in EMBEDDER_ALIAS:
+        if _text_keyed(m):
             o_shas = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in o_texts]
         else:
             o_shas = [r.sha256 for r in orig_records]
@@ -1137,7 +1177,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 _, m_texts = texts_for_method(
                     m, [files[s.id].text for s in ep.samples], trans_texts, [s.lang for s in ep.samples]
                 )
-                if m in EMBEDDER_ALIAS:
+                if _text_keyed(m):
                     m_shas = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in m_texts]
                 else:
                     m_shas = [r["sha256_out"] for r in trans_records]
@@ -1157,6 +1197,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 pairs_b=ep.pairs.b,
                 label=ep.pairs.label,
             )
+
+    if args.stage == "scores":
+        set_run_status(run_dir, STATUS_COMPLETE)
+        _log("Stage 'scores' complete.")
+        return 0
 
     y_all = ep.pairs.label.astype(np.int64)
     assignments = ep.assignments
