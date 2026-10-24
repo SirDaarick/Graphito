@@ -352,7 +352,7 @@ Conviene precisar qué se adaptó: la \emph{entrada} (el grafo), no el modelo. G
 \subsubsection{Idea General}
 Sin ajuste, casi cualquier par de programas obtiene una similitud muy alta (Figura~\ref{fig:heatmap_logico}): GraphCodeBERT sabe leer código, pero nadie le enseñó qué significa ``parecido'' para esta tarea. El ajuste contrastivo se lo enseña con ejemplos. Es como entrenar a un catador mostrándole tres muestras, una de referencia, otra del mismo vino y una distinta, y pidiéndole que acerque las dos primeras y aleje la tercera.
 
-Cada ejemplo es una \textbf{tripleta} de programas del mismo problema (Figura~\ref{fig:esquema_triplete}):
+Cada ejemplo es una \textbf{tripleta} de programas del mismo problema, esquema habitual en el aprendizaje de similitud \cite{Schroff2015FaceNet} (Figura~\ref{fig:esquema_triplete}):
 
 \begin{itemize}
     \item el \textbf{ancla}, una solución correcta;
@@ -386,7 +386,7 @@ Se entrenaron dos configuraciones, cada una con dos semillas: la \textbf{A}, sol
     Adaptación & LoRA, rango 16 & Solo se ajusta una parte pequeña; el resto queda congelado. \\ \hline
     Pérdida & InfoNCE, temperatura 0.05 & Reconocer cuál es el positivo del ancla. \\ \hline
     Lote y tripletas & 16 problemas por paso; 150,000 tripletas (9,375 pasos) & Cada problema aporta un ancla, un positivo y un negativo difícil. \\ \hline
-    Optimizador y tasa & AdamW, $10^{-4}$ & Con un arranque gradual (5\,\%) y un descenso lineal al final. \\ \hline
+    Optimizador y tasa & AdamW \cite{Loshchilov2019AdamW}, $10^{-4}$ & Con un arranque gradual (5\,\%) y un descenso lineal al final. \\ \hline
     Semillas & 0 y 1 & Dos corridas por configuración. \\ \hline
     Selección & Cada 1,000 pasos, en la validación de CodeNet & Se conserva la mejor copia; ESCOM no interviene. \\ \hline
 \end{xltabular}
@@ -395,8 +395,8 @@ Se entrenaron dos configuraciones, cada una con dos semillas: la \textbf{A}, sol
 Para elegir qué configuración usar se miden dos cosas en la validación de CodeNet:
 
 \begin{itemize}
-    \item \textbf{AUC dentro del problema.} Se toma una solución correcta como referencia y se pregunta: entre otra solución correcta y una incorrecta del mismo problema, ¿cuál queda más parecida a la referencia? El AUC es la fracción de veces que acierta (0.5 equivale a adivinar y 1.0 a acertar siempre). Es la medida más cercana al uso real, porque el docente compara cada entrega solo contra la solución de su propia tarea.
-    \item \textbf{MAP@R entre problemas} (Sección~\ref{subsec:agrupamiento_e1}). Mide si el modelo separa bien los problemas distintos. Es útil, pero no decide, porque al docente no le importa qué tan lejos queda un programa de otro problema.
+    \item \textbf{AUC dentro del problema.} Se toma una solución correcta como referencia y se pregunta: entre otra solución correcta y una incorrecta del mismo problema, ¿cuál queda más parecida a la referencia? El AUC \cite{Hanley1982ROC} es la fracción de veces que acierta (0.5 equivale a adivinar y 1.0 a acertar siempre). Es la medida más cercana al uso real, porque el docente compara cada entrega solo contra la solución de su propia tarea.
+    \item \textbf{MAP@R entre problemas} \cite{Musgrave2020Reality} (Sección~\ref{subsec:agrupamiento_e1}). Mide si el modelo separa bien los problemas distintos. Es útil, pero no decide, porque al docente no le importa qué tan lejos queda un programa de otro problema.
 \end{itemize}
 
 La configuración B ganó con el primer criterio (AUC de 0.634 en las dos semillas, frente a unos 0.607 de A) y A con el segundo (0.847 frente a 0.811). Se eligió B, con la semilla 1 por desempate (0.634 frente a 0.633). Sin ajuste, el AUC era de 0.542 y el MAP@R de 0.182 (Figura~\ref{fig:val_auc_ajuste}).

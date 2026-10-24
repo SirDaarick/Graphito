@@ -621,8 +621,8 @@ De los 1,000 problemas del subconjunto depurado de C++ de CodeNet se tomaron, po
 
 \begin{enumerate}
     \item \textbf{Que quepa en una ventana.} GraphCodeBERT lee 512 elementos a la vez. Se conservaron solo los programas que caben completos, para que el vector resuma todo el programa y no una parte. Este filtro descartó 25,933 programas, casi todos los que se retiraron.
-    \item \textbf{Sin casi-copias de una solución correcta.} Una respuesta incorrecta que comparte más del 90\,\% de sus fragmentos con una correcta del mismo problema suele diferir en un solo símbolo (un \texttt{<} en lugar de un \texttt{>}). De ella no se puede aprender nada y solo añade ruido. Se retiraron 41.
-    \item \textbf{Sin coincidencias con ESCOM.} Se compararon con los 43,895 archivos de ESCOM; solo uno compartía 80\,\% o más de sus fragmentos con alguno y se retiró, para que la evaluación final no incluya algo que el modelo ya vio.
+    \item \textbf{Sin casi-copias de una solución correcta.} Una respuesta incorrecta que comparte más del 90\,\% de sus fragmentos con una correcta del mismo problema suele diferir en un solo símbolo (un \texttt{<} en lugar de un \texttt{>}). De ella no se puede aprender nada y solo añade ruido. La comparación usa fragmentos de código superpuestos, como en la detección de documentos casi idénticos \cite{Broder1997Resemblance}. Se retiraron 41.
+    \item \textbf{Sin coincidencias con ESCOM.} Se compararon con los 43,895 archivos de ESCOM; solo uno compartía 80\,\% o más de sus fragmentos con alguno y se retiró, para que la evaluación final no incluya algo que el modelo ya vio. Los duplicados entre entrenamiento y evaluación inflan los resultados \cite{Allamanis2019Adverse,Lee2022Dedup}.
 \end{enumerate}
 
 Doce problemas quedaron con menos de dos soluciones correctas y se omitieron. El resultado son 988 problemas y 27,463 programas: 19,235 correctos y 8,228 incorrectos.
@@ -640,7 +640,7 @@ El primer filtro tiene un costo: los programas que se conservaron son más corto
 \subsection{Partición}
 \label{subsec:particion_codenet}
 
-La partición sigue la misma idea que en los datos de ESCOM (Sección~\ref{subsec:particion_datos}): se hace por problema y no por programa. Las soluciones de un mismo problema se parecen entre sí; si unas quedaran en entrenamiento y otras en validación, el modelo parecería acertar solo porque reconoce el problema. Los 988 problemas se repartieron al azar, con semilla fija, en 80\,\% para entrenamiento, 10\,\% para validación y 10\,\% para prueba, proporciones habituales que dejan 99 problemas para validar (Tabla~\ref{tab:particion_codenet}).
+La partición sigue la misma idea que en los datos de ESCOM (Sección~\ref{subsec:particion_datos}): se hace por problema y no por programa. Las soluciones de un mismo problema se parecen entre sí; si unas quedaran en entrenamiento y otras en validación, el modelo parecería acertar solo porque reconoce el problema, una fuga de información \cite{Kapoor2023Leakage}. Los 988 problemas se repartieron al azar, con semilla fija, en 80\,\% para entrenamiento, 10\,\% para validación y 10\,\% para prueba, proporciones habituales que dejan 99 problemas para validar (Tabla~\ref{tab:particion_codenet}).
 
 \begin{table}[H]
     \centering
