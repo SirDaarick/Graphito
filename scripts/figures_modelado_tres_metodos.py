@@ -1,4 +1,4 @@
-"""Thesis figures that compare Jaccard, zero-shot `v2_norm` and the contrastive adapter B_s1 on ESCOM.
+﻿"""Thesis figures that compare Jaccard, zero-shot `v2_norm` and the contrastive adapter B_s1 on ESCOM.
 
 Two stages, so the drawing never needs a GPU:
 
@@ -29,7 +29,7 @@ SHOWCASE = DATA_REPO.parent / "Graphito-worktrees" / "doc-v2norm" / "runs" / "lo
 FIG_DIR = ROOT / "Documentacion" / "Documento" / "figuras"
 SEED = 42
 METHODS = ("jaccard", "v2_norm", "ft_B_s1")
-NAMES = {"jaccard": "Jaccard (texto)", "v2_norm": "GraphCodeBERT sin ajuste (v2_norm)", "ft_B_s1": "GraphCodeBERT ajustado"}
+NAMES = {"jaccard": "Jaccard (texto)", "v2_norm": "GraphCodeBERT sin ajuste (v2_norm)", "ft_B_s1": "GraphCodeBERT ajustado (modelo usado)"}
 SHORT = {"jaccard": "Jaccard", "v2_norm": "v2_norm", "ft_B_s1": "Ajustado"}
 COLORS = {"jaccard": "#555555", "v2_norm": "#D55E00", "ft_B_s1": "#0072B2"}
 MARKERS = {"jaccard": "s", "v2_norm": "o", "ft_B_s1": "D"}
