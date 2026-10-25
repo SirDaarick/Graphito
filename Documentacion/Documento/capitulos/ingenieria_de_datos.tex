@@ -20,14 +20,13 @@ Siguiendo la metodología \textbf{Komorebi} para proyectos de Inteligencia Artif
         \node[data, below=of gen] (limp) {\textbf{Limpieza y eliminación de duplicados}\\Mismo criterio para código humano y de IA};
         \node[data, below=of limp] (split) {\textbf{Partición \texttt{split\_v1}}\\Entrenamiento, validación y prueba, separadas por tarea};
         \node[box, fill=green!12, below=of split] (conj) {\textbf{Conjunto de datos de Graphito}\\42,389 archivos: 40,936 humanos y 1,453 de IA};
-        \node[box, dashed, fill=violet!8, below=of conj] (cn) {\textbf{Conjunto externo \textit{Project CodeNet}}\\Se prepara y se particiona aparte, por problema: 27,463 programas para ajustar el Canal A};
+        \node[box, dashed, fill=violet!8, below=1.0cm of conj] (cn) {\textbf{Conjunto externo \textit{Project CodeNet}}\\Se prepara y se particiona aparte, por problema: 27,463 programas para ajustar el Canal A};
 
         \draw[arrow] (ieee.south) -- (enun.north);
         \draw[arrow] (enun.south) -- (gen.north);
         \draw[arrow] (gen.south) -- (limp.north);
         \draw[arrow] (limp.south) -- (split.north);
         \draw[arrow] (split.south) -- (conj.north);
-        \draw[arrow, dashed] (conj.south) -- (cn.north);
     \end{tikzpicture}
     \caption{Flujo general de adquisición y preparación de los datos de Graphito, desde el código real de estudiantes hasta el conjunto particionado. El conjunto externo de CodeNet (abajo) sigue su propio recorrido, descrito en las Secciones~\ref{subsec:origen_codenet} y~\ref{subsec:seleccion_codenet}.}
     \label{fig:pipeline_adquisicion}
@@ -597,7 +596,7 @@ El Canal A busca qué hace el programa, no cómo está escrito. Los pasos son:
     \item \textbf{Subtokens y ventanas.} El código se divide en subtokens, es decir, trozos de palabra. Si no cabe en una sola entrada, se corta en ventanas de 382 subtokens que se traslapan a la mitad, hasta 16 ventanas. Cada ventana conserva los nodos del grafo que quedan dentro de ella.
 \end{enumerate}
 
-En la versión original (v2) los identificadores no se renombraban (no se sustituían por nombres genéricos). Por eso el Canal A era sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}. El renombrado canónico de la versión desplegada elimina esa sensibilidad (ROC-AUC de 0.856 a 0.902; Sección~\ref{subsec:robustez_canal_a}).\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+En la versión original (v2) los identificadores no se renombraban (no se sustituían por nombres genéricos). Por eso el Canal A era sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}. El renombrado canónico (versión \texttt{v2\_norm}, que también usa el modelo ajustado con CodeNet) elimina esa sensibilidad (ROC-AUC de 0.856 a 0.902; Sección~\ref{subsec:robustez_canal_a}).\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
 
 El renombrado no modifica \texttt{main}, las palabras clave ni las funciones y tipos de la biblioteca estándar (como \texttt{printf}, \texttt{scanf} o \texttt{std::vector}), y tampoco el código dentro de nodos con error de sintaxis. Se aplica solo al Canal A: CharCNN conserva los nombres tal como están, y Jaccard no lo necesita porque ya abstrae los identificadores en su propia tokenización (Sección~\ref{subsec:linea_base_lexica}). En el motor desplegado se aplica antes de cada embedding, tanto a las referencias como a las entregas.\footnote{Implementado en \texttt{models/logic\_eval/canonical.py}.} Si el renombrado falla, se usa el código original y el reporte registra \texttt{gcb\_estado = OK\_SIN\_NORM}.
 
@@ -608,12 +607,12 @@ El renombrado no modifica \texttt{main}, las palabras clave ni las funciones y t
 Los programas de CodeNet reciben la misma preparación del Canal A que el código de los estudiantes (Sección~\ref{subsec:prep_semantica}), incluido el renombrado canónico de identificadores. Así, el modelo se ajusta con exactamente la misma entrada que verá cuando el sistema esté en uso.
 
 \subsubsection{Selección y Limpieza}
-De los 1,000 problemas del subconjunto depurado de C++ se tomaron, por problema, hasta 20 soluciones correctas y 10 incorrectas, elegidas al azar con semilla fija. Ese tope evita que unos pocos problemas con miles de envíos dominen el aprendizaje y permite entrenar en una sola tarjeta gráfica de 8 GB. Después se aplicaron tres filtros:
+De los 1,000 problemas del subconjunto depurado de C++ se quiso conservar, por problema, un máximo de 20 soluciones correctas y 10 incorrectas. Para ello se fueron revisando soluciones elegidas al azar con semilla fija (hasta 150 correctas por problema) y se guardaron las primeras que pasaban los tres filtros que siguen. Ese tope evita que unos pocos problemas con miles de envíos dominen el aprendizaje y permite entrenar en una sola tarjeta gráfica de 8 GB. Los filtros fueron:
 
 \begin{enumerate}
-    \item \textbf{Que quepa en una ventana.} GraphCodeBERT lee 512 elementos a la vez. Se conservaron solo los programas que caben completos, para que el vector resuma todo el programa y no una parte. Este filtro descartó 25,933 programas, casi todos los que se retiraron.
+    \item \textbf{Que quepa en una ventana.} GraphCodeBERT lee 512 elementos a la vez. Se conservaron solo los programas que caben completos, para que el vector resuma todo el programa y no una parte. Este filtro descartó 25,933 de los programas revisados, casi todos los que se retiraron.
     \item \textbf{Sin casi-copias de una solución correcta.} Una respuesta incorrecta que comparte más del 90\,\% de sus fragmentos con una correcta del mismo problema suele diferir en un solo símbolo (un \texttt{<} en lugar de un \texttt{>}). De ella no se puede aprender nada y solo añade ruido. La comparación usa fragmentos de código superpuestos, como en la detección de documentos casi idénticos \cite{Broder1997Resemblance}. Se retiraron 41.
-    \item \textbf{Sin coincidencias con ESCOM.} Se compararon con los 43,895 archivos de ESCOM; solo uno compartía 80\,\% o más de sus fragmentos con alguno y se retiró, para que la evaluación final no incluya algo que el modelo ya vio. Los duplicados entre entrenamiento y evaluación inflan los resultados \cite{Allamanis2019Adverse,Lee2022Dedup}.
+    \item \textbf{Sin coincidencias con ESCOM.} Se compararon con los 43,895 archivos del corpus de estudiantes con el que se evalúa; solo uno compartía 80\,\% o más de sus fragmentos con alguno y se retiró, para que la evaluación final no incluya algo que el modelo ya vio. Los duplicados entre entrenamiento y evaluación inflan los resultados \cite{Allamanis2019Adverse,Lee2022Dedup}.
 \end{enumerate}
 
 Doce problemas quedaron con menos de dos soluciones correctas y se omitieron. El resultado son 988 problemas y 27,463 programas: 19,235 correctos y 8,228 incorrectos.

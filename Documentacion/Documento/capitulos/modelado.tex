@@ -5,7 +5,7 @@ Con los datos listos (Capítulo~\ref{cap:ingenieria_datos}), la metodología Kom
 
 Graphito usa dos modelos que analizan el código de formas distintas, más una regla simple de comparación como vara de medir (Figura~\ref{fig:panorama_modelos}). El Canal Semántico mide qué tan parecida es una entrega a la solución de referencia en lo que hace el programa. El Canal Estilométrico estima si la forma de escribir se parece más a la de código generado por IA. La línea base léxica compara fragmentos de texto y no usa aprendizaje automático. Ninguna salida es un veredicto: son datos para que el docente decida qué revisar primero.
 
-La pregunta guía del Canal A es: \emph{¿qué tan semántica es la similitud?}, es decir, si el modelo capta qué hace el programa o solo cómo se ve. La evidencia indica que capta bien la estructura general, pero depende de los nombres de las variables y no supera a la línea base léxica. Se reporta tal cual: un resultado negativo bien medido también es un resultado.
+La pregunta guía del Canal A es: \emph{¿qué tan semántica es la similitud?}, es decir, si el modelo capta qué hace el programa o solo cómo se ve. La evidencia indica que capta bien la estructura general, pero en su versión base depende de los nombres de las variables. Dos mejoras sucesivas atacan ese límite: sustituir los nombres por nombres genéricos (\texttt{v2\_norm}) y ajustar el modelo con ejemplos de CodeNet para que aprenda qué significa que dos programas se parezcan. Ninguna de las dos le permite superar a la línea base léxica. Se reporta tal cual: un resultado negativo bien medido también es un resultado.
 
 \begin{figure}[H]
     \centering
@@ -188,8 +188,10 @@ La Figura~\ref{fig:curvas_charcnn} muestra la evolución real. A la izquierda, l
 \end{figure}
 
 % ----------------------------------------------------------------------
-\subsection{Canal A: GraphCodeBERT sin Entrenamiento Adicional}
+\subsection{Canal A: GraphCodeBERT Base (sin Entrenamiento Adicional)}
 \label{subsec:modelado_graphcodebert}
+
+El Canal A pasó por tres versiones, que se usan con estos nombres en el resto del capítulo: \textbf{v2}, el modelo tal como viene, con una entrada fiel al original; \textbf{v2\_norm}, el mismo modelo con los nombres de variables sustituidos por nombres genéricos antes de calcular el vector; y el \textbf{modelo ajustado}, que es \texttt{v2\_norm} con un entrenamiento adicional hecho con CodeNet (Sección~\ref{subsec:ajuste_contrastivo}). Esta subsección describe la versión base; las otras dos se explican más adelante, con su motivo y sus resultados.
 
 \subsubsection{Idea General}
 GraphCodeBERT \cite{Guo2021GraphCodeBERT} es un modelo preentrenado con millones de programas. Es como un lector que ya revisó muchísimo código antes de llegar a Graphito. Su resultado para un fragmento de código es un \textbf{vector}: una lista de 768 números que resume qué hace el código. Dos códigos que hacen cosas parecidas deberían producir vectores que apunten en direcciones parecidas.
@@ -237,7 +239,7 @@ La Figura~\ref{fig:flujo_graphcodebert} muestra el recorrido. Se eliminan los co
         \node[st] (n1) at (-4.8,0) {\textbf{1. Archivo}\\C o C++, sin comentarios};
         \node[st] (n2) at (0,0) {\textbf{2. Subtokens y DFG}\\El DFG indica ``quién le pasa valor a quién''};
         \node[st] (n3) at (4.8,0) {\textbf{3. Ventanas}\\382 subtokens, paso de 191, hasta 16};
-        \node[mdl] (n4) at (4.8,-2.7) {\textbf{4. GraphCodeBERT}\\Sin reentrenar; un vector por ventana};
+        \node[mdl] (n4) at (4.8,-2.7) {\textbf{4. GraphCodeBERT}\\Versión base, sin reentrenar; un vector por ventana};
         \node[mdl] (n5) at (0,-2.7) {\textbf{5. Promedio}\\Un vector para todo el archivo};
         \node[outb] (n6) at (-4.8,-2.7) {\textbf{6. Coseno}\\Contra el vector de la solución de referencia: similitud};
         \draw[arrow] (n1.east) -- (n2.west);
@@ -250,7 +252,7 @@ La Figura~\ref{fig:flujo_graphcodebert} muestra el recorrido. Se eliminan los co
     \label{fig:flujo_graphcodebert}
 \end{figure}
 
-La Tabla~\ref{tab:config_graphcodebert} reúne la configuración. Como el modelo no se entrena, los valores son solo de entrada y de resumen.
+La Tabla~\ref{tab:config_graphcodebert} reúne la configuración. Como en esta versión el modelo no se entrena, los valores son solo de entrada y de resumen.
 
 {\small
 \renewcommand{\arraystretch}{1.2}
@@ -264,7 +266,7 @@ La Tabla~\ref{tab:config_graphcodebert} reúne la configuración. Como el modelo
     \endhead
     \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Modelo}} \\ \hline
     Modelo base & \texttt{graphcodebert-base} & Modelo preentrenado de Microsoft \cite{Guo2021GraphCodeBERT}. \\ \hline
-    Reentrenamiento & Ninguno (\textit{zero-shot}) & Se usa tal como viene. \\ \hline
+    Reentrenamiento & Ninguno en esta versión (\textit{zero-shot}) & Se usa tal como viene; el ajuste posterior se describe en la Sección~\ref{subsec:ajuste_contrastivo}. \\ \hline
     \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Entrada}} \\ \hline
     Código por ventana & 382 subtokens (384 posiciones) & Dos posiciones son marcadores de inicio y fin. \\ \hline
     Nodos del grafo & 128 & Completan las 512 posiciones que admite el modelo. \\ \hline
@@ -292,7 +294,7 @@ El código original de Microsoft construye el grafo de flujo de datos solo para 
         \node[code] (c) at (0,0) {int a = 5;\\int b = a + 2;\\return b;};
         \node[val] (v5) at (4.6,0) {5};
         \node[var, right=1.0cm of v5] (va) {a};
-        \node[var, right=1.0cm of va] (vb) {b}; Se probó también \textit{winnowing} \cite{Schleimer2003Winnowing}, una variante que compara una muestra de los fragmentos; se comporta casi igual que Jaccard, por lo que el capítulo solo muestra Jaccard.
+        \node[var, right=1.0cm of va] (vb) {b};
         \node[res, right=1.0cm of vb] (vr) {return};
         \draw[arrow] (v5) -- (va);
         \draw[arrow] (va) -- (vb);
@@ -303,7 +305,7 @@ El código original de Microsoft construye el grafo de flujo de datos solo para 
     \label{fig:dfg_ejemplo}
 \end{figure}
 
-La Tabla~\ref{tab:ajustes_c_cpp} resume los ajustes que C y C++ requirieron.
+Se probó también \textit{winnowing} \cite{Schleimer2003Winnowing}, una variante que compara una muestra de los fragmentos; se comporta casi igual que Jaccard, por lo que el capítulo toma Jaccard como método de texto. La Tabla~\ref{tab:ajustes_c_cpp} resume los ajustes que C y C++ requirieron.
 
 \begin{table}[H]
     \centering
@@ -343,7 +345,7 @@ Los apuntadores tienen un límite. El grafo sigue las variables por su nombre, i
 Conviene precisar qué se adaptó: la \emph{entrada} (el grafo), no el modelo. GraphCodeBERT nunca vio C ni C++ durante su preentrenamiento (Sección~\ref{subsec:limitaciones}).
 
 \subsubsection{Por Qué no se Entrena (\textit{Zero-Shot})}
-\textit{Zero-shot} significa usar un modelo tal como viene. Se evaluó la alternativa, un adaptador \textbf{LoRA} \cite{Hu2022LoRA} que reentrena solo una parte pequeña del modelo, pero no mejoró el resultado, así que no se usa. Lo que sí se cuidó fue la entrada: la versión actual (``v2'') reconstruye el grafo y la entrada de forma fiel al original, y su resultado en pares de plagio se reporta en la Sección~\ref{subsec:pares_plagio}. Sobre esa versión se añadió un renombrado canónico de los identificadores del usuario antes de calcular el vector (\texttt{v2\_norm}); el modelo sigue sin reentrenarse y su efecto se mide en la Sección~\ref{subsec:robustez_canal_a}. Más adelante se probó otro ajuste, con un objetivo distinto y datos externos (Sección~\ref{subsec:ajuste_contrastivo}).
+\textit{Zero-shot} significa usar un modelo tal como viene. Se evaluó la alternativa, un adaptador \textbf{LoRA} \cite{Hu2022LoRA} que reentrena solo una parte pequeña del modelo, con el objetivo original de completar palabras. No mejoró el resultado y ese primer intento se descartó; más adelante se retoma la idea con otro objetivo. Lo que sí se cuidó fue la entrada: la versión base (``v2'') reconstruye el grafo y la entrada de forma fiel al original, y su resultado en pares de plagio se reporta en la Sección~\ref{subsec:pares_plagio}. Sobre esa versión se añadió un renombrado canónico de los identificadores del usuario antes de calcular el vector (\texttt{v2\_norm}); el modelo sigue sin reentrenarse y su efecto se mide en la Sección~\ref{subsec:robustez_canal_a}. Más adelante se probó otro ajuste, con un objetivo distinto y datos externos (Sección~\ref{subsec:ajuste_contrastivo}).
 
 % ----------------------------------------------------------------------
 \subsection{Canal A: Ajuste Contrastivo con CodeNet}
@@ -594,7 +596,7 @@ Para saber si el detector reconoce a un generador que no vio al entrenar, se ent
 
 GraphCodeBERT entiende la estructura del código y no se deja engañar si cambian los bucles o el orden, pero pierde precisión cuando se cambian los nombres de las variables, problema que se corrige renombrando los identificadores de forma canónica antes de pasar por el modelo. Aun así, en este conjunto, una comparación directa de texto (Jaccard) resulta más efectiva.
 
-Para saber si el Canal A realmente comprende la lógica de los programas, se puso a prueba en cuatro escenarios contra una regla sencilla (Jaccard), la cual solo cuenta qué porcentaje de fragmentos de texto comparten dos archivos. Se usó GraphCodeBERT de fábrica (\textit{zero-shot}, sin reentrenamiento).
+Para saber si el Canal A realmente comprende la lógica de los programas, se puso a prueba en cuatro escenarios contra una regla sencilla (Jaccard), la cual solo cuenta qué porcentaje de fragmentos de texto comparten dos archivos. Se usó GraphCodeBERT de fábrica (\textit{zero-shot}, sin reentrenamiento) y, en sus versiones posteriores, con renombrado canónico (\texttt{v2\_norm}). Las figuras de esta sección y de las siguientes muestran ya los tres métodos finales (Jaccard, \texttt{v2\_norm} y el modelo ajustado con CodeNet, Sección~\ref{subsec:ajuste_contrastivo}); sus tablas conservan además la versión base v2, y la Sección~\ref{subsec:resultados_ajuste} reúne la comparación completa.
 
 \subsubsection{Detección de pares de plagio}
 \label{subsec:pares_plagio}
@@ -758,7 +760,7 @@ Se evaluó el modelo ajustado (configuración B, semilla 1, fijada antes de ver 
     \end{tabularx}
 \end{table}
 
-El ajuste mejora el agrupamiento (de 0.379 a 0.431) y resiste mejor dos trucos: el código muerto (de 0.794 a 0.866) y los trucos combinados (de 0.708 a 0.830). En cambio, no se puede afirmar que mejore la relación con que el código funcione: la ganancia es de 0.031 y su intervalo incluye el cero, lo que significa que podría deberse al azar. Con solo 14 tareas la prueba es poco sensible, y las otras tres corridas dieron resultados parecidos (MAP@R entre 0.431 y 0.439; ROC-AUC entre 0.598 y 0.613). Jaccard sigue siendo mejor en el agrupamiento y en la resistencia a los trucos; en la prueba de si el código funciona, ambos quedan dentro de sus márgenes de error. Por eso el modelo ajustado se mantiene como una señal secundaria.
+El ajuste mejora el agrupamiento (de 0.379 a 0.431) y resiste mejor dos trucos: el código muerto (de 0.794 a 0.866) y los trucos combinados (de 0.708 a 0.830). En cambio, no se puede afirmar que mejore la relación con que el código funcione: la ganancia es de 0.031 y su intervalo incluye el cero, lo que significa que podría deberse al azar. Con solo 14 tareas la prueba es poco sensible, y las otras tres corridas dieron resultados parecidos (MAP@R entre 0.431 y 0.439; ROC-AUC entre 0.598 y 0.613). Algunas de ellas superan en esta última medida a la corrida elegida (0.586); no se sustituyó la elección porque se fijó antes de evaluar, con la validación de CodeNet (Sección~\ref{subsec:ajuste_contrastivo}), para no escoger el resultado más favorable a posteriori. Jaccard sigue siendo mejor en el agrupamiento y en la resistencia a los trucos; en la prueba de si el código funciona, ambos quedan dentro de sus márgenes de error. Por eso el modelo ajustado se mantiene como una señal secundaria.
 
 La Figura~\ref{fig:robustez_comparacion_lineas} muestra la resistencia de los tres métodos en cada truco. Jaccard se mantiene casi plano; el modelo sin ajuste cae con el código muerto y con los trucos combinados; el ajustado cae menos, aunque sus intervalos de confianza se solapan con los del modelo sin ajuste.
 
@@ -788,7 +790,7 @@ Asimismo, toda evaluación honesta debe señalar las fronteras de sus datos. Los
     \item \textbf{Contexto de los datos:} Los programas base provienen de cursos de la Universidad de Sarajevo (2016--2017) y se compararon contra entregas aprobadas de alumnos, no contra soluciones oficiales del profesor. Validar el sistema con entregas reales de la ESCOM es el paso natural siguiente.
 \end{enumerate}
 
-Superar estas barreras abre rutas claras para el trabajo futuro que se detalla en el Capítulo~\ref{cap:conclusiones}: desde entrenar a GraphCodeBERT específicamente para separar copias (\textit{entrenamiento contrastivo}, cuya implementación está avanzada dentro del proyecto), utilizar un LLM clasificador de frontera como Jev para complementar las métricas, hasta incorporar mapas de calor palabra por palabra (\textit{saliencia}) y un modelo de lenguaje que explique los hallazgos en lenguaje natural.
+Superar estas barreras abre rutas claras para el trabajo futuro que se detalla en el Capítulo~\ref{cap:conclusiones}: desde repetir el ajuste de GraphCodeBERT con programas escolares o de más lenguajes (el hecho con CodeNet, Sección~\ref{subsec:ajuste_contrastivo}, usó problemas de concursos en C++), utilizar un LLM clasificador de frontera como Jev para complementar las métricas, hasta incorporar mapas de calor palabra por palabra (\textit{saliencia}) y un modelo de lenguaje que explique los hallazgos en lenguaje natural.
 
 % ----------------------------------------------------------------------
 \subsection{Discusión y Resumen}
@@ -810,7 +812,7 @@ Los experimentos demuestran que ambos canales se complementan porque ven cosas d
         ¿Qué pasa si disfrazan la copia cambiando el código? & Resiste cambios de bucles y orden, y con renombrado canónico tampoco le afecta renombrar las variables (0.90 en ambos casos); el código muerto (0.79) y todos los trucos combinados (0.71) sí bajan su precisión. & Si un alumno cambia la estructura o renombra variables, el Canal A lo detectará sin problema; ante código muerto o trucos combinados, el indicador de texto sigue siendo el más robusto. \\ \hline
         ¿Reconoce qué tarea resuelve cada entrega? & Acierta el ejercicio en el 83\,\% de los casos (40 veces mejor que el azar). & Agrupa bien las entregas por lógica para revisar soluciones parecidas en bloque. \\ \hline
         ¿Sirve la similitud para calificar si el código funciona? & Señal muy débil (0.560, casi equivalente al azar). & Ayuda a ordenar qué revisar primero, pero no sustituye las pruebas unitarias. \\ \hline
-        ¿Mejora entrenar el Canal A con CodeNet? & Agrupa mejor (de 0.379 a 0.431) y resiste mejor el código muerto y los trucos combinados (de 0.71 a 0.83); la relación con que el código funcione sube de 0.555 a 0.586, sin poder afirmarse. & El modelo ajustado es igual o mejor en todo lo medido, pero el indicador de texto sigue siendo el más fiable; sirve como respaldo estructural. \\ \hline
+        ¿Mejora entrenar el Canal A con CodeNet? & Agrupa mejor (de 0.379 a 0.431) y resiste mejor el código muerto y los trucos combinados (de 0.71 a 0.83); la relación con que el código funcione sube de 0.555 a 0.586, sin poder afirmarse. & El modelo ajustado agrupa mejor y resiste mejor el código muerto y los trucos combinados; en lo demás no se distingue con claridad del modelo sin ajuste (en dos trucos individuales queda ligeramente por debajo). El indicador de texto sigue siendo el más fiable; el modelo ajustado sirve como respaldo estructural. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -819,6 +821,6 @@ Los experimentos demuestran que ambos canales se complementan porque ven cosas d
 \label{sec:conclusion_modelado}
 % ======================================================================
 
-Este capítulo presentó la arquitectura y la validación empírica de los modelos que dan vida a Graphito. Los resultados muestran un contraste claro y valioso: mientras que el Canal B (CharCNN) logra una precisión sobresaliente para identificar el estilo de generación de IA con un mínimo de falsas alarmas, el Canal A (GraphCodeBERT) demuestra que un modelo complejo sin ajuste específico puede capturar la estructura lógica del código, pero sigue siendo superado por métodos clásicos de comparación de texto en C y C++: el renombrado canónico de identificadores resolvió la debilidad ante el cambio de nombres de variables, pero el código muerto y la combinación de trucos siguen degradando al Canal A, y la comparación de texto continúa siendo la señal más robusta, por lo que GraphCodeBERT sigue sin decidir. Un ajuste posterior con datos de CodeNet mejoró el agrupamiento y la resistencia al código muerto, pero no demostró una mejora en la relación con la corrección del código. Reportar con transparencia tanto estos aciertos como sus límites técnicos garantiza que la herramienta se utilice con el rigor que merece.
+Este capítulo presentó la arquitectura y la validación empírica de los modelos que dan vida a Graphito. Los resultados muestran un contraste claro y valioso: mientras que el Canal B (CharCNN) logra una precisión sobresaliente para identificar el estilo de generación de IA con un mínimo de falsas alarmas, el Canal A (GraphCodeBERT) demuestra que un modelo complejo sin ajuste específico puede capturar la estructura lógica del código, pero sigue siendo superado por métodos clásicos de comparación de texto en C y C++. El renombrado canónico de identificadores resolvió la debilidad ante el cambio de nombres de variables, pero el código muerto y la combinación de trucos siguen degradando al Canal A. Un ajuste posterior con datos de CodeNet (sus datos y su preparación están en el Capítulo~\ref{cap:ingenieria_datos}) mejoró el agrupamiento y la resistencia al código muerto, pero no demostró una mejora en la relación con la corrección del código. Por eso la comparación de texto continúa siendo la señal más robusta y GraphCodeBERT, con o sin ajuste, sigue sin decidir. Reportar con transparencia tanto estos aciertos como sus límites técnicos garantiza que la herramienta se utilice con el rigor que merece.
 
 En el Capítulo~\ref{cap:despliegue} se muestra cómo estos modelos se integran dentro de una plataforma web ágil, presentando sus indicadores de forma clara para acompañar el criterio del profesor.
