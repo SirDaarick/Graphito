@@ -70,11 +70,11 @@ El paquete no sobrescribe versiones anteriores. La Tabla~\ref{tab:desplegado} re
         \textbf{Componente} & \textbf{Umbral de alerta} & \textbf{Papel} \\ \hline
         Similitud léxica (Jaccard, Canal A) & \texttt{fpr\_0.05}: en validación, 4.6~\% de falsas alertas y 84.5~\% de casos detectados & \textbf{Decide} la alerta de similitud \\ \hline
         CharCNN v2 (Canal B) & \texttt{fpr\_0.01}: 0.1715; en validación, 0.98~\% de falsas alertas y 97.1~\% de casos detectados & \textbf{Decide} el indicador de estilo \\ \hline
-        GraphCodeBERT (Canal A) & No tiene & Se calcula y se muestra como \emph{exploratorio}; \textbf{no decide} \\ \hline
+        GraphCodeBERT ajustado (Canal A) & No tiene & Se calcula y se muestra como \emph{exploratorio}; \textbf{no decide} \\ \hline
     \end{tabularx}
 \end{table}
 
-GraphCodeBERT no viaja en el paquete: se usa tal como viene preentrenado, y el paquete solo registra su versión exacta para poder reproducir el cálculo. El embedding desplegado aplica antes un renombrado canónico de los identificadores (\texttt{v2\_norm}) y la colección de Chroma está versionada: cuando cambia ese procesamiento, las referencias se reindexan.
+El paquete incluye el adaptador entrenado de GraphCodeBERT (ajuste contrastivo con CodeNet, Capítulo~\ref{cap:modelado}), con su huella digital registrada en el manifiesto; el modelo base se toma preentrenado y, al arrancar, se le fusiona el adaptador. Si la huella no coincide, el sistema no analiza y avisa en lugar de recurrir a otro modelo. El embedding desplegado aplica antes un renombrado canónico de los identificadores, y la colección de Chroma está versionada con la identidad del adaptador: cuando cambia ese procesamiento o el adaptador, las referencias se reindexan. Un ajuste de configuración permite volver al modelo sin ajuste si fuera necesario.
 
 % ----------------------------------------------------------------------
 \subsection{Cómo Decide la Plataforma}

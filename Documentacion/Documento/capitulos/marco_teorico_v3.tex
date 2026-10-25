@@ -551,6 +551,15 @@ GraphCodeBERT ha demostrado un alto desempeño en tareas como detección de clon
 
 En conjunto, los modelos basados en grafos permiten capturar el comportamiento funcional del código, siendo especialmente efectivos para detectar similitudes semánticas profundas. Sin embargo, al centrarse en la lógica del programa, tienden a ignorar características superficiales del código, como el estilo o la forma en que está escrito, lo que limita su utilidad en tareas donde estos aspectos son relevantes.
 
+\subsection{Adaptación de modelos preentrenados y aprendizaje contrastivo}
+\label{sec:aprendizaje_contrastivo}
+
+Un modelo preentrenado como GraphCodeBERT aprendió a leer código con una tarea general, no con el propósito específico de decidir cuándo dos programas se parecen. Para acercarlo a una tarea concreta se le puede dar un entrenamiento adicional con ejemplos de esa tarea, práctica conocida como ajuste fino (\textit{fine-tuning}). Reentrenar todos sus parámetros es costoso, por lo que existen técnicas que ajustan solo una parte pequeña \cite{Ding2023PEFT}. Una de las más usadas es LoRA, que congela el modelo original y entrena unas matrices pequeñas añadidas a algunas de sus capas, con lo que se ajusta una fracción mínima de los parámetros \cite{Hu2022LoRA}.
+
+Para enseñar a un modelo a comparar se usa el \textbf{aprendizaje contrastivo}: se le muestran ejemplos que deben quedar cerca (por ejemplo, dos soluciones correctas del mismo problema) y ejemplos que deben quedar lejos (una solución de otro problema o una incorrecta), de modo que aprenda a acercar los primeros y alejar los segundos. Es como enseñar a un catador mostrándole una muestra de referencia, otra del mismo vino y una distinta. Los ejemplos se organizan en tripletas (ancla, positivo y negativo) \cite{Schroff2015FaceNet} y una función de pérdida mide si el modelo reconoce cuál de las opciones es la correcta; una de las más utilizadas es InfoNCE \cite{Oord2018InfoNCE}. El enfoque se ha aplicado a representaciones de código: ContraCode aprende a reconocer que dos versiones transformadas de un mismo programa son equivalentes \cite{Jain2021ContraCode}, y UniXcoder incorpora una tarea contrastiva en su preentrenamiento \cite{Guo2022UniXcoder}.
+
+Estos métodos necesitan muchos problemas, varias soluciones por problema y una etiqueta confiable de si cada solución es correcta. Conjuntos públicos como Project CodeNet reúnen esos elementos: millones de envíos a concursos de programación, cada uno con el veredicto de un juez automático \cite{Puri2021CodeNet}. Con ellos es posible ajustar un modelo para que compare programas, como se hace en el Canal A de Graphito (Capítulo~\ref{cap:modelado}).
+
 \subsection{Comparación de modelos}
 
 La evolución de las arquitecturas para el análisis de código refleja un incremento progresivo en la capacidad de abstracción semántica. A continuación, se presenta una síntesis comparativa de los modelos analizados, categorizados por su tipo de representación, destacando sus fortalezas y las limitaciones técnicas que definen su alcance.
@@ -912,8 +921,11 @@ A partir de estos cuatro estados, se calculan indicadores de desempeño que perm
 
 
 
-Finalmente, el análisis se complementa con la curva ROC y el valor AUC (\textit{Area Under the Curve}). La curva ROC permite visualizar el equilibrio entre la tasa de verdaderos positivos y falsos positivos a través de distintos umbrales, mientras que el AUC proporciona una medida agregada de la capacidad del modelo para distinguir entre clases, donde un valor de 1.0 representa un clasificador perfecto.
+Finalmente, el análisis se complementa con la curva ROC y el valor AUC (\textit{Area Under the Curve}). La curva ROC permite visualizar el equilibrio entre la tasa de verdaderos positivos y falsos positivos a través de distintos umbrales, mientras que el AUC proporciona una medida agregada de la capacidad del modelo para distinguir entre clases, donde un valor de 1.0 representa un clasificador perfecto \cite{Hanley1982ROC}. Cuando las clases están muy desbalanceadas, conviene elegir la métrica según el uso previsto del modelo y no solo por la proporción de clases \cite{McDermott2024AUROC}.
 
+\subsection{Métricas de ordenamiento y recuperación}
+
+Cuando un sistema no clasifica sino que \emph{ordena} resultados por similitud, como hace Graphito al presentar al docente las entregas más parecidas, se emplean métricas distintas. \textbf{Recall@1} indica en qué proporción de los casos el resultado más parecido pertenece al grupo correcto, por ejemplo, la misma tarea. \textbf{MAP@R} promedia qué tan arriba quedan, en la lista ordenada, todos los elementos que sí pertenecen al grupo; su valor máximo es 1.0 y se ha propuesto como medida más informativa que otras en la evaluación de representaciones aprendidas por comparación \cite{Musgrave2020Reality}. Finalmente, para saber cuánto puede variar un resultado según la muestra, se reportan intervalos de confianza calculados con la técnica \textit{bootstrap}, que repite la medición muchas veces con muestras al azar de los mismos datos \cite{Efron1993Bootstrap}.
 
 \section{Integración y fusión de características (\textit{Feature Fusion})}
 

@@ -72,7 +72,8 @@ La selección de \textbf{GraphCodeBERT} \cite{Guo2021GraphCodeBERT} como motor d
 
 \begin{itemize}
 	\item \textbf{Integración Estructural:} A diferencia de otros modelos que tratan el código como una simple secuencia de texto, GraphCodeBERT integra información estructural mediante el uso de grafos de flujo de datos (DFG). Esto permite que el mecanismo de atención se centre en las conexiones que tienen sentido semántico real.
-	\item \textbf{Resistencia a la Ofuscación:} Debido a que el modelo captura la relación entre variables, es altamente efectivo detectando similitudes incluso cuando el código ha sido alterado mediante cambios de nombres de variables, reordenamiento de sentencias o cambios en las estructuras de control.
+	\item \textbf{Resistencia a la Ofuscación:} Debido a que el modelo captura la relación entre variables, se espera que detecte similitudes incluso cuando el código ha sido alterado mediante reordenamiento de sentencias o cambios en las estructuras de control. Los cambios de nombres de variables, en cambio, lo afectan en su versión original, por lo que la propuesta sustituye los identificadores por nombres genéricos antes de calcular el vector; la evaluación de esta decisión se presenta en el Capítulo~\ref{cap:modelado}.
+	\item \textbf{Ajuste al propósito de comparar:} Un modelo preentrenado sabe leer código, pero no fue entrenado para decidir cuándo dos programas son parecidos, por lo que tiende a asignar similitudes muy altas a casi cualquier par. Por ello se contempla un ajuste adicional mediante aprendizaje contrastivo (Sección~\ref{sec:aprendizaje_contrastivo}), que le enseña con ejemplos de soluciones correctas e incorrectas de un mismo problema qué significa que dos programas se parezcan.
 	\item \textbf{Especialización Funcional:} Como se detalla en el marco teórico, este modelo se especializa en el comportamiento lógico del programa. Si bien tiende a ignorar rasgos superficiales como el estilo, esta característica se alinea perfectamente con la arquitectura de doble canal de Graphito, delegando la responsabilidad del análisis de estilo al Canal B (CharCNN).
 \end{itemize}
 
@@ -91,7 +92,7 @@ Un Grafo de Flujo de Datos (DFG) es una representación dirigida que captura las
 
 \subsubsection{Procesamiento en GraphCodeBERT}
 
-Una vez construido el DFG, la secuencia de \textit{tokens} del código y la estructura del grafo se integran en el modelo. La arquitectura utiliza tareas de entrenamiento como la predicción de relaciones entre nodos, lo que favorece el aprendizaje de representaciones mucho más estructuradas y fieles al comportamiento funcional del software.
+Una vez construido el DFG, la secuencia de \textit{tokens} del código y la estructura del grafo se integran en el modelo. La arquitectura utiliza tareas de entrenamiento como la predicción de relaciones entre nodos, lo que favorece el aprendizaje de representaciones mucho más estructuradas y fieles al comportamiento funcional del software. Sobre ese modelo se aplica el ajuste descrito arriba: se entrena solo una parte pequeña de sus parámetros con la técnica LoRA \cite{Hu2022LoRA}, usando programas de Project CodeNet \cite{Puri2021CodeNet}, un conjunto público de soluciones con veredicto verificado por un juez automático.
 
 \subsubsection{Embedding Lógico}
 

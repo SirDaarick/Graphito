@@ -106,6 +106,8 @@ Una evolución de este enfoque es GraphCodeBERT, que incorpora información estr
 
 Además de CodeBERT y GraphCodeBERT, investigaciones recientes han propuesto otros modelos basados en arquitecturas Transformer diseñados específicamente para el análisis de código fuente. Uno de estos modelos es UniXcoder, desarrollado por investigadores de Microsoft, el cual busca aprender representaciones unificadas del código mediante diferentes tareas de preentrenamiento. Este modelo combina información sintáctica y semántica del programa para generar representaciones que pueden utilizarse en tareas como búsqueda de código, generación automática de documentación y análisis de similitud entre programas. Estudios recientes han demostrado que este tipo de modelos puede capturar patrones complejos en el código y mejorar la capacidad de los sistemas para identificar relaciones semánticas entre programas escritos de manera diferente \cite{Guo2022UniXcoder}.
 
+Estos modelos, tal como se publican, no están entrenados específicamente para decidir cuándo dos programas se parecen. Para ello se han propuesto enfoques de aprendizaje contrastivo, que entrenan al modelo con ejemplos de programas equivalentes y no equivalentes \cite{Jain2021ContraCode}, y se cuenta con conjuntos públicos como Project CodeNet, que reúne millones de soluciones a problemas de programación con el veredicto de un juez automático \cite{Puri2021CodeNet}. Queda por comprobar si ese tipo de ajuste beneficia a programas de cursos introductorios, que son más largos y menos regulares que los de los concursos, y si resiste los trucos con los que se disfraza una copia en el plagio académico.
+
 \paragraph{Características de los modelos basados en Transformers}
 \begin{itemize}
     \item Capturan relaciones semánticas dentro del código mediante mecanismos de atención
@@ -153,6 +155,7 @@ En general, la literatura muestra que los sistemas existentes para la detección
     \item Los enfoques estructurales no capturan completamente la semántica del código
     \item Los modelos de aprendizaje profundo requieren grandes volúmenes de datos
     \item Existe dificultad para interpretar los resultados de modelos complejos
+    \item Los modelos preentrenados no están entrenados para comparar programas, y el ajuste contrastivo con datos de concursos no se ha comprobado en tareas escolares
 \end{itemize}
 
 En síntesis, la investigación en detección de similitud de código ha evolucionado desde enfoques basados en comparación textual hacia métodos más avanzados que incorporan representaciones estructurales y semánticas del programa. Mientras que herramientas tradicionales como MOSS y JPlag se enfocan principalmente en coincidencias sintácticas, los modelos modernos basados en aprendizaje profundo y arquitecturas Transformer permiten capturar relaciones semánticas más complejas dentro del código. No obstante, el desarrollo reciente de herramientas de generación automática de código plantea nuevos retos para la evaluación académica, lo que sugiere la necesidad de desarrollar sistemas híbridos que integren múltiples técnicas de análisis para mejorar la detección de similitud y la identificación de código generado mediante inteligencia artificial.
