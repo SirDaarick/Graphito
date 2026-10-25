@@ -424,6 +424,7 @@ def plot_cluster_showcase(
     seeds: Sequence[int] = (42, 7, 123),
     dpi: int = 300,
     passing: Optional[Sequence[bool]] = None,
+    fixed_selection: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Plot showcase t-SNE clusters selected by objective inter-task criteria.
 
@@ -439,6 +440,11 @@ def plot_cluster_showcase(
     ``passing`` optionally flags, per row, whether the solution passes its tests; the
     reference star of each task is the first sampled passing solution (fallback: the
     first sampled one, recorded in the metadata).
+
+    ``fixed_selection`` (``panel_a_tasks``, ``panel_b_tasks``, ``external_index``) skips the
+    objective selection and draws exactly those tasks and that external point, so a figure
+    in another embedding space stays comparable with an earlier one; the similarity values
+    stored in the metadata are then measured in the current space.
     """
     from matplotlib.lines import Line2D
 
@@ -470,6 +476,9 @@ def plot_cluster_showcase(
         return {}
 
     most_similar_pair, max_sim = max(task_cross_sim.items(), key=lambda x: x[1])
+    if fixed_selection is not None:
+        most_similar_pair = tuple(fixed_selection["panel_b_tasks"])
+        max_sim = task_cross_sim[tuple(sorted(most_similar_pair))]
 
     eligible_tasks = [t for t in unique_tasks if len(task_indices[t]) >= 20]
     if len(eligible_tasks) < 3:
@@ -491,10 +500,28 @@ def plot_cluster_showcase(
     if best_triplet is None:
         best_triplet = tuple(eligible_tasks[:3])
 
+    if fixed_selection is not None:
+        best_triplet = tuple(fixed_selection["panel_a_tasks"])
+        a, b, c = best_triplet
+        min_triplet_sim = float(np.mean([
+            task_cross_sim[tuple(sorted(p))] for p in ((a, b), (a, c), (b, c))
+        ]))
+
     panel_a_tasks = list(best_triplet)
     panel_b_tasks = list(most_similar_pair)
 
     external = select_external_point(full_sim, labels, panel_a_tasks)
+    if fixed_selection is not None:
+        ext_i = int(fixed_selection["external_index"])
+        ext_task = str(labels_arr[ext_i])
+        panel_idx = np.flatnonzero(np.isin(labels_arr, panel_a_tasks))
+        ext_idx = np.flatnonzero(labels_arr == ext_task)
+        external = {
+            "task": ext_task,
+            "mean_similarity_to_panel": float(np.mean(full_sim[np.ix_(ext_idx, panel_idx)])),
+            "index": ext_i,
+            "point_mean_similarity": float(np.mean(full_sim[ext_i, panel_idx])),
+        }
     external_task = external["task"]
     external_idx = external["index"]
 
@@ -603,6 +630,8 @@ def plot_cluster_showcase(
         "reference_solutions": references,
         "tsne": {"metric": "cosine", "perplexity": 30, "init": "pca", "random_state": primary_seed},
     }
+    if fixed_selection is not None:
+        showcase_info["selection"] = "reused"
     if json_path is not None:
         json_path.parent.mkdir(parents=True, exist_ok=True)
         with open(json_path, "w", encoding="utf-8") as f:

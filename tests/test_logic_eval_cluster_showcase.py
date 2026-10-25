@@ -59,3 +59,30 @@ def test_external_rule_is_deterministic_with_ties():
     assert first == second
     assert first["task"] == "T1"
     assert first["index"] == 4
+
+
+def test_cluster_showcase_reuses_fixed_selection(tmp_path):
+    import matplotlib
+    matplotlib.use("Agg")
+    from models.logic_eval.plots import plot_cluster_showcase
+
+    rng = np.random.default_rng(0)
+    tasks = ["T1", "T2", "T3", "T4", "T5"]
+    centers = rng.normal(size=(len(tasks), 16))
+    labels, vecs = [], []
+    for t, c in zip(tasks, centers):
+        for _ in range(40):
+            labels.append(t)
+            vecs.append(c + 0.3 * rng.normal(size=16) + 3.0)
+    emb = np.asarray(vecs)
+    fixed = {"panel_a_tasks": ["T1", "T2", "T3"], "panel_b_tasks": ["T4", "T5"], "external_index": 170}
+    info = plot_cluster_showcase(
+        emb, labels, tmp_path / "f.png", json_path=tmp_path / "f.json", seeds=(42,), dpi=50,
+        fixed_selection=fixed,
+    )
+    assert info["distinct_triplet"]["tasks"] == ["T1", "T2", "T3"]
+    assert info["similar_pair"]["tasks"] == ["T4", "T5"]
+    assert info["external_point"]["solution_index"] == 170
+    assert info["external_point"]["task"] == "T5"
+    assert info["selection"] == "reused"
+    assert (tmp_path / "f.png").is_file() and (tmp_path / "f.json").is_file()

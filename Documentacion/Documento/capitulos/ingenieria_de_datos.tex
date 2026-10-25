@@ -3,7 +3,7 @@
 
 Un modelo de aprendizaje automático se parece a un estudiante que prepara un examen: aprende de los ejemplos que se le muestran. Si esos ejemplos son pocos, están sesgados o repiten las preguntas del examen, el resultado final puede parecer bueno sin serlo. Por eso, antes de describir los modelos, este capítulo explica de dónde salen los datos de Graphito y cómo se prepararon para que la evaluación sea justa.
 
-Siguiendo la metodología \textbf{Komorebi} para proyectos de Inteligencia Artificial \cite{verges_como_2023}, el capítulo cubre dos fases. La \textbf{Adquisición de Datos} (Sección~\ref{sec:adquisicion_datos}) responde a tres preguntas: qué código se necesitaba, cómo se obtuvo la contraparte generada por inteligencia artificial (IA) sobre los mismos problemas y cuántos ejemplos de IA bastan. La \textbf{Preparación de Datos} (Sección~\ref{sec:preparacion_datos}) explica cómo se limpiaron los archivos, cómo se retiraron los duplicados, cómo se dividió el conjunto sin fuga de información y cómo se adaptó el texto para cada uno de los dos canales de análisis. La Figura~\ref{fig:pipeline_adquisicion} resume el recorrido completo.
+Siguiendo la metodología \textbf{Komorebi} para proyectos de Inteligencia Artificial \cite{verges_como_2023}, el capítulo cubre dos fases. La \textbf{Adquisición de Datos} (Sección~\ref{sec:adquisicion_datos}) responde a tres preguntas: qué código se necesitaba, cómo se obtuvo la contraparte generada por inteligencia artificial (IA) sobre los mismos problemas y cuántos ejemplos de IA bastan. La \textbf{Preparación de Datos} (Sección~\ref{sec:preparacion_datos}) explica cómo se limpiaron los archivos, cómo se retiraron los duplicados, cómo se dividió el conjunto sin fuga de información y cómo se adaptó el texto para cada uno de los dos canales de análisis. La Figura~\ref{fig:pipeline_adquisicion} resume el recorrido completo. Al final, la Sección~\ref{sec:datos_codenet} describe un segundo conjunto, externo (\textit{Project CodeNet}), que se usó para ajustar el Canal A.
 
 \begin{figure}[H]
     \centering
@@ -493,17 +493,19 @@ Graphito analiza cada archivo con dos canales que miran cosas distintas. El Cana
         \node[stepb] (b1) at (3.0,1.1) {Texto normalizado (5 pasos)};
         \node[stepb] (b2) at (5.7,1.1) {Ventanas de 4,096 caracteres};
         \node[stepb] (b3) at (8.4,1.1) {Índices numéricos};
-        \node[stepa] (a1) at (3.0,-1.1) {Sin comentarios};
-        \node[stepa] (a2) at (5.7,-1.1) {Árbol sintáctico (Tree-sitter)};
-        \node[stepa] (a3) at (8.4,-1.1) {Grafo de flujo de datos};
-        \node[stepa] (a4) at (11.1,-1.1) {Ventanas de subtokens};
+        \node[stepa, text width=1.8cm] (a1) at (3.0,-1.1) {Sin comentarios};
+        \node[stepa, text width=1.8cm] (a1b) at (5.5,-1.1) {Renombrado canónico};
+        \node[stepa, text width=1.8cm] (a2) at (8.0,-1.1) {Árbol sintáctico (Tree-sitter)};
+        \node[stepa, text width=1.8cm] (a3) at (10.5,-1.1) {Grafo de flujo de datos};
+        \node[stepa, text width=1.8cm] (a4) at (13.0,-1.1) {Ventanas de subtokens};
         \node[lab] at (2.0,2.1) {Canal B (estilo)};
         \node[lab] at (2.0,-2.1) {Canal A (semántica)};
         \draw[arrow] (f.east) -- (b1.west);
         \draw[arrow] (f.east) -- (a1.west);
         \draw[arrow] (b1.east) -- (b2.west);
         \draw[arrow] (b2.east) -- (b3.west);
-        \draw[arrow] (a1.east) -- (a2.west);
+        \draw[arrow] (a1.east) -- (a1b.west);
+        \draw[arrow] (a1b.east) -- (a2.west);
         \draw[arrow] (a2.east) -- (a3.west);
         \draw[arrow] (a3.east) -- (a4.west);
     \end{tikzpicture}
@@ -521,7 +523,7 @@ Graphito analiza cada archivo con dos canales que miran cosas distintas. El Cana
         \hline
         \textbf{Componente} & \textbf{Canal A (GraphCodeBERT)} & \textbf{Canal B (CharCNN)} \\ \hline
         Comentarios & Eliminados antes de analizar el código. & Eliminados, igual que en el Canal A. \\ \hline
-        Nombres de variables & Se conservan; los nombres se parten en subtokens y también se usan en el grafo de flujo de datos. & Se conservan carácter por carácter. \\ \hline
+        Nombres de variables & Se renombran de forma canónica (\texttt{v1}, \texttt{v2}, \ldots); esos nombres se parten en subtokens y también se usan en el grafo de flujo de datos. & Se conservan carácter por carácter. \\ \hline
         Espacios y sangría & No influyen: el analizador sintáctico lee elementos del programa. & Tabuladores a espacios, espacios repetidos reducidos a uno, sangría y líneas vacías eliminadas; se conservan los saltos de línea. \\ \hline
         Representación final & Subtokens del código más nodos del grafo, hasta 512 posiciones por ventana (384 de código y 128 de grafo). & Índices numéricos de 98 posibles valores (relleno, desconocido y 96 caracteres). \\ \hline
         Archivos largos & Ventanas de 382 subtokens que avanzan de 191 en 191, hasta 16 ventanas. & Ventanas de 4,096 caracteres que avanzan de 2,048 en 2,048, hasta 8 ventanas. \\ \hline
@@ -551,12 +553,15 @@ El Canal A busca qué hace el programa, no cómo está escrito. Los pasos son:
 
 \begin{enumerate}
     \item \textbf{Eliminación de comentarios,} respetando el contenido de las cadenas de texto.
+    \item \textbf{Renombrado canónico.} Los identificadores definidos por el usuario se sustituyen por nombres genéricos: las variables por \texttt{v1}, \texttt{v2}, \ldots, las funciones por \texttt{f1}, \texttt{f2}, \ldots y los tipos propios por \texttt{t1}, \texttt{t2}, \ldots, en orden de primera aparición y de forma determinista. Así, dos programas que solo cambian los nombres producen el mismo texto.
     \item \textbf{Árbol sintáctico.} El analizador Tree-sitter \cite{Brunsfeld2021Treesitter} reconoce la estructura del programa (funciones, ciclos, condiciones). Tolera código incompleto o con errores locales, algo común en trabajos de estudiantes.
     \item \textbf{Grafo de flujo de datos (DFG).} Es un esquema que indica ``qué variable le pasa su valor a cuál''. Se construye una sola vez sobre el archivo completo.
     \item \textbf{Subtokens y ventanas.} El código se divide en subtokens, es decir, trozos de palabra. Si no cabe en una sola entrada, se corta en ventanas de 382 subtokens que se traslapan a la mitad, hasta 16 ventanas. Cada ventana conserva los nodos del grafo que quedan dentro de ella.
 \end{enumerate}
 
-En esta versión los identificadores no se renombran (no se sustituyen por nombres genéricos). Por eso el Canal A es sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}.\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+En la versión original (v2) los identificadores no se renombraban (no se sustituían por nombres genéricos). Por eso el Canal A era sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}. El renombrado canónico de la versión desplegada elimina esa sensibilidad (ROC-AUC de 0.856 a 0.902; Sección~\ref{subsec:robustez_canal_a}).\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+
+El renombrado no modifica \texttt{main}, las palabras clave ni las funciones y tipos de la biblioteca estándar (como \texttt{printf}, \texttt{scanf} o \texttt{std::vector}), y tampoco el código dentro de nodos con error de sintaxis. Se aplica solo al Canal A: CharCNN conserva los nombres tal como están, y Jaccard no lo necesita porque ya abstrae los identificadores en su propia tokenización (Sección~\ref{subsec:linea_base_lexica}). En el motor desplegado se aplica antes de cada embedding, tanto a las referencias como a las entregas.\footnote{Implementado en \texttt{models/logic\_eval/canonical.py}.} Si el renombrado falla, se usa el código original y el reporte registra \texttt{gcb\_estado = OK\_SIN\_NORM}.
 
 % ----------------------------------------------------------------------
 \subsection{Composición Final del Conjunto}
@@ -587,10 +592,77 @@ En el conjunto, solo cerca del 3\,\% de los archivos son de IA. Este desbalance 
 \end{itemize}
 
 % ======================================================================
+\section{Datos Externos para Ajustar el Canal A: Project CodeNet}
+\label{sec:datos_codenet}
+% ======================================================================
+
+Los datos de los estudiantes de Sarajevo permiten medir el Canal A, pero no enseñarle algo más específico: reconocer cuándo dos programas resuelven el \emph{mismo problema} y distinguir una solución correcta de una incorrecta. Para eso hacen falta muchos problemas, varias soluciones de cada uno y un veredicto confiable sobre cuáles funcionan. Esta sección describe el conjunto externo que se usó para ese ajuste (Sección~\ref{subsec:ajuste_contrastivo}); los datos de los estudiantes se reservaron solo para evaluar.
+
+% ----------------------------------------------------------------------
+\subsection{Origen y Justificación}
+\label{subsec:origen_codenet}
+
+Se eligió \textit{Project CodeNet} \cite{Puri2021CodeNet}, publicado por IBM en 2021. Reúne unos 14 millones de envíos a concursos de programación en línea, para más de 4,000 problemas, y cada envío trae el veredicto de un juez automático: \textit{Accepted} si pasó todas las pruebas o \textit{Wrong Answer} si dio una respuesta incorrecta. Se tomó el lenguaje C++, que es el que tiene más envíos, ya cuenta con un subconjunto depurado de casi-copias y es uno de los dos lenguajes de ESCOM. Las razones fueron cuatro:
+
+\begin{itemize}
+    \item \textbf{Veredicto verificado sin etiquetar a mano.} Que un programa sea correcto o incorrecto lo decide un juez que ejecuta pruebas, no una persona.
+    \item \textbf{Muchas soluciones por problema.} Cada problema tiene cientos de soluciones distintas, lo que permite enseñar que programas muy diferentes pueden resolver lo mismo.
+    \item \textbf{Autoría humana anterior a los modelos de lenguaje actuales,} el mismo requisito que se pidió a los datos de estudiantes (Sección~\ref{subsec:requerimientos_dataset}).
+    \item \textbf{Independencia de ESCOM.} Como el ajuste no vio ningún dato de los estudiantes, la evaluación final sigue siendo justa.
+\end{itemize}
+
+Su límite es que son problemas de concursos y no tareas escolares: los programas suelen leer de la entrada estándar y rara vez incluyen menús o estructuras como las de las tareas de ESCOM. Por eso el resultado solo se da por bueno al evaluarlo con datos de ESCOM.
+
+% ----------------------------------------------------------------------
+\subsection{Selección y Limpieza}
+\label{subsec:seleccion_codenet}
+
+De los 1,000 problemas del subconjunto depurado de C++ de CodeNet se tomaron, por problema, hasta 20 soluciones correctas y 10 incorrectas, elegidas al azar con semilla fija. Ese tope evita que unos pocos problemas con miles de envíos dominen el aprendizaje y permite entrenar en una sola tarjeta gráfica de 8 GB. A cada programa se le aplicó la misma preparación del Canal A (Sección~\ref{subsec:prep_semantica}, incluido el renombrado canónico de identificadores) y tres filtros:
+
+\begin{enumerate}
+    \item \textbf{Que quepa en una ventana.} GraphCodeBERT lee 512 elementos a la vez. Se conservaron solo los programas que caben completos, para que el vector resuma todo el programa y no una parte. Este filtro descartó 25,933 programas, casi todos los que se retiraron.
+    \item \textbf{Sin casi-copias de una solución correcta.} Una respuesta incorrecta que comparte más del 90\,\% de sus fragmentos con una correcta del mismo problema suele diferir en un solo símbolo (un \texttt{<} en lugar de un \texttt{>}). De ella no se puede aprender nada y solo añade ruido. La comparación usa fragmentos de código superpuestos, como en la detección de documentos casi idénticos \cite{Broder1997Resemblance}. Se retiraron 41.
+    \item \textbf{Sin coincidencias con ESCOM.} Se compararon con los 43,895 archivos de ESCOM; solo uno compartía 80\,\% o más de sus fragmentos con alguno y se retiró, para que la evaluación final no incluya algo que el modelo ya vio. Los duplicados entre entrenamiento y evaluación inflan los resultados \cite{Allamanis2019Adverse,Lee2022Dedup}.
+\end{enumerate}
+
+Doce problemas quedaron con menos de dos soluciones correctas y se omitieron. El resultado son 988 problemas y 27,463 programas: 19,235 correctos y 8,228 incorrectos.
+
+El primer filtro tiene un costo: los programas que se conservaron son más cortos que los de ESCOM (Figura~\ref{fig:longitud_codenet}). La mediana es de 26 líneas frente a 104. Es una limitación que se tiene presente al interpretar los resultados del Capítulo~\ref{cap:modelado}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figuras/codenet_longitud_comparada.png}
+    \caption{Líneas no vacías por programa en los datos de CodeNet conservados y en la muestra de ESCOM usada para evaluar. Las líneas punteadas marcan la mediana de cada conjunto.}
+    \label{fig:longitud_codenet}
+\end{figure}
+
+% ----------------------------------------------------------------------
+\subsection{Partición}
+\label{subsec:particion_codenet}
+
+La partición sigue la misma idea que en los datos de ESCOM (Sección~\ref{subsec:particion_datos}): se hace por problema y no por programa. Las soluciones de un mismo problema se parecen entre sí; si unas quedaran en entrenamiento y otras en validación, el modelo parecería acertar solo porque reconoce el problema, una fuga de información \cite{Kapoor2023Leakage}. Los 988 problemas se repartieron al azar, con semilla fija, en 80\,\% para entrenamiento, 10\,\% para validación y 10\,\% para prueba, proporciones habituales que dejan 99 problemas para validar (Tabla~\ref{tab:particion_codenet}).
+
+\begin{table}[H]
+    \centering
+    \caption{Composición de los datos de CodeNet, particionados por problema.}
+    \label{tab:particion_codenet}
+    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
+        \hline
+        \textbf{Subconjunto} & \textbf{Problemas} & \textbf{Correctos} & \textbf{Incorrectos} & \textbf{Uso en el Proyecto} \\ \hline
+        Entrenamiento & 790 & 15,412 & 6,588 & Ajuste de los pesos del modelo. \\ \hline
+        Validación & 99 & 1,920 & 846 & Elegir qué copia del modelo conservar. \\ \hline
+        Prueba & 99 & 1,903 & 794 & Reservada; no se utilizó. \\ \hline
+        \textbf{Total} & \textbf{988} & \textbf{19,235} & \textbf{8,228} & \textbf{27,463 programas.} \\ \hline
+    \end{tabularx}
+\end{table}
+
+La partición de prueba de CodeNet se reservó pero no se usó: la evaluación final se hizo con los datos de ESCOM, que el ajuste nunca vio.
+
+% ======================================================================
 \section{Conclusión del capítulo}
 \label{sec:conclusion_ingenieria_datos}
 % ======================================================================
 
-Este capítulo describió cómo se construyó la base de datos de Graphito. Se partió de código humano anterior a la IA generativa, se reconstruyeron los enunciados que faltaban y se generó una contraparte de IA sobre los mismos problemas, en el mismo idioma y con perfiles de estudiante. Un experimento de curva de aprendizaje sugiere que más ejemplos del mismo generador aportarían poco, y que la limitación principal es la diversidad de generadores. Después se limpiaron los archivos con el mismo criterio para ambas clases, se retiraron duplicados, se dividió el conjunto por tarea para evitar la fuga de información y se preparó el texto para cada canal. El resultado es un conjunto de 42,389 archivos, con muchos más archivos humanos que de IA, a propósito.
+Este capítulo describió cómo se construyó la base de datos de Graphito. Se partió de código humano anterior a la IA generativa, se reconstruyeron los enunciados que faltaban y se generó una contraparte de IA sobre los mismos problemas, en el mismo idioma y con perfiles de estudiante. Un experimento de curva de aprendizaje sugiere que más ejemplos del mismo generador aportarían poco, y que la limitación principal es la diversidad de generadores. Después se limpiaron los archivos con el mismo criterio para ambas clases, se retiraron duplicados, se dividió el conjunto por tarea para evitar la fuga de información y se preparó el texto para cada canal. El resultado es un conjunto de 42,389 archivos, con muchos más archivos humanos que de IA, a propósito. Aparte, se preparó un conjunto externo de 27,463 programas de CodeNet para ajustar el Canal A.
 
-El Capítulo~\ref{cap:modelado} usa estos datos para describir el Canal B (CharCNN entrenado sobre este conjunto), el Canal A (GraphCodeBERT aplicado sin entrenamiento adicional) y una línea base léxica, y presenta los resultados de su evaluación.
+El Capítulo~\ref{cap:modelado} usa estos datos para describir el Canal B (CharCNN entrenado sobre el conjunto de Graphito), el Canal A (GraphCodeBERT, usado primero sin entrenamiento adicional y luego ajustado con CodeNet) y una línea base léxica, y presenta los resultados de su evaluación.

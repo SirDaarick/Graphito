@@ -45,7 +45,7 @@ La pregunta guía del Canal A es: \emph{¿qué tan semántica es la similitud?},
 \label{sec:entrenamiento_modelos}
 % ======================================================================
 
-Esta sección describe cada componente en orden: el Canal B (CharCNN), el Canal A (GraphCodeBERT), la línea base léxica y la calibración, que convierte las puntuaciones crudas en umbrales interpretables. Solo CharCNN se entrena en este proyecto; GraphCodeBERT se usa tal como viene preentrenado.
+Esta sección describe cada componente en orden: el Canal B (CharCNN), el Canal A (GraphCodeBERT), la línea base léxica y la calibración, que convierte las puntuaciones crudas en umbrales interpretables. CharCNN se entrena con los datos del proyecto. GraphCodeBERT se usa primero tal como viene preentrenado y después se ajusta una vez con datos externos (Sección~\ref{subsec:ajuste_contrastivo}).
 
 % ----------------------------------------------------------------------
 \subsection{Canal B: CharCNN}
@@ -343,7 +343,81 @@ Los apuntadores tienen un límite. El grafo sigue las variables por su nombre, i
 Conviene precisar qué se adaptó: la \emph{entrada} (el grafo), no el modelo. GraphCodeBERT nunca vio C ni C++ durante su preentrenamiento (Sección~\ref{subsec:limitaciones}).
 
 \subsubsection{Por Qué no se Entrena (\textit{Zero-Shot})}
-\textit{Zero-shot} significa usar un modelo tal como viene. Se evaluó la alternativa, un adaptador \textbf{LoRA} \cite{Hu2022LoRA} que reentrena solo una parte pequeña del modelo, pero no mejoró el resultado, así que no se usa. Lo que sí se cuidó fue la entrada: la versión actual (``v2'') reconstruye el grafo y la entrada de forma fiel al original, y su resultado en pares de plagio se reporta en la Sección~\ref{subsec:pares_plagio}.
+\textit{Zero-shot} significa usar un modelo tal como viene. Se evaluó la alternativa, un adaptador \textbf{LoRA} \cite{Hu2022LoRA} que reentrena solo una parte pequeña del modelo, pero no mejoró el resultado, así que no se usa. Lo que sí se cuidó fue la entrada: la versión actual (``v2'') reconstruye el grafo y la entrada de forma fiel al original, y su resultado en pares de plagio se reporta en la Sección~\ref{subsec:pares_plagio}. Sobre esa versión se añadió un renombrado canónico de los identificadores del usuario antes de calcular el vector (\texttt{v2\_norm}); el modelo sigue sin reentrenarse y su efecto se mide en la Sección~\ref{subsec:robustez_canal_a}. Más adelante se probó otro ajuste, con un objetivo distinto y datos externos (Sección~\ref{subsec:ajuste_contrastivo}).
+
+% ----------------------------------------------------------------------
+\subsection{Canal A: Ajuste Contrastivo con CodeNet}
+\label{subsec:ajuste_contrastivo}
+
+\subsubsection{Idea General}
+Sin ajuste, casi cualquier par de programas obtiene una similitud muy alta (Figura~\ref{fig:heatmap_logico}): GraphCodeBERT sabe leer código, pero nadie le enseñó qué significa ``parecido'' para esta tarea. El ajuste contrastivo se lo enseña con ejemplos. Es como entrenar a un catador mostrándole tres muestras, una de referencia, otra del mismo vino y una distinta, y pidiéndole que acerque las dos primeras y aleje la tercera.
+
+Cada ejemplo es una \textbf{tripleta} de programas del mismo problema, esquema habitual en el aprendizaje de similitud \cite{Schroff2015FaceNet} (Figura~\ref{fig:esquema_triplete}):
+
+\begin{itemize}
+    \item el \textbf{ancla}, una solución correcta;
+    \item el \textbf{positivo}, otra solución correcta del mismo problema, que debe quedar cerca del ancla;
+    \item el \textbf{negativo difícil}, una solución incorrecta del mismo problema, que debe quedar más lejos.
+\end{itemize}
+
+Los programas de los otros problemas del mismo lote actúan como negativos fáciles. La pérdida (InfoNCE \cite{Oord2018InfoNCE}) premia que el modelo reconozca, entre varias opciones, cuál es el positivo del ancla. Para no reentrenar los 125 millones de parámetros del modelo se usó otra vez LoRA \cite{Hu2022LoRA}, que ajusta solo una parte pequeña (unos 590 mil pesos, 0.5\,\% del total). Lo que cambia respecto del intento de la Sección~\ref{subsec:modelado_graphcodebert} es el objetivo (comparar programas, no completar palabras) y los datos (CodeNet, Sección~\ref{sec:datos_codenet}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figuras/codenet_esquema_triplete.png}
+    \caption{Esquema de una tripleta de entrenamiento: se acerca el positivo al ancla y se aleja el negativo difícil. Los programas de otros problemas del lote actúan como negativos fáciles.}
+    \label{fig:esquema_triplete}
+\end{figure}
+
+\subsubsection{Hiperparámetros y Entrenamiento}
+Se entrenaron dos configuraciones, cada una con dos semillas: la \textbf{A}, solo con negativos de otros problemas, y la \textbf{B}, que añade los negativos difíciles, para comprobar si estos ayudan. Ambas usaron los mismos 778 problemas de entrenamiento que tienen al menos una solución incorrecta. Cada corrida de B tardó unas 8 horas en una sola tarjeta gráfica de 8 GB. La Tabla~\ref{tab:hiperparametros_ajuste} resume el ajuste.
+
+{\small
+\renewcommand{\arraystretch}{1.2}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{4.4cm}|>{\raggedright\arraybackslash}X|}
+    \caption{Hiperparámetros del ajuste contrastivo de GraphCodeBERT.}\label{tab:hiperparametros_ajuste}\\
+    \hline
+    \textbf{Parámetro} & \textbf{Valor} & \textbf{Qué significa} \\ \hline
+    \endfirsthead
+    \hline
+    \textbf{Parámetro} & \textbf{Valor} & \textbf{Qué significa} \\ \hline
+    \endhead
+    Modelo base & GraphCodeBERT con renombrado canónico (\texttt{v2\_norm}) & La misma entrada del Canal A, sin cambios. \\ \hline
+    Adaptación & LoRA, rango 16 & Solo se ajusta una parte pequeña; el resto queda congelado. \\ \hline
+    Pérdida & InfoNCE, temperatura 0.05 & Reconocer cuál es el positivo del ancla. \\ \hline
+    Lote y tripletas & 16 problemas por paso; 150,000 tripletas (9,375 pasos) & Cada problema aporta un ancla, un positivo y un negativo difícil. \\ \hline
+    Optimizador y tasa & AdamW \cite{Loshchilov2019AdamW}, $10^{-4}$ & Con un arranque gradual (5\,\%) y un descenso lineal al final. \\ \hline
+    Semillas & 0 y 1 & Dos corridas por configuración. \\ \hline
+    Selección & Cada 1,000 pasos, en la validación de CodeNet & Se conserva la mejor copia; ESCOM no interviene. \\ \hline
+\end{xltabular}
+}
+
+Para elegir qué configuración usar se miden dos cosas en la validación de CodeNet:
+
+\begin{itemize}
+    \item \textbf{AUC dentro del problema.} Se toma una solución correcta como referencia y se pregunta: entre otra solución correcta y una incorrecta del mismo problema, ¿cuál queda más parecida a la referencia? El AUC \cite{Hanley1982ROC} es la fracción de veces que acierta (0.5 equivale a adivinar y 1.0 a acertar siempre). Es la medida más cercana al uso real, porque el docente compara cada entrega solo contra la solución de su propia tarea.
+    \item \textbf{MAP@R entre problemas} \cite{Musgrave2020Reality} (Sección~\ref{subsec:agrupamiento_e1}). Mide si el modelo separa bien los problemas distintos. Es útil, pero no decide, porque al docente no le importa qué tan lejos queda un programa de otro problema.
+\end{itemize}
+
+La configuración B ganó con el primer criterio (AUC de 0.634 en las dos semillas, frente a unos 0.607 de A) y A con el segundo (0.847 frente a 0.811). Se eligió B, con la semilla 1 por desempate (0.634 frente a 0.633). Sin ajuste, el AUC era de 0.542 y el MAP@R de 0.182 (Figura~\ref{fig:val_auc_ajuste}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figuras/entrenamiento_val_auc.png}
+    \caption{AUC dentro del problema en la validación de CodeNet durante el entrenamiento, por configuración (A, sin negativos difíciles; B, con ellos) y semilla. La línea punteada es el modelo sin ajuste.}
+    \label{fig:val_auc_ajuste}
+\end{figure}
+
+\subsubsection{Qué Cambia en el Vector}
+La Figura~\ref{fig:coseno_ajuste} compara la similitud entre pares de programas de la validación de CodeNet. Sin ajuste, los programas de problemas distintos obtienen en promedio 0.96 y los del mismo problema 0.97: casi no hay diferencia, y cualquier programa parece parecerse a cualquier otro. Con el ajuste, los de problemas distintos bajan a 0.27 y los del mismo problema quedan en 0.75. Esta medición es de CodeNet; el efecto sobre los datos de ESCOM se presenta en la Sección~\ref{subsec:resultados_ajuste}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{figuras/coseno_zero_shot.png}\hfill
+    \includegraphics[width=0.48\textwidth]{figuras/coseno_entrenado.png}
+    \caption{Similitud entre pares de programas de la validación de CodeNet, sin ajuste (izquierda) y con el ajuste (derecha). Las líneas punteadas marcan el promedio de cada grupo.}
+    \label{fig:coseno_ajuste}
+\end{figure}
 
 % ----------------------------------------------------------------------
 \subsection{Línea Base Léxica: Jaccard}
@@ -503,13 +577,22 @@ Al evaluar la capacidad global del modelo para separar ambos grupos, el resultad
     \label{fig:roc_pr_charcnn}
 \end{figure}
 
-Apesar de estos resultados sobresalientes, conviene tener presentes dos matices importantes. El primero, en esta prueba el 7\,\% de los archivos eran de IA, en un grupo escolar donde casi nadie use IA, el porcentaje de falsas positivos entre los sospechosos parecerá mayor. Segundo, los códigos de IA provienen de \textit{DeepSeek-Chat} y \textit{Qwen3} (con tasas de detección del 88\,\% y 90\,\% en experimentos entrenando con un modelo y probando con el otro), por lo que su eficacia ante otros modelos queda abierta a estudio.
+Apesar de estos resultados sobresalientes, conviene tener presentes dos matices importantes. El primero, en esta prueba el 7\,\% de los archivos eran de IA, en un grupo escolar donde casi nadie use IA, el porcentaje de falsas positivos entre los sospechosos parecerá mayor. Segundo, los códigos de IA provienen de \textit{DeepSeek-Chat} y \textit{Qwen3} (con tasas de detección del 88\,\% y 90\,\%, respectivamente), por lo que su eficacia ante otros modelos queda abierta a estudio. El experimento siguiente acota esta duda entre esos dos generadores.
+
+Para saber si el detector reconoce a un generador que no vio al entrenar, se entrenó con uno de ellos y se probó con el otro (\textit{leave-one-LLM-out}), con tres semillas y reglas fijadas de antemano. Para que la comparación fuera justa, el entrenamiento con \textit{DeepSeek-Chat} se repitió con el mismo número de archivos que \textit{Qwen3}. La capacidad de separar IA de humano casi no cambia: el ROC-AUC sobre el generador no visto se mantiene entre 0.985 y 0.993 y la tasa de falsas alarmas en humanos sigue cerca del 1\,\%. En cambio, con el umbral fijo (\texttt{fpr\_0.01}) la detección baja: 0.08 al entrenar con \textit{DeepSeek-Chat} y probar con \textit{Qwen3} (mismo tamaño), y 0.15 al entrenar con \textit{Qwen3} y probar con \textit{DeepSeek-Chat} (Figura~\ref{fig:lolo_charcnn}). La regla fijada de antemano lo clasifica como un resultado \emph{mixto}: el modelo ordena bien a un generador desconocido, pero con el umbral actual dejaría escapar más código de IA. Solo se probaron estos dos generadores, con prompts idénticos y humanos del mismo curso, por lo que no permite concluir sobre otros modelos.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figuras/lolo_charcnn.png}
+    \caption{CharCNN ante un generador no visto durante el entrenamiento (\textit{leave-one-LLM-out}): comparación entre el generador visto y el no visto, por condición de entrenamiento.}
+    \label{fig:lolo_charcnn}
+\end{figure}
 
 % ----------------------------------------------------------------------
 \subsection{Canal A: Similitud entre Programas (GraphCodeBERT)}
 \label{subsec:canal_a_semantica}
 
-GraphCodeBERT entiende la estructura del código y no se deja engañar si cambian los bucles o el orden, pero pierde precisión cuando se cambian los nombres de las variables, en este conjunto, una comparación directa de texto (Jaccard) resulta más efectiva.
+GraphCodeBERT entiende la estructura del código y no se deja engañar si cambian los bucles o el orden, pero pierde precisión cuando se cambian los nombres de las variables, problema que se corrige renombrando los identificadores de forma canónica antes de pasar por el modelo. Aun así, en este conjunto, una comparación directa de texto (Jaccard) resulta más efectiva.
 
 Para saber si el Canal A realmente comprende la lógica de los programas, se puso a prueba en cuatro escenarios contra una regla sencilla (Jaccard), la cual solo cuenta qué porcentaje de fragmentos de texto comparten dos archivos. Se usó GraphCodeBERT de fábrica (\textit{zero-shot}, sin reentrenamiento).
 
@@ -528,11 +611,12 @@ Entre casi dos millones de combinaciones posibles de 6,797 programas, se evaluó
         \textbf{Método} & \textbf{ROC-AUC} & \textbf{Qué significa} \\ \hline
         Jaccard (comparación de texto) & 0.945 [0.930, 0.964] & Ordena correctamente 95 de cada 100 comparaciones. \\ \hline
         GraphCodeBERT & 0.856 [0.796, 0.893] & Ordena correctamente 86 de cada 100 comparaciones. \\ \hline
+        GraphCodeBERT con renombrado canónico (v2\_norm) & 0.902 [0.863, 0.930] & Ordena correctamente 90 de cada 100 comparaciones. \\ \hline
         Azar & 0.500 & Equivale a adivinar (50 de cada 100). \\ \hline
     \end{tabularx}
 \end{table}
 
-Como muestra la tabla, la comparación simple de texto supera a GraphCodeBERT, incluso si se retiran de la prueba las copias idénticas (0.975 frente a 0.883). Quitar el grafo de flujo de datos o normalizar nombres antes de pasar por el modelo tampoco cambió este resultado.
+Como muestra la tabla, la comparación simple de texto supera a GraphCodeBERT, incluso si se retiran de la prueba las copias idénticas (0.975 frente a 0.883). Quitar el grafo de flujo de datos tampoco cambió este resultado. En cambio, renombrar los identificadores de forma canónica antes de pasar por el modelo (\texttt{v2\_norm}, descrito en la Sección~\ref{subsec:robustez_canal_a}) lo mejora de 0.856 a 0.902, sin alcanzar a Jaccard.
 
 \subsubsection{Resistencia a trucos de modificación (Robustez)}
 \label{subsec:robustez_canal_a}
@@ -564,6 +648,33 @@ Cuando un alumno copia código, suele disfrazarlo haciendo cambios superficiales
 
 El hallazgo con este experimento es muy revelador y refutó nuestra hipótesis inicial. Esperábamos que el método de texto fallara más ante cambios combinados, pero ocurrió lo contrario. GraphCodeBERT es inmune a los cambios de estructura (su puntaje casi no se mueve si cambias un \texttt{for} por un \texttt{while}), pero depende mucho de los nombres de las variables (cae de 0.856 a 0.683 al renombrarlas) y se distrae con el código basura (baja a 0.768). En cambio, como la comparación de texto normaliza los identificadores antes de comparar, el renombrado no le afecta en absoluto.
 
+Como la debilidad ante el renombrado venía de que el modelo lee los nombres, se probó una corrección: antes de calcular el vector, los identificadores definidos por el usuario se sustituyen por nombres canónicos (\texttt{v1}, \texttt{v2}, \texttt{f1}, \texttt{t1}, \ldots) en orden de aparición, de modo que dos programas que solo difieren en los nombres producen el mismo texto. A esta variante se le llama \texttt{v2\_norm}. La prueba se fijó antes de ver los resultados y se repitió sobre los pares de plagio del conjunto de prueba (Tabla~\ref{tab:robustez_v2norm} y Figura~\ref{fig:robustez_v2norm}). En esta repetición el truco de renombrado se volvió determinista (antes dependía de una semilla interna de Python); con ello GraphCodeBERT v2 obtiene 0.684 al renombrar, frente al 0.683 de la Tabla~\ref{tab:robustez_canal_a}, es decir, el mismo resultado.
+
+\begin{table}[H]
+    \centering
+    \caption{Desempeño (ROC-AUC [IC 95\,\%]) de GraphCodeBERT con renombrado canónico (\texttt{v2\_norm}) frente a v2 y Jaccard.}
+    \label{tab:robustez_v2norm}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|X|c|c|c|}
+        \hline
+        \textbf{Modificación aplicada al código} & \textbf{GraphCodeBERT v2} & \textbf{GraphCodeBERT v2\_norm} & \textbf{Jaccard (Texto)} \\ \hline
+        Código original (sin cambios) & 0.856 [0.796, 0.893] & 0.902 [0.863, 0.930] & 0.945 \\ \hline
+        Renombrar todas las variables & 0.684 [0.563, 0.775] & 0.902 [0.864, 0.928] & 0.945 \\ \hline
+        Insertar código muerto (basura) & 0.768 & 0.794 & 0.950 \\ \hline
+        Todos los trucos combinados al máximo & 0.714 & 0.708 & 0.931 \\ \hline
+    \end{tabularx}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figuras/robustez_v2norm.png}
+    \caption{Efecto del renombrado canónico de identificadores sobre la robustez de GraphCodeBERT (\texttt{v2\_norm} frente a v2 y Jaccard) en el código original y con cada truco de modificación.}
+    \label{fig:robustez_v2norm}
+\end{figure}
+
+El renombrado canónico elimina la parte de la caída causada por el renombrado: la diferencia entre la caída de v2 y la de \texttt{v2\_norm} es de 0.171 [0.066, 0.306] puntos de ROC-AUC, y \texttt{v2\_norm} no pierde nada al renombrar (0.902 con y sin renombrado). Este resultado confirmó la primera hipótesis fijada de antemano. La segunda quedó refutada en sentido favorable: se esperaba que \texttt{v2\_norm} quedara a menos de 0.02 de v2 sin renombrar, pero lo superó por 0.046. Como comprobación, el texto canónico de un programa renombrado coincide byte a byte con el del programa original en 188 de 200 casos (94\,\%); el resto se debe a límites del canonicalizador. El código muerto y la combinación de todos los trucos \textbf{no} se resolvieron: \texttt{v2\_norm} cae a 0.794 y 0.708, y Jaccard sigue siendo el método más robusto.
+
 \subsubsection{Reconocimiento de problemas correctos (Agrupamiento)}
 \label{subsec:agrupamiento_e1}
 Aquí evaluamos si el modelo es capaz de notar que dos alumnos están resolviendo la misma tarea, aunque cada quien programe a su manera. Se analizaron 2,842 entregas de 48 tareas distintas usando dos medidas, \textbf{Recall@1} (¿el código más parecido de toda la base de datos es de esta misma tarea?) y \textbf{MAP@R} \cite{Musgrave2020Reality} (al ordenar todos los archivos por similitud, ¿qué tan arriba quedan todos los compañeros que hicieron esa misma tarea correctamente?, donde 1.0 es perfecto).
@@ -579,11 +690,12 @@ Aquí evaluamos si el modelo es capaz de notar que dos alumnos están resolviend
         \textbf{Método} & \textbf{MAP@R (Orden general)} & \textbf{Recall@1 (Vecino más cercano)} \\ \hline
         Jaccard (Texto) & \textbf{0.450} [0.406, 0.499] & \textbf{0.847} (85\,\%) \\ \hline
         GraphCodeBERT v2 & 0.387 [0.341, 0.443] & 0.825 (83\,\%) \\ \hline
+        GraphCodeBERT v2\_norm & 0.379 [0.336, 0.430] & 0.822 (82\,\%) \\ \hline
         Azar & 0.002 & 0.021 (2\,\%) \\ \hline
     \end{tabularx}
 \end{table}
 
-Ambos métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). En más de 4 de cada 5 entregas (82.5\,\%), el archivo que GraphCodeBERT considera más parecido pertenece al mismo ejercicio, lo que confirma que sí logra capturar qué problema resuelve el código. Sin embargo, Jaccard logra grupos más definidos, como se aprecia visualmente en las Figuras~\ref{fig:heatmap_logico} y~\ref{fig:clusters_canal_a}.
+Ambos métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). En más de 4 de cada 5 entregas (82.5\,\%), el archivo que GraphCodeBERT considera más parecido pertenece al mismo ejercicio, lo que confirma que sí logra capturar qué problema resuelve el código. Sin embargo, Jaccard logra grupos más definidos, como se aprecia visualmente en las Figuras~\ref{fig:heatmap_logico} y~\ref{fig:clusters_canal_a}. El renombrado canónico no cambia este resultado: \texttt{v2\_norm} obtiene un MAP@R de 0.379 frente a 0.387 de v2, una diferencia de $-0.008$ [$-0.022$, $+0.006$] que no es distinguible de cero (Figura~\ref{fig:clusters_canal_a_v2norm}).
 
 \begin{figure}[H]
     \centering
@@ -606,9 +718,16 @@ Ambos métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). En m�
     \label{fig:clusters_canal_a}
 \end{figure}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figuras/clusters_canal_a_v2norm.png}
+    \caption{Mismo mapa visual de la Figura~\ref{fig:clusters_canal_a}, con los mismos problemas y puntos, pero con los vectores de \texttt{v2\_norm}. En (a) las tres tareas de lógica distinta siguen en regiones separadas, aunque una de ellas se parte en dos grupos; en (b) las dos tareas similares siguen mezcladas.}
+    \label{fig:clusters_canal_a_v2norm}
+\end{figure}
+
 \subsubsection{¿Parecerse a una buena solución significa que el código funciona?}
 \label{subsec:similitud_correccion_e2}
-Finalmente, probamos en 543 entregas si parecerse al código de un compañero que sacó 10 (aprobó todas las pruebas unitarias) garantiza que la entrega también sea correcta. La relación resultó muy débil, tanto GraphCodeBERT (ROC-AUC de 0.560) como Jaccard (0.563) están apenas por encima de lanzar una moneda (0.500). 
+Finalmente, probamos en 543 entregas si parecerse al código de un compañero que sacó 10 (aprobó todas las pruebas unitarias) garantiza que la entrega también sea correcta. La relación resultó muy débil, tanto GraphCodeBERT (ROC-AUC de 0.560) como Jaccard (0.563) están apenas por encima de lanzar una moneda (0.500). Con renombrado canónico (\texttt{v2\_norm}) el resultado es el mismo (0.555).
 
 Como se ve en la Figura~\ref{fig:correctness_eval}, un programa que falla todas las pruebas puede lucir casi idéntico a uno perfecto (en ocaciones un signo < en lugar de un > basta para fallar todas las pruebas). Por tanto, la similitud sirve para organizar la revisión del profesor, pero jamás reemplaza ejecutar las pruebas unitarias.
 
@@ -618,6 +737,42 @@ Como se ve en la Figura~\ref{fig:correctness_eval}, un programa que falla todas 
     \caption{Similitud frente a una solución correcta según las pruebas unitarias aprobadas. Si la similitud predijera la calificación, las cajas descenderían en escalera de izquierda a derecha, sin embargo, se mantienen casi a la misma altura tanto para quienes aprueban todo como para quienes fallan.}
     \label{fig:correctness_eval}
 \end{figure}
+
+\subsubsection{Efecto del Ajuste con CodeNet}
+\label{subsec:resultados_ajuste}
+Se evaluó el modelo ajustado (configuración B, semilla 1, fijada antes de ver los resultados) con las mismas pruebas anteriores y los mismos datos de ESCOM, una sola vez y sin cambiar nada después. Antes de mirar el modelo ajustado se comprobó que el modelo sin ajuste reproducía exactamente los números ya reportados. Se plantearon tres hipótesis: que el ajuste mejora la relación entre parecerse a una solución correcta y funcionar (E2), que mejora el agrupamiento por tarea (E1) y que no empeora la resistencia a los trucos. La Tabla~\ref{tab:resultados_ajuste} muestra las dos primeras pruebas y la Tabla~\ref{tab:veredictos_ajuste} el veredicto de cada hipótesis.
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados en ESCOM del modelo ajustado frente al modelo sin ajuste y a Jaccard (IC 95\,\%). El ROC-AUC corresponde a la prueba de la Sección~\ref{subsec:similitud_correccion_e2}.}
+    \label{tab:resultados_ajuste}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|X|c|c|c|}
+        \hline
+        \textbf{Método} & \textbf{MAP@R (agrupamiento)} & \textbf{Recall@1} & \textbf{ROC-AUC (funciona)} \\ \hline
+        Jaccard (Texto) & \textbf{0.450} [0.406, 0.499] & \textbf{0.847} & 0.563 [0.520, 0.611] \\ \hline
+        GraphCodeBERT \texttt{v2\_norm} sin ajuste & 0.379 [0.336, 0.430] & 0.822 & 0.555 [0.505, 0.609] \\ \hline
+        GraphCodeBERT ajustado (B, semilla 1) & 0.431 [0.382, 0.485] & 0.841 & 0.586 [0.545, 0.626] \\ \hline
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Hipótesis fijadas antes de evaluar y su resultado (modelo ajustado frente al modelo sin ajuste).}
+    \label{tab:veredictos_ajuste}
+    \renewcommand{\arraystretch}{1.2}
+    \small
+    \begin{tabularx}{\textwidth}{|X|X|c|}
+        \hline
+        \textbf{Hipótesis} & \textbf{Resultado} & \textbf{Veredicto} \\ \hline
+        Mejora la relación entre parecerse a una solución correcta y funcionar & $+0.031$ [$-0.014$, $+0.086$] & No concluyente \\ \hline
+        Mejora el agrupamiento por tarea & $+0.051$ [$+0.028$, $+0.077$] & Confirmada \\ \hline
+        No empeora la resistencia a los trucos & Ninguna prueba empeora más que sin ajuste & Confirmada \\ \hline
+    \end{tabularx}
+\end{table}
+
+El ajuste mejora el agrupamiento (de 0.379 a 0.431) y resiste mejor dos trucos: el código muerto (de 0.794 a 0.866) y los trucos combinados (de 0.708 a 0.830). En cambio, no se puede afirmar que mejore la relación con que el código funcione: la ganancia es de 0.031 y su intervalo incluye el cero, lo que significa que podría deberse al azar. Con solo 14 tareas la prueba es poco sensible, y las otras tres corridas dieron resultados parecidos (MAP@R entre 0.431 y 0.439; ROC-AUC entre 0.598 y 0.613). Jaccard sigue siendo mejor en el agrupamiento y en la resistencia a los trucos; en la prueba de si el código funciona, ambos quedan dentro de sus márgenes de error. Por eso el modelo ajustado se mantiene como una señal secundaria.
 
 % ----------------------------------------------------------------------
 \subsection{Explicabilidad y Limitaciones del Estudio}
@@ -633,8 +788,8 @@ Para que el docente confíe en la herramienta y le resule útil, necesita entend
 
 Asimismo, toda evaluación honesta debe señalar las fronteras de sus datos. Los resultados de este capítulo deben leerse considerando tres limitaciones principales:
 \begin{enumerate}
-    \item \textbf{Un modelo que no está entrenado para C/C++:} GraphCodeBERT fue entrenado originalmente con otros seis lenguajes (como Python y Java) y con variables en inglés \cite{Guo2021GraphCodeBERT}, además de estar diseñado para autocompletar código y no para medir plagio. Por eso acumula similitudes altas cerca de 1.0, pierde precisión con apuntadores (véase la Sección~\ref{subsubsec:adaptacion_c_cpp}) y se confunde al cambiar los nombres de las variables (que en este conjunto están en serbocroata).
-    \item \textbf{Variedad en modelos de IA generadores de código y posibles ``atajos'':} El detector aprendió de dos modelos específicos (\textit{DeepSeek-Chat} y \textit{Qwen3}). Además, las redes suelen aprovechar pistas rápidas \cite{Geirhos2020Shortcut}: por ejemplo, la línea \texttt{using namespace} aparece en el 30\,\% del código de IA frente al 7\,\% del humano, un detalle que el modelo podría usar a su favor.
+    \item \textbf{Un modelo que no está entrenado para C/C++:} GraphCodeBERT fue entrenado originalmente con otros seis lenguajes (como Python y Java) y con variables en inglés \cite{Guo2021GraphCodeBERT}, además de estar diseñado para autocompletar código y no para medir plagio. Por eso acumula similitudes altas cerca de 1.0, pierde precisión con apuntadores (véase la Sección~\ref{subsubsec:adaptacion_c_cpp}) y se confundía al cambiar los nombres de las variables (que en este conjunto están en serbocroata), problema que corrige el renombrado canónico (Sección~\ref{subsec:robustez_canal_a}); el código muerto y la combinación de trucos siguen degradándolo.
+    \item \textbf{Variedad en modelos de IA generadores de código y posibles ``atajos'':} El detector aprendió de dos modelos específicos (\textit{DeepSeek-Chat} y \textit{Qwen3}). Además, las redes suelen aprovechar pistas rápidas \cite{Geirhos2020Shortcut}: por ejemplo, la línea \texttt{using namespace} aparece en el 30\,\% del código de IA frente al 7\,\% del humano, un detalle que el modelo podría usar a su favor. Ante un generador no visto al entrenar, el ROC-AUC se mantiene (0.985 a 0.993) pero la detección con el umbral fijo baja entre 0.08 y 0.15 (Figura~\ref{fig:lolo_charcnn}).
     \item \textbf{Contexto de los datos:} Los programas base provienen de cursos de la Universidad de Sarajevo (2016--2017) y se compararon contra entregas aprobadas de alumnos, no contra soluciones oficiales del profesor. Validar el sistema con entregas reales de la ESCOM es el paso natural siguiente.
 \end{enumerate}
 
@@ -656,10 +811,11 @@ Los experimentos demuestran que ambos canales se complementan porque ven cosas d
         \hline
         \textbf{Pregunta evaluada} & \textbf{Resultado clave} & \textbf{Utilidad práctica para el docente} \\ \hline
         ¿El Canal B distingue código hecho por IA? & Detecta el 89\,\% de la IA equivocándose solo en 1 de cada 100 humanos (ROC-AUC de 0.994). & Excelente filtro de alerta temprana, siempre como apoyo y no como sanción automática. \\ \hline
-        ¿El Canal A detecta copias entre alumnos? & Ordena bien el 86\,\% de los casos, pero la comparación de texto (Jaccard) llega al 95\,\%. & Conviene apoyarse primero en el indicador de texto y usar el Canal A como respaldo estructural. \\ \hline
-        ¿Qué pasa si disfrazan la copia cambiando el código? & Resiste cambios de bucles y orden, pero baja su precisión si renombran todas las variables (de 0.86 a 0.68). & Si un alumno cambia la estructura sin renombrar variables, el Canal A lo detectará sin problema. \\ \hline
+        ¿El Canal A detecta copias entre alumnos? & Ordena bien el 86\,\% de los casos (90\,\% con renombrado canónico), pero la comparación de texto (Jaccard) llega al 95\,\%. & Conviene apoyarse primero en el indicador de texto y usar el Canal A como respaldo estructural. \\ \hline
+        ¿Qué pasa si disfrazan la copia cambiando el código? & Resiste cambios de bucles y orden, y con renombrado canónico tampoco le afecta renombrar las variables (0.90 en ambos casos); el código muerto (0.79) y todos los trucos combinados (0.71) sí bajan su precisión. & Si un alumno cambia la estructura o renombra variables, el Canal A lo detectará sin problema; ante código muerto o trucos combinados, el indicador de texto sigue siendo el más robusto. \\ \hline
         ¿Reconoce qué tarea resuelve cada entrega? & Acierta el ejercicio en el 83\,\% de los casos (40 veces mejor que el azar). & Agrupa bien las entregas por lógica para revisar soluciones parecidas en bloque. \\ \hline
         ¿Sirve la similitud para calificar si el código funciona? & Señal muy débil (0.560, casi equivalente al azar). & Ayuda a ordenar qué revisar primero, pero no sustituye las pruebas unitarias. \\ \hline
+        ¿Mejora entrenar el Canal A con CodeNet? & Agrupa mejor (de 0.379 a 0.431) y resiste mejor el código muerto y los trucos combinados (de 0.71 a 0.83); la relación con que el código funcione sube de 0.555 a 0.586, sin poder afirmarse. & El modelo ajustado es igual o mejor en todo lo medido, pero el indicador de texto sigue siendo el más fiable; sirve como respaldo estructural. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -668,6 +824,6 @@ Los experimentos demuestran que ambos canales se complementan porque ven cosas d
 \label{sec:conclusion_modelado}
 % ======================================================================
 
-Este capítulo presentó la arquitectura y la validación empírica de los modelos que dan vida a Graphito. Los resultados muestran un contraste claro y valioso: mientras que el Canal B (CharCNN) logra una precisión sobresaliente para identificar el estilo de generación de IA con un mínimo de falsas alarmas, el Canal A (GraphCodeBERT) demuestra que un modelo complejo sin ajuste específico puede capturar la estructura lógica del código, pero sigue siendo superado por métodos clásicos de comparación de texto cuando los alumnos renombran variables en C y C++. Reportar con transparencia tanto estos aciertos como sus límites técnicos garantiza que la herramienta se utilice con el rigor que merece.
+Este capítulo presentó la arquitectura y la validación empírica de los modelos que dan vida a Graphito. Los resultados muestran un contraste claro y valioso: mientras que el Canal B (CharCNN) logra una precisión sobresaliente para identificar el estilo de generación de IA con un mínimo de falsas alarmas, el Canal A (GraphCodeBERT) demuestra que un modelo complejo sin ajuste específico puede capturar la estructura lógica del código, pero sigue siendo superado por métodos clásicos de comparación de texto en C y C++: el renombrado canónico de identificadores resolvió la debilidad ante el cambio de nombres de variables, pero el código muerto y la combinación de trucos siguen degradando al Canal A, y la comparación de texto continúa siendo la señal más robusta, por lo que GraphCodeBERT sigue sin decidir. Un ajuste posterior con datos de CodeNet mejoró el agrupamiento y la resistencia al código muerto, pero no demostró una mejora en la relación con la corrección del código. Reportar con transparencia tanto estos aciertos como sus límites técnicos garantiza que la herramienta se utilice con el rigor que merece.
 
 En el Capítulo~\ref{cap:despliegue} se muestra cómo estos modelos se integran dentro de una plataforma web ágil, presentando sus indicadores de forma clara para acompañar el criterio del profesor.
