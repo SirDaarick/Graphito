@@ -360,7 +360,7 @@ Cada ejemplo es una \textbf{tripleta} de programas del mismo problema, esquema h
     \item el \textbf{negativo difícil}, una solución incorrecta del mismo problema, que debe quedar más lejos.
 \end{itemize}
 
-Los programas de los otros problemas del mismo lote actúan como negativos fáciles. La pérdida (InfoNCE \cite{Oord2018InfoNCE}) premia que el modelo reconozca, entre varias opciones, cuál es el positivo del ancla. Para no reentrenar los 125 millones de parámetros del modelo se usó otra vez LoRA \cite{Hu2022LoRA}, que ajusta solo una parte pequeña (unos 590 mil pesos, 0.5\,\% del total). Lo que cambia respecto del intento de la Sección~\ref{subsec:modelado_graphcodebert} es el objetivo (comparar programas, no completar palabras) y los datos (CodeNet, Sección~\ref{sec:datos_codenet}).
+Los programas de los otros problemas del mismo lote actúan como negativos fáciles. La pérdida (InfoNCE \cite{Oord2018InfoNCE}) premia que el modelo reconozca, entre varias opciones, cuál es el positivo del ancla. Para no reentrenar los 125 millones de parámetros del modelo se usó otra vez LoRA \cite{Hu2022LoRA}, que ajusta solo una parte pequeña (unos 590 mil pesos, 0.5\,\% del total). Lo que cambia respecto del intento de la Sección~\ref{subsec:modelado_graphcodebert} es el objetivo (comparar programas, no completar palabras) y los datos (CodeNet, Secciones~\ref{subsec:origen_codenet} y~\ref{subsec:seleccion_codenet}).
 
 \begin{figure}[H]
     \centering
@@ -620,7 +620,7 @@ Como muestra la tabla, la comparación simple de texto supera a GraphCodeBERT, i
 
 \subsubsection{Resistencia a trucos de modificación (Robustez)}
 \label{subsec:robustez_canal_a}
-Cuando un alumno copia código, suele disfrazarlo haciendo cambios superficiales. Usando \texttt{tree-sitter}, aplicamos automáticamente trucos comunes a los 6,797 programas: cambiar bucles \texttt{for} por \texttt{while}, desordenar líneas independientes, invertir condiciones \texttt{if}, renombrar variables e insertar ``código muerto'' (líneas que no hacen nada, como \texttt{if (0) \{ ; \}}). La Tabla~\ref{tab:robustez_canal_a} y la Figura~\ref{fig:robustez_degradacion_canal_a} muestran cómo resistió cada método.
+Cuando un alumno copia código, suele disfrazarlo haciendo cambios superficiales. Usando \texttt{tree-sitter}, aplicamos automáticamente trucos comunes a los 6,797 programas: cambiar bucles \texttt{for} por \texttt{while}, desordenar líneas independientes, invertir condiciones \texttt{if}, renombrar variables e insertar ``código muerto'' (líneas que no hacen nada, como \texttt{if (0) \{ ; \}}). La Tabla~\ref{tab:robustez_canal_a} muestra cómo resistió cada método; la Figura~\ref{fig:robustez_comparacion_lineas} (Sección~\ref{subsec:resultados_ajuste}) la completa con los tres métodos finales.
 
 \begin{table}[H]
     \centering
@@ -639,16 +639,9 @@ Cuando un alumno copia código, suele disfrazarlo haciendo cambios superficiales
     \end{tabularx}
 \end{table}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.88\textwidth]{figuras/robustez_degradacion_canal_a.png}
-    \caption{Caída de rendimiento a medida que el código se modifica más intensamente (de 0 a 1). Las líneas superiores (métodos de texto como Jaccard y \textit{winnowing}) se mantienen casi planas, demostrando gran resistencia. Las líneas inferiores (GraphCodeBERT) caen notablemente cuando se acumulan todos los cambios.}
-    \label{fig:robustez_degradacion_canal_a}
-\end{figure}
-
 El hallazgo con este experimento es muy revelador y refutó nuestra hipótesis inicial. Esperábamos que el método de texto fallara más ante cambios combinados, pero ocurrió lo contrario. GraphCodeBERT es inmune a los cambios de estructura (su puntaje casi no se mueve si cambias un \texttt{for} por un \texttt{while}), pero depende mucho de los nombres de las variables (cae de 0.856 a 0.683 al renombrarlas) y se distrae con el código basura (baja a 0.768). En cambio, como la comparación de texto normaliza los identificadores antes de comparar, el renombrado no le afecta en absoluto.
 
-Como la debilidad ante el renombrado venía de que el modelo lee los nombres, se probó una corrección: antes de calcular el vector, los identificadores definidos por el usuario se sustituyen por nombres canónicos (\texttt{v1}, \texttt{v2}, \texttt{f1}, \texttt{t1}, \ldots) en orden de aparición, de modo que dos programas que solo difieren en los nombres producen el mismo texto. A esta variante se le llama \texttt{v2\_norm}. La prueba se fijó antes de ver los resultados y se repitió sobre los pares de plagio del conjunto de prueba (Tabla~\ref{tab:robustez_v2norm} y Figura~\ref{fig:robustez_v2norm}). En esta repetición el truco de renombrado se volvió determinista (antes dependía de una semilla interna de Python); con ello GraphCodeBERT v2 obtiene 0.684 al renombrar, frente al 0.683 de la Tabla~\ref{tab:robustez_canal_a}, es decir, el mismo resultado.
+Como la debilidad ante el renombrado venía de que el modelo lee los nombres, se probó una corrección: antes de calcular el vector, los identificadores definidos por el usuario se sustituyen por nombres canónicos (\texttt{v1}, \texttt{v2}, \texttt{f1}, \texttt{t1}, \ldots) en orden de aparición, de modo que dos programas que solo difieren en los nombres producen el mismo texto. A esta variante se le llama \texttt{v2\_norm}. La prueba se fijó antes de ver los resultados y se repitió sobre los pares de plagio del conjunto de prueba (Tabla~\ref{tab:robustez_v2norm}). En esta repetición el truco de renombrado se volvió determinista (antes dependía de una semilla interna de Python); con ello GraphCodeBERT v2 obtiene 0.684 al renombrar, frente al 0.683 de la Tabla~\ref{tab:robustez_canal_a}, es decir, el mismo resultado.
 
 \begin{table}[H]
     \centering
@@ -665,13 +658,6 @@ Como la debilidad ante el renombrado venía de que el modelo lee los nombres, se
         Todos los trucos combinados al máximo & 0.714 & 0.708 & 0.931 \\ \hline
     \end{tabularx}
 \end{table}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.88\textwidth]{figuras/robustez_v2norm.png}
-    \caption{Efecto del renombrado canónico de identificadores sobre la robustez de GraphCodeBERT (\texttt{v2\_norm} frente a v2 y Jaccard) en el código original y con cada truco de modificación.}
-    \label{fig:robustez_v2norm}
-\end{figure}
 
 El renombrado canónico elimina la parte de la caída causada por el renombrado: la diferencia entre la caída de v2 y la de \texttt{v2\_norm} es de 0.171 [0.066, 0.306] puntos de ROC-AUC, y \texttt{v2\_norm} no pierde nada al renombrar (0.902 con y sin renombrado). Este resultado confirmó la primera hipótesis fijada de antemano. La segunda quedó refutada en sentido favorable: se esperaba que \texttt{v2\_norm} quedara a menos de 0.02 de v2 sin renombrar, pero lo superó por 0.046. Como comprobación, el texto canónico de un programa renombrado coincide byte a byte con el del programa original en 188 de 200 casos (94\,\%); el resto se debe a límites del canonicalizador. El código muerto y la combinación de todos los trucos \textbf{no} se resolvieron: \texttt{v2\_norm} cae a 0.794 y 0.708, y Jaccard sigue siendo el método más robusto.
 
@@ -695,34 +681,34 @@ Aquí evaluamos si el modelo es capaz de notar que dos alumnos están resolviend
     \end{tabularx}
 \end{table}
 
-Ambos métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). En más de 4 de cada 5 entregas (82.5\,\%), el archivo que GraphCodeBERT considera más parecido pertenece al mismo ejercicio, lo que confirma que sí logra capturar qué problema resuelve el código. Sin embargo, Jaccard logra grupos más definidos, como se aprecia visualmente en las Figuras~\ref{fig:heatmap_logico} y~\ref{fig:clusters_canal_a}. El renombrado canónico no cambia este resultado: \texttt{v2\_norm} obtiene un MAP@R de 0.379 frente a 0.387 de v2, una diferencia de $-0.008$ [$-0.022$, $+0.006$] que no es distinguible de cero (Figura~\ref{fig:clusters_canal_a_v2norm}).
+Todos los métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). En más de 4 de cada 5 entregas (82.5\,\%), el archivo que GraphCodeBERT considera más parecido pertenece al mismo ejercicio, lo que confirma que sí logra capturar qué problema resuelve el código. Sin embargo, Jaccard logra grupos más definidos, como se aprecia visualmente en las Figuras~\ref{fig:heatmap_logico} y~\ref{fig:clusters_canal_a_v2norm}. El renombrado canónico no cambia este resultado: \texttt{v2\_norm} obtiene un MAP@R de 0.379 frente a 0.387 de v2, una diferencia de $-0.008$ [$-0.022$, $+0.006$] que no es distinguible de cero (Figura~\ref{fig:clusters_canal_a_v2norm}).
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.80\textwidth]{figuras/g3_map_at_r.png}
-    \caption{Comparación de agrupamiento (MAP@R). Mientras más alta, mejor agrupa el método las soluciones de una misma tarea. Todos superan ampliamente la línea punteada del azar.}
+    \includegraphics[width=0.80\textwidth]{figuras/comparacion_map_at_r.png}
+    \caption{Comparación de agrupamiento (MAP@R, IC 95\,\%) de Jaccard, GraphCodeBERT sin ajuste (\texttt{v2\_norm}) y GraphCodeBERT ajustado con CodeNet. Mientras más alta, mejor agrupa el método las soluciones de una misma tarea. Todos superan ampliamente la línea punteada del azar.}
     \label{fig:map_at_r_eval}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{figuras/g1_heatmap.png}
-    \caption{Mapa de calor de similitud entre tareas. Amarillo indica alta similitud y morado, baja. Los cuatro bloques cuadrados en la diagonal son entregas de una misma tarea. Jaccard (izquierda) los separa con nitidez; GraphCodeBERT (centro y derecha) pinta casi todo de amarillo porque tiende a dar puntajes altos a cualquier código en C/C++.}
+    \includegraphics[width=\textwidth]{figuras/comparacion_mapa_calor.png}
+    \caption{Mapa de calor de similitud entre entregas, ordenadas por tarea. Amarillo indica alta similitud y morado, baja; cada panel usa su propia escala. Los bloques cuadrados de la diagonal son entregas de una misma tarea. Jaccard (izquierda) los separa con nitidez; GraphCodeBERT sin ajuste (centro) pinta casi todo de amarillo, porque da puntajes muy altos a cualquier código en C/C++; el modelo ajustado (derecha) abre el rango de valores y deja ver bloques por tarea, aunque menos nítidos que los de Jaccard.}
     \label{fig:heatmap_logico}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{figuras/clusters_canal_a.png}
-    \caption{Mapa visual (proyección t-SNE \cite{Chari2023Specious}) de cómo GraphCodeBERT organiza las entregas. Cada punto es un programa y cada color una tarea. En (a) logra separar tres tareas con lógica distinta, pero en (b) mezcla dos tareas que usan rutinas similares.}
-    \label{fig:clusters_canal_a}
+    \includegraphics[width=\textwidth]{figuras/clusters_canal_a_v2norm.png}
+    \caption{Mapa visual (proyección t-SNE \cite{Chari2023Specious}) de cómo GraphCodeBERT sin ajuste (\texttt{v2\_norm}) organiza las entregas. Cada punto es un programa y cada color una tarea. En (a) las tres tareas de lógica distinta quedan en regiones separadas, aunque una de ellas se parte en dos grupos; en (b) las dos tareas que usan rutinas similares quedan mezcladas.}
+    \label{fig:clusters_canal_a_v2norm}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{figuras/clusters_canal_a_v2norm.png}
-    \caption{Mismo mapa visual de la Figura~\ref{fig:clusters_canal_a}, con los mismos problemas y puntos, pero con los vectores de \texttt{v2\_norm}. En (a) las tres tareas de lógica distinta siguen en regiones separadas, aunque una de ellas se parte en dos grupos; en (b) las dos tareas similares siguen mezcladas.}
-    \label{fig:clusters_canal_a_v2norm}
+    \includegraphics[width=\textwidth]{figuras/clusters_canal_a_ajustado.png}
+    \caption{Mismo mapa visual de la Figura~\ref{fig:clusters_canal_a_v2norm}, con los mismos problemas y puntos, pero con los vectores del modelo ajustado con CodeNet. En (a) las tres tareas de lógica distinta siguen en regiones separadas, aunque una de ellas se parte en dos grupos; en (b) las dos tareas similares siguen mezcladas.}
+    \label{fig:clusters_canal_a_ajustado}
 \end{figure}
 
 \subsubsection{¿Parecerse a una buena solución significa que el código funciona?}
@@ -733,8 +719,8 @@ Como se ve en la Figura~\ref{fig:correctness_eval}, un programa que falla todas 
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{figuras/g4_correctness.png}
-    \caption{Similitud frente a una solución correcta según las pruebas unitarias aprobadas. Si la similitud predijera la calificación, las cajas descenderían en escalera de izquierda a derecha, sin embargo, se mantienen casi a la misma altura tanto para quienes aprueban todo como para quienes fallan.}
+    \includegraphics[width=\textwidth]{figuras/comparacion_correccion.png}
+    \caption{Similitud frente a una solución correcta según las pruebas unitarias aprobadas, para Jaccard, GraphCodeBERT sin ajuste (\texttt{v2\_norm}) y GraphCodeBERT ajustado. Si la similitud predijera la calificación, las cajas descenderían en escalera de izquierda a derecha, sin embargo, se mantienen casi a la misma altura tanto para quienes aprueban todo como para quienes fallan.}
     \label{fig:correctness_eval}
 \end{figure}
 
@@ -773,6 +759,15 @@ Se evaluó el modelo ajustado (configuración B, semilla 1, fijada antes de ver 
 \end{table}
 
 El ajuste mejora el agrupamiento (de 0.379 a 0.431) y resiste mejor dos trucos: el código muerto (de 0.794 a 0.866) y los trucos combinados (de 0.708 a 0.830). En cambio, no se puede afirmar que mejore la relación con que el código funcione: la ganancia es de 0.031 y su intervalo incluye el cero, lo que significa que podría deberse al azar. Con solo 14 tareas la prueba es poco sensible, y las otras tres corridas dieron resultados parecidos (MAP@R entre 0.431 y 0.439; ROC-AUC entre 0.598 y 0.613). Jaccard sigue siendo mejor en el agrupamiento y en la resistencia a los trucos; en la prueba de si el código funciona, ambos quedan dentro de sus márgenes de error. Por eso el modelo ajustado se mantiene como una señal secundaria.
+
+La Figura~\ref{fig:robustez_comparacion_lineas} muestra la resistencia de los tres métodos en cada truco. Jaccard se mantiene casi plano; el modelo sin ajuste cae con el código muerto y con los trucos combinados; el ajustado cae menos, aunque sus intervalos de confianza se solapan con los del modelo sin ajuste.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/comparacion_robustez_lineas.png}
+    \caption{Resistencia a los trucos de modificación (ROC-AUC en pares de plagio de la partición de prueba, con la banda del IC 95\,\%) de Jaccard, GraphCodeBERT sin ajuste (\texttt{v2\_norm}) y GraphCodeBERT ajustado con CodeNet. T1 a T6 son trucos individuales y T7 los combina con la intensidad indicada.}
+    \label{fig:robustez_comparacion_lineas}
+\end{figure}
 
 % ----------------------------------------------------------------------
 \subsection{Explicabilidad y Limitaciones del Estudio}

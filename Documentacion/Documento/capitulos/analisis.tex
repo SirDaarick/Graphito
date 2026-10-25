@@ -819,7 +819,7 @@ En este sentido, el análisis realizado respalda la viabilidad del sistema propu
 
 \subsection{Selección y justificación del conjunto de datos}
 
-Para el entrenamiento del clasificador estilométrico propuesto se requieren dos tipos de datos: código fuente escrito por humanos en un contexto educativo introductorio, y código equivalente generado por modelos de inteligencia artificial. A continuación se describe y justifica cada fuente utilizada, así como la estructura cuantitativa del dataset resultante.
+Para el entrenamiento del clasificador estilométrico propuesto se requieren dos tipos de datos: código fuente escrito por humanos en un contexto educativo introductorio, y código equivalente generado por modelos de inteligencia artificial. Para el ajuste del Canal A semántico se requiere además un tercero: soluciones correctas e incorrectas de muchos problemas distintos, con un veredicto verificado automáticamente. A continuación se describe y justifica cada fuente utilizada, así como la estructura cuantitativa del dataset resultante.
 
 \subsubsection{Código humano: IEEE Programming Homework Dataset}
 
@@ -855,10 +855,14 @@ Con el objetivo de maximizar la generalización de la red convolucional ante dis
 		\addlinespace
 
 		Código IA (Local)     & CodeLlama, DeepSeek, Qwen2.5                         & C / C++           & Generativo (Open-Source)     & Evaluación de robustez ante modelos locales y diversidad estilística.      \\
+
+		\addlinespace
+
+		Código humano con veredicto & Project CodeNet \cite{Puri2021CodeNet}         & C++               & Concursantes (Humano)        & Ajuste contrastivo del Canal A (GraphCodeBERT) con soluciones correctas e incorrectas. \\
 		\bottomrule
 	\end{tabularx}
 	\smallskip
-	\footnotesize\textit{Elaboración propia con base en \cite{Ljubovic2020Dataset}.}
+	\footnotesize\textit{Elaboración propia con base en \cite{Ljubovic2020Dataset} y \cite{Puri2021CodeNet}.}
 \end{table}
 
 Para garantizar la consistencia entre ambas clases, todos los \textit{prompts} de generación se formulan indicando explícitamente al modelo que utilice nombres de variables y comentarios en serbocroata. Esto asegura que el idioma no constituya una señal discriminante (sesgo) durante el entrenamiento, forzando a la red a aprender diferencias estrictamente de naturaleza estilométrica espacial. Adicionalmente, se generan variantes de \textit{prompt} para cada problema con el fin de reducir la dependencia a un estilo de generación único:
@@ -869,9 +873,15 @@ Para garantizar la consistencia entre ambas clases, todos los \textit{prompts} d
 	\item Un \textit{prompt} con enfoque en optimización sin instrucciones de estilo adicionales.
 \end{itemize}
 
+\subsubsection{Soluciones con veredicto verificado: Project CodeNet}
+
+El Canal A necesita aprender a comparar programas, no solo a leerlos, y para ello se requiere código de muchos problemas con soluciones que se sepa si funcionan o no. Con este fin se utiliza \textit{Project CodeNet} \cite{Puri2021CodeNet}, un conjunto público de IBM Research con unos 14 millones de envíos a plataformas de concursos de programación en línea, más de 4,000 problemas y un veredicto emitido por un juez automático para cada envío. De él se toman programas en C++. Su selección se justifica por cuatro razones.
+
+Primero, el veredicto (aceptado o respuesta incorrecta) lo decide un juez que ejecuta pruebas y no una persona, por lo que no hay etiquetado manual que pueda sesgarse. Segundo, cada problema cuenta con cientos de soluciones distintas, lo que permite enseñar que programas muy diferentes pueden resolver lo mismo. Tercero, el código es de autoría humana y anterior a los modelos de lenguaje actuales, igual que el conjunto de estudiantes. Cuarto, es independiente de los datos de ESCOM: como el ajuste no los ve, estos se reservan para una evaluación final imparcial. Su límite es que son problemas de concursos y no tareas escolares, por lo que su efecto solo se da por válido al evaluarlo con datos de estudiantes. La preparación y la partición de este conjunto se detallan en el Capítulo~\ref{cap:ingenieria_datos}.
+
 \subsubsection{Consideraciones de balance y partición}
 
-El corpus final se construye con clases estrictamente balanceadas (50\% humano, 50\% IA) para evitar sesgos de clase mayoritaria en las predicciones de la CharCNN. La partición de los datos se realiza a nivel de \textit{problema}; es decir, todas las soluciones (humanas o sintéticas) de un problema específico aparecen exclusivamente en una de las fases (entrenamiento, validación o prueba). Esta restricción arquitectónica previene la fuga de información (\textit{data leakage}), obligando al modelo a clasificar basándose en el estilo y no en la lógica del algoritmo. La Tabla \ref{tab:distribucion_muestras} presenta la distribución cuantitativa establecida.
+El corpus final se construye con clases estrictamente balanceadas (50\% humano, 50\% IA) para evitar sesgos de clase mayoritaria en las predicciones de la CharCNN. La partición de los datos se realiza a nivel de \textit{problema}; es decir, todas las soluciones (humanas o sintéticas) de un problema específico aparecen exclusivamente en una de las fases (entrenamiento, validación o prueba). Esta restricción arquitectónica previene la fuga de información (\textit{data leakage}), obligando al modelo a clasificar basándose en el estilo y no en la lógica del algoritmo. La Tabla \ref{tab:distribucion_muestras} presenta la distribución cuantitativa establecida. El conjunto de CodeNet se particiona con el mismo principio, por problema, y su reparto se presenta en el Capítulo~\ref{cap:ingenieria_datos}.
 
 \begin{table}[H]
 	\centering
