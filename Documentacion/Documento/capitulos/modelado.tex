@@ -1,7 +1,7 @@
 \chapter{Modelización}
 \label{cap:modelado}
 
-Con los datos listos (Capítulo~\ref{cap:ingenieria_datos}), la metodología Komorebi \cite{verges_como_2023} pasa a la fase de \textbf{Modelización}: construir los modelos y ponerlos a prueba. La Sección~\ref{sec:entrenamiento_modelos} explica qué se construyó; la Sección~\ref{sec:evaluacion_modelos} mide qué tan bien funciona y qué límites tiene.
+Con los datos listos (Capítulo~\ref{cap:ingenieria_datos}), la metodología Komorebi \cite{verges_como_2023} pasa a la fase de \textbf{Modelización}: construir los modelos y ponerlos a prueba. Los datos del capítulo anterior alimentan a los dos canales: el conjunto de Sarajevo y su contraparte de IA sirven para el Canal B, y los programas de CodeNet para entrenar el Canal A. La Sección~\ref{sec:entrenamiento_modelos} explica qué se construyó; la Sección~\ref{sec:evaluacion_modelos} mide qué tan bien funciona y qué límites tiene.
 
 Graphito usa dos modelos que analizan el código de formas distintas, más una regla simple de comparación como vara de medir (Figura~\ref{fig:panorama_modelos}). El Canal Semántico mide qué tan parecida es una entrega a la solución de referencia en lo que hace el programa. El Canal Estilométrico estima si la forma de escribir se parece más a la de código generado por IA. La línea base léxica compara fragmentos de texto y no usa aprendizaje automático. Ninguna salida es un veredicto: son datos para que el docente decida qué revisar primero.
 
@@ -137,10 +137,10 @@ Un hiperparámetro es un ajuste que se fija antes de entrenar, como el número d
     \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Arquitectura}} \\ \hline
     Embedding & 128 números por carácter & Tamaño de la ``ficha'' de cada carácter. \\ \hline
     Kernels \cite{Kim2014CNN} & 3, 5, 7 y 9; 64 filtros cada una & Fragmentos de distinto alcance: 256 detectores en total. \\ \hline
-    Dropout & 0.4 & Fracción de conexiones apagadas al azar al entrenar, para reducir la memorización. \\ \hline
+    Dropout \cite{Srivastava2014Dropout} & 0.4 & Fracción de conexiones apagadas al azar al entrenar, para reducir la memorización. \\ \hline
     Capa densa & 1,024 & Tamaño de la ``huella de estilo''. \\ \hline
     \rowcolor{gray!15} \multicolumn{3}{|l|}{\textbf{Entrenamiento}} \\ \hline
-    Optimizador y tasa & Adam, $10^{-3}$ & Método que ajusta los pesos y tamaño de cada paso. \\ \hline
+    Optimizador y tasa & Adam \cite{Kingma2015Adam}, $10^{-3}$ & Método que ajusta los pesos y tamaño de cada paso. \\ \hline
     Reducción de la tasa & $\times 0.5$ si 3 épocas no mejoran & Pasos más finos al final; ocurrió en las épocas 20 y 35 (numeradas desde 0). \\ \hline
     Tamaño de lote y épocas & 128 y hasta 50 & Ejemplos por ajuste y pasadas completas de entrenamiento. \\ \hline
     Muestreo por época & 1:1 (874 de IA y 874 humanos nuevos) & En cada época se sortean humanos distintos (Sección~\ref{subsec:composicion_final}). \\ \hline
@@ -359,7 +359,7 @@ Cada ejemplo es una \textbf{tripleta} de programas del mismo problema, esquema h
     \item el \textbf{negativo difícil}, una solución incorrecta del mismo problema, que debe quedar más lejos.
 \end{itemize}
 
-Los programas de los otros problemas del mismo lote actúan como negativos fáciles. La pérdida (InfoNCE \cite{Oord2018InfoNCE}) premia que el modelo reconozca, entre varias opciones, cuál es el positivo del ancla. Para no reentrenar los 125 millones de parámetros del modelo se usó otra vez LoRA \cite{Hu2022LoRA}, que ajusta solo una parte pequeña (unos 590 mil pesos, 0.5\,\% del total). Lo que cambia respecto de un primer intento con LoRA (Sección~\ref{subsec:modelos_anteriores}) es el objetivo (comparar programas, no completar palabras) y los datos (CodeNet, Secciones~\ref{subsec:origen_codenet} y~\ref{subsec:seleccion_codenet}).
+Los programas de los otros problemas del mismo lote actúan como negativos fáciles. La \textbf{pérdida}, que es la regla con la que se califica cada intento del modelo durante el entrenamiento (aquí, InfoNCE \cite{Oord2018InfoNCE}), premia que el modelo reconozca, entre varias opciones, cuál es el positivo del ancla. Para no reentrenar los 125 millones de parámetros del modelo se usó otra vez LoRA \cite{Hu2022LoRA}, que ajusta solo una parte pequeña (unos 590 mil pesos, 0.5\,\% del total). Lo que cambia respecto de un primer intento con LoRA (Sección~\ref{subsec:modelos_anteriores}) es el objetivo (comparar programas, no completar palabras) y los datos (CodeNet, Secciones~\ref{subsec:origen_codenet} y~\ref{subsec:seleccion_codenet}).
 
 \begin{figure}[H]
     \centering
@@ -369,7 +369,7 @@ Los programas de los otros problemas del mismo lote actúan como negativos fáci
 \end{figure}
 
 \subsubsection{Hiperparámetros y Entrenamiento}
-Se entrenaron dos configuraciones, cada una con dos semillas: la \textbf{A}, solo con negativos de otros problemas, y la \textbf{B}, que añade los negativos difíciles, para comprobar si estos ayudan. Ambas usaron los mismos 778 problemas de entrenamiento que tienen al menos una solución incorrecta. Cada corrida de B tardó unas 8 horas en una sola tarjeta gráfica de 8 GB. La Tabla~\ref{tab:hiperparametros_ajuste} resume el ajuste.
+Se entrenaron dos configuraciones, cada una con dos semillas (dos puntos de partida aleatorios distintos, para comprobar que el resultado no es cuestión de suerte): la \textbf{A}, solo con negativos de otros problemas, y la \textbf{B}, que añade los negativos difíciles, para comprobar si estos ayudan. Ambas usaron los mismos 778 problemas de entrenamiento que tienen al menos una solución incorrecta. Cada corrida de B tardó unas 8 horas en una sola tarjeta gráfica de 8 GB. La Tabla~\ref{tab:hiperparametros_ajuste} resume el ajuste.
 
 {\small
 \renewcommand{\arraystretch}{1.2}
@@ -705,7 +705,7 @@ Todos los métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). C
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figuras/clusters_canal_a_v2norm.png}
-    \caption{Mapa visual (proyección t-SNE \cite{Chari2023Specious}) de cómo GraphCodeBERT sin ajuste (\texttt{v2\_norm}) organiza las entregas. Cada punto es un programa y cada color una tarea. En (a) las tres tareas de lógica distinta quedan en regiones separadas, aunque una de ellas se parte en dos grupos; en (b) las dos tareas que usan rutinas similares quedan mezcladas.}
+    \caption{Mapa visual (proyección t-SNE \cite{vanderMaaten2008tSNE}, que debe leerse con cautela \cite{Chari2023Specious}) de cómo GraphCodeBERT sin ajuste (\texttt{v2\_norm}) organiza las entregas. Cada punto es un programa y cada color una tarea. En (a) las tres tareas de lógica distinta quedan en regiones separadas, aunque una de ellas se parte en dos grupos; en (b) las dos tareas que usan rutinas similares quedan mezcladas.}
     \label{fig:clusters_canal_a_v2norm}
 \end{figure}
 

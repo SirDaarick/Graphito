@@ -230,7 +230,7 @@ Para no dejar la presencia de comentarios como pista fácil, se definieron seis 
 La temperatura ($T$) es un parámetro del modelo de lenguaje: valores altos producen respuestas más variadas y valores bajos, más conservadoras.
 
 \subsubsection{Variedad de Generadores}
-El código de IA no proviene de un solo modelo. Los códigos finales archivos finales provienen de \textit{DeepSeek-Chat} y de \textit{Qwen3}. Esto es una limitación importante: aún no se sabe qué tan bien se reconocerá código de IA producido por otros modelos. Se retoma en los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
+El código de IA no proviene de un solo modelo. Los archivos finales provienen de \textit{DeepSeek-Chat} y de \textit{Qwen3}. Esto es una limitación importante: aún no se sabe qué tan bien se reconocerá código de IA producido por otros modelos. Se retoma en los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
 
 % ----------------------------------------------------------------------
 \subsection{Criterio de Paro de la Generación: Curva de Aprendizaje}
@@ -238,7 +238,7 @@ El código de IA no proviene de un solo modelo. Los códigos finales archivos fi
 
 Generar código con modelos de lenguaje cuesta tiempo y dinero. Para optimizar estos recursos nos hicimos la siguiente pregunta: ¿conviene seguir generando códigos con IA? Ya que al entrenar un modelo los primeros ejemplos le enseñan mucho, pero cada ejemplo parecido adicional va aportando cada vez menos. Puesto que la planeación inicial contemplaba un corpus de 20,000 códigos (10,000 por clase), decidimos realizar un experimento que funcionara como criterio de paro: ir evaluando el rendimiento del modelo a medida que aumentaba progresivamente la cantidad de códigos de IA generados, y detener el proceso cuando la mejora marginal se volviera pequeña. Se fue entrenando el modelo a la par que los códigos de IA fueron generados, analizando la mejora en la curva de aprendizaje para evaluar si aún valía la pena continuar con la generación.
 
-Antes del experimento: cuatro conceptos que se usan en esta sección. La Tabla~\ref{tab:conceptos_curva} explica los términos que aparecen en los resultados.
+Antes del experimento conviene explicar tres conceptos que se usan en esta sección. La Tabla~\ref{tab:conceptos_curva} define los términos que aparecen en los resultados.
 
 \begin{table}[H]
     \centering
@@ -260,7 +260,7 @@ Antes del experimento: cuatro conceptos que se usan en esta sección. La Tabla~\
     \end{tabularx}
 \end{table}
 
-En la \ref{tab:embudo_humano} se muestra como se repartieron los códigos de autoría humana para el experimento.
+En la Tabla~\ref{tab:embudo_humano} se muestra cómo se repartieron los códigos de autoría humana para el experimento.
 
 \begin{table}[H]
     \centering
