@@ -1,6 +1,6 @@
 # Plan de redacción — Cap. 9 Despliegue (`despliegue.tex`)
 
-**Objetivo:** reescribir el capítulo 9 según `Documentacion/PLAN_ESTRUCTURA_TESIS.md` (sec. 2 Cap. 9 y
+**Objetivo:** reescribir el capítulo 9 según `Documentacion/planeacion/PLAN_ESTRUCTURA_TESIS.md` (sec. 2 Cap. 9 y
 sec. 3), con el mismo registro de los Cap. 7 y 8: formal, ligero, para lectores sin formación técnica;
 diagramas y tablas antes que párrafos técnicos.
 

@@ -1,6 +1,6 @@
 # Plan de redacción — Cap. 7 Ingeniería de datos (`ingenieria_de_datos.tex`)
 
-**Objetivo:** reescribir el capítulo 7 siguiendo `Documentacion/PLAN_ESTRUCTURA_TESIS.md` (sección 2, Cap. 7),
+**Objetivo:** reescribir el capítulo 7 siguiendo `Documentacion/planeacion/PLAN_ESTRUCTURA_TESIS.md` (sección 2, Cap. 7),
 con registro formal pero accesible para lectores sin formación en IA o sistemas (incluso de ciencias
 sociales), y con diagramas que hagan dinámica la lectura.
 

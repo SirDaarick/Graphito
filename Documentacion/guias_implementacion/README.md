@@ -44,7 +44,7 @@ El archivo de migración con las sentencias DDL se encuentra en:
 | **06** | **Visualizador Diff & Anotaciones** | ✅ **Implementada** | ✅ **SÍ** | Monaco Editor / Feedback | [06_visualizador_diff_comentarios.md](./06_visualizador_diff_comentarios.md) |
 | **07** | **Botones de Triaje Docente** | ✅ **Implementada** | ✅ **SÍ** | Human-in-the-Loop / DB | [07_triaje_docente_decision.md](./07_triaje_docente_decision.md) |
 | **08** | **Navegación Ágil (Avance Automático)** | ✅ **Implementada** | ❌ No | UX / Flujo de Revisión | [08_navegacion_agil_autoscroll.md](./08_navegacion_agil_autoscroll.md) |
-| **09** | **Mejora de Modelos & Benchmark** | 🔄 **Fase 1 Lista / Fases 2-4 Plan.** | ⚠️ Mínimo | ML / GraphCodeBERT / CharCNN | [09_mejora_modelos_benchmark.md](./09_mejora_modelos_benchmark.md) & [Reporte de Auditoría](../REPORTE_MEJORA_MODELOS_ML.md) |
+| **09** | **Mejora de Modelos & Benchmark** | 🔄 **Fase 1 Lista / Fases 2-4 Plan.** | ⚠️ Mínimo | ML / GraphCodeBERT / CharCNN | [09_mejora_modelos_benchmark.md](./09_mejora_modelos_benchmark.md) & [Reporte de Auditoría](../informes/REPORTE_MEJORA_MODELOS_ML.md) |
 | **10** | **Interpretabilidad en UI (XAI)** | ✅ **Implementada** | ✅ **SÍ** | Explainable AI / Visualización | [10_interpretabilidad_xai_ui.md](./10_interpretabilidad_xai_ui.md) |
 
 ---
@@ -64,7 +64,7 @@ El archivo de migración con las sentencias DDL se encuentra en:
 
 ### 🔹 Fase 3: Inteligencia Artificial Explicable, Rigor Científico y Ergonomía
 - [x] ✅ **[Guía 10: Interpretabilidad en la UI (XAI)](./10_interpretabilidad_xai_ui.md)** — Cajón de evidencias periciales (`EvidenceDrawer.tsx`), badges por categoría (Flujo DFG, Patrón LLM, Construcción Avanzada) y salto a número de línea.
-- [x] 🔄 **[Guía 09: Mejora de Modelos y Benchmark](./09_mejora_modelos_benchmark.md)** — **Fase 1 completada y validada** (salvaguarda CharCNN $<60$ chars, LoRA 20k fusionado, máscara float32 DFG, calibración logística sigmoidal suave, 47/47 tests unitarios pasando). Fases 2 a 4 estructuradas en el **[Reporte de Auditoría Técnica](../REPORTE_MEJORA_MODELOS_ML.md)**.
+- [x] 🔄 **[Guía 09: Mejora de Modelos y Benchmark](./09_mejora_modelos_benchmark.md)** — **Fase 1 completada y validada** (salvaguarda CharCNN $<60$ chars, LoRA 20k fusionado, máscara float32 DFG, calibración logística sigmoidal suave, 47/47 tests unitarios pasando). Fases 2 a 4 estructuradas en el **[Reporte de Auditoría Técnica](../informes/REPORTE_MEJORA_MODELOS_ML.md)**.
 - [x] ✅ **[Guía 01: Modo Claro / Oscuro](./01_modo_claro_oscuro.md)** — Arquitectura de tokens CSS en `index.css`, `ThemeContext.tsx` y botón toggle accesible en `Header.tsx`.
 
 ---

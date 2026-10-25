@@ -1,6 +1,6 @@
 # Plan de redacción — Cap. 8 Modelización (`modelado.tex`)
 
-**Objetivo:** reescribir el capítulo 8 según `Documentacion/PLAN_ESTRUCTURA_TESIS.md` (sec. 2, Cap. 8;
+**Objetivo:** reescribir el capítulo 8 según `Documentacion/planeacion/PLAN_ESTRUCTURA_TESIS.md` (sec. 2, Cap. 8;
 sec. 5 números), con el mismo registro del Cap. 7: formal, accesible a lectores de cualquier
 formación, con analogías breves, y con **diagramas que expliquen cómo son y cómo funcionan los
 modelos** y **organizadores** (tablas agrupadas) para entender los hiperparámetros.
@@ -64,7 +64,7 @@ modelos** y **organizadores** (tablas agrupadas) para entender los hiperparámet
   ROC-AUC val 0.865 vs 0.797).
 - DFG verificado contra el código original de Microsoft (`tests/reference/graphcodebert/`).
 - Zero-shot vs LoRA: en el benchmark anterior el adaptador LoRA entrenado con MLM bajaba AUC de
-  0.646 a 0.630 (`benchmark_baseline_nolora_results.json`, `models/graphcodebert/README.md:246`).
+  0.646 a 0.630 (`archivo/benchmarks_modelos_anteriores/benchmark_baseline_nolora_results.json`, `models/graphcodebert/README.md:246`).
   Advertir que fue en el benchmark anterior (golden set), no en `split_v1`.
 - Pares de plagio, test (1,908,545 pares, 338 positivos), ROC-AUC [IC 95 %]: Jaccard 0.945
   [0.930, 0.964]; winnowing 0.944; v2 0.856 [0.796, 0.893]; v2 sin DFG 0.851; pipeline anterior

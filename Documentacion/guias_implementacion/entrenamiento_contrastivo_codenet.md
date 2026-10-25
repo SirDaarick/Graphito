@@ -22,11 +22,11 @@
 
 El Canal A convierte cada entrega en un vector y lo compara por coseno con la **solución de referencia del docente** (`Documentacion/Documento/capitulos/modelado.tex:22`, `:242`). Hoy se usa GraphCodeBERT zero-shot:
 
-- El adaptador LoRA anterior se entrenó con MLM y además recibía la entrada legacy desordenada. Bajaba el ROC-AUC de 0.646 a 0.630 (`benchmark_baseline_nolora_results.json`). Por eso no se puede atribuir el fracaso solo al objetivo MLM: había dos fallas a la vez.
+- El adaptador LoRA anterior se entrenó con MLM y además recibía la entrada legacy desordenada. Bajaba el ROC-AUC de 0.646 a 0.630 (`archivo/benchmarks_modelos_anteriores/benchmark_baseline_nolora_results.json`). Por eso no se puede atribuir el fracaso solo al objetivo MLM: había dos fallas a la vez.
 - Con la entrada corregida (`v2`), GraphCodeBERT obtiene ROC-AUC de 0.741 a 0.856, por debajo de Jaccard (0.945) (`modelado.tex:459-460`).
-- En E1, GraphCodeBERT agrupa por tarea peor que Jaccard: ΔMAP@R = −0.0639, IC95 [−0.0830, −0.0443] (`Documentacion/REPORTE_EVALUACION_AGRUPAMIENTO_LOGICO_CANAL_A.md:51`).
+- En E1, GraphCodeBERT agrupa por tarea peor que Jaccard: ΔMAP@R = −0.0639, IC95 [−0.0830, −0.0443] (`Documentacion/informes/REPORTE_EVALUACION_AGRUPAMIENTO_LOGICO_CANAL_A.md:51`).
 - En E2, parecerse a la referencia predice la corrección solo débilmente: Macro-AUC = 0.5598, IC95 [0.5199, 0.6015] (mismo reporte, línea 18).
-- Bajo ofuscación, Jaccard no se degradó más que `v2`; H1 quedó refutada (`Documentacion/REPORTE_EXPERIMENTO_ROBUSTEZ_CANAL_A.md:18`).
+- Bajo ofuscación, Jaccard no se degradó más que `v2`; H1 quedó refutada (`Documentacion/informes/REPORTE_EXPERIMENTO_ROBUSTEZ_CANAL_A.md:18`).
 
 **Pregunta:** ¿un objetivo contrastivo que enseñe explícitamente "resuelve el mismo problema = vectores cercanos" mejora la similitud con la referencia en ESCOM respecto a `v2_norm` zero-shot?
 

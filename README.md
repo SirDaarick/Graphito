@@ -33,7 +33,7 @@ flowchart LR
 
 1. 🧠 **Canal A (Semántica Algorítmica):**
    - Extrae el Grafo de Flujo de Datos (**DFG**) con *Tree-sitter*, capturando el flujo de valores entre variables a través de ciclos y condicionales.
-   - Aplica **GraphCodeBERT** optimizado con adaptadores **LoRA** (`adaptador-lora-20k`) para garantizar invarianza ante renombramiento de variables y reordenamiento de bloques.
+   - Aplica **GraphCodeBERT** ajustado con **LoRA** mediante entrenamiento contrastivo sobre Project CodeNet (adaptador `B_s1`, en `models/deploy/gcb_adapter/`), con renombrado canónico de identificadores antes de calcular cada vector. Es una señal secundaria: no decide por sí sola.
 2. ✍️ **Canal B (Estilometría y Detección de Sintaxis de LLMs):**
    - Implementa una arquitectura **CharCNN** (Convolutional Neural Network a nivel de caracteres) que analiza la cadencia sintáctica, regularidad léxica y patrones estilométricos característicos de modelos generativos (como ChatGPT, Claude o Copilot).
 3. ⚖️ **Fusión Multimodal y Penalización por Discrepancia:**
@@ -81,12 +81,20 @@ graphito/
 ├── models/                 # Modelos de Machine Learning e inferencia
 │   ├── graphcodebert/      # Parser DFG y adaptador LoRA para Canal A
 │   ├── char_cnn/           # Modelo convolucional a nivel de caracteres para Canal B
+│   ├── deploy/             # Artefactos verificados que carga el backend (incluye el adaptador entrenado)
 │   └── fusion.py           # Algoritmo de combinación y cálculo de discrepancia
 ├── data/                   # Pipeline de generación sintética y datasets
+├── scripts/                # Experimentos, evaluación y generación de figuras de la tesis
+├── runs/                   # Evidencia de experimentos (ver runs/README.md)
+├── odd/                    # Bitácora de tareas de cada cambio (decisiones y evidencia)
+├── archivo/                # Material de modelos anteriores, conservado solo como historia
+│   └── benchmarks_modelos_anteriores/
 ├── Documentacion/          # Documentación formal de Trabajo Terminal y guías
-│   ├── Documento/          # Proyecto LaTeX compilable (capítulos, figuras, main.tex)
-│   ├── guias_implementacion/ # 10 guías maestras de diseño e implementación
-│   └── PLAN_METODOLOGIA_KOMOREBI.md
+│   ├── Documento/          # Proyecto LaTeX compilable (capítulos, figuras, tablas, main.tex)
+│   ├── guias_implementacion/ # Guías de diseño e implementación
+│   ├── informes/           # Informes técnicos de experimentos y mejoras
+│   ├── planeacion/         # Planes de estructura de la tesis y de metodología
+│   └── correcciones/       # Correcciones recibidas del Trabajo Terminal
 ├── tests/                  # Suite de pruebas automatizadas con Pytest
 ├── docker-compose.yml      # Despliegue orquestado con contenedores
 └── README.md               # Este documento
@@ -174,7 +182,7 @@ The benchmark modes are `calibrated-fit-in-run`, `calibrated-frozen` and `uncali
 - Fused (provisional, production fusion is SDD-4): runs on submissions scored by both channels (the config records `dropped_without_reference`). ROC/PR-AUC rank by the max of the calibrated channel scores; operating points are the confusion of the OR decision (calibrated A >= t_A OR calibrated B >= t_B).
 - A run is staged under `runs/.staging/` and moved to `runs/benchmark/<ts>/` only when complete (`summary.json` has `"status": "complete"`); a failure leaves no run behind. Input errors (non-test golden sample, missing source hash, split manifest hash mismatch, missing calibration) print `ERROR: ...` and exit 2.
 - Outputs go to `runs/benchmark/<ts>/` (one subdir per channel), which is gitignored. Commit only selected artifacts, explicitly: `git add -f runs/benchmark/<ts>/channel_a/<ts>/metrics.json runs/benchmark/<ts>/channel_a/<ts>/report.md runs/benchmark/<ts>/calibration_channel_a.json`.
-- **Legacy results:** the root `benchmark_*results.json` and `benchmark_charcnn_*.json` files predate the split manifest (the old golden set reused 1825/2621 CharCNN train/val samples and used hardcoded thresholds). They are kept for history but are NOT comparable with new runs, which carry the split manifest sha256.
+- **Legacy results:** the `benchmark_*results.json` and `benchmark_charcnn_*.json` files in `archivo/benchmarks_modelos_anteriores/` predate the split manifest (the old golden set reused 1825/2621 CharCNN train/val samples and used hardcoded thresholds). They are kept for history but are NOT comparable with new runs, which carry the split manifest sha256.
 
 ### Migration note: 768-dim semantic vectors (Chroma v2 collection)
 
@@ -192,7 +200,7 @@ Rollback: revert the commit and delete `codigos_referencia_v2`; the legacy colle
 
 ## 📖 Documentación Técnica y Auditoría de Modelos
 
-- 📄 **[Auditoría Técnica y Reporte de Mejora de Modelos ML (Fase 1)](Documentacion/REPORTE_MEJORA_MODELOS_ML.md)**: Diagnóstico empírico de patologías (train/serve skew, desconexión LoRA, anisotropía), remediaciones de inferencia, formulación matemática de calibración sigmoidal ($x_0 = 0.85, k = 24.0$) y validación experimental en casos reales de ESCOM IPN.
+- 📄 **[Auditoría Técnica y Reporte de Mejora de Modelos ML (Fase 1)](Documentacion/informes/REPORTE_MEJORA_MODELOS_ML.md)**: Diagnóstico empírico de patologías (train/serve skew, desconexión LoRA, anisotropía), remediaciones de inferencia, formulación matemática de calibración sigmoidal ($x_0 = 0.85, k = 24.0$) y validación experimental en casos reales de ESCOM IPN.
 - 📚 **[Guías de Implementación Arquitectónica](Documentacion/guias_implementacion/README.md)**: Especificaciones técnicas detalladas para los módulos y flujos del sistema.
 
 ---
