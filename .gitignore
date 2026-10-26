@@ -78,3 +78,5 @@ Programas_ESCOM/paradigmas_programaci*/
 *.fdb_latexmk
 *.synctex.gz
 _minted-*/
+# TypeScript incremental build cache
+*.tsbuildinfo
