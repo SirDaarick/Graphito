@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { ArrowLeft, Code2, Download, ShieldCheck, UserCheck, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { AuthCard } from "../components/layout/AuthCard";
 import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
 import { saveVerdict } from "../lib/verdicts";
 import { evidenceByLine } from "../lib/evidence";
@@ -48,10 +47,10 @@ interface CodeData {
 type ViewMode = "report" | "code_diff";
 type CodeStatus = "idle" | "loading" | "error" | "ready";
 
-const KBD = "px-1 py-0.2 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700";
+const KBD = "px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono text-[10px]";
 
 const FOOTER_TOOLTIP =
-    "absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-[#070c18]/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]";
+    "absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-graphito-surface/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]";
 
 function parseReportId(id: string | number | undefined): number | null {
     if (id === undefined || id === null || id === "") return null;
@@ -341,6 +340,16 @@ export function SimilarityReportModal({
         }
     }, [isOpen, shouldRender]);
 
+    // Smooth transition when switching between report summary and code diff view
+    useGSAP(() => {
+        if (!shouldRender || !bodyContainerRef.current) return;
+        gsap.fromTo(
+            bodyContainerRef.current,
+            { opacity: 0.6, y: inCodeView ? 10 : -8 },
+            { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }
+        );
+    }, [inCodeView, shouldRender]);
+
     // Line-level evidence for the code view: the report's own rows, or the ones that came with the code.
     const lineEvidence = useMemo(() => {
         const own = comparison?.indicadores ?? [];
@@ -364,9 +373,9 @@ export function SimilarityReportModal({
 
     const isSample = comparison.engine === "stub" || comparison.engine === "demo";
     const navButton =
-        "p-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60";
+        "p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue";
     const headerButton =
-        "p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60";
+        "p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue";
     // Two panes side by side on wide screens; stacked (two shorter panes) on phones.
     const paneHeight = isWide ? "calc(92dvh - 220px)" : "clamp(200px, 30dvh, 320px)";
 
@@ -385,10 +394,10 @@ export function SimilarityReportModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="report-modal-title"
-                className={`relative w-full opacity-0 ${inCodeView ? "max-w-[1600px]" : "max-w-4xl"}`}
+                className={`relative w-full opacity-0 transition-[max-width] duration-300 ease-out ${inCodeView ? "max-w-[1600px]" : "max-w-4xl"}`}
             >
-                <AuthCard className="w-full !p-0 !rounded-3xl overflow-hidden border-slate-200 dark:border-[#2b3346]/60 bg-white/95 dark:bg-[#0f1522]/90">
-                    <div className={`flex flex-col relative ${inCodeView ? "h-[92dvh]" : "max-h-[92dvh]"}`}>
+                <div className="w-full rounded-3xl overflow-hidden border border-slate-200 dark:border-[#2b3346]/60 bg-white dark:bg-[#151c2e] shadow-2xl relative z-10">
+                    <div className="flex flex-col relative h-[86dvh] min-h-[640px] max-h-[880px]">
                         {/* Floating Toast para Veredicto y Avance Ágil */}
                         {triageToast && (
                             <div
@@ -406,13 +415,13 @@ export function SimilarityReportModal({
                         )}
 
                         {/* Top bar: back, title, submission carousel */}
-                        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-[#2b3346]/40 bg-slate-50 dark:bg-[#0f1422] shrink-0">
+                        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-graphito-subtle/40 bg-slate-50 dark:bg-graphito-dark shrink-0">
                             <div className="flex items-center gap-3 min-w-0">
                                 {inCodeView ? (
                                     <button
                                         ref={backToSummaryRef}
                                         onClick={() => setViewMode("report")}
-                                        className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60"
+                                        className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/80 active:scale-95 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
                                     >
                                         <ArrowLeft size={16} aria-hidden="true" />
                                         <span className="hidden sm:inline">Volver al resumen</span>
@@ -427,20 +436,30 @@ export function SimilarityReportModal({
                                     <h2 id="report-modal-title" className="text-base sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                                         {inCodeView ? "Comparación de código" : "Reporte de similitud"}
                                     </h2>
-                                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium truncate">
+                                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium truncate">
                                         Entrega de {comparison.title}
                                     </p>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
+                                {comparison.engine === "stub" && (
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-mono">
+                                        STUB
+                                    </span>
+                                )}
+                                {comparison.estado_calibracion && (
+                                    <span className="hidden md:inline px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-graphito-subtle">
+                                        {comparison.estado_calibracion}
+                                    </span>
+                                )}
                                 {isSample && (
                                     <span className="hidden sm:inline px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/40">
                                         Datos de ejemplo
                                     </span>
                                 )}
                                 {submissions && submissions.length > 0 && currentIndex >= 0 && (
-                                    <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-[#161d2d] px-1.5 py-1 rounded-2xl border border-slate-300/60 dark:border-[#2b3346]">
+                                    <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-graphito-surface px-1.5 py-1 rounded-2xl border border-slate-300/60 dark:border-graphito-subtle">
                                         <button
                                             onClick={() => navigateTo(currentIndex - 1)}
                                             disabled={!hasPrev || isNavigating}
@@ -462,14 +481,28 @@ export function SimilarityReportModal({
                                         </button>
                                     </div>
                                 )}
+                                {!inCodeView && (
+                                    <button
+                                        ref={viewCodeButtonRef}
+                                        type="button"
+                                        onClick={() => setViewMode("code_diff")}
+                                        className="inline-flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-xl bg-gradient-to-r from-graphito-blue to-graphito-violet text-white text-xs sm:text-sm font-bold shadow-md shadow-graphito-blue/20 hover:brightness-110 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue shrink-0 ml-1"
+                                    >
+                                        <Code2 size={16} aria-hidden="true" />
+                                        <span className="hidden sm:inline">Ver código para comparar</span>
+                                        <span className="sm:hidden">Comparar código</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
                         {/* Body: the summary by default; the code comparison only when asked for */}
                         <div
                             ref={bodyContainerRef}
-                            className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#2b3346] scrollbar-track-transparent ${
-                                inCodeView ? "p-3 sm:p-4" : "p-4 sm:p-6"
+                            className={`flex-1 min-h-0 ${
+                                inCodeView
+                                    ? "overflow-hidden p-2 sm:p-3 flex flex-col"
+                                    : "overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-graphito-subtle scrollbar-track-transparent"
                             }`}
                         >
                             {inCodeView ? (
@@ -487,24 +520,17 @@ export function SimilarityReportModal({
                                 />
                             ) : (
                                 <div className="flex flex-col gap-5">
-                                    <ReportMetrics report={comparison} animate={isAnimating} />
-                                    <div className="flex sm:justify-end">
-                                        <button
-                                            ref={viewCodeButtonRef}
-                                            onClick={() => setViewMode("code_diff")}
-                                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-graphito-blue text-white text-sm font-semibold shadow-sm hover:brightness-110 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0f1522]"
-                                        >
-                                            <Code2 size={18} aria-hidden="true" />
-                                            Ver comparación de código
-                                        </button>
-                                    </div>
+                                    <ReportMetrics
+                                        report={comparison}
+                                        animate={isAnimating}
+                                    />
                                 </div>
                             )}
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-slate-50 dark:bg-[#0f1422] border-t border-slate-200 dark:border-[#2b3346]/40 shrink-0">
-                            <div className="hidden md:flex items-center gap-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-slate-50 dark:bg-graphito-dark border-t border-slate-200 dark:border-graphito-subtle/40 shrink-0">
+                            <div className="hidden md:flex items-center gap-2.5 text-[11px] text-slate-600 dark:text-slate-400">
                                 <span><kbd className={KBD}>←</kbd> <kbd className={KBD}>→</kbd> navegar</span>
                                 <span aria-hidden="true">•</span>
                                 <span><kbd className={KBD}>A</kbd> sin observaciones</span>
@@ -518,7 +544,7 @@ export function SimilarityReportModal({
                                 <button
                                     onClick={() => handleVerdictAndAdvance("conforme")}
                                     aria-label="Marcar sin observaciones (tecla A)"
-                                    className="group relative p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                                    className="group relative p-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
                                 >
                                     <ShieldCheck size={19} />
                                     <div role="tooltip" className={FOOTER_TOOLTIP}>
@@ -530,7 +556,7 @@ export function SimilarityReportModal({
                                 <button
                                     onClick={() => handleVerdictAndAdvance("aclaracion")}
                                     aria-label="Marcar para aclarar con el estudiante (tecla R)"
-                                    className="group relative p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+                                    className="group relative p-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                                 >
                                     <UserCheck size={19} />
                                     <div role="tooltip" className={FOOTER_TOOLTIP}>
@@ -543,7 +569,7 @@ export function SimilarityReportModal({
                                     onClick={handleDownloadPdf}
                                     disabled={isDownloadingPdf || reportId === null}
                                     aria-label="Descargar reporte en PDF"
-                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center"
+                                    className="group relative p-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center"
                                 >
                                     {isDownloadingPdf ? (
                                         <div className="w-[19px] h-[19px] border-2 border-slate-400 dark:border-white/30 border-t-graphito-blue dark:border-t-white rounded-full animate-spin" />
@@ -558,18 +584,18 @@ export function SimilarityReportModal({
                                 {/* Cerrar */}
                                 <button
                                     onClick={onClose}
-                                    aria-label="Cerrar"
-                                    className="group relative p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-rose-500 hover:border-rose-500/40 hover:bg-rose-500/10 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
+                                    aria-label="Cerrar modal"
+                                    className="group relative p-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-500 hover:border-rose-500/40 hover:bg-rose-500/10 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                                 >
                                     <X size={19} />
                                     <div role="tooltip" className={FOOTER_TOOLTIP}>
-                                        <span>Cerrar</span>
+                                        <span>Cerrar modal</span>
                                     </div>
                                 </button>
                             </div>
                         </div>
                     </div>
-                </AuthCard>
+                </div>
             </div>
         </div>
     );
@@ -594,12 +620,12 @@ function CodeView({ status, codeData, reportId, evidence, paneHeight, onRetry, .
         return (
             <div role="alert" className="flex flex-col items-center justify-center gap-3 py-20 text-center">
                 <p className="text-base font-semibold text-slate-900 dark:text-white">No se pudo cargar el código</p>
-                <p className="max-w-sm text-sm text-slate-600 dark:text-slate-400">
+                <p className="max-w-sm text-sm text-slate-600 dark:text-slate-300">
                     Revisa tu conexión e inténtalo de nuevo. El resumen de la entrega sigue disponible.
                 </p>
                 <button
                     onClick={onRetry}
-                    className="mt-1 rounded-xl border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-800 transition-all hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                    className="mt-1 min-h-[44px] rounded-xl border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-800 transition-all hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                 >
                     Reintentar
                 </button>
@@ -617,7 +643,7 @@ function CodeView({ status, codeData, reportId, evidence, paneHeight, onRetry, .
     }
 
     return (
-        <div>
+        <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
             <SideBySideDiffViewer
                 referenceCode={codeData.reference_code}
                 studentCode={codeData.student_code}
@@ -626,14 +652,9 @@ function CodeView({ status, codeData, reportId, evidence, paneHeight, onRetry, .
                 language={codeData.language}
                 reportId={reportId}
                 evidence={evidence}
-                paneHeight={paneHeight}
+                paneHeight="h-full"
                 {...viewer}
             />
-            {evidence.size > 0 && (
-                <p className="mt-2 px-1 text-xs text-slate-500 dark:text-slate-400">
-                    Las líneas resaltadas en amarillo tienen una observación: pasa el cursor o enfócalas con el teclado para leerla.
-                </p>
-            )}
         </div>
     );
 }

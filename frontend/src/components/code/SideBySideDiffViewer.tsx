@@ -1,23 +1,18 @@
 /**
  * @file SideBySideDiffViewer.tsx
  * @description Componente de cotejo visual lado a lado (Side-by-Side Diff) para análisis de integridad académica.
- * Provee:
- * 1. Visualización sincronizada de código de referencia (docente) vs. entrega evaluada (alumno).
- * 2. Resaltado léxico con paleta Synthwave '84 para C/C++.
- * 3. Hilo interactivo de anotaciones y observaciones pedagógicas (en línea y generales).
- * 4. Sincronización bidireccional de desplazamiento (scroll) con bloqueo preventivo de bucles.
- * 5. Explicación al pasar el cursor (o enfocar) una línea sospechosa de la entrega.
+ * 1. Estudiante / Entrega a la izquierda; Referencia canónica docente a la derecha.
+ * 2. Desplazamiento sincronizado vertical con barra de scroll unificada en el panel derecho.
+ * 3. Resaltado léxico con paleta Synthwave '84 para C/C++.
+ * 4. Observaciones pedagógicas (en línea y generales) y tooltips explicativos.
  */
 
 import React, { useId, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { MessageSquare, MessageSquarePlus, Plus, Trash2, X, Send, User, Sparkles, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageSquare, MessageSquarePlus, Plus, Trash2, X, Send, User, ChevronDown, ChevronUp } from "lucide-react";
 import { SynthwaveLine } from "./SynthwaveHighlighter";
 import type { LineEvidence } from "../../lib/evidence";
 
-/**
- * Representa una anotación pedagógica registrada por un docente en una revisión.
- */
 export interface ComentarioRevisionItem {
     id: number;
     reporte_id: number;
@@ -28,9 +23,6 @@ export interface ComentarioRevisionItem {
     autor_nombre?: string;
 }
 
-/**
- * Propiedades del componente SideBySideDiffViewer.
- */
 interface SideBySideDiffViewerProps {
     referenceCode: string;
     studentCode: string;
@@ -42,9 +34,7 @@ interface SideBySideDiffViewerProps {
     onAddComment: (lineNum: number | null, text: string) => Promise<void>;
     onDeleteComment: (commentId: number) => Promise<void>;
     isSubmittingComment?: boolean;
-    /** Why a line of the student code is suspicious, by 1-based line number. Shown on hover or focus. */
     evidence?: Map<number, LineEvidence[]>;
-    /** CSS height of each code pane (the viewer scrolls inside it). */
     paneHeight?: string;
 }
 
@@ -64,15 +54,13 @@ export function SideBySideDiffViewer({
     referenceAuthor = "Docente (Referencia Canónica)",
     studentAuthor = "Estudiante (Entrega)",
     language = "c",
-    reportId,
     comments,
     onAddComment,
     onDeleteComment,
     isSubmittingComment = false,
     evidence = NO_EVIDENCE,
-    paneHeight = "calc(95vh - 145px)",
+    paneHeight,
 }: SideBySideDiffViewerProps) {
-    // Sincronización de scroll
     const leftScrollRef = useRef<HTMLDivElement>(null);
     const rightScrollRef = useRef<HTMLDivElement>(null);
     const isScrollingRef = useRef<"left" | "right" | null>(null);
@@ -81,10 +69,8 @@ export function SideBySideDiffViewer({
     const tipId = useId();
     const tipRowRef = useRef<HTMLElement | null>(null);
 
-    // Estado para nueva nota en línea
     const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null);
     const [commentText, setCommentText] = useState("");
-    // Estado para nueva nota general
     const [showGeneralComposer, setShowGeneralComposer] = useState(false);
     const [generalCommentText, setGeneralCommentText] = useState("");
     const [showGeneralCommentsTray, setShowGeneralCommentsTray] = useState(true);
@@ -93,7 +79,6 @@ export function SideBySideDiffViewer({
     const stuLines = useMemo(() => studentCode.split("\n"), [studentCode]);
     const maxLines = Math.max(refLines.length, stuLines.length);
 
-    // Agrupar comentarios por línea
     const commentsByLine = useMemo(() => {
         const map = new Map<number, ComentarioRevisionItem[]>();
         comments.forEach((c) => {
@@ -106,7 +91,6 @@ export function SideBySideDiffViewer({
         return map;
     }, [comments]);
 
-    // Comentarios generales
     const generalComments = useMemo(
         () => comments.filter((c) => c.numero_linea === null),
         [comments]
@@ -118,7 +102,6 @@ export function SideBySideDiffViewer({
         setTip({ line, top: rect.top, bottom: rect.bottom, left: rect.left });
     };
 
-    // A pointer tooltip disappears on scroll; a keyboard-focused row keeps its tooltip and follows the row.
     const syncTipOnScroll = () => {
         const row = tipRowRef.current;
         if (!row) {
@@ -129,7 +112,6 @@ export function SideBySideDiffViewer({
         setTip((prev) => (prev ? { ...prev, top: rect.top, bottom: rect.bottom, left: rect.left } : prev));
     };
 
-    // Manejar scroll sincronizado (solo cuando los dos paneles van lado a lado)
     const handleScroll = (source: "left" | "right") => {
         syncTipOnScroll();
         if (!window.matchMedia("(min-width: 768px)").matches) return;
@@ -164,13 +146,13 @@ export function SideBySideDiffViewer({
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#151020] rounded-xl overflow-hidden border border-[#2d2244]/80 shadow-xl font-mono text-[13px]">
-            {/* Subtle Top Accent */}
-            <div className="h-[2px] bg-gradient-to-r from-fuchsia-500/60 via-cyan-400/60 to-amber-300/60" />
+        <div className="flex flex-col flex-1 h-full min-h-0 bg-[#151020] rounded-2xl overflow-hidden border border-[#2d2244]/80 shadow-xl font-mono text-[13px]">
+            {/* Top Accent Strip */}
+            <div className="h-[2px] bg-gradient-to-r from-fuchsia-500/60 via-cyan-400/60 to-amber-300/60 shrink-0" />
 
             {/* General Comment Composer Dropdown */}
             {showGeneralComposer && (
-                <div className="p-4 bg-[#231a38] border-b border-fuchsia-500/30 text-sans">
+                <div className="p-4 bg-[#231a38] border-b border-fuchsia-500/30 text-sans shrink-0">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-fuchsia-300 flex items-center gap-1.5 font-sans">
                             <MessageSquare size={14} /> Nueva Observación General del Docente
@@ -209,7 +191,7 @@ export function SideBySideDiffViewer({
 
             {/* General Comments Display */}
             {generalComments.length > 0 && (
-                <div className="px-6 py-2.5 bg-[#1e1730] border-b border-[#2d2244] font-sans">
+                <div className="px-6 py-2.5 bg-[#1e1730] border-b border-[#2d2244] font-sans shrink-0">
                     <button
                         onClick={() => setShowGeneralCommentsTray(!showGeneralCommentsTray)}
                         className="flex items-center justify-between w-full text-xs font-bold text-slate-300 hover:text-white py-1"
@@ -248,21 +230,13 @@ export function SideBySideDiffViewer({
                 </div>
             )}
 
-            {/* Column Headers — Zen Single Toolbar */}
+            {/* Column Headers: Student Left, Teacher Reference Right */}
             <div className="grid grid-cols-1 md:grid-cols-2 border-b border-[#2d2244] bg-[#1a1427] text-xs font-sans shrink-0">
-                <div className="px-5 py-2 flex items-center justify-between md:border-r border-[#2d2244]">
+                {/* Left Side: Student Submission */}
+                <div className="px-5 py-2.5 flex items-center justify-between md:border-r border-[#2d2244]">
                     <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#36f9f6]" />
-                        <span className="font-semibold text-slate-200 text-xs">{referenceAuthor}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                        {language.toUpperCase()} CANÓNICO
-                    </span>
-                </div>
-                <div className="px-5 py-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#ff7edb]" />
-                        <span className="font-semibold text-slate-200 text-xs">{studentAuthor}</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#ff7edb] shadow-[0_0_8px_rgba(255,126,219,0.6)]" />
+                        <span className="font-bold text-slate-100 text-xs">{studentAuthor}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         {comments.length > 0 && (
@@ -282,59 +256,27 @@ export function SideBySideDiffViewer({
                         </button>
                     </div>
                 </div>
+
+                {/* Right Side: Canonical Reference */}
+                <div className="px-5 py-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#36f9f6] shadow-[0_0_8px_rgba(54,249,246,0.6)]" />
+                        <span className="font-bold text-slate-100 text-xs">{referenceAuthor}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-500">
+                        {language.toUpperCase()}
+                    </span>
+                </div>
             </div>
 
-            {/* Side by Side Scrolling Area */}
-            <div className="grid grid-cols-1 md:grid-cols-2 flex-1 overflow-hidden relative">
-                {/* Left Side: Teacher / Canonical Reference */}
+            {/* Side by Side Scrolling Area: Left = Student, Right = Teacher Reference */}
+            <div className="grid grid-cols-1 md:grid-cols-2 flex-1 min-h-0 overflow-hidden relative">
+                {/* Left Side: Student Submission + Inline Comments (Scrollbar hidden, synced with Right) */}
                 <div
                     ref={leftScrollRef}
                     onScroll={() => handleScroll("left")}
-                    className="overflow-y-auto overflow-x-auto md:border-r border-b md:border-b-0 border-[#2d2244] bg-[#1a1427] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ height: paneHeight }}
-                >
-                    <table className="w-full border-collapse">
-                        <tbody>
-                            {Array.from({ length: maxLines }).map((_, index) => {
-                                const lineNum = index + 1;
-                                const refLine = refLines[index] ?? "";
-                                const stuLine = stuLines[index] ?? "";
-                                const isDiff = refLine !== stuLine;
-
-                                return (
-                                    <tr
-                                        key={`ref-${lineNum}`}
-                                        className={`group transition-colors ${
-                                            isDiff
-                                                ? "bg-cyan-950/20 hover:bg-cyan-950/30"
-                                                : "hover:bg-[#251d38]/50"
-                                        }`}
-                                    >
-                                        {/* Line Number */}
-                                        <td className="w-12 sm:w-14 py-1 px-3 text-right text-slate-500 font-mono text-[12px] sm:text-[13px] select-none border-r border-[#291e3e]">
-                                            {index < refLines.length ? lineNum : ""}
-                                        </td>
-                                        {/* Code Content */}
-                                        <td className={`py-1 px-4 font-mono text-[13px] sm:text-[13.5px] leading-relaxed whitespace-pre ${isDiff ? "border-l-2 border-[#36f9f6]/40" : ""}`}>
-                                            {index < refLines.length ? (
-                                                <SynthwaveLine line={refLine} />
-                                            ) : (
-                                                <span className="text-slate-700 italic select-none">~</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Right Side: Student Submission + Inline Comments */}
-                <div
-                    ref={rightScrollRef}
-                    onScroll={() => handleScroll("right")}
-                    className="overflow-y-auto overflow-x-auto bg-[#181324] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text"
-                    style={{ height: paneHeight }}
+                    className="overflow-y-auto overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:border-r border-b md:border-b-0 border-[#2d2244] bg-[#181324] select-text h-full min-h-0"
+                    style={paneHeight && paneHeight !== "h-full" ? { height: paneHeight } : undefined}
                 >
                     <table className="w-full border-collapse">
                         <tbody>
@@ -423,7 +365,7 @@ export function SideBySideDiffViewer({
                                                                     </div>
                                                                     <button
                                                                         onClick={() => onDeleteComment(comment.id)}
-                                                                        className="text-slate-500 hover:text-rose-400 opacity-0 group-hover/box:opacity-100 transition-opacity"
+                                                                        className="text-slate-500 hover:text-rose-400 opacity-0 group/box:opacity-100 transition-opacity"
                                                                         title="Eliminar observación"
                                                                     >
                                                                         <Trash2 size={13} />
@@ -448,25 +390,24 @@ export function SideBySideDiffViewer({
                                                                     </button>
                                                                 </div>
                                                                 <textarea
-                                                                    autoFocus
                                                                     value={commentText}
                                                                     onChange={(e) => setCommentText(e.target.value)}
-                                                                    placeholder="Escribe la observación sobre esta línea..."
-                                                                    className="w-full h-16 p-2.5 bg-[#181324] border border-[#3d2f5a] rounded-lg text-slate-200 text-xs focus:outline-none focus:border-[#36f9f6] resize-none"
+                                                                    placeholder="Escribe tu observación o sugerencia técnica para esta línea..."
+                                                                    className="w-full h-20 p-2.5 bg-[#1a1427] border border-[#3d2f5a] rounded-lg text-slate-200 text-xs placeholder-slate-500 focus:outline-none focus:border-[#36f9f6] transition-all resize-none"
                                                                 />
                                                                 <div className="flex justify-end gap-2 mt-2">
                                                                     <button
                                                                         onClick={() => setActiveCommentLine(null)}
-                                                                        className="px-2.5 py-1 text-slate-400 hover:text-white text-xs"
+                                                                        className="px-3 py-1 text-xs text-slate-400 hover:text-white"
                                                                     >
                                                                         Cancelar
                                                                     </button>
                                                                     <button
                                                                         onClick={() => handleSaveLineComment(lineNum)}
                                                                         disabled={isSubmittingComment || !commentText.trim()}
-                                                                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-fuchsia-500 to-[#36f9f6] text-black font-bold text-xs hover:opacity-90 active:scale-95 disabled:opacity-50"
+                                                                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-gradient-to-r from-fuchsia-500 to-indigo-600 text-white text-xs font-bold hover:opacity-90 active:scale-95 disabled:opacity-50"
                                                                     >
-                                                                        <Send size={11} />
+                                                                        <Send size={12} />
                                                                         <span>Guardar Nota</span>
                                                                     </button>
                                                                 </div>
@@ -477,6 +418,49 @@ export function SideBySideDiffViewer({
                                             </tr>
                                         )}
                                     </React.Fragment>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Right Side: Teacher / Canonical Reference (Master Scrollbar) */}
+                <div
+                    ref={rightScrollRef}
+                    onScroll={() => handleScroll("right")}
+                    className="overflow-y-auto overflow-x-auto bg-[#1a1427] scrollbar-thin scrollbar-thumb-[#3d2f5a] scrollbar-track-transparent select-text h-full min-h-0"
+                    style={paneHeight && paneHeight !== "h-full" ? { height: paneHeight } : undefined}
+                >
+                    <table className="w-full border-collapse">
+                        <tbody>
+                            {Array.from({ length: maxLines }).map((_, index) => {
+                                const lineNum = index + 1;
+                                const refLine = refLines[index] ?? "";
+                                const stuLine = stuLines[index] ?? "";
+                                const isDiff = refLine !== stuLine;
+
+                                return (
+                                    <tr
+                                        key={`ref-${lineNum}`}
+                                        className={`group transition-colors ${
+                                            isDiff
+                                                ? "bg-cyan-950/20 hover:bg-cyan-950/30"
+                                                : "hover:bg-[#251d38]/50"
+                                        }`}
+                                    >
+                                        {/* Line Number */}
+                                        <td className="w-12 sm:w-14 py-1 px-3 text-right text-slate-500 font-mono text-[12px] sm:text-[13px] select-none border-r border-[#291e3e]">
+                                            {index < refLines.length ? lineNum : ""}
+                                        </td>
+                                        {/* Code Content */}
+                                        <td className={`py-1 px-4 font-mono text-[13px] sm:text-[13.5px] leading-relaxed whitespace-pre ${isDiff ? "border-l-2 border-[#36f9f6]/40" : ""}`}>
+                                            {index < refLines.length ? (
+                                                <SynthwaveLine line={refLine} />
+                                            ) : (
+                                                <span className="text-slate-700 italic select-none">~</span>
+                                            )}
+                                        </td>
+                                    </tr>
                                 );
                             })}
                         </tbody>

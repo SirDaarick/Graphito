@@ -12,6 +12,9 @@ export default {
           dark: '#0f172a',       // Fondo principal en Modo Oscuro (Slate-900)
           card: '#1e293b',       // Tarjetas en Modo Oscuro
           border: '#334155',     // Bordes en Modo Oscuro
+          surface: '#121827',    // Superficies elevadas oscuras
+          subtle: '#2b3346',     // Bordes secundarios y divisores
+          muted: '#94a3b8',      // Textos secundarios y metadatos
           blue: '#3b82f6',       // Azul primario
           violet: '#a78bfa',     // Violeta del gradiente
         },

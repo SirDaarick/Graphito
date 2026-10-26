@@ -11,6 +11,11 @@
     @apply bg-slate-50 text-slate-900 dark:bg-graphito-dark dark:text-white transition-colors duration-200 min-h-[100dvh];
   }
 
+  /* Focus visible accessibility outline helper */
+  :focus-visible {
+    outline-offset: 2px;
+  }
+
   /* Scrollbars Personalizados - Minimalista Zen sin fondos blancos */
   ::-webkit-scrollbar {
     width: 6px;
@@ -125,4 +130,32 @@
 .animate-glow-3 {
   animation: ambient-float-3 26s ease-in-out infinite;
   will-change: transform;
-}
+}
+
+/* Reducción de movimiento para usuarios que lo soliciten (WCAG 2.1 AA) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-glow-1,
+  .animate-glow-2,
+  .animate-glow-3 {
+    animation: none !important;
+  }
+}
+
+/* Utilidades para Glassmorfismo Calibrado (WCAG AA Compliant) */
+@layer utilities {
+  .glass-card {
+    @apply bg-white/25 dark:bg-graphito-card/15 backdrop-blur-[3px] border border-slate-200/60 dark:border-white/15 shadow-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)];
+  }
+  .glass-card-hover {
+    @apply bg-white/25 dark:bg-graphito-card/15 backdrop-blur-[3px] border border-slate-200/60 dark:border-white/15 shadow-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:border-graphito-blue/40 dark:hover:border-graphito-blue/40 hover:shadow-2xl transition-all duration-200;
+  }
+  .glass-modal {
+    @apply bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-[#2b3346]/60 shadow-2xl shadow-black/30 dark:shadow-black/70;
+  }
+  .glass-nav {
+    @apply bg-white/20 dark:bg-graphito-dark/15 backdrop-blur-[3px] border-b border-slate-200/60 dark:border-white/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)];
+  }
+  .glass-input {
+    @apply bg-white/25 dark:bg-graphito-card/15 backdrop-blur-[3px] border border-slate-200/60 dark:border-white/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)];
+  }
+}

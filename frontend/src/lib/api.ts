@@ -101,6 +101,7 @@ export interface Problema {
     catalogo_id?: string | null;
     /** Hidden from the default lists; reversible. */
     archivado?: boolean;
+    entregas?: CodigoFuente[];
 }
 
 export interface Grupo {
@@ -347,11 +348,14 @@ export const api = {
     },
 
     problems: {
-        async list(includeArchived = false): Promise<Problema[]> {
+        async list(includeArchived = false, withSubmissions = true): Promise<Problema[]> {
             if (IS_DEMO_MODE) {
-                return DEMO_PROBLEMAS;
+                return DEMO_PROBLEMAS.map((p) => ({
+                    ...p,
+                    entregas: withSubmissions ? (DEMO_SUBMISSIONS[p.id] || []) : undefined,
+                }));
             }
-            return request<Problema[]>(includeArchived ? "/problems/?include_archived=true" : "/problems/");
+            return request<Problema[]>(`/problems/?include_archived=${includeArchived}&with_submissions=${withSubmissions}`);
         },
         async archive(id: number): Promise<Problema> {
             if (IS_DEMO_MODE) {
@@ -776,4 +780,10 @@ export const api = {
             });
         }
     }
-};
+};
+
+export function invalidateLibrary() {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("graphito_library_refresh"));
+    }
+}

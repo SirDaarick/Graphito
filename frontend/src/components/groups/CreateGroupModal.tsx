@@ -97,8 +97,8 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }: CreateGrou
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
 
-            <div ref={contentRef} className="relative w-full max-w-2xl z-10 max-h-[92vh] flex flex-col">
-                <AuthCard className="w-full p-0 overflow-hidden flex flex-col max-h-[90vh] bg-white dark:bg-graphito-card border border-slate-200 dark:border-[#2b3346]/60 shadow-2xl rounded-2xl transition-colors">
+            <div ref={contentRef} className="relative w-full max-w-2xl z-10 h-[560px] max-h-[85vh] flex flex-col">
+                <AuthCard className="w-full h-full p-0 overflow-hidden flex flex-col bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-[#2b3346]/60 shadow-2xl rounded-3xl transition-colors">
                     <div className="flex items-center justify-between px-8 py-6 border-b border-slate-200 dark:border-[#2b3346]/40 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-graphito-blue/10 border border-graphito-blue/20 flex items-center justify-center text-graphito-blue">

@@ -3,6 +3,7 @@ import { Bell, ChevronDown, X, FileText, Sun, Moon } from "lucide-react";
 import { GradientButton } from "../ui/GradientButton";
 import { Docente, IS_DEMO_MODE } from "../../lib/api";
 import { useTheme } from "../../context/ThemeContext";
+import { navigate } from "../../lib/router";
 
 import logo from "../../assets/logo.png";
 
@@ -47,7 +48,6 @@ export function Header({
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const { isDark, toggleTheme } = useTheme();
 
-
     const notifRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -78,13 +78,23 @@ export function Header({
         onLogout?.();
     };
 
+    const handleLogoClick = () => {
+        navigate("/biblioteca");
+        onNavigate?.("biblioteca");
+    };
+
     return (
-        <header className="w-full bg-white dark:bg-graphito-dark border-b border-slate-200 dark:border-graphito-border px-6 py-4 transition-colors duration-200">
+        <header className="sticky top-0 z-30 w-full bg-white/20 dark:bg-graphito-dark/15 backdrop-blur-[3px] border-b border-slate-200/60 dark:border-white/15 px-6 py-3.5 transition-colors duration-200 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
 
                 {/* Lado Izquierdo: Logo y Nav */}
                 <div className="flex items-center gap-10">
-                    <div className="flex items-center gap-3 group cursor-pointer">
+                    <button
+                        type="button"
+                        onClick={handleLogoClick}
+                        className="flex items-center gap-3 group text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue rounded-lg p-1 -m-1 min-h-[44px]"
+                        aria-label="Ir a la biblioteca de Graphito"
+                    >
                         <img
                             src={logo}
                             alt="Graphito Logo"
@@ -99,21 +109,24 @@ export function Header({
                                 Modo Demo
                             </span>
                         )}
-                    </div>
+                    </button>
 
-                    <nav className="hidden md:flex items-center gap-6">
+                    <nav className="hidden md:flex items-center gap-6" aria-label="Navegación principal">
                         {NAV_SECTIONS.map((item) => {
                             const isActive = activeSection === item.key;
                             return (
                                 <button
                                     key={item.key}
                                     type="button"
-                                    onClick={() => onNavigate?.(item.key)}
+                                    onClick={() => {
+                                        navigate(item.key === "catalogo" ? "/catalogo" : "/biblioteca");
+                                        onNavigate?.(item.key);
+                                    }}
                                     aria-current={isActive ? "page" : undefined}
-                                    className={`font-body text-sm font-semibold pb-1 border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue/50 rounded-sm ${
+                                    className={`font-body text-sm font-semibold min-h-[44px] flex items-center pb-1 border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue rounded-sm ${
                                         isActive
-                                            ? "text-slate-800 dark:text-white border-graphito-blue"
-                                            : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white"
+                                            ? "text-slate-900 dark:text-white border-graphito-blue"
+                                            : "text-slate-600 dark:text-slate-300 border-transparent hover:text-slate-900 dark:hover:text-white"
                                     }`}
                                 >
                                     {item.label}
@@ -124,7 +137,7 @@ export function Header({
                 </div>
 
                 {/* Lado Derecho: Acciones y Perfil */}
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 sm:gap-6">
 
                     <GradientButton onClick={onNewCode}>
                         <span>+ Nuevo código</span>
@@ -133,8 +146,8 @@ export function Header({
                     {/* Botón Switch Modo Claro / Oscuro */}
                     <button
                         onClick={toggleTheme}
-                        className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-graphito-card rounded-full transition-all focus-visible:outline-none"
-                        aria-label="Cambiar tema"
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-graphito-card rounded-full transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue focus-visible:outline-none"
+                        aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
                         title={isDark ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
                     >
                         {isDark ? (
@@ -152,8 +165,9 @@ export function Header({
                                 setShowNotifications(!showNotifications);
                                 setShowUserMenu(false);
                             }}
-                            className="relative p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-card rounded-full transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
-                            aria-label="Notificaciones"
+                            className="relative p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-card rounded-full transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue focus-visible:outline-none"
+                            aria-label={notifications.length > 0 ? `Notificaciones (${notifications.length} nuevas)` : "Notificaciones"}
+                            aria-expanded={showNotifications}
                         >
                             <Bell size={20} />
                             {notifications.length > 0 && (
@@ -163,11 +177,11 @@ export function Header({
 
                         {/* Dropdown de notificaciones */}
                         {showNotifications && (
-                            <div className="absolute right-0 top-12 w-80 bg-white dark:bg-graphito-card border border-slate-200 dark:border-graphito-border rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 z-50 overflow-hidden">
+                            <div className="absolute right-0 top-12 w-80 bg-white/90 dark:bg-graphito-card/90 backdrop-blur-xl border border-slate-200/80 dark:border-white/[0.08] rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/50 z-50 overflow-hidden">
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-graphito-border">
                                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
                                     {notifications.length > 0 && (
-                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-graphito-dark px-2 py-0.5 rounded-full">
+                                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-graphito-dark px-2 py-0.5 rounded-full">
                                             {notifications.length}
                                         </span>
                                     )}
@@ -188,10 +202,10 @@ export function Header({
                                                         <p className="text-xs font-semibold text-slate-800 dark:text-white leading-tight">
                                                             Comparación terminada
                                                         </p>
-                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
+                                                        <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-tight">
                                                             {notif.comparison.title}
                                                         </p>
-                                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                                                             {notif.comparison.subtitle}
                                                         </p>
                                                     </div>
@@ -202,9 +216,9 @@ export function Header({
                                                             e.stopPropagation();
                                                             handleReportClick(notif.comparison);
                                                         }}
-                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-graphito-blue bg-graphito-blue/10 dark:text-white dark:bg-graphito-blue/20 hover:bg-graphito-blue/30 rounded-lg transition-colors"
+                                                        className="flex items-center gap-1 px-3 py-1.5 min-h-[32px] text-[11px] font-bold text-graphito-blue bg-graphito-blue/10 dark:text-white dark:bg-graphito-blue/20 hover:bg-graphito-blue/30 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
                                                     >
-                                                        <FileText size={11} />
+                                                        <FileText size={12} />
                                                         Reporte
                                                     </button>
                                                     <button
@@ -212,16 +226,16 @@ export function Header({
                                                             e.stopPropagation();
                                                             dismissNotification(notif.id);
                                                         }}
-                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-dark rounded-lg transition-colors"
+                                                        className="flex items-center gap-1 px-3 py-1.5 min-h-[32px] text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-dark rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
                                                     >
-                                                        <X size={11} />
+                                                        <X size={12} />
                                                         Cerrar
                                                     </button>
                                                 </div>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="px-4 py-8 text-center text-xs text-slate-500">
+                                        <div className="px-4 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
                                             No hay notificaciones
                                         </div>
                                     )}
@@ -240,8 +254,9 @@ export function Header({
                                 setShowUserMenu(!showUserMenu);
                                 setShowNotifications(false);
                             }}
-                            className="flex items-center gap-3 pl-2 cursor-pointer group rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue/50 focus-visible:outline-none"
+                            className="flex items-center gap-3 pl-2 min-h-[44px] cursor-pointer group rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue focus-visible:outline-none"
                             aria-label="Menú de usuario"
+                            aria-expanded={showUserMenu}
                         >
                             <div className="relative">
                                 <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-graphito-card border border-slate-200 dark:border-graphito-border overflow-hidden ring-2 ring-transparent group-hover:ring-graphito-blue/50 transition-all">
@@ -262,12 +277,12 @@ export function Header({
 
                         {/* Dropdown del usuario */}
                         {showUserMenu && (
-                            <div className="absolute right-0 top-12 w-48 bg-white dark:bg-graphito-card border border-slate-200 dark:border-graphito-border rounded-xl shadow-2xl shadow-black/10 dark:shadow-black/40 z-50 overflow-hidden">
+                            <div className="absolute right-0 top-12 w-48 bg-white/90 dark:bg-graphito-card/90 backdrop-blur-xl border border-slate-200/80 dark:border-white/[0.08] rounded-xl shadow-2xl shadow-black/10 dark:shadow-black/50 z-50 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-slate-200 dark:border-graphito-border">
                                     <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                                         {currentUser?.nombre || "Docente"}
                                     </p>
-                                    <p className="text-[10px] text-slate-500 truncate">
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                                         {currentUser?.email || "docente@graphito.edu"}
                                     </p>
                                 </div>
@@ -277,7 +292,7 @@ export function Header({
                                             e.stopPropagation();
                                             handleLogout();
                                         }}
-                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-dark transition-colors"
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
                                     >
                                         <span>Cerrar sesión</span>
                                     </button>

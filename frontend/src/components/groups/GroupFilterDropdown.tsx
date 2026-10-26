@@ -43,10 +43,10 @@ export function GroupFilterDropdown({
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 border ${
+                className={`flex items-center gap-2.5 px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-semibold transition-all duration-200 border backdrop-blur-md shadow-sm ${
                     selectedGroupId !== null
-                        ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400 dark:text-cyan-300 shadow-sm shadow-cyan-500/10"
-                        : "bg-surface-elevated/80 border-line-subtle text-content-secondary hover:text-content-primary hover:border-line-strong"
+                        ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-300 shadow-sm shadow-cyan-500/10"
+                        : "bg-white/25 dark:bg-graphito-card/15 border-slate-200/60 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-graphito-blue/40"
                 }`}
                 title="Filtrar biblioteca por curso o grupo académico"
             >
@@ -65,7 +65,7 @@ export function GroupFilterDropdown({
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-2xl bg-surface-elevated/95 backdrop-blur-xl border border-line-subtle shadow-2xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-2xl bg-white/90 dark:bg-graphito-card/90 backdrop-blur-xl border border-slate-200/80 dark:border-white/[0.08] shadow-2xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
                     <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-content-muted flex items-center justify-between">
                         <span>Filtrar por Curso</span>
                         <FolderKanban size={12} />
