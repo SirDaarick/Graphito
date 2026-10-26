@@ -34,6 +34,11 @@ async def test_list_catalog_grouped_without_code(client: AsyncClient):
     assert res.status_code == 200, res.text
     subjects = res.json()
     assert len(subjects) == 3
+    assert [s["materia"] for s in subjects] == [
+        "fundamentos_programación",
+        "algoritmos_estructuras_datos",
+        "analisis_diseño_algoritmos",
+    ]
     assert sum(s["total"] for s in subjects) == 84
     assert not any("paradigmas" in s["materia"] for s in subjects)
 

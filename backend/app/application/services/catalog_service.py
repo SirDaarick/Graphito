@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 CATALOG_AUTHOR = "Catálogo ESCOM"
 
+SUBJECT_ORDER = {
+    "fundamentos_programación": 0,
+    "algoritmos_estructuras_datos": 1,
+    "analisis_diseño_algoritmos": 2,
+}
+
 
 class CatalogService:
     def __init__(
@@ -57,7 +63,7 @@ class CatalogService:
             subject.total += 1
         for subject in subjects.values():
             subject.unidades.sort(key=lambda u: unit_sort_key(u.unidad))
-        return list(subjects.values())
+        return sorted(subjects.values(), key=lambda s: SUBJECT_ORDER.get(s.materia, 999))
 
     def _require_entry(self, entry_id: str) -> CatalogEntry:
         entry = get_catalog_entry(entry_id)

@@ -27,7 +27,7 @@ def test_no_invented_score_fallbacks():
     modal = _read("pages/SimilarityReportModal.tsx")
     assert not re.search(r"(\?\?|:)\s*(62|85)\s*[;)]", modal)
     assert "overallScore > 70" not in modal
-    assert not re.search(r"\?\?\s*3\b", _read("components/xai/EvidenceDrawer.tsx"))
+    assert not re.search(r"\?\?\s*3\b", _read("components/report/ReportMetrics.tsx"))
     for rel, text in _all_sources().items():
         # NULL scores are never coerced to 0% (`rep ? x * 100 : 0` and friends).
         assert not re.search(r"similitud_semantica\s*\*\s*100\)\s*:\s*0\b", text), rel
@@ -71,9 +71,9 @@ def test_verdict_mapping_never_falls_back_to_conforme():
 def test_indicators_default_to_neutral_and_lookups_ignore_prototype_keys():
     # A row without categoria/origen must not be promoted to a calibrated decision row.
     assert not re.search(r"categoria\s*\?\?\s*[\"']GENERAL[\"']", _read("pages/SimilarityReportModal.tsx"))
-    assert not re.search(r"categoria\s*\?\?\s*[\"']GENERAL[\"']", _read("components/xai/EvidenceDrawer.tsx"))
+    assert not re.search(r"categoria\s*\?\?\s*[\"']GENERAL[\"']", _read("components/report/ReportMetrics.tsx"))
     # Plain-object label maps indexed by backend strings resolve 'constructor', 'toString', ...
-    for rel in ("lib/dictamen.ts", "lib/evidence.ts", "components/xai/EvidenceDrawer.tsx"):
+    for rel in ("lib/dictamen.ts", "lib/evidence.ts", "components/report/ReportMetrics.tsx"):
         assert (SRC / rel).is_file(), f"contract file missing: {rel}"
         text = _read(rel)
         assert not re.search(r"[A-Z_]{4,}\[[^\]]+\]\s*\?\?", text), rel
@@ -87,7 +87,7 @@ def test_ui_shows_method_engine_calibration_gcb_and_label():
     assert "No validado contra plagio derivado de la referencia" in texts
     assert "STUB" in _read("pages/SimilarityReportModal.tsx")
     assert "estado_calibracion" in _read("pages/SimilarityReportModal.tsx")
-    assert "Heurística" in _read("components/xai/EvidenceDrawer.tsx")
+    assert "Heurística" in _read("lib/evidence.ts")
 
 
 def test_report_type_is_nullable_and_has_provenance():

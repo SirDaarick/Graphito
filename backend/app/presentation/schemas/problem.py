@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
+from app.presentation.schemas.submission import CodigoFuenteResponse
 
 
 class ProblemaCreate(BaseModel):
@@ -26,3 +27,4 @@ class ProblemaResponse(BaseModel):
     fecha_creacion: datetime
     catalogo_id: Optional[str] = None
     archivado: bool = False
+    entregas: Optional[List[CodigoFuenteResponse]] = None

@@ -50,14 +50,41 @@ class ProblemService:
         return ProblemaResponse.model_validate(problema)
 
     async def list_problems(
-        self, docente_id: int, include_archived: bool = False
+        self, docente_id: int, include_archived: bool = False, with_submissions: bool = False
     ) -> List[ProblemaResponse]:
         stmt = select(Problema).where(Problema.docente_id == docente_id)
         if not include_archived:
             stmt = stmt.where(Problema.archivado.is_(False))
+        if with_submissions:
+            stmt = stmt.options(
+                selectinload(Problema.codigos)
+                .selectinload(CodigoFuente.reportes_entrega)
+                .selectinload(ReporteAnalisis.indicadores)
+            )
         result = await self.db.execute(stmt)
         problemas = result.scalars().all()
-        return [ProblemaResponse.model_validate(p) for p in problemas]
+        if not with_submissions:
+            return [ProblemaResponse.model_validate(p) for p in problemas]
+
+        response_list: List[ProblemaResponse] = []
+        for p in problemas:
+            resp = ProblemaResponse.model_validate(p)
+            entregas_resp: List[CodigoFuenteResponse] = []
+            alumno_codigos = [c for c in p.codigos if c.tipo == TipoCodigoEnum.ENTREGA_ALUMNO]
+            alumno_codigos.sort(key=lambda c: c.created_at, reverse=True)
+            for c in alumno_codigos:
+                c_resp = CodigoFuenteResponse.model_validate(c)
+                if c.reportes_entrega:
+                    sorted_reports = sorted(
+                        c.reportes_entrega,
+                        key=lambda r: r.fecha_analisis,
+                        reverse=True,
+                    )
+                    c_resp.reporte = ReporteAnalisisResponse.model_validate(sorted_reports[0])
+                entregas_resp.append(c_resp)
+            resp.entregas = entregas_resp
+            response_list.append(resp)
+        return response_list
 
     async def set_archived(self, docente_id: int, problema_id: int, archived: bool) -> ProblemaResponse:
         problema = await self.get_problem(docente_id, problema_id)

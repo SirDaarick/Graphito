@@ -28,11 +28,12 @@ async def create_problem(
 @router.get("/", response_model=List[ProblemaResponse])
 async def list_problems(
     include_archived: bool = False,
+    with_submissions: bool = False,
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
     service = ProblemService(db)
-    return await service.list_problems(current_user.id, include_archived)
+    return await service.list_problems(current_user.id, include_archived, with_submissions)
 
 
 @router.post("/{problem_id}/archive", response_model=ProblemaResponse)
