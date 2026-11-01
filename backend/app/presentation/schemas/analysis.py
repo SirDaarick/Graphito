@@ -143,6 +143,25 @@ class ReporteAnalisisResponse(BaseModel):
         return "calibrado"
 
 
+class LineaEstiloResponse(BaseModel):
+    numero_linea: int
+    aporte: float
+
+
+class StyleAttributionResponse(BaseModel):
+    """Occlusion attribution over lines: an approximation, never a verdict (`aproximacion` is always true).
+
+    `probabilidad` is the CharCNN raw (uncalibrated) score of the file, None when it is too short to score.
+    `aporte` is how much the raw score drops when the line is removed, in log-odds units (the probability
+    saturates near 1.0); read it as a relative size, not as a probability.
+    """
+
+    metodo: str = "oclusion_por_linea"
+    probabilidad: Optional[float] = None
+    lineas: List[LineaEstiloResponse] = []
+    aproximacion: bool = True
+
+
 class ReportCodeComparisonResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -6,6 +6,7 @@ import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
 import { clearVerdict, getVerdict, saveVerdict } from "../lib/verdicts";
 import { calibrationLabel } from "../lib/dictamen";
 import { evidenceByLine } from "../lib/evidence";
+import type { StyleAttribution } from "../lib/styleAttribution";
 import { useDialogFocus } from "../lib/focusTrap";
 import { TOUR_REPORT_VIEW_EVENT } from "../lib/tour/reportView";
 import type { TourReportView } from "../lib/tour/types";
@@ -93,6 +94,7 @@ export function SimilarityReportModal({
     const [codeData, setCodeData] = useState<CodeData | null>(null);
     const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
     const [comments, setComments] = useState<ComentarioRevisionItem[]>([]);
+    const [styleAttribution, setStyleAttribution] = useState<StyleAttribution | null>(null);
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
     const [triageToast, setTriageToast] = useState<{ message: string; type: "success" | "warning"; undo: () => void } | null>(null);
@@ -224,6 +226,13 @@ export function SimilarityReportModal({
             .then((list) => isCurrent() && setComments(list))
             .catch(() => isCurrent() && setComments([]));
 
+        // Approximation computed on demand; if it fails the view falls back to the literal differences.
+        setStyleAttribution(null);
+        api.analysis
+            .getStyleAttribution(repId)
+            .then((data) => isCurrent() && setStyleAttribution(data))
+            .catch(() => isCurrent() && setStyleAttribution(null));
+
         api.analysis
             .getCode(repId)
             .then((data) => {
@@ -252,6 +261,7 @@ export function SimilarityReportModal({
         setCodeData(null);
         setCodeStatus("idle");
         setComments([]);
+        setStyleAttribution(null);
         if (!isOpen) setViewMode("report");
     }, [isOpen, reportId]);
 
@@ -587,6 +597,7 @@ export function SimilarityReportModal({
                                     onDeleteComment={handleDeleteComment}
                                     isSubmittingComment={isSubmittingComment}
                                     evidence={lineEvidence}
+                                    styleAttribution={styleAttribution}
                                     paneHeight={paneHeight}
                                     onRetry={() => reportId !== null && loadCode(reportId)}
                                 />
@@ -681,12 +692,13 @@ interface CodeViewProps {
     onDeleteComment: (commentId: number) => Promise<void>;
     isSubmittingComment: boolean;
     evidence: ReturnType<typeof evidenceByLine>;
+    styleAttribution: StyleAttribution | null;
     paneHeight: string;
     onRetry: () => void;
 }
 
 /** The optional second view: loading, error with retry, or the side-by-side comparison. */
-function CodeView({ status, codeData, reportId, evidence, paneHeight, onRetry, ...viewer }: CodeViewProps) {
+function CodeView({ status, codeData, reportId, evidence, styleAttribution, paneHeight, onRetry, ...viewer }: CodeViewProps) {
     if (status === "error") {
         return (
             <div role="alert" className="flex flex-col items-center justify-center gap-3 py-20 text-center">
@@ -723,6 +735,7 @@ function CodeView({ status, codeData, reportId, evidence, paneHeight, onRetry, .
                 language={codeData.language}
                 reportId={reportId}
                 evidence={evidence}
+                styleLines={styleAttribution?.lineas}
                 paneHeight="h-full"
                 {...viewer}
             />

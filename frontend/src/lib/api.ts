@@ -23,6 +23,8 @@ import {
     formatPct,
 } from "./dictamen";
 
+import type { StyleAttribution } from "./styleAttribution";
+
 export const IS_DEMO_MODE: boolean =
     import.meta.env.DEMO_MODE === "true" ||
     import.meta.env.VITE_DEMO_MODE === "true";
@@ -568,6 +570,22 @@ export const api = {
                 return DEMO_CODE_COMPARISONS[reportId] || DEMO_CODE_COMPARISONS[101];
             }
             return request<ReportCodeComparison>(`/analysis/reports/${reportId}/code`);
+        },
+        /** Lines that most influence the CharCNN style score (occlusion approximation). */
+        async getStyleAttribution(reportId: number): Promise<StyleAttribution> {
+            if (IS_DEMO_MODE) {
+                return {
+                    metodo: "oclusion_por_linea",
+                    probabilidad: 0.18,
+                    lineas: [
+                        { numero_linea: 4, aporte: 0.04 },
+                        { numero_linea: 7, aporte: 0.025 },
+                        { numero_linea: 9, aporte: 0.01 },
+                    ],
+                    aproximacion: true,
+                };
+            }
+            return request<StyleAttribution>(`/analysis/reports/${reportId}/style-attribution`);
         },
         async uploadBatch(
             problemaId: number,

@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { MessageSquare, MessageSquarePlus, Plus, Trash2, X, Send, User, ChevronDown, ChevronUp } from "lucide-react";
 import { SynthwaveLine } from "./SynthwaveHighlighter";
 import type { LineEvidence } from "../../lib/evidence";
+import { styleIntensityByLine, type LineaEstilo, type StyleIntensity } from "../../lib/styleAttribution";
 
 export interface ComentarioRevisionItem {
     id: number;
@@ -35,8 +36,22 @@ interface SideBySideDiffViewerProps {
     onDeleteComment: (commentId: number) => Promise<void>;
     isSubmittingComment?: boolean;
     evidence?: Map<number, LineEvidence[]>;
+    /** Style-attribution lines (approximation); undefined while unavailable. */
+    styleLines?: LineaEstilo[];
     paneHeight?: string;
 }
+
+type HighlightMode = "estilo" | "literal";
+
+const STYLE_LEGEND =
+    "Líneas que más influyen en el puntaje de estilo (aproximación: se quita cada línea y se mide el cambio).";
+
+/** Neutral violet (the "Estilo del código" accent), stronger with the contribution. */
+const STYLE_ROW_CLASS: Record<StyleIntensity, string> = {
+    1: "bg-violet-500/10 hover:bg-violet-500/15 shadow-[inset_3px_0_0_rgba(139,92,246,0.5)]",
+    2: "bg-violet-500/20 hover:bg-violet-500/25 shadow-[inset_3px_0_0_rgba(139,92,246,0.7)]",
+    3: "bg-violet-500/30 hover:bg-violet-500/35 shadow-[inset_3px_0_0_rgba(139,92,246,0.95)]",
+};
 
 interface LineTip {
     line: number;
@@ -59,8 +74,12 @@ export function SideBySideDiffViewer({
     onDeleteComment,
     isSubmittingComment = false,
     evidence = NO_EVIDENCE,
+    styleLines,
     paneHeight,
 }: SideBySideDiffViewerProps) {
+    const [highlightMode, setHighlightMode] = useState<HighlightMode>("estilo");
+    const toggleLabelId = useId();
+    const styleIntensity = useMemo(() => styleIntensityByLine(styleLines), [styleLines]);
     const leftScrollRef = useRef<HTMLDivElement>(null);
     const rightScrollRef = useRef<HTMLDivElement>(null);
     const isScrollingRef = useRef<"left" | "right" | null>(null);
@@ -159,12 +178,59 @@ export function SideBySideDiffViewer({
                     <span className="inline-block w-3 h-3 rounded-sm bg-amber-400/20 shadow-[inset_3px_0_0_rgba(251,191,36,0.9)]" aria-hidden="true" />
                     Línea con una observación (pasa el cursor o enfócala para leerla)
                 </li>
-                <li className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-3 rounded-sm bg-fuchsia-950/60 border border-fuchsia-500/30" aria-hidden="true" />
-                    Línea distinta a la de la referencia
-                </li>
-                <li className="text-slate-400">
-                    Los nombres renombrados no se enlazan: la comparación se hace por posición de línea.
+                {highlightMode === "estilo" ? (
+                    <li data-tour="style-lines" className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                            <span className="inline-block w-3 h-3 rounded-sm bg-violet-500/10 shadow-[inset_3px_0_0_rgba(139,92,246,0.5)]" />
+                            <span className="inline-block w-3 h-3 rounded-sm bg-violet-500/20 shadow-[inset_3px_0_0_rgba(139,92,246,0.7)]" />
+                            <span className="inline-block w-3 h-3 rounded-sm bg-violet-500/30 shadow-[inset_3px_0_0_rgba(139,92,246,0.95)]" />
+                        </span>
+                        {styleLines === undefined
+                            ? "Aproximación de estilo no disponible por ahora."
+                            : styleLines.length === 0
+                            ? `${STYLE_LEGEND} Ninguna línea destaca en esta entrega.`
+                            : STYLE_LEGEND}
+                    </li>
+                ) : (
+                    <>
+                        <li className="flex items-center gap-1.5">
+                            <span className="inline-block w-3 h-3 rounded-sm bg-fuchsia-950/60 border border-fuchsia-500/30" aria-hidden="true" />
+                            Línea distinta a la de la referencia
+                        </li>
+                        <li className="text-slate-400">
+                            Los nombres renombrados no se enlazan: la comparación se hace por posición de línea.
+                        </li>
+                    </>
+                )}
+                <li className="ml-auto flex items-center gap-2">
+                    <span id={toggleLabelId} className="text-slate-400">Resaltar:</span>
+                    <div
+                        data-tour="highlight-toggle"
+                        role="group"
+                        aria-labelledby={toggleLabelId}
+                        className="inline-flex overflow-hidden rounded-lg border border-violet-500/40"
+                    >
+                        {(
+                            [
+                                ["estilo", "Estilo"],
+                                ["literal", "Diferencias literales"],
+                            ] as const
+                        ).map(([mode, label]) => (
+                            <button
+                                key={mode}
+                                type="button"
+                                aria-pressed={highlightMode === mode}
+                                onClick={() => setHighlightMode(mode)}
+                                className={`px-2.5 py-1 text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-300 ${
+                                    highlightMode === mode
+                                        ? "bg-violet-500/30 text-violet-100"
+                                        : "bg-transparent text-slate-300 hover:bg-violet-500/10"
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </li>
             </ul>
 
@@ -302,7 +368,8 @@ export function SideBySideDiffViewer({
                                 const lineNum = index + 1;
                                 const refLine = refLines[index] ?? "";
                                 const stuLine = stuLines[index] ?? "";
-                                const isDiff = refLine !== stuLine;
+                                const isDiff = highlightMode === "literal" && refLine !== stuLine;
+                                const styleLevel = highlightMode === "estilo" ? styleIntensity.get(lineNum) : undefined;
                                 const lineEvidence = evidence.get(lineNum);
                                 const lineComments = commentsByLine.get(lineNum) || [];
                                 const isComposerActive = activeCommentLine === lineNum;
@@ -321,6 +388,8 @@ export function SideBySideDiffViewer({
                                             className={`group transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300/70 ${
                                                 lineEvidence
                                                     ? "bg-amber-400/10 hover:bg-amber-400/20 shadow-[inset_3px_0_0_rgba(251,191,36,0.9)] cursor-help"
+                                                    : styleLevel
+                                                    ? STYLE_ROW_CLASS[styleLevel]
                                                     : isDiff
                                                     ? "bg-fuchsia-950/20 hover:bg-fuchsia-950/30"
                                                     : "hover:bg-[#251d38]/50"
@@ -456,7 +525,7 @@ export function SideBySideDiffViewer({
                                 const lineNum = index + 1;
                                 const refLine = refLines[index] ?? "";
                                 const stuLine = stuLines[index] ?? "";
-                                const isDiff = refLine !== stuLine;
+                                const isDiff = highlightMode === "literal" && refLine !== stuLine;
 
                                 return (
                                     <tr

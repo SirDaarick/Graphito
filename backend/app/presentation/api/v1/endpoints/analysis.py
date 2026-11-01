@@ -1,6 +1,9 @@
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
+from app.domain.ports.inference_port import InferencePort
+from app.infrastructure.inference import get_inference_engine, runtime as inference_runtime
+from app.application.services.style_attribution_service import StyleAttributionService
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
@@ -18,6 +21,7 @@ from app.presentation.schemas.analysis import (
     ReporteAnalisisResponse,
     ReportCodeComparisonResponse,
     IndicadorResponse,
+    StyleAttributionResponse,
 )
 from app.presentation.schemas.batch import (
     BatchUploadResponse,
@@ -166,6 +170,35 @@ async def get_report_code(
         indicadores=indicadores_resp,
         metricas_codigo=metricas,
     )
+
+
+@router.get("/reports/{report_id}/style-attribution", response_model=StyleAttributionResponse)
+async def get_report_style_attribution(
+    report_id: int,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+    engine: InferencePort = Depends(get_inference_engine),
+):
+    """
+    Aproximación por oclusión: líneas que más influyen en el puntaje de estilo (CharCNN). Se quita cada
+    línea y se mide el cambio del puntaje; no es un dictamen ni una detección por línea.
+    """
+    orchestrator = AnalysisOrchestrator(db)
+    report = await orchestrator.get_report_model(report_id)
+    if (
+        report.entrega
+        and report.entrega.problema
+        and report.entrega.problema.docente_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para ver esta entrega.",
+        )
+    runtime = inference_runtime.get_runtime()
+    manifest_sha = getattr(getattr(runtime, "calibration", None), "manifest_sha256", "") or ""
+    service = StyleAttributionService(engine, model_id=str(manifest_sha))
+    code = report.entrega.contenido if report.entrega else ""
+    return await service.compute(report.entrega_id, code or "")
 
 
 @router.post("/batch", response_model=BatchUploadResponse, status_code=status.HTTP_202_ACCEPTED)
