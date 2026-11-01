@@ -1,4 +1,9 @@
-export type TourFlow = "own" | "library";
+import type { ExampleSummary } from "../api";
+
+export type TourFlow = "own" | "library" | "examples";
+
+/** Side of the report modal a step needs: the metric cards or the side-by-side code. */
+export type TourReportView = "summary" | "code";
 
 export type TourPlacement = "top" | "bottom" | "left" | "right";
 
@@ -34,10 +39,18 @@ export interface TourStep {
     scopedToProblem?: boolean;
     /** Last card of a flow. */
     final?: boolean;
+    /** Route to open when the step starts (e.g. a report); null/absent means stay where the user is. */
+    enterRoute?: (context: TourContext) => string | null;
+    /** Report modal view to show when the step starts. */
+    reportView?: TourReportView;
+    /** The library page selects the example group while this step is current. */
+    showGroup?: boolean;
 }
 
 export interface TourContext {
     problemId: number | null;
+    /** Set only by the examples flow: the group and reports it walks through. */
+    examples?: ExampleSummary;
 }
 
 export type TourStatus = "idle" | "choosing" | "running";

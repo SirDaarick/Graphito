@@ -115,6 +115,24 @@ export interface Grupo {
     total_problemas?: number;
     total_entregas?: number;
     archivado?: boolean;
+    /** True for the preloaded "Ejemplo" group. */
+    es_ejemplo?: boolean;
+}
+
+/** The four kinds of submission the example group shows for each of its problems. */
+export type ExampleCase = "identical" | "similar" | "different" | "ai";
+
+/** Response of `POST /examples/ensure`: the example group and the reports the guided tour opens. */
+export interface ExampleSummary {
+    grupo_id: number;
+    /** False when the group already existed. */
+    creado: boolean;
+    problemas: { problema_id: number; titulo: string }[];
+    recorrido: {
+        problema_id: number;
+        /** Report id of each case, openable at `/reporte/:id`. */
+        casos: Record<ExampleCase, number>;
+    };
 }
 
 export interface GrupoProblema {
@@ -195,6 +213,8 @@ export interface ReportScoring {
     versiones_modelo?: Record<string, string | number | null> | null;
     etiqueta_validacion?: string;
     estado_calibracion?: "calibrado" | "no_calibrado" | "stub" | "legacy" | string | null;
+    /** True when the submission belongs to the preloaded "Ejemplo" group. */
+    es_ejemplo?: boolean;
 }
 
 export interface ReporteAnalisis extends ReportScoring {
@@ -735,6 +755,16 @@ export const api = {
             return request<Problema>(`/catalog/${encodeURIComponent(id)}/use`, {
                 method: "POST",
             });
+        },
+    },
+
+    examples: {
+        /** Creates the teacher's "Ejemplo" group if it is missing (idempotent) and describes it. */
+        async ensure(): Promise<ExampleSummary> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, DEMO_READ_ONLY);
+            }
+            return request<ExampleSummary>("/examples/ensure", { method: "POST" });
         },
     },
 

@@ -2,10 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { computeTooltipPosition } from "../../lib/tour/geometry";
-import { currentStep, resolveTargetSelectors, routeAdvancesStep, stepProgress } from "../../lib/tour/machine";
+import { currentStep, resolveTargetSelectors, routeAdvancesStep, stepEntryPath, stepProgress } from "../../lib/tour/machine";
+import { requestReportView } from "../../lib/tour/reportView";
 import { otherFlow } from "../../lib/tour/steps";
 import type { Size } from "../../lib/tour/types";
-import { navigate, subscribeToRoute } from "../../lib/router";
+import { matchRoute, navigate, normalizePath, subscribeToRoute } from "../../lib/router";
 import { useTour } from "./TourContext";
 import { TourTooltip } from "./TourTooltip";
 import { useTourTarget } from "./useTourTarget";
@@ -25,10 +26,12 @@ function isFilled(element: HTMLElement | null): boolean {
 }
 
 export function TourOverlay() {
-    const { state, next, back, goTo, exit, choose } = useTour();
+    const { state, next, back, goTo, exit, choose, open } = useTour();
     const step = currentStep(state);
     const { current, total } = stepProgress(state);
     const problemId = state.context.problemId;
+    const entryPath = step ? stepEntryPath(step, state.context) : null;
+    const reportView = step?.reportView;
 
     const selectors = useMemo(() => (step ? resolveTargetSelectors(step, { problemId }) : []), [step, problemId]);
     const target = useTourTarget(selectors, step?.id ?? null);
@@ -54,6 +57,17 @@ export function TourOverlay() {
         const timer = window.setTimeout(() => setMoving(false), MOVE_TRANSITION_MS);
         return () => window.clearTimeout(timer);
     }, [stepId]);
+
+    // A step may open its own route (a report) and the view of it that its target lives in.
+    useEffect(() => {
+        if (!stepId) return;
+        if (entryPath && normalizePath(window.location.pathname) !== normalizePath(entryPath)) {
+            // Between reports the history entry is replaced, so closing the modal still goes back once.
+            const fromReport = matchRoute("/reporte/:id", window.location.pathname).isMatch;
+            navigate(entryPath, { replace: fromReport, state: { fromGraphito: true } });
+        }
+        if (reportView) requestReportView(reportView);
+    }, [stepId, entryPath, reportView]);
 
     // Missing target: dim first, offer a spinner, then a way to recover.
     useEffect(() => {
@@ -193,11 +207,15 @@ export function TourOverlay() {
                     filled={filled}
                     position={position}
                     recoverLabel={recoverLabel}
+                    otherFlowLabel={state.flow === "examples" ? "Elegir otro recorrido" : "Probar el otro flujo"}
                     onNext={() => next(step.id)}
                     onBack={back}
                     onExit={exit}
                     onRecover={recover}
-                    onOtherFlow={() => state.flow && choose(otherFlow(state.flow))}
+                    onOtherFlow={() => {
+                        if (state.flow === "examples") open();
+                        else if (state.flow) choose(otherFlow(state.flow));
+                    }}
                 />
             )}
 

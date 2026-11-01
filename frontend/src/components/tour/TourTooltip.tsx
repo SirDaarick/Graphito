@@ -16,6 +16,8 @@ interface TourTooltipProps {
     /** Anchored next to the target; omit for a card centered on screen. */
     position?: TooltipPosition;
     recoverLabel?: string;
+    /** Label of the secondary button on the final card. */
+    otherFlowLabel: string;
     onNext: () => void;
     onBack: () => void;
     onExit: () => void;
@@ -34,7 +36,7 @@ const ARROW_BY_PLACEMENT: Record<TourPlacement, { side: "top" | "bottom" | "left
 const ARROW_SIZE = 14;
 
 export const TourTooltip = forwardRef<HTMLDivElement, TourTooltipProps>(function TourTooltip(
-    { step, mode, current, total, isFirst, filled, position, recoverLabel, onNext, onBack, onExit, onRecover, onOtherFlow },
+    { step, mode, current, total, isFirst, filled, position, recoverLabel, otherFlowLabel, onNext, onBack, onExit, onRecover, onOtherFlow },
     ref
 ) {
     const isLost = mode === "lost";
@@ -126,7 +128,7 @@ export const TourTooltip = forwardRef<HTMLDivElement, TourTooltipProps>(function
                     ) : step.final ? (
                         <>
                             <Button variant="ghost" size="sm" onClick={onOtherFlow}>
-                                Probar el otro flujo
+                                {otherFlowLabel}
                             </Button>
                             <Button variant="gradient" size="sm" onClick={onNext}>
                                 Finalizar

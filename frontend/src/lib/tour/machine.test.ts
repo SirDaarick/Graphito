@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest";
+import type { ExampleSummary } from "../api";
 import {
     INITIAL_TOUR_STATE,
     currentStep,
     resolveTargetSelectors,
     routeAdvancesStep,
+    stepEntryPath,
     stepProgress,
+    tourGroupId,
     tourReducer,
 } from "./machine";
 import { getSteps } from "./steps";
 import type { TourAction } from "./machine";
 import type { TourState } from "./types";
+
+const EXAMPLES: ExampleSummary = {
+    grupo_id: 7,
+    creado: false,
+    problemas: [{ problema_id: 31, titulo: "Ejemplo" }],
+    recorrido: { problema_id: 31, casos: { identical: 101, similar: 102, different: 103, ai: 104 } },
+};
 
 function run(actions: TourAction[], from: TourState = INITIAL_TOUR_STATE): TourState {
     return actions.reduce(tourReducer, from);
@@ -71,6 +81,33 @@ describe("tourReducer", () => {
         expect(run([{ type: "choose", flow: "library" }], started).context.problemId).toBeNull();
     });
 
+    it("starts the examples flow with its summary and the showcase problem", () => {
+        const state = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }]);
+        expect(state).toMatchObject({ status: "running", flow: "examples", stepIndex: 0 });
+        expect(state.context).toEqual({ problemId: 31, examples: EXAMPLES });
+        expect(currentStep(state)?.id).toBe("ex-library");
+    });
+
+    it("does not start the examples flow without its summary", () => {
+        const choosing = run([{ type: "open" }]);
+        expect(run([{ type: "choose", flow: "examples" }], choosing)).toBe(choosing);
+    });
+
+    it("drops the examples summary when another flow starts", () => {
+        const started = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }]);
+        const other = run([{ type: "choose", flow: "own" }], started);
+        expect(other.context).toEqual({ problemId: null });
+        expect(other.context.examples).toBeUndefined();
+    });
+
+    it("finishes the examples flow after its own last step", () => {
+        const steps = getSteps("examples");
+        const started = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }]);
+        const atLast = run(Array(steps.length - 1).fill({ type: "next" }), started);
+        expect(currentStep(atLast)?.id).toBe("ex-done");
+        expect(run([{ type: "next" }], atLast)).toEqual(INITIAL_TOUR_STATE);
+    });
+
     it("reports progress over the whole flow", () => {
         const started = run([{ type: "open" }, { type: "choose", flow: "library" }, { type: "next" }]);
         expect(stepProgress(started)).toEqual({ current: 2, total: getSteps("library").length });
@@ -97,6 +134,34 @@ describe("resolveTargetSelectors", () => {
 
     it("returns nothing for a centered card", () => {
         expect(resolveTargetSelectors(done, { problemId: null })).toEqual([]);
+    });
+});
+
+describe("tourGroupId", () => {
+    const start = (flow: "own" | "examples") =>
+        run([{ type: "open" }, flow === "examples" ? { type: "choose", flow, examples: EXAMPLES } : { type: "choose", flow }]);
+
+    it("is the example group only while its library step is current", () => {
+        const first = start("examples");
+        expect(tourGroupId(first)).toBe(7);
+        expect(tourGroupId(run([{ type: "next" }], first))).toBeNull();
+    });
+
+    it("is null outside the examples flow and when idle", () => {
+        expect(tourGroupId(start("own"))).toBeNull();
+        expect(tourGroupId(INITIAL_TOUR_STATE)).toBeNull();
+    });
+});
+
+describe("stepEntryPath", () => {
+    it("resolves the report a step opens from the tour context", () => {
+        const state = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }, { type: "next" }]);
+        expect(stepEntryPath(currentStep(state)!, state.context)).toBe("/reporte/101");
+    });
+
+    it("is null for steps that do not navigate", () => {
+        const state = run([{ type: "open" }, { type: "choose", flow: "own" }]);
+        expect(stepEntryPath(currentStep(state)!, state.context)).toBeNull();
     });
 });
 

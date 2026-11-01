@@ -288,7 +288,7 @@ export function SideBySideDiffViewer({
             </div>
 
             {/* Side by Side Scrolling Area: Left = Student, Right = Teacher Reference */}
-            <div className="grid grid-cols-1 md:grid-cols-2 flex-1 min-h-0 overflow-hidden relative">
+            <div data-tour="code-panes" className="grid grid-cols-1 md:grid-cols-2 flex-1 min-h-0 overflow-hidden relative">
                 {/* Left Side: Student Submission + Inline Comments (Scrollbar hidden, synced with Right) */}
                 <div
                     ref={leftScrollRef}

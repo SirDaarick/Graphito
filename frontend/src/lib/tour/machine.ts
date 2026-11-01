@@ -1,3 +1,4 @@
+import type { ExampleSummary } from "../api";
 import { matchRoute } from "../router";
 import { getSteps } from "./steps";
 import type { TourContext, TourFlow, TourState, TourStep } from "./types";
@@ -11,7 +12,8 @@ export const INITIAL_TOUR_STATE: TourState = {
 
 export type TourAction =
     | { type: "open" }
-    | { type: "choose"; flow: TourFlow }
+    /** The examples flow needs the summary of the group it walks through. */
+    | { type: "choose"; flow: TourFlow; examples?: ExampleSummary }
     /** `from` makes the advance idempotent: it only applies while that step is still current. */
     | { type: "next"; from?: string }
     | { type: "back" }
@@ -26,6 +28,15 @@ export function tourReducer(state: TourState, action: TourAction): TourState {
 
         case "choose":
             if (state.status !== "choosing" && state.status !== "running") return state;
+            if (action.flow === "examples") {
+                if (!action.examples) return state;
+                return {
+                    status: "running",
+                    flow: action.flow,
+                    stepIndex: 0,
+                    context: { problemId: action.examples.recorrido.problema_id, examples: action.examples },
+                };
+            }
             return { status: "running", flow: action.flow, stepIndex: 0, context: { problemId: null } };
 
         case "next": {
@@ -76,6 +87,17 @@ export function resolveTargetSelectors(step: TourStep, context: TourContext): st
         return [`${base}[data-problem-id="${context.problemId}"]`, base];
     }
     return [base];
+}
+
+/** Route the step opens when it starts, or null when it stays where the user is. */
+export function stepEntryPath(step: TourStep, context: TourContext): string | null {
+    return step.enterRoute?.(context) ?? null;
+}
+
+/** Group the library page must select now: the example group during its showcase step. */
+export function tourGroupId(state: TourState): number | null {
+    const step = currentStep(state);
+    return step?.showGroup ? (state.context.examples?.grupo_id ?? null) : null;
 }
 
 /** True when the step advances on a route change and `path` satisfies it. */

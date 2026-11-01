@@ -1,4 +1,5 @@
-import type { TourFlow, TourStep } from "./types";
+import type { ExampleCase } from "../api";
+import type { TourContext, TourFlow, TourStep } from "./types";
 
 const OWN_EXERCISE_STEPS: TourStep[] = [
     {
@@ -154,7 +155,155 @@ const SHARED_TAIL: TourStep[] = [
     },
 ];
 
-const FLOW_HEADS: Record<TourFlow, TourStep[]> = {
+/** Route of the example report for one case, or null when the summary is not loaded. */
+function exampleReport(caso: ExampleCase): (context: TourContext) => string | null {
+    return (context) => {
+        const id = context.examples?.recorrido.casos[caso];
+        return id === undefined ? null : `/reporte/${id}`;
+    };
+}
+
+const LIBRARY_ROUTE = () => "/biblioteca";
+
+/** A report is fetched after its step starts, so its targets may take a while to appear. */
+const REPORT_GRACE_MS = 8000;
+
+/**
+ * "Ver ejemplos": walks the preloaded example group. It has its own ending (the reports
+ * are already analysed) and only describes what each metric measures.
+ */
+const EXAMPLE_STEPS: TourStep[] = [
+    {
+        id: "ex-library",
+        target: "problem-card",
+        title: "Tu grupo Ejemplo",
+        text: "Trae un problema ya analizado con cuatro entregas de muestra.",
+        placement: "bottom",
+        advance: { kind: "manual" },
+        scopedToProblem: true,
+        // The library may still be reloading right after the group was created.
+        graceMs: 8000,
+        enterRoute: LIBRARY_ROUTE,
+        showGroup: true,
+    },
+    {
+        id: "ex-identical-literal",
+        target: "metric-literal",
+        title: "Entrega idéntica",
+        text: "La coincidencia literal mide el texto compartido: aquí es muy alta.",
+        placement: "top",
+        advance: { kind: "manual" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("identical"),
+        reportView: "summary",
+        recoverTo: "ex-library",
+    },
+    {
+        id: "ex-identical-semantic",
+        target: "metric-semantic",
+        title: "Similitud semántica",
+        text: "Compara la lógica con la referencia, aunque cambien los nombres.",
+        placement: "bottom",
+        advance: { kind: "manual" },
+        recoverTo: "ex-identical-literal",
+    },
+    {
+        id: "ex-code-open",
+        target: "view-code",
+        title: "Compara el código",
+        text: "Pulsa «Ver código para comparar» para ver ambos programas.",
+        placement: "bottom",
+        advance: { kind: "click" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("identical"),
+        reportView: "summary",
+        recoverTo: "ex-identical-literal",
+    },
+    {
+        id: "ex-code-panes",
+        target: "code-panes",
+        title: "Entrega y referencia",
+        text: "La entrega y la referencia se muestran juntas; los títulos indican cuál es cuál.",
+        placement: "top",
+        advance: { kind: "manual" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("identical"),
+        reportView: "code",
+        recoverTo: "ex-code-open",
+    },
+    {
+        id: "ex-similar-literal",
+        target: "metric-literal",
+        title: "Mismo problema, otra solución",
+        text: "Escrita por separado, comparte menos texto con la referencia.",
+        placement: "top",
+        advance: { kind: "manual" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("similar"),
+        reportView: "summary",
+        recoverTo: "ex-library",
+    },
+    {
+        id: "ex-similar-code",
+        target: "code-panes",
+        title: "Así se ve su código",
+        text: "Mismo objetivo, otra forma de escribirlo: se marcan las líneas distintas.",
+        placement: "top",
+        advance: { kind: "manual" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("similar"),
+        reportView: "code",
+        recoverTo: "ex-similar-literal",
+    },
+    {
+        id: "ex-different-literal",
+        target: "metric-literal",
+        title: "Código de otro problema",
+        text: "Al ser de otro problema, comparte aún menos texto con la referencia.",
+        placement: "top",
+        advance: { kind: "manual" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("different"),
+        reportView: "summary",
+        recoverTo: "ex-library",
+    },
+    {
+        id: "ex-different-code",
+        target: "code-panes",
+        title: "Programas distintos",
+        text: "Cada lado resuelve algo diferente; se marcan las líneas que difieren.",
+        placement: "top",
+        advance: { kind: "manual" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("different"),
+        reportView: "code",
+        recoverTo: "ex-different-literal",
+    },
+    {
+        id: "ex-ai-style",
+        target: "metric-style",
+        title: "Estilo del código",
+        text: "Mide qué tanto se parece la escritura a código generado por IA.",
+        placement: "bottom",
+        advance: { kind: "manual" },
+        graceMs: REPORT_GRACE_MS,
+        enterRoute: exampleReport("ai"),
+        reportView: "summary",
+        recoverTo: "ex-library",
+    },
+    {
+        id: "ex-done",
+        title: "¡Eso es todo!",
+        text: "Las métricas orientan y la decisión es del docente. Puedes eliminar el grupo Ejemplo y restaurarlo desde «Ver ejemplos».",
+        placement: "bottom",
+        advance: { kind: "manual" },
+        enterRoute: LIBRARY_ROUTE,
+        final: true,
+    },
+];
+
+/** Flows that end with the shared "compare a submission and read the report" tail. */
+const FLOW_HEADS: Record<Exclude<TourFlow, "examples">, TourStep[]> = {
     own: OWN_EXERCISE_STEPS,
     library: LIBRARY_STEPS,
 };
@@ -170,12 +319,19 @@ export const TOUR_FLOWS: { flow: TourFlow; title: string; description: string }[
         title: "Usar un ejercicio de la biblioteca",
         description: "Elige uno precargado y analiza una entrega.",
     },
+    {
+        flow: "examples",
+        title: "Ver ejemplos",
+        description: "Recorre un grupo ya analizado: entrega idéntica, similar, distinta y de IA.",
+    },
 ];
 
 export function getSteps(flow: TourFlow): TourStep[] {
+    if (flow === "examples") return EXAMPLE_STEPS;
     return [...FLOW_HEADS[flow], ...SHARED_TAIL];
 }
 
-export function otherFlow(flow: TourFlow): TourFlow {
+/** The sibling of the two exercise flows; the examples flow has no sibling (it reopens the chooser). */
+export function otherFlow(flow: Exclude<TourFlow, "examples">): Exclude<TourFlow, "examples"> {
     return flow === "own" ? "library" : "own";
 }

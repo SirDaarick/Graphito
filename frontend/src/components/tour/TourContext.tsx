@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { ExampleSummary } from "../../lib/api";
 import type { TourFlow, TourState } from "../../lib/tour/types";
 
 export interface TourApi {
@@ -7,7 +8,8 @@ export interface TourApi {
     hasSeen: boolean;
     open: () => void;
     exit: () => void;
-    choose: (flow: TourFlow) => void;
+    /** The examples flow also needs the summary returned by `api.examples.ensure()`. */
+    choose: (flow: TourFlow, examples?: ExampleSummary) => void;
     /** With `fromStepId`, advances only if that step is still the current one. */
     next: (fromStepId?: string) => void;
     back: () => void;
