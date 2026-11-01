@@ -359,6 +359,7 @@ export function Biblioteca({
     const renderCard = (ref: Reference) => (
         <ReferenceCard
             key={ref.id}
+            problemId={ref.problemId}
             title={ref.title}
             category={ref.category}
             categoryColor={ref.categoryColor as "cyan" | "purple" | "orange"}

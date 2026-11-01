@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, ChevronDown, X, FileText, Sun, Moon } from "lucide-react";
+import { Bell, ChevronDown, X, FileText, Sun, Moon, CircleQuestionMark } from "lucide-react";
 import { GradientButton } from "../ui/GradientButton";
 import { Docente, IS_DEMO_MODE } from "../../lib/api";
 import { useTheme } from "../../context/ThemeContext";
 import { navigate } from "../../lib/router";
+import { useTour } from "../tour/TourContext";
 
 import logo from "../../assets/logo.png";
 
@@ -47,6 +48,7 @@ export function Header({
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const { isDark, toggleTheme } = useTheme();
+    const tour = useTour();
 
     const notifRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
@@ -123,6 +125,7 @@ export function Header({
                                         onNavigate?.(item.key);
                                     }}
                                     aria-current={isActive ? "page" : undefined}
+                                    data-tour={item.key === "catalogo" ? "nav-catalog" : undefined}
                                     className={`font-body text-sm font-semibold min-h-[44px] flex items-center pb-1 border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue rounded-sm ${
                                         isActive
                                             ? "text-slate-900 dark:text-white border-graphito-blue"
@@ -139,9 +142,29 @@ export function Header({
                 {/* Lado Derecho: Acciones y Perfil */}
                 <div className="flex items-center gap-4 sm:gap-6">
 
-                    <GradientButton onClick={onNewCode}>
+                    <GradientButton onClick={onNewCode} data-tour="header-new-code">
                         <span>+ Nuevo código</span>
                     </GradientButton>
+
+                    {/* Guía interactiva: solo con backend real, el modo demo es de solo lectura */}
+                    {!IS_DEMO_MODE && (
+                        <button
+                            type="button"
+                            onClick={tour.open}
+                            className="relative hidden sm:inline-flex items-center justify-center gap-2 p-2.5 lg:px-4 min-w-[44px] min-h-[44px] rounded-full text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-card transition-all focus-visible:ring-2 focus-visible:ring-graphito-blue focus-visible:outline-none"
+                            aria-label="Cómo usar Graphito"
+                            title="Cómo usar"
+                        >
+                            <CircleQuestionMark size={20} className="text-graphito-blue" aria-hidden="true" />
+                            <span className="hidden lg:inline">Cómo usar</span>
+                            {!tour.hasSeen && (
+                                <span className="absolute top-1.5 right-1.5 lg:top-2 lg:right-2 flex h-2.5 w-2.5" aria-hidden="true">
+                                    <span className="absolute inline-flex h-full w-full rounded-full bg-graphito-violet opacity-75 animate-ping" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-graphito-violet" />
+                                </span>
+                            )}
+                        </button>
+                    )}
 
                     {/* Botón Switch Modo Claro / Oscuro */}
                     <button

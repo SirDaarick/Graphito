@@ -102,7 +102,7 @@ export function CatalogProgramModal({
                                         Ya está en tu biblioteca
                                     </span>
                                 )}
-                                <GradientButton onClick={onGoToBiblioteca} className="!py-3 !px-6 !rounded-2xl">
+                                <GradientButton onClick={onGoToBiblioteca} data-tour="catalog-go-library" className="!py-3 !px-6 !rounded-2xl">
                                     <div className="flex items-center gap-2">
                                         <BookOpen size={16} />
                                         <span>Ir a la biblioteca</span>
@@ -112,6 +112,7 @@ export function CatalogProgramModal({
                         ) : (
                             <GradientButton
                                 onClick={handleAdd}
+                                data-tour="catalog-add"
                                 disabled={!program || isAdding}
                                 className="!py-3 !px-6 !rounded-2xl"
                             >

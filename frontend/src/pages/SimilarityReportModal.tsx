@@ -432,7 +432,7 @@ export function SimilarityReportModal({
                                         <ArrowLeft size={18} />
                                     </button>
                                 )}
-                                <div className="min-w-0">
+                                <div className="min-w-0" data-tour="report-title">
                                     <h2 id="report-modal-title" className="text-base sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                                         {inCodeView ? "Comparación de código" : "Reporte de similitud"}
                                     </h2>
@@ -540,6 +540,7 @@ export function SimilarityReportModal({
                                 <span><kbd className={KBD}>Esc</kbd> {inCodeView ? "volver al resumen" : "cerrar"}</span>
                             </div>
                             <div className="flex items-center gap-2.5 ml-auto">
+                                <div className="flex items-center gap-2.5" data-tour="report-verdict">
                                 {/* Validar Conforme */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("conforme")}
@@ -563,6 +564,8 @@ export function SimilarityReportModal({
                                         <span>Marcar para aclarar con el estudiante</span>
                                     </div>
                                 </button>
+
+                                </div>
 
                                 {/* Descargar PDF */}
                                 <button

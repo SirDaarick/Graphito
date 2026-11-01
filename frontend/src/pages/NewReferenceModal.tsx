@@ -7,7 +7,8 @@ import { api, IS_DEMO_MODE } from "../lib/api";
 interface NewReferenceModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess?: () => void;
+    /** Called after the problem and its reference were saved; receives the new problem id. */
+    onSuccess?: (problemId: number) => void;
 }
 
 export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceModalProps) {
@@ -62,7 +63,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
             setDescription("");
             setCode("");
             setFileName(null);
-            onSuccess?.();
+            onSuccess?.(prob.id);
             onClose();
         } catch (err: any) {
             setError(err.message || "Error al agregar la referencia.");
@@ -91,6 +92,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                     <Button
                         type="button"
                         variant="gradient"
+                        data-tour="ref-submit"
                         onClick={handleSubmit}
                         disabled={isLoading}
                         isLoading={isLoading}
@@ -150,7 +152,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
 
             {/* Row: Title & Language */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2 space-y-1.5">
+                <div className="md:col-span-2 space-y-1.5" data-tour="ref-title">
                     <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
                         Título del Problema / Ejercicio
                     </label>
@@ -181,7 +183,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Left Column: Source Code */}
-                <div className="space-y-4">
+                <div className="space-y-4" data-tour="ref-code">
                     <label className="text-[10px] uppercase font-black tracking-widest text-slate-500">
                         Código Fuente {fileName && <span className="text-graphito-blue">({fileName})</span>}
                     </label>
