@@ -10,14 +10,18 @@ like a catalog adoption, so they are embedded and indexed in the vector store.
 reference, a submission, a report), so it is idempotent and also repairs a partial or deleted group.
 """
 
+import asyncio
+import hashlib
 import json
 import logging
 import uuid
+import weakref
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.problem_service import ProblemService
@@ -51,6 +55,93 @@ CATALOG_PREFIX = "ejemplo:"
 FIXTURE_VERSION = 1
 
 
+ADVISORY_LOCK_NAMESPACE = 0x47524150  # "GRAP": first key of the pg advisory lock, the teacher id is the second
+
+# Process-local locks, per event loop (an asyncio.Lock contended in one loop breaks in another).
+_local_locks: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, Dict[int, asyncio.Lock]]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _local_lock(docente_id: int) -> asyncio.Lock:
+    per_loop = _local_locks.setdefault(asyncio.get_running_loop(), {})
+    return per_loop.setdefault(docente_id, asyncio.Lock())
+
+
+@asynccontextmanager
+async def _teacher_lock(db: AsyncSession, docente_id: int):
+    """Mutual exclusion for one teacher's example reconcile.
+
+    Always a process-local `asyncio.Lock` (covers SQLite and the single-worker case). On PostgreSQL
+    it also takes a SESSION-level advisory lock on a dedicated connection: the reconcile commits after
+    every problem, which would end a transaction-level lock (`pg_advisory_xact_lock`) at the first
+    commit; and the request session hands its connection back to the pool on each commit, so a session
+    lock taken on it would be released on another connection. The dedicated connection keeps the lock
+    until the finally block. If the lock cannot be taken it is logged and the reconcile proceeds
+    (the reconcile is idempotent; the lock only prevents duplicates).
+    """
+    async with _local_lock(docente_id):
+        bind = db.bind
+        conn = None
+        if bind is not None and bind.dialect.name == "postgresql":
+            try:
+                conn = await bind.connect()
+                await conn.execute(
+                    text("SELECT pg_advisory_lock(:ns, :id)"), {"ns": ADVISORY_LOCK_NAMESPACE, "id": docente_id}
+                )
+            except Exception:
+                logger.exception("Could not take the advisory lock for teacher %s; continuing without it.", docente_id)
+                if conn is not None:
+                    await conn.close()
+                conn = None
+        try:
+            yield
+        finally:
+            if conn is not None:
+                try:
+                    await conn.execute(
+                        text("SELECT pg_advisory_unlock(:ns, :id)"), {"ns": ADVISORY_LOCK_NAMESPACE, "id": docente_id}
+                    )
+                except Exception:
+                    logger.exception("Could not release the advisory lock for teacher %s.", docente_id)
+                finally:
+                    await conn.close()  # closing the connection also drops any session lock left
+
+
+def _engine_identity(inference: Any) -> Optional[str]:
+    """What makes two engines produce the same embedding: the real engine's pipeline fingerprint
+    (manifest + canonicalization + adapter identity). The STUB is deterministic by class. Anything
+    else is not cached."""
+    fingerprint = getattr(inference, "embedding_fingerprint", None)
+    if isinstance(fingerprint, str) and fingerprint:
+        return f"fp:{fingerprint}"
+    if type(inference).__name__ == "StubInferenceEngine":
+        return "stub"
+    return None
+
+
+class _CachingInference:
+    """Wraps an engine so `extract_semantic_embedding` is memoised; everything else is delegated."""
+
+    def __init__(self, inner: InferencePort, cache: Dict[tuple, List[float]]):
+        self._inner = inner
+        self._cache = cache
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    async def extract_semantic_embedding(self, code: str, lang: str = "c") -> List[float]:
+        identity = _engine_identity(self._inner)
+        if identity is None:
+            return await self._inner.extract_semantic_embedding(code, lang=lang)
+        key = (hashlib.sha256(code.encode("utf-8")).hexdigest(), lang, identity)
+        hit = self._cache.get(key)
+        if hit is None:
+            hit = list(await self._inner.extract_semantic_embedding(code, lang=lang))  # errors are not cached
+            self._cache[key] = hit
+        return list(hit)
+
+
 @dataclass
 class _Created:
     """What one `ensure_examples` call wrote, so a failure can remove exactly that."""
@@ -79,6 +170,8 @@ class ExampleService:
     # --- fixture ----------------------------------------------------------------------------
 
     _fixture_cache: Dict[tuple, Dict[str, Any]] = {}  # per process, keyed by path and mtime
+    # Per process: (sha256 of the code, language, engine identity) -> embedding. Example seeding only.
+    _embedding_cache: Dict[tuple, List[float]] = {}
 
     def _load_fixture(self) -> Dict[str, Any]:
         key = (str(self.fixture_path), self.fixture_path.stat().st_mtime_ns)
@@ -105,11 +198,22 @@ class ExampleService:
     # --- public API -------------------------------------------------------------------------
 
     async def ensure_examples(self, docente_id: int) -> ExampleSummary:
-        """Make sure the teacher has the example group with every example problem and report."""
+        """Make sure the teacher has the example group with every example problem and report.
+
+        The reconcile runs under a per-teacher lock (sign-up seeding and the tour's call can overlap);
+        completeness is checked again once the lock is held, so the loser just reads the winner's work.
+        """
         fixture = self._load_fixture()
         complete = await self._complete_summary(docente_id, fixture)
         if complete is not None:
             return complete
+        async with _teacher_lock(self.db, docente_id):
+            complete = await self._complete_summary(docente_id, fixture)
+            if complete is not None:
+                return complete
+            return await self._reconcile(docente_id, fixture)
+
+    async def _reconcile(self, docente_id: int, fixture: Dict[str, Any]) -> ExampleSummary:
         created = _Created()
         resolved: List[tuple] = []
         try:
@@ -257,7 +361,9 @@ class ExampleService:
         if existing is not None:
             return existing
         reference = fixture_problem["referencia"]
-        stored = await ProblemService(self.db, self.inference, self.vector_store).add_reference_code(
+        # The example references are the same for every teacher: embed each once per process.
+        inference = _CachingInference(self.inference, self._embedding_cache)
+        stored = await ProblemService(self.db, inference, self.vector_store).add_reference_code(
             docente_id, problema.id, reference["autor"], reference["contenido"], fixture_problem["lenguaje"]
         )
         return stored.id
