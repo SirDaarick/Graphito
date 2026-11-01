@@ -40,6 +40,8 @@ interface ReferenceCardProps {
     onAssignToGroup?: () => void;
     onToggleArchive?: () => void;
     onDelete?: () => void;
+    /** Guided tour: keep the submissions list open while true (closed again when it turns false). */
+    forceExpanded?: boolean;
 }
 
 // Colors for language badges: C++ in pink, C in blue (>4.5:1 contrast)
@@ -65,11 +67,20 @@ export function ReferenceCard({
     onAssignToGroup,
     onToggleArchive,
     onDelete,
+    forceExpanded = false,
 }: ReferenceCardProps) {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(forceExpanded);
+    const wasForcedRef = useRef(forceExpanded);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const hasActions = Boolean(onAssignToGroup || onToggleArchive || onDelete);
+
+    // The guided tour opens the list while its step is current and closes it when the step ends.
+    useEffect(() => {
+        if (forceExpanded) setIsExpanded(true);
+        else if (wasForcedRef.current) setIsExpanded(false);
+        wasForcedRef.current = forceExpanded;
+    }, [forceExpanded]);
 
     useEffect(() => {
         if (!isMenuOpen) return;
@@ -296,6 +307,8 @@ export function ReferenceCard({
                     <div className="overflow-hidden">
                         {comparisons.length > 0 && (
                             <div
+                                data-tour="problem-submissions"
+                                data-problem-id={problemId}
                                 className={cn(
                                     "border-t border-slate-200 dark:border-graphito-border transition-all duration-300",
                                     isExpanded ? "mt-5 pt-5" : "mt-0 pt-0 pb-0 border-transparent"

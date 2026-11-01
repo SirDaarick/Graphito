@@ -120,6 +120,12 @@ export function tourGroupId(state: TourState): number | null {
     return step?.showGroup ? (state.context.examples?.grupo_id ?? null) : null;
 }
 
+/** Problem whose submissions list the library must show expanded now: the picked one during its step. */
+export function tourExpandedProblemId(state: TourState): number | null {
+    const step = currentStep(state);
+    return step?.expandProblem ? state.context.problemId : null;
+}
+
 /** True when the step advances on a route change and `path` satisfies it. */
 export function routeAdvancesStep(step: TourStep, path: string): boolean {
     return step.advance.kind === "route" && matchRoute(step.advance.pattern, path).isMatch;

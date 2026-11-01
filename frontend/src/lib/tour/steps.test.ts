@@ -110,6 +110,7 @@ describe("examples flow", () => {
     it("walks the cases in order: identical, similar, different, ai", () => {
         expect(steps.map((s) => s.id)).toEqual([
             "ex-library",
+            "ex-problem-submissions",
             "ex-identical-semantic",
             "ex-identical-literal-extra",
             "ex-code-open",
@@ -130,6 +131,25 @@ describe("examples flow", () => {
     ])("%s shows the code panes of its own case", (id, route, recoverTo) => {
         expect(byId(id)).toMatchObject({ target: "code-panes", reportView: "code", advance: { kind: "manual" }, recoverTo });
         expect(byId(id).enterRoute?.({ problemId: 31, examples: EXAMPLES })).toBe(route);
+    });
+
+    it("expands the picked problem's submissions before opening any report", () => {
+        expect(byId("ex-problem-submissions")).toMatchObject({
+            target: "problem-submissions",
+            scopedToProblem: true,
+            expandProblem: true,
+            advance: { kind: "manual" },
+            recoverTo: "ex-library",
+        });
+        expect(byId("ex-problem-submissions").text).toBe("Estas son sus entregas con su similitud con la referencia.");
+        expect(byId("ex-problem-submissions").enterRoute).toBeUndefined();
+        expect(steps.filter((s) => s.expandProblem).map((s) => s.id)).toEqual(["ex-problem-submissions"]);
+    });
+
+    it("does not claim the code view marks differing lines", () => {
+        for (const id of ["ex-similar-code", "ex-different-code"]) {
+            expect(byId(id).text, id).not.toMatch(/marcan|distintas|difieren/i);
+        }
     });
 
     it("opens the report of each case through enterRoute", () => {

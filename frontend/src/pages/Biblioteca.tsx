@@ -5,7 +5,7 @@ import { SearchBar } from "../components/layout/SearchBar";
 import { api, Grupo, CodigoFuente } from "../lib/api";
 import { toComparison } from "../lib/dictamen";
 import { navigate } from "../lib/router";
-import { tourGroupId } from "../lib/tour/machine";
+import { tourExpandedProblemId, tourGroupId } from "../lib/tour/machine";
 import { useTour } from "../components/tour/TourContext";
 import {
     Loader2,
@@ -61,7 +61,7 @@ export function Biblioteca({
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedLanguage, setSelectedLanguage] = useState<"todos" | "c" | "cpp">("todos");
     const [sortBy, setSortBy] = useState<SortOption>("recientes");
-    const [groupByCourse, setGroupByCourse] = useState(false);
+    const [groupByCourse, setGroupByCourse] = useState(true);
     const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
 
     const [references, setReferences] = useState<Reference[]>([]);
@@ -83,10 +83,13 @@ export function Biblioteca({
     // The "Ver ejemplos" tour shows the example group's problems only.
     const tour = useTour();
     const tourGroup = tourGroupId(tour.state);
+    const tourExpandedProblem = tourExpandedProblemId(tour.state);
     useEffect(() => {
         if (tourGroup === null) return;
         setSelectedGroupId(tourGroup);
         setCurrentPage(1);
+        // In the grouped view the example group's section must be open so its problems are on screen.
+        setExpandedGroupIds((prev) => new Set(prev).add(`group-${tourGroup}`));
     }, [tourGroup]);
 
     const fetchGroups = async () => {
@@ -387,6 +390,7 @@ export function Biblioteca({
             onCompare={() => onCompare?.({ id: ref.problemId, title: ref.title, lenguaje: ref.lenguaje })}
             onComparisonClick={onComparisonClick}
             archived={ref.archived}
+            forceExpanded={tourExpandedProblem === ref.problemId}
             onAssignToGroup={() => setAssignTarget({ id: ref.problemId, title: ref.title })}
             onToggleArchive={() => handleToggleProblemArchive(ref)}
             onDelete={() => {
@@ -737,7 +741,10 @@ export function Biblioteca({
 
                                 {isExpanded && (
                                     <div className="p-4 sm:p-6 pt-0 border-t border-slate-200/50 dark:border-white/5">
-                                        <div className="flex flex-col pt-4">
+                                        <div
+                                            className="flex flex-col pt-4"
+                                            data-tour={group.id === tourGroup ? "example-problems" : undefined}
+                                        >
                                             {problems.map((ref) => renderCard(ref))}
                                         </div>
                                     </div>
