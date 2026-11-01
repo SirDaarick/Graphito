@@ -148,6 +148,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
                     <Button
                         type="button"
                         variant="gradient"
+                        data-tour="cmp-submit"
                         onClick={handleStartAnalysis}
                         disabled={isLoading || problems.length === 0}
                         isLoading={isLoading}
@@ -268,7 +269,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
             </div>
 
             {/* Student Author */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" data-tour="cmp-author">
                 <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
                     Alumno / Identificador de la Entrega
                 </label>
@@ -283,7 +284,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
             </div>
 
             {/* Upload Zone */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" data-tour="cmp-code">
                 <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
                     Código de la Entrega {fileName && <span className="text-graphito-blue">({fileName})</span>}
                 </label>

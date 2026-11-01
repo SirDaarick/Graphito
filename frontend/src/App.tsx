@@ -11,12 +11,14 @@ import { SimilarityReportModal } from "./pages/SimilarityReportModal";
 import { api, Docente, IS_DEMO_MODE, invalidateLibrary } from "./lib/api";
 import { toComparison } from "./lib/dictamen";
 import { navigate, usePath, useRouteMatch, getInitialRoute } from "./lib/router";
+import { useTour } from "./components/tour/TourContext";
 
 type View = "login" | "register" | "app";
 
 function App() {
     const path = usePath();
     const reportMatch = useRouteMatch("/reporte/:id");
+    const tour = useTour();
 
     const [currentUser, setCurrentUser] = useState<Docente | null>(null);
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -209,7 +211,10 @@ function App() {
                         />
                     ) : (
                         <Catalogo
-                            onProgramAdded={() => invalidateLibrary()}
+                            onProgramAdded={(problemId) => {
+                                invalidateLibrary();
+                                if (problemId !== undefined) tour.setProblem(problemId);
+                            }}
                             onGoToBiblioteca={() => {
                                 setSection("biblioteca");
                                 navigate("/biblioteca");
@@ -219,7 +224,10 @@ function App() {
                     <NewReferenceModal
                         isOpen={isNewCodeModalOpen}
                         onClose={() => setIsNewCodeModalOpen(false)}
-                        onSuccess={() => invalidateLibrary()}
+                        onSuccess={(problemId) => {
+                            invalidateLibrary();
+                            tour.setProblem(problemId);
+                        }}
                     />
                     <NewComparisonModal
                         isOpen={isNewComparisonModalOpen}

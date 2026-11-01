@@ -8,7 +8,7 @@ import { cn } from "../lib/utils";
 
 interface CatalogoProps {
     /** Called after a catalog program was added to the teacher's library. */
-    onProgramAdded?: () => void;
+    onProgramAdded?: (problemId?: number) => void;
     /** Switches the app to the library section. */
     onGoToBiblioteca?: () => void;
 }
@@ -145,9 +145,9 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
         setIsModalOpen(true);
     };
 
-    const handleAdded = () => {
+    const handleAdded = (problem?: { id: number }) => {
         loadAdded();
-        onProgramAdded?.();
+        onProgramAdded?.(problem?.id);
     };
 
     const handleGoToBiblioteca = () => {
@@ -180,6 +180,7 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
                 <button
                     type="button"
                     onClick={toggleAll}
+                    data-tour="catalog-expand-all"
                     className="shrink-0 flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-xl text-xs font-bold border border-slate-200 dark:border-graphito-border bg-white dark:bg-graphito-card text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-graphito-dark transition-all duration-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue active:scale-95"
                 >
                     <Layers size={15} className="text-graphito-blue" />
@@ -306,6 +307,7 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
                                                                             key={program.id}
                                                                             type="button"
                                                                             onClick={() => openProgram(program.id)}
+                                                                            data-tour="catalog-program"
                                                                             className="group/card text-left p-4 rounded-xl border border-slate-200/60 dark:border-white/10 bg-slate-50/30 dark:bg-graphito-dark/20 backdrop-blur-[2px] hover:bg-white/60 dark:hover:bg-graphito-card/40 hover:border-graphito-blue/50 hover:shadow-lg hover:shadow-graphito-blue/10 hover:-translate-y-0.5 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue transition-all duration-200 min-h-[48px] flex flex-col justify-between"
                                                                         >
                                                                             <div>

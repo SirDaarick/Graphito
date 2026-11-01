@@ -29,6 +29,8 @@ function scoreColor(comparison: Comparison): string {
 }
 
 interface ReferenceCardProps {
+    /** Backend problem id; lets the guided tour point at one specific card. */
+    problemId?: number;
     title: string;
     category: string;
     categoryColor: "orange" | "purple" | "cyan";
@@ -53,6 +55,7 @@ const categoryColors = {
 };
 
 export function ReferenceCard({
+    problemId,
     title,
     category,
     categoryColor,
@@ -203,6 +206,8 @@ export function ReferenceCard({
                         <GradientButton
                             className="text-xs sm:text-sm !py-2.5 !px-5 min-h-[42px] !rounded-xl shadow-sm"
                             onClick={onCompare}
+                            data-tour="compare"
+                            data-problem-id={problemId}
                         >
                             <Plus className="h-4 w-4" />
                             <span>Comparar</span>
