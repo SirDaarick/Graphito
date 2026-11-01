@@ -36,6 +36,14 @@ describe("tourReducer", () => {
         expect(run([{ type: "next" }, { type: "next" }, { type: "back" }], started).stepIndex).toBe(1);
     });
 
+    it("applies a guarded advance once, even when the same event fires twice", () => {
+        const started = run([{ type: "open" }, { type: "choose", flow: "library" }]);
+        const once = run([{ type: "next", from: "lib-catalog" }], started);
+        expect(currentStep(once)?.id).toBe("lib-expand");
+        // A second route event in the same tick still carries the old step id.
+        expect(run([{ type: "next", from: "lib-catalog" }], once)).toBe(once);
+    });
+
     it("finishes after the last step", () => {
         const steps = getSteps("own");
         const started = run([{ type: "open" }, { type: "choose", flow: "own" }]);

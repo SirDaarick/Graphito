@@ -12,7 +12,8 @@ export const INITIAL_TOUR_STATE: TourState = {
 export type TourAction =
     | { type: "open" }
     | { type: "choose"; flow: TourFlow }
-    | { type: "next" }
+    /** `from` makes the advance idempotent: it only applies while that step is still current. */
+    | { type: "next"; from?: string }
     | { type: "back" }
     | { type: "goTo"; stepId: string }
     | { type: "exit" }
@@ -29,7 +30,9 @@ export function tourReducer(state: TourState, action: TourAction): TourState {
 
         case "next": {
             if (state.status !== "running" || !state.flow) return state;
-            const isLast = state.stepIndex >= getSteps(state.flow).length - 1;
+            const steps = getSteps(state.flow);
+            if (action.from !== undefined && steps[state.stepIndex]?.id !== action.from) return state;
+            const isLast = state.stepIndex >= steps.length - 1;
             return isLast ? INITIAL_TOUR_STATE : { ...state, stepIndex: state.stepIndex + 1 };
         }
 

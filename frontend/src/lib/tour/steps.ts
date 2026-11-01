@@ -33,7 +33,7 @@ const OWN_EXERCISE_STEPS: TourStep[] = [
         title: "Guárdalo",
         text: "Pulsa «Agregar código de referencia».",
         placement: "top",
-        advance: { kind: "click" },
+        advance: { kind: "click", untilGone: true },
         recoverTo: "own-new-code",
     },
 ];
@@ -72,7 +72,7 @@ const LIBRARY_STEPS: TourStep[] = [
         title: "Agrégalo a tu biblioteca",
         text: "Se usará como solución de referencia.",
         placement: "top",
-        advance: { kind: "click" },
+        advance: { kind: "click", untilGone: true },
         recoverTo: "lib-program",
     },
     {
@@ -82,6 +82,7 @@ const LIBRARY_STEPS: TourStep[] = [
         text: "Pulsa «Ir a la biblioteca».",
         placement: "top",
         advance: { kind: "route", pattern: "/biblioteca" },
+        graceMs: 10000,
         recoverTo: "lib-program",
     },
 ];
