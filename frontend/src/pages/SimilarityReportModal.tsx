@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
 import { saveVerdict } from "../lib/verdicts";
 import { evidenceByLine } from "../lib/evidence";
+import { useDialogFocus } from "../lib/focusTrap";
 import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
 import { ReportMetrics } from "../components/report/ReportMetrics";
 
@@ -340,6 +341,8 @@ export function SimilarityReportModal({
         }
     }, [isOpen, shouldRender]);
 
+    useDialogFocus(contentRef, isOpen && shouldRender);
+
     // Smooth transition when switching between report summary and code diff view
     useGSAP(() => {
         if (!shouldRender || !bodyContainerRef.current) return;
@@ -394,7 +397,7 @@ export function SimilarityReportModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="report-modal-title"
-                className={`relative w-full opacity-0 transition-[max-width] duration-300 ease-out ${inCodeView ? "max-w-[1600px]" : "max-w-4xl"}`}
+                className={`relative w-full opacity-0 focus:outline-none transition-[max-width] duration-300 ease-out ${inCodeView ? "max-w-[1600px]" : "max-w-4xl"}`}
             >
                 <div className="w-full rounded-3xl overflow-hidden border border-slate-200 dark:border-[#2b3346]/60 bg-white dark:bg-[#151c2e] shadow-2xl relative z-10">
                     <div className="flex flex-col relative h-[86dvh] min-h-[640px] max-h-[880px]">
@@ -415,8 +418,8 @@ export function SimilarityReportModal({
                         )}
 
                         {/* Top bar: back, title, submission carousel */}
-                        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-graphito-subtle/40 bg-slate-50 dark:bg-graphito-dark shrink-0">
-                            <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-graphito-subtle/40 bg-slate-50 dark:bg-graphito-dark shrink-0">
+                            <div className="flex items-center gap-3 min-w-0 flex-1 basis-56">
                                 {inCodeView ? (
                                     <button
                                         ref={backToSummaryRef}
@@ -436,13 +439,16 @@ export function SimilarityReportModal({
                                     <h2 id="report-modal-title" className="text-base sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                                         {inCodeView ? "Comparación de código" : "Reporte de similitud"}
                                     </h2>
-                                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium truncate">
+                                    <p
+                                        className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium line-clamp-2 break-words"
+                                        title={comparison.title}
+                                    >
                                         Entrega de {comparison.title}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex flex-wrap items-center gap-2 ml-auto">
                                 {comparison.engine === "stub" && (
                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-mono">
                                         STUB
