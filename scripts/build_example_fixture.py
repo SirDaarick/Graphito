@@ -13,9 +13,19 @@ when its four example submissions behave as the example group needs:
 All numbers come from the real scoring run; nothing is invented. The output follows contract C1 of
 `odd/tasks/example-group.md` and is read at runtime by the backend, never recomputed.
 
+Of the first five readable golden-set tasks it keeps the showcase plus the `--count - 1` with the clearest
+gaps between the three cases. After them the builder appends three problems built from the ESCOM teacher
+catalog (`backend/app/data/catalog_escom.json`). Each has three entregas (no AI case): the catalog
+reference verbatim (identical), a hand-written human solution from `backend/app/data/examples/escom/`
+(similar, `autor_humano`) and an unrelated catalog program (different). A problem is kept only when, on the
+measured values, raw Channel A and GraphCodeBERT similarity are strictly ordered identical > similar >
+different and the identical case scores 1.0 in Channel A. Channel B is recorded as measured, with no
+criterion; when the human solution still flags in Channel B, a note is appended to the description.
+
 Usage (from the repository root):
-  python scripts/build_example_fixture.py [--out PATH] [--count 5] [--dry-run]
-Exits non-zero when fewer than `--count` tasks qualify.
+  python scripts/build_example_fixture.py [--out PATH] [--count 3] [--dry-run] [--escom-candidates]
+Exits non-zero when fewer than `--count` tasks qualify or the ESCOM problem does not meet its ordering.
+`--escom-candidates` only measures every candidate pair of ESCOM_CANDIDATES and prints the table.
 """
 
 import argparse
@@ -100,6 +110,54 @@ META: Dict[str, Dict[str, str]] = {
     },
 }
 
+# --- ESCOM catalog problem ------------------------------------------------------------------------
+CATALOG = ROOT / "backend" / "app" / "data" / "catalog_escom.json"
+ESCOM_CASES = ["identical", "similar", "different"]
+ESCOM_PID = 10_000  # any id outside the golden-set enumeration; only used as the vector-store filter
+ESCOM_SOURCE = "escom_catalogo"
+GOLDEN_SOURCE = "golden_set"
+GOLDEN_POOL = 5  # readable golden-set tasks considered; the showcase plus the clearest ones are kept
+HUMAN_DIR = ROOT / "backend" / "app" / "data" / "examples" / "escom"
+HUMAN_AUTHOR_NOTE = (
+    " Nota: la solución propia de este ejemplo la escribió una persona sin ayuda de IA y aun así el "
+    "estilo marca alto; la métrica de estilo no basta por sí sola."
+)
+# One entry per ESCOM problem. `reference` is a catalog program, `human` a hand-written file in HUMAN_DIR
+# (a person wrote it without AI help). `different` lists catalog programs from unrelated temas, in order of
+# preference; the first one that keeps the strict ordering is used.
+ESCOM_PROBLEMS: List[Dict] = [
+    {
+        "reference": "factorial_iterativo_for.c",
+        "human": "factorial.c",
+        "different": ["registro_alumno_estructura.c", "escritura_archivo_texto_fprintf.c", "28_grafo_matriz_adyacencia.c"],
+        "titulo": "Calcular el factorial de un número",
+        "descripcion": (
+            "Escribe un programa en C que lea un número entero, calcule su factorial y muestre el "
+            "resultado. La referencia lo calcula con una función y un ciclo for."
+        ),
+    },
+    {
+        "reference": "01_ordenamiento_burbuja_iterativo.c",
+        "human": "burbuja.c",
+        "different": ["escritura_archivo_texto_fprintf.c", "registro_alumno_estructura.c", "19_lista_doblemente_enlazada.c"],
+        "titulo": "Ordenar un arreglo con el método de la burbuja",
+        "descripcion": (
+            "Escribe un programa en C que ordene un arreglo de enteros de menor a mayor con el método de "
+            "la burbuja, usando dos ciclos for que intercambian elementos adyacentes, y muestre el resultado."
+        ),
+    },
+    {
+        "reference": "busqueda_lineal_arreglo.c",
+        "human": "busqueda_lineal.c",
+        "different": ["19_lista_doblemente_enlazada.c", "registro_alumno_estructura.c", "escritura_archivo_texto_fprintf.c"],
+        "titulo": "Búsqueda lineal en un arreglo",
+        "descripcion": (
+            "Escribe un programa en C que capture un arreglo de enteros y un número a buscar, recorra el "
+            "arreglo y muestre la posición donde lo encontró o que no existe."
+        ),
+    },
+]
+
 
 def _read(path: Path) -> Optional[str]:
     try:
@@ -155,6 +213,13 @@ class TaskPick:
     def showcase_score(self) -> float:
         b = self.ai.b
         return (self.identical.a.raw - self.similar.a.raw) + (b.calibrated - b.threshold)
+
+    @property
+    def clarity(self) -> float:
+        """Smallest gap between consecutive cases (identical > similar > different) in raw A and GCB."""
+        a = [c.a.raw for c in (self.identical, self.similar, self.different)]
+        g = [c.outcome.gcb_similarity or 0.0 for c in (self.identical, self.similar, self.different)]
+        return min(a[0] - a[1], a[1] - a[2], g[0] - g[1], g[1] - g[2])
 
 
 async def _pick_task(
@@ -248,6 +313,7 @@ def _problem(pick: TaskPick) -> dict:
     cases = {"identical": pick.identical, "similar": pick.similar, "different": pick.different, "ai": pick.ai}
     return {
         "key": pick.key,
+        "fuente": GOLDEN_SOURCE,
         "titulo": meta["titulo"],
         "descripcion": meta["descripcion"],
         "lenguaje": "c",
@@ -265,6 +331,113 @@ def _problem(pick: TaskPick) -> dict:
     }
 
 
+class EscomMeasure:
+    """One catalog problem: the reference, the human solution and one `different` program, scored."""
+
+    def __init__(self, spec: Dict, programs: Dict[str, dict], outcomes: Dict[str, ScoringOutcome]):
+        self.spec, self.programs, self.outcomes = spec, programs, outcomes
+
+    @property
+    def key(self) -> str:
+        return "escom:" + Path(self.spec["reference"]).stem
+
+    def violations(self) -> List[str]:
+        """Why this candidate does not meet the ordering (empty when it does), from the measured values."""
+        o = self.outcomes
+        bad = []
+        for case in ESCOM_CASES:
+            if not _evaluable(o[case]) or not isinstance(o[case].gcb_similarity, float):
+                bad.append(f"{case}: canal no evaluable o GraphCodeBERT no medido")
+        if bad:
+            return bad
+        a = {c: o[c].channel_a.raw for c in ESCOM_CASES}
+        g = {c: o[c].gcb_similarity for c in ESCOM_CASES}
+        if a["identical"] < 1.0 - 1e-9:
+            bad.append(f"A bruto idéntico {a['identical']:.4f} != 1.0")
+        if g["identical"] < 0.999:
+            bad.append(f"GCB idéntico {g['identical']:.4f} no es ≈ 1.0")
+        if not a["identical"] > a["similar"] > a["different"]:
+            bad.append(f"A bruto sin orden estricto: {a}")
+        if not g["identical"] > g["similar"] > g["different"]:
+            bad.append(f"GCB sin orden estricto: {g}")
+        return bad
+
+    @property
+    def human_flag_b(self) -> bool:
+        return self.outcomes["similar"].channel_b.flag is True
+
+
+async def _measure_escom(
+    scoring: ScoringService, store: VectorStorePort, pid: int, spec: Dict, catalog: Dict[str, dict]
+) -> List[EscomMeasure]:
+    """Measure the problem against each `different` candidate; the reference is indexed once."""
+    ref = catalog[spec["reference"]]
+    ref_code = ref["codigo"]
+    stem = Path(ref["nombre_archivo"]).stem
+    human_path = HUMAN_DIR / spec["human"]
+    human = {"nombre_archivo": spec["human"], "codigo": _read(human_path), "origen": _origin(human_path)}
+    if human["codigo"] is None:
+        raise SystemExit(f"{human_path} no es UTF-8")
+    # Index the reference the way `ProblemService.add_reference_code` does, so GraphCodeBERT is measured.
+    vector = await scoring.inference.extract_semantic_embedding(ref_code, lang="c")
+    await store.upsert_reference(
+        reference_id=f"escom/{stem}",
+        embedding=vector,
+        metadata={"problema_id": pid, "autor": REFERENCE_AUTHOR, "tipo": "REFERENCIA", "lenguaje": "c"},
+        document=ref_code,
+    )
+    out = []
+    for diff_name in spec["different"]:
+        programs = {
+            "identical": {**ref, "origen": f"backend/app/data/catalog_escom.json#{ref['nombre_archivo']}"},
+            "similar": human,
+            "different": {**catalog[diff_name], "origen": f"backend/app/data/catalog_escom.json#{diff_name}"},
+        }
+        outcomes = {}
+        for case, program in programs.items():
+            outcomes[case] = await scoring.score_code(program["codigo"], [(stem, ref_code)], language="c", problema_id=pid)
+        out.append(EscomMeasure(spec, programs, outcomes))
+    return out
+
+
+def _escom_problem(m: EscomMeasure) -> dict:
+    descripcion = m.spec["descripcion"] + (HUMAN_AUTHOR_NOTE if m.human_flag_b else "")
+    entregas = []
+    for case in ESCOM_CASES:
+        entrega = {
+            "caso": case,
+            "autor": AUTHORS[case],
+            "origen": m.programs[case]["origen"],
+            "contenido": m.programs[case]["codigo"],
+        }
+        if case == "similar":
+            entrega["autor_humano"] = True
+        entrega["outcome"] = _serialize_outcome(m.outcomes[case])
+        entregas.append(entrega)
+    return {
+        "key": m.key,
+        "fuente": ESCOM_SOURCE,
+        "titulo": m.spec["titulo"],
+        "descripcion": descripcion,
+        "lenguaje": "c",
+        "referencia": {"autor": REFERENCE_AUTHOR, "contenido": m.programs["identical"]["codigo"]},
+        "entregas": entregas,
+    }
+
+
+def _print_escom(measures: List[EscomMeasure]) -> None:
+    print(f"{'problema':<40}{'caso':<10}{'A raw':>8}{'GCB':>8}{'B raw':>8}{'B cal':>8}{'B thr':>8}{'flagB':>7}  programa")
+    for m in measures:
+        for case in ESCOM_CASES:
+            o = m.outcomes[case]
+            print(
+                f"{m.key:<40}{case:<10}{o.channel_a.raw:>8.4f}{o.gcb_similarity!s:>8}{o.channel_b.raw:>8.4f}"
+                f"{o.channel_b.calibrated:>8.4f}{o.channel_b.threshold:>8.4f}{str(o.channel_b.flag):>7}  "
+                f"{m.programs[case]['nombre_archivo']}"
+            )
+        print(f"  -> {'cumple el orden' if not m.violations() else 'no cumple: ' + '; '.join(m.violations())}")
+
+
 def _print_table(picks: List[TaskPick]) -> None:
     head = f"{'tarea':<14}{'caso':<10}{'A raw':>8}{'A cal':>8}{'flagA':>7}{'B raw':>8}{'B cal':>8}{'flagB':>7}{'GCB':>8}  origen"
     print(head)
@@ -277,7 +450,24 @@ def _print_table(picks: List[TaskPick]) -> None:
             )
 
 
-async def _run(count: int, dry_run: bool, out: Path) -> int:
+async def _pick_escom(
+    scoring: ScoringService, store: VectorStorePort
+) -> Tuple[List[EscomMeasure], List[EscomMeasure], List[str]]:
+    """Per problem, the first `different` candidate that keeps the strict ordering (else the problem fails)."""
+    catalog = {p["nombre_archivo"]: p for p in json.loads(CATALOG.read_text(encoding="utf-8"))}
+    chosen, measured, failed = [], [], []
+    for i, spec in enumerate(ESCOM_PROBLEMS):
+        candidates = await _measure_escom(scoring, store, ESCOM_PID + i, spec, catalog)
+        measured.extend(candidates)
+        ok = next((m for m in candidates if not m.violations()), None)
+        if ok is None:
+            failed.append(spec["reference"])
+        else:
+            chosen.append(ok)
+    return chosen, measured, failed
+
+
+async def _run(count: int, dry_run: bool, out: Path, escom_candidates: bool = False) -> int:
     runtime = build_runtime(settings)
     if not runtime.ready:
         print(f"Inferencia REAL no lista (engine={runtime.engine_label}, motivo={runtime.reason}).", file=sys.stderr)
@@ -292,6 +482,10 @@ async def _run(count: int, dry_run: bool, out: Path) -> int:
     )
     scoring = ScoringService(runtime.engine, runtime.calibration, store, runtime.lexical)
     try:
+        if escom_candidates:
+            _, measures, _ = await _pick_escom(scoring, store)
+            _print_escom(measures)
+            return 0
         rejected: Dict[str, str] = {}
         picks: List[TaskPick] = []
         for pid, task_dir in enumerate(sorted(p for p in CORPUS.iterdir() if p.is_dir()), start=1):
@@ -304,7 +498,7 @@ async def _run(count: int, dry_run: bool, out: Path) -> int:
         picks.sort(key=lambda p: (_line_count(p.ref.code) >= MAX_READABLE_LINES, _line_count(p.ref.code), p.key))
         pool = picks
         rejected.update(await _assign_different(scoring, pool))
-        qualified = [p for p in pool if p.different is not None][:count]
+        qualified = [p for p in pool if p.different is not None][:GOLDEN_POOL]
         for p in pool:
             if p not in qualified and p.key not in rejected:
                 rejected[p.key] = "fuera de los primeros candidatos más legibles"
@@ -316,6 +510,16 @@ async def _run(count: int, dry_run: bool, out: Path) -> int:
 
         qualified.sort(key=lambda p: p.showcase_score, reverse=True)  # problems[0] is the tour showcase
         _print_table(qualified)
+        # The showcase stays first; the rest are the ones with the clearest gaps between the three cases.
+        rest = sorted(qualified[1:], key=lambda p: p.clarity, reverse=True)
+        for p in qualified:
+            print(f"[claridad] {p.key}: {p.clarity:.4f}")
+        qualified = qualified[:1] + rest[: count - 1]
+        escom, measures, failed = await _pick_escom(scoring, store)
+        _print_escom(measures)
+        if failed:
+            print(f"Sin `different` que mantenga el orden estricto: {', '.join(failed)}", file=sys.stderr)
+            return 4
         if dry_run:
             print("--dry-run: no se escribe el archivo.")
             return 0
@@ -329,7 +533,7 @@ async def _run(count: int, dry_run: bool, out: Path) -> int:
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "manifest_sha": manifest_sha,
             "engine": "real",
-            "problems": [_problem(p) for p in qualified],
+            "problems": [_problem(p) for p in qualified] + [_escom_problem(m) for m in escom],
         }
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(fixture, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -344,10 +548,11 @@ async def _run(count: int, dry_run: bool, out: Path) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    ap.add_argument("--count", type=int, default=5)
+    ap.add_argument("--count", type=int, default=3, help="golden-set problems to keep")
     ap.add_argument("--dry-run", action="store_true", help="score and print the table without writing")
+    ap.add_argument("--escom-candidates", action="store_true", help="measure only the ESCOM catalog candidates")
     args = ap.parse_args()
-    sys.exit(asyncio.run(_run(args.count, args.dry_run, args.out)))
+    sys.exit(asyncio.run(_run(args.count, args.dry_run, args.out, args.escom_candidates)))
 
 
 if __name__ == "__main__":

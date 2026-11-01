@@ -513,7 +513,7 @@ export function SimilarityReportModal({
                                 )}
                                 {comparison.es_ejemplo && (
                                     <span
-                                        title="Estos ejemplos vienen del mismo corpus con el que se entrenaron los modelos, pero sus códigos no se usaron en el entrenamiento. Se eligieron porque muestran bien cada caso; con otros códigos los resultados pueden variar."
+                                        title="Los códigos de estos ejemplos no se usaron para entrenar los modelos. Se eligieron porque muestran bien cada caso; con otros códigos los resultados pueden variar."
                                         className="px-2.5 py-1 rounded-full text-xs font-semibold border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-300 dark:border-graphito-subtle"
                                     >
                                         Ejemplo

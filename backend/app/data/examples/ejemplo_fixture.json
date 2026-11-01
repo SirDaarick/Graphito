@@ -1,11 +1,12 @@
 {
   "version": 1,
-  "generated_at": "2026-11-01T07:45:03+00:00",
+  "generated_at": "2026-11-01T19:22:00+00:00",
   "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
   "engine": "real",
   "problems": [
     {
       "key": "A2017_Z4_Z1",
+      "fuente": "golden_set",
       "titulo": "Insertar un número entre las palabras de un texto",
       "descripcion": "Escribe la función ubaci_broj, que recibe una cadena de texto y un número entero y devuelve la misma cadena con el número insertado después de cada palabra, separado por espacios, modificándola en el sitio y respetando el signo del número.",
       "lenguaje": "c",
@@ -158,6 +159,7 @@
     },
     {
       "key": "A2017_Z3_Z3",
+      "fuente": "golden_set",
       "titulo": "Eliminar cifras indicadas de un arreglo de enteros",
       "descripcion": "Lee un arreglo de enteros y un arreglo de cifras. Escribe la función izbaci_cifre, que quita de cada número las cifras listadas, comprueba que el arreglo de cifras no tenga repetidas ni valores fuera de 0 a 9, y el programa muestra los números resultantes.",
       "lenguaje": "c",
@@ -309,311 +311,8 @@
       ]
     },
     {
-      "key": "A2017_Z1_Z1",
-      "titulo": "Elegir el menú más económico para tres personas",
-      "descripcion": "Lee el plato elegido por tres personas (P, H o C), suma el costo del pedido en tres establecimientos con precios distintos, indica cuál resulta más económico y evalúa si aplicar el descuento en el restaurante lo volvería más barato.",
-      "lenguaje": "c",
-      "referencia": {
-        "autor": "Referencia del ejemplo",
-        "contenido": "#include <stdio.h>\n\nint main() {\n\tchar t, b, m, nr;\n\tfloat CR=0, CFF=0, CB=0, MINC;\n\tprintf(\"Unesite jelo za Tarika: \");\n\tscanf(\"%c\", &t);\n\tscanf(\"%c\", &nr);\n\tswitch (t) {\n\t\tcase 'P':\n\t\t\tCR+=6.8;\n\t\t\tCFF+=8.0;\n\t\t\tCB+=5.3;\n\t\t\tbreak;\n\t\tcase 'H':\n\t\t\tCR+=3.3;\n\t\t\tCFF+=3.0;\n\t\t\tCB+=5.0;\n\t\t\tbreak;\n\t\tcase 'C':\n\t\t\tCR+=5.0;\n\t\t\tCFF+=3.9;\n\t\t\tCB+=6.0;\n\t\t\tbreak;\n\t}\n\tprintf(\"Unesite jelo za Bojana: \");\n\tscanf(\"%c\", &b);\n\tscanf(\"%c\", &nr);\n\tswitch (b) {\n\t\tcase 'P':\n\t\t\tCR+=6.8;\n\t\t\tCFF+=8.0;\n\t\t\tCB+=5.3;\n\t\t\tbreak;\n\t\tcase 'H':\n\t\t\tCR+=3.3;\n\t\t\tCFF+=3.0;\n\t\t\tCB+=5.0;\n\t\t\tbreak;\n\t\tcase 'C':\n\t\t\tCR+=5.0;\n\t\t\tCFF+=3.9;\n\t\t\tCB+=6.0;\n\t\t\tbreak;\n\t}\n\tprintf(\"Unesite jelo za Mirzu: \");\n\tscanf(\"%c\", &m);\n\tscanf(\"%c\", &nr);\n\tswitch (m) {\n\t\tcase 'P':\n\t\t\tCR+=6.8;\n\t\t\tCFF+=8.0;\n\t\t\tCB+=5.3;\n\t\t\tbreak;\n\t\tcase 'H':\n\t\t\tCR+=3.3;\n\t\t\tCFF+=3.0;\n\t\t\tCB+=5.0;\n\t\t\tbreak;\n\t\tcase 'C':\n\t\t\tCR+=5.0;\n\t\t\tCFF+=3.9;\n\t\t\tCB+=6.0;\n\t\t\tbreak;\n\t}\n\t\n\tMINC=CR;\n\tif(CFF<MINC) {\n\t\tMINC=CFF;\n\t}\n\tif (CB<MINC) {\n\t\tMINC=CB;\n\t}\n\t\n\tif (MINC==CR) {\n\t\tprintf(\"Najjeftiniji je Restoran \\\"Kod konja i konjusara\\\" (%.2f KM).\\n\", CR);\n\t}\n\tif (MINC==CFF) {\n\t\t\tprintf(\"Najjeftiniji je Fast-food \\\"Trovac\\\" (%.2f KM).\\n\", CFF);\n\t}\n\tif (MINC==CB) {\n\t\tprintf(\"Najjeftiniji je Bistro \\\"Lorelei\\\" (%.2f KM).\\n\", CB);\n\t}\n\t\n\tif (MINC!=CR) {\n\t\tfloat NCR=0;\n\t\tint bup=0, buh=0, buc=0;\n\t\tif (t=='P' || b=='P' || m=='P') {\n\t\t\tif (t=='P') {\n\t\t\t\tbup++;\n\t\t\t}\n\t\t\tif (b=='P') {\n\t\t\t\tbup++;\n\t\t\t}\n\t\t\tif (m=='P') {\n\t\t\t\tbup++;\n\t\t\t}\n\t\t\tNCR=CR-bup*0.68;\n\t\t}\n\t\telse if (t=='C' || b=='C' || m=='C') {\n\t\t\tif (t=='C') {\n\t\t\t\tbuc++;\n\t\t\t}\n\t\t\tif (b=='C') {\n\t\t\t\tbuc++;\n\t\t\t}\n\t\t\tif (m=='C') {\n\t\t\t\tbuc++;\n\t\t\t}\n\t\t\tNCR=CR-buc*0.5;\n\t\t}\n\t\telse {\n\t\t\tNCR=CR-0.99;\n\t\t}\n\t\tif (NCR<MINC) {\n\t\t\tprintf(\"Sa popustom bi Restoran bio jeftiniji (%.2f KM).\\n\", NCR);\n\t\t}\n\t}\n\treturn 0;\n}\n"
-      },
-      "entregas": [
-        {
-          "caso": "identical",
-          "autor": "Ejemplo: copia de la referencia",
-          "origen": "data/golden_set/corpus/A2017_Z1_Z1/reference/student1518.c",
-          "contenido": "#include <stdio.h>\n\nint main() {\n\tchar t, b, m, nr;\n\tfloat CR=0, CFF=0, CB=0, MINC;\n\tprintf(\"Unesite jelo za Tarika: \");\n\tscanf(\"%c\", &t);\n\tscanf(\"%c\", &nr);\n\tswitch (t) {\n\t\tcase 'P':\n\t\t\tCR+=6.8;\n\t\t\tCFF+=8.0;\n\t\t\tCB+=5.3;\n\t\t\tbreak;\n\t\tcase 'H':\n\t\t\tCR+=3.3;\n\t\t\tCFF+=3.0;\n\t\t\tCB+=5.0;\n\t\t\tbreak;\n\t\tcase 'C':\n\t\t\tCR+=5.0;\n\t\t\tCFF+=3.9;\n\t\t\tCB+=6.0;\n\t\t\tbreak;\n\t}\n\tprintf(\"Unesite jelo za Bojana: \");\n\tscanf(\"%c\", &b);\n\tscanf(\"%c\", &nr);\n\tswitch (b) {\n\t\tcase 'P':\n\t\t\tCR+=6.8;\n\t\t\tCFF+=8.0;\n\t\t\tCB+=5.3;\n\t\t\tbreak;\n\t\tcase 'H':\n\t\t\tCR+=3.3;\n\t\t\tCFF+=3.0;\n\t\t\tCB+=5.0;\n\t\t\tbreak;\n\t\tcase 'C':\n\t\t\tCR+=5.0;\n\t\t\tCFF+=3.9;\n\t\t\tCB+=6.0;\n\t\t\tbreak;\n\t}\n\tprintf(\"Unesite jelo za Mirzu: \");\n\tscanf(\"%c\", &m);\n\tscanf(\"%c\", &nr);\n\tswitch (m) {\n\t\tcase 'P':\n\t\t\tCR+=6.8;\n\t\t\tCFF+=8.0;\n\t\t\tCB+=5.3;\n\t\t\tbreak;\n\t\tcase 'H':\n\t\t\tCR+=3.3;\n\t\t\tCFF+=3.0;\n\t\t\tCB+=5.0;\n\t\t\tbreak;\n\t\tcase 'C':\n\t\t\tCR+=5.0;\n\t\t\tCFF+=3.9;\n\t\t\tCB+=6.0;\n\t\t\tbreak;\n\t}\n\t\n\tMINC=CR;\n\tif(CFF<MINC) {\n\t\tMINC=CFF;\n\t}\n\tif (CB<MINC) {\n\t\tMINC=CB;\n\t}\n\t\n\tif (MINC==CR) {\n\t\tprintf(\"Najjeftiniji je Restoran \\\"Kod konja i konjusara\\\" (%.2f KM).\\n\", CR);\n\t}\n\tif (MINC==CFF) {\n\t\t\tprintf(\"Najjeftiniji je Fast-food \\\"Trovac\\\" (%.2f KM).\\n\", CFF);\n\t}\n\tif (MINC==CB) {\n\t\tprintf(\"Najjeftiniji je Bistro \\\"Lorelei\\\" (%.2f KM).\\n\", CB);\n\t}\n\t\n\tif (MINC!=CR) {\n\t\tfloat NCR=0;\n\t\tint bup=0, buh=0, buc=0;\n\t\tif (t=='P' || b=='P' || m=='P') {\n\t\t\tif (t=='P') {\n\t\t\t\tbup++;\n\t\t\t}\n\t\t\tif (b=='P') {\n\t\t\t\tbup++;\n\t\t\t}\n\t\t\tif (m=='P') {\n\t\t\t\tbup++;\n\t\t\t}\n\t\t\tNCR=CR-bup*0.68;\n\t\t}\n\t\telse if (t=='C' || b=='C' || m=='C') {\n\t\t\tif (t=='C') {\n\t\t\t\tbuc++;\n\t\t\t}\n\t\t\tif (b=='C') {\n\t\t\t\tbuc++;\n\t\t\t}\n\t\t\tif (m=='C') {\n\t\t\t\tbuc++;\n\t\t\t}\n\t\t\tNCR=CR-buc*0.5;\n\t\t}\n\t\telse {\n\t\t\tNCR=CR-0.99;\n\t\t}\n\t\tif (NCR<MINC) {\n\t\t\tprintf(\"Sa popustom bi Restoran bio jeftiniji (%.2f KM).\\n\", NCR);\n\t\t}\n\t}\n\treturn 0;\n}\n",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 1.0,
-              "calibrated": 0.002231476112663188,
-              "flag": true,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 0.190202,
-              "calibrated": 0.007303253101919205,
-              "flag": false,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 1.0,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        },
-        {
-          "caso": "similar",
-          "autor": "Ejemplo: solución propia",
-          "origen": "data/golden_set/corpus/A2017_Z1_Z1/original/student9466.c",
-          "contenido": "#include <stdio.h>\n\nint main()\n{\n    char jeloZaTarika, jeloZaMirzu, jeloZaBojana, noviRed;\n\n    printf(\"Unesite jelo za Tarika: \");\n    scanf(\"%c\", &jeloZaTarika);\n    scanf(\"%c\", &noviRed);\n    printf(\"Unesite jelo za Bojana: \");\n    scanf(\"%c\", &jeloZaBojana);\n    scanf(\"%c\", &noviRed);\n    printf(\"Unesite jelo za Mirzu: \");\n    scanf(\"%c\", &jeloZaMirzu);\n    scanf(\"%c\", &noviRed);\n\n    float pizzaRestoran = 6.8, pizzaTrovac = 8.0, pizzaLorelei = 5.3;\n    float hamburgerRestoran = 3.3, hamburgerTrovac = 3.0, hamburgerLorelei = 5.0;\n    float cevapiRestoran = 5.0, cevapiTrovac = 3.9, cevapiLorelei = 6.0;\n\n    float ukupnoRestoran = 0, ukupnoTrovac = 0, ukupnoLorelei = 0;\n    \n    float ukupnoHamburger = 0, ukupnoPizza = 0, ukupnoCevapi = 0;\n\n    switch(jeloZaTarika) {\n    case 'H' :\n        ukupnoRestoran += hamburgerRestoran;\n        ukupnoTrovac += hamburgerTrovac;\n        ukupnoLorelei += hamburgerLorelei;\n        ukupnoHamburger += hamburgerRestoran;\n        break;\n    case 'P':\n        ukupnoRestoran += pizzaRestoran;\n        ukupnoTrovac += pizzaTrovac;\n        ukupnoLorelei += pizzaLorelei;\n        ukupnoPizza += pizzaRestoran;\n        break;\n    case 'C':\n        ukupnoRestoran += cevapiRestoran;\n        ukupnoTrovac += cevapiTrovac;\n        ukupnoLorelei += cevapiLorelei;\n        ukupnoCevapi += cevapiRestoran;\n        break;\n    default:\n        break;\n    }\n\n    switch(jeloZaBojana) {\n\n    case 'H':\n        ukupnoRestoran+=hamburgerRestoran;\n        ukupnoTrovac+=hamburgerTrovac;\n        ukupnoLorelei+=hamburgerLorelei;\n        ukupnoHamburger += hamburgerRestoran;\n        break;\n    case 'P':\n        ukupnoRestoran+=pizzaRestoran;\n        ukupnoTrovac+=pizzaTrovac;\n        ukupnoLorelei+=pizzaLorelei;\n        ukupnoPizza += pizzaRestoran;\n        break;\n    case 'C':\n        ukupnoRestoran+=cevapiRestoran;\n        ukupnoTrovac+=cevapiTrovac;\n        ukupnoLorelei+=cevapiLorelei;\n        ukupnoCevapi += cevapiRestoran;\n        break;\n    default:\n        break;\n    }\n\n    switch(jeloZaMirzu) {\n    case 'H':\n        ukupnoRestoran+=hamburgerRestoran;\n        ukupnoTrovac+=hamburgerTrovac;\n        ukupnoLorelei+=hamburgerLorelei;\n        ukupnoHamburger += hamburgerRestoran;\n        break;\n    case 'P':\n        ukupnoRestoran+=pizzaRestoran;\n        ukupnoTrovac+=pizzaTrovac;\n        ukupnoLorelei+=pizzaLorelei;\n        ukupnoPizza += pizzaRestoran;\n        break;\n    case 'C':\n        ukupnoRestoran+=cevapiRestoran;\n        ukupnoTrovac+=cevapiTrovac;\n        ukupnoLorelei+=cevapiLorelei;\n        ukupnoCevapi += cevapiRestoran;\n        break;\n    default:\n        break;\n    }\n\n    float min=1000;\n    \n    if(ukupnoRestoran < min) {\n        min=ukupnoRestoran;\n    }\n\n    if(ukupnoTrovac < min) {\n        min = ukupnoTrovac;\n    }\n\n    if(ukupnoLorelei < min) {\n        min = ukupnoLorelei;\n    }\n    \n    float max = 0;\n    \n    if(ukupnoHamburger > max){\n        max = ukupnoHamburger;\n    }\n    \n    if(ukupnoPizza > max){\n        max = ukupnoPizza;\n    }\n    \n    if(ukupnoCevapi > max){\n        max = ukupnoCevapi;\n    }\n    \n    float popust = max * 10/100;\n\n    float restoranSaPopustom = 0;\n    if(ukupnoRestoran != min) {\n        restoranSaPopustom = ukupnoRestoran - popust;\n    }\n\n    if(min == ukupnoRestoran) {\n        printf (\"Najjeftiniji je Restoran \\\"Kod konja i konjusara\\\" (%.2f KM).\\n\", ukupnoRestoran);\n\n    }\n    else if(min == ukupnoTrovac)\n    {\n        printf(\"Najjeftiniji je Fast-food \\\"Trovac\\\" (%.2f KM).\\n\", ukupnoTrovac);\n    } \n    else if(min == ukupnoLorelei)\n    {\n        printf (\"Najjeftiniji je Bistro \\\"Lorelei\\\" (%.2f KM).\\n\", ukupnoLorelei);\n    }\n    \n    if(restoranSaPopustom > 0 && restoranSaPopustom<min) {\n        printf(\"Sa popustom bi Restoran bio jeftiniji (%.2f KM).\\n\", restoranSaPopustom);\n    }\n    return 0;\n}\n",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 0.37662337662337664,
-              "calibrated": 1.8168714684560833e-05,
-              "flag": false,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 0.087349,
-              "calibrated": 0.0023676387280001654,
-              "flag": false,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 0.8942,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        },
-        {
-          "caso": "different",
-          "autor": "Ejemplo: código de otro problema",
-          "origen": "data/golden_set/corpus/A2016_Z4_Z2/reference/student8004.c",
-          "contenido": "#include <stdio.h>\n\nvoid unesi(char niz[], int velicina)\n{\n    int i=0;\n    char znak=getchar();\n    if (znak=='\\n')\n        znak=getchar();\n    while(i<velicina-1 && znak!='\\n')\n    {\n        niz[i]=znak;\n        i++;\n        znak=getchar();\n    }\n    niz[i]='\\0';\n}\n\nchar* kodiraj(char* s, char* t)\n{\n    int brojac[96]={0},i,j;\n    int maxi=0,broj_brojaca=0;\n    char ascii[200]={0};\n/*formiranje ascii stringa*/\n    for(i=0;i<96;i++)\n    {\n    \tif(i==95)\n    \t\t*(t+i)='\\0';\n    \telse *(t+i)=i+32;\n    }\n/*ucestalosti charova*/\n    for(i=0;;i++)\n    {\n    \tj=0;\n        while(j<95)\n        {\n            if(*(s+i)==*(t+j))\n            {\n                brojac[j]++;\n                break;\n            }\n            j++;\n        }\n        if(*(s+i+1)=='\\0')\n            break;\n    }\n/*pronalazenje najucestalijeg*/\n\ti=0;\n    while(i<95)\n    {\n        if(brojac[i]>maxi)\n            maxi=brojac[i];\n        i++;\n    }\n/**/\n/*redoslijedom od najucestalijeg*/\n    do\n    {\n        for(i=0;i<95;i++)\n        {\n            for(j=0;;j++)\n            {\n                broj_brojaca=0;\n                if(brojac[j]==maxi)\n                {\n                    ascii[i]=*(t+j);\n                    if(maxi>0)\n                    {\n                        if(broj_brojaca==0)\n                            i++;\n                    }\n                    if(maxi==0)\n                        i++;\n                    broj_brojaca++;\n                }\n                if(*(t+j)=='\\0')\n                    break;\n            }\n            if(broj_brojaca==0)\n                i--;\n            maxi--;\n        }\n    }while(maxi>0);\n/*pretvaranje u kod*/\n    for(i=0;;i++)\n    {\n        *(t+i)=ascii[i];\n        if(ascii[i]=='\\0')\n            break;\n    }\n/*sifriranje*/\n    for(i=0;;i++)\n    {\n    \tif(*(s+i)=='\\0')\n        {\n            *(s+i)='\\0';\n            break;\n        }\n        for(j=0;;j++)\n        {\n        \tif(*(t+j)=='\\0')\n                break;\n            if(*(s+i)==*(t+j))\n            {\n                *(s+i)=126-j;\n                break;\n            }\n        }\n    }\n\treturn s;\n}\n\nchar* dekodiraj(char* s, char* t)\n{\n    int i,j;\n    for(i=0;*(s+i)!='\\0';i++)\n    {\n        for(j=0;j<95;j++)\n        {\n            if(*(s+i)==126-j)\n            {\n                *(s+i)=*(t+j);\n                break;\n            }\n        }\n    }\n    return s;\n}\n\nint main()\n{\n\tchar s[1000],kod[150];\n\tunesi(s,1000);\n    printf(\"%s\",kodiraj(s,kod));\n    printf(\"\\n%s\",dekodiraj(s,kod));\n    return 0;\n}",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 0.058161350844277676,
-              "calibrated": 3.997249892074253e-06,
-              "flag": false,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 1.3e-05,
-              "calibrated": 3.176380192204675e-08,
-              "flag": false,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 0.4701,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        },
-        {
-          "caso": "ai",
-          "autor": "Ejemplo: generado con IA",
-          "origen": "data/golden_set/corpus/A2017_Z1_Z1/ai/ref_comentado-bueno_or-deepseek-chat_20260716_050851_0013.c",
-          "contenido": "#include <stdio.h>\n#include <string.h>\n\n/*\n * Ovaj program racuna ukupne troskove obroka za tri osobe: Tarika, Bojana i Mirzu.\n * Svaka osoba bira jedan obrok u tri razlicita restorana: Restoran, Fast-food i Bistro.\n * Obroci su: hamburger, cevapi i pica. Svaki obrok ima svoju cenu u svakom restoranu.\n * Program zatim racuna koji je restoran najjeftiniji za svaku osobu, uzimajuci u obzir\n * moguce popuste. Popusti se primenjuju ako osoba naruci odredjenu kombinaciju obroka.\n * Na kraju program ispisuje koji je restoran najjeftiniji za svaku osobu i koliko kosta.\n */\n\n// Funkcija koja ispisuje cene u svakom restoranu\nvoid ispisiCene(char restoran[], float hamburger, float cevapi, float pica) {\n    printf(\"Cene u %s:\\n\", restoran);\n    printf(\"  Hamburger: %.2f KM\\n\", hamburger);\n    printf(\"  Cevapi: %.2f KM\\n\", cevapi);\n    printf(\"  Pica: %.2f KM\\n\", pica);\n    printf(\"\\n\");\n}\n\n// Funkcija koja racuna cenu obroka sa popustom\nfloat racunajSaPopustom(float cenaHamburgera, float cenaCevapa, float cenaPice, char izbor[]) {\n    float ukupnaCena = 0;\n    \n    // Proveravamo sta je osoba izabrala i racunamo cenu\n    if (strcmp(izbor, \"hamburger\") == 0) {\n        ukupnaCena = cenaHamburgera;\n    } else if (strcmp(izbor, \"cevapi\") == 0) {\n        ukupnaCena = cenaCevapa;\n    } else if (strcmp(izbor, \"pica\") == 0) {\n        ukupnaCena = cenaPice;\n    } else {\n        printf(\"Greska: Nepoznat izbor obroka!\\n\");\n        return -1;\n    }\n    \n    // Primenjujemo popust ako je cena veca od 10 KM (10% popusta)\n    if (ukupnaCena > 10) {\n        printf(\"  Ostvarujete popust od 10 posto!\\n\");\n        ukupnaCena = ukupnaCena * 0.9; // Oduzimamo 10% od cene\n    }\n    \n    return ukupnaCena;\n}\n\n// Funkcija koja pronalazi najjeftiniji restoran za datu osobu\nvoid nadjiNajjeftiniji(char osoba[], char izbor[], \n                       float ceneRestoran[], float ceneFastfood[], float ceneBistro[]) {\n    // Racunamo cene u svakom restoranu sa popustom\n    float cenaRestoran = racunajSaPopustom(ceneRestoran[0], ceneRestoran[1], ceneRestoran[2], izbor);\n    float cenaFastfood = racunajSaPopustom(ceneFastfood[0], ceneFastfood[1], ceneFastfood[2], izbor);\n    float cenaBistro = racunajSaPopustom(ceneBistro[0], ceneBistro[1], ceneBistro[2], izbor);\n    \n    printf(\"\\n%s, izabrali ste: %s\\n\", osoba, izbor);\n    printf(\"  Cena u Restoranu: %.2f KM\\n\", cenaRestoran);\n    printf(\"  Cena u Fast-foodu: %.2f KM\\n\", cenaFastfood);\n    printf(\"  Cena u Bistrou: %.2f KM\\n\", cenaBistro);\n    \n    // Poredimo cene i nalazimo najjeftiniju opciju\n    // Ovo je kao da uporedjujem ko je najbrzi na takmicenju, samo sa parama\n    if (cenaRestoran <= cenaFastfood && cenaRestoran <= cenaBistro) {\n        printf(\"  Najjeftiniji restoran za vas je: Restoran (%.2f KM)\\n\", cenaRestoran);\n    } else if (cenaFastfood <= cenaRestoran && cenaFastfood <= cenaBistro) {\n        printf(\"  Najjeftiniji restoran za vas je: Fast-food (%.2f KM)\\n\", cenaFastfood);\n    } else {\n        printf(\"  Najjeftiniji restoran za vas je: Bistro (%.2f KM)\\n\", cenaBistro);\n    }\n}\n\nint main() {\n    // Definisemo cene za svaki restoran\n    // Cene su u KM (konvertibilne marke)\n    float ceneRestoran[3] = {8.5, 12.0, 10.0};  // hamburger, cevapi, pica\n    float ceneFastfood[3] = {5.0, 9.0, 7.5};    // hamburger, cevapi, pica\n    float ceneBistro[3] = {7.0, 11.0, 9.5};     // hamburger, cevapi, pica\n    \n    // Ispisujemo cene za svaki restoran da korisnik vidi\n    printf(\"Dobrodosli u program za racunanje najjeftinijeg obroka!\\n\");\n    printf(\"=====================================================\\n\\n\");\n    \n    ispisiCene(\"Restoran\", ceneRestoran[0], ceneRestoran[1], ceneRestoran[2]);\n    ispisiCene(\"Fast-food\", ceneFastfood[0], ceneFastfood[1], ceneFastfood[2]);\n    ispisiCene(\"Bistro\", ceneBistro[0], ceneBistro[1], ceneBistro[2]);\n    \n    // Tarik bira sta ce jesti\n    char tarikovIzbor[] = \"hamburger\";\n    nadjiNajjeftiniji(\"Tarik\", tarikovIzbor, ceneRestoran, ceneFastfood, ceneBistro);\n    \n    // Bojan bira sta ce jesti\n    char bojanovIzbor[] = \"cevapi\";\n    nadjiNajjeftiniji(\"Bojan\", bojanovIzbor, ceneRestoran, ceneFastfood, ceneBistro);\n    \n    // Mirza bira sta ce jesti\n    char mirzinIzbor[] = \"pica\";\n    nadjiNajjeftiniji(\"Mirza\", mirzinIzbor, ceneRestoran, ceneFastfood, ceneBistro);\n    \n    printf(\"\\nHvala sto ste koristili program! Prijatno!\\n\");\n    \n    return 0;\n}",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 0.10979228486646884,
-              "calibrated": 3.997249892074253e-06,
-              "flag": false,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 0.999996,
-              "calibrated": 0.999996551625931,
-              "flag": true,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 0.7977,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "key": "A2017_Z4_Z2",
-      "titulo": "Verificar las longitudes de las palabras de un texto",
-      "descripcion": "Escribe la función provjeri_duzine, que recibe una cadena, un arreglo de longitudes y su tamaño, y devuelve 1 si la cantidad de palabras de la cadena coincide con el tamaño del arreglo y cada palabra tiene exactamente la longitud indicada en su posición; en otro caso devuelve 0.",
-      "lenguaje": "c",
-      "referencia": {
-        "autor": "Referencia del ejemplo",
-        "contenido": "#include <stdio.h>\nint provjeri_duzine(char *s,int duzine[],int duz_niza)\n{\n\tint i,razmak=1,br_rijeci=-1,duzina1=0;\n\tchar*p=s;\n\t/*slaganje broja rijeci i broja clanova niza  PROVJERA*/\n\n\twhile (*p!='\\0') {\n\t\tif(*p<'A'||(*p>'Z'&& *p<'a')||*p>'z') {\n\t\t\trazmak=1;\n\t\t\tp++;\n\t\t} else if(razmak==1) {\n\t\t\trazmak=0;\n\t\t\tbr_rijeci++;\n\t\t\tp++;\n\t\t} else p++;\n\t}\n\tif (br_rijeci!=duz_niza-1)\n\t\treturn 0;\n\trazmak=1;\n\tbr_rijeci=-1;\n\n\n\twhile(*s!='\\0') {\n\t\tif(*s<'A'||(*s>'Z'&& *s<'a')||*s>'z') {\n\t\t\trazmak=1;\n\t\t\ts++;\n\t\t} else if(razmak==1) {\n\t\t\t/* dodje na rijec*/\n\t\t\tduzina1=0;\n\t\t\trazmak=0;\n\t\t\tp=s;\n\t\t\t/*mjesto rijeci*/\n\t\t\tbr_rijeci++;\n\t\t\tif(br_rijeci> duz_niza-1)\n\t\t\t\treturn 0;\n\t\t\t/*\t brojanje slova*/\n\t\t\twhile((*p>='A'&& *p<'Z')||(*p>='a'&& *p<='z')) {\n\t\t\t\tp++;\n\t\t\t\tduzina1++;\n\t\t\t}\n\t\t\ts=p-1;\n\t\t\t/*provjera duzine*/\n\t\t\tif(duzine[br_rijeci]!=duzina1)\n\t\t\t\treturn 0;\n\t\t\ts++;\n\t\t} else s++;\n\t}\n\n\tif(br_rijeci!=duz_niza-1)\n\t\treturn 0;\n\treturn 1;\n}\n\nint main()\n{\n\tprintf(\"Zadaća 4, Zadatak 2\");\n\treturn 0;\n}\n"
-      },
-      "entregas": [
-        {
-          "caso": "identical",
-          "autor": "Ejemplo: copia de la referencia",
-          "origen": "data/golden_set/corpus/A2017_Z4_Z2/reference/student4577.c",
-          "contenido": "#include <stdio.h>\nint provjeri_duzine(char *s,int duzine[],int duz_niza)\n{\n\tint i,razmak=1,br_rijeci=-1,duzina1=0;\n\tchar*p=s;\n\t/*slaganje broja rijeci i broja clanova niza  PROVJERA*/\n\n\twhile (*p!='\\0') {\n\t\tif(*p<'A'||(*p>'Z'&& *p<'a')||*p>'z') {\n\t\t\trazmak=1;\n\t\t\tp++;\n\t\t} else if(razmak==1) {\n\t\t\trazmak=0;\n\t\t\tbr_rijeci++;\n\t\t\tp++;\n\t\t} else p++;\n\t}\n\tif (br_rijeci!=duz_niza-1)\n\t\treturn 0;\n\trazmak=1;\n\tbr_rijeci=-1;\n\n\n\twhile(*s!='\\0') {\n\t\tif(*s<'A'||(*s>'Z'&& *s<'a')||*s>'z') {\n\t\t\trazmak=1;\n\t\t\ts++;\n\t\t} else if(razmak==1) {\n\t\t\t/* dodje na rijec*/\n\t\t\tduzina1=0;\n\t\t\trazmak=0;\n\t\t\tp=s;\n\t\t\t/*mjesto rijeci*/\n\t\t\tbr_rijeci++;\n\t\t\tif(br_rijeci> duz_niza-1)\n\t\t\t\treturn 0;\n\t\t\t/*\t brojanje slova*/\n\t\t\twhile((*p>='A'&& *p<'Z')||(*p>='a'&& *p<='z')) {\n\t\t\t\tp++;\n\t\t\t\tduzina1++;\n\t\t\t}\n\t\t\ts=p-1;\n\t\t\t/*provjera duzine*/\n\t\t\tif(duzine[br_rijeci]!=duzina1)\n\t\t\t\treturn 0;\n\t\t\ts++;\n\t\t} else s++;\n\t}\n\n\tif(br_rijeci!=duz_niza-1)\n\t\treturn 0;\n\treturn 1;\n}\n\nint main()\n{\n\tprintf(\"Zadaća 4, Zadatak 2\");\n\treturn 0;\n}\n",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 1.0,
-              "calibrated": 0.002231476112663188,
-              "flag": true,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 2.1e-05,
-              "calibrated": 5.81323258974642e-08,
-              "flag": false,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 1.0,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        },
-        {
-          "caso": "similar",
-          "autor": "Ejemplo: solución propia",
-          "origen": "data/golden_set/corpus/A2017_Z4_Z2/original/student3715.c",
-          "contenido": "#include <stdio.h>\n\nint provjeri_duzine (char* s, int niz[], int vel) {\n\tint prekid=1, broj_rijeci=0, duzina_rijeci=0;\n\t\n\twhile (*s!='\\0') {\n\t\tif (!((*s>='A' && *s<='Z') || (*s>='a' && *s<='z'))) prekid=1;\n\t\telse if (prekid==1) {\n\t\t\tprekid=0;\n\t\t\tif (vel<broj_rijeci) return 0;\n\t\t\tbroj_rijeci++;\n\t\t\tduzina_rijeci=0;\n\t\t\t\n\t\t\t/* Posmatramo isključivo velika i mala slova: */\n\t\t\twhile ((*s>='A' && *s<='Z') || (*s>='a' && *s<='z')) {\n\t\t\t\tduzina_rijeci++;\n\t\t\t\ts++;\n\t\t\t}\n\t\t\t\n\t\t\t/* Poredimo odgovarajući član niza sa dužinom svake riječi: */\n\t\t\tif (niz[broj_rijeci-1]!=duzina_rijeci) return 0;\n\t\t\t\n\t\t\t/* Pokazivač vraćamo na prekid riječi: */\n\t\t\ts--;\n\t\t}\n\t\ts++;\n\t}\n\t\n\t/* Veličina niza i broj riječi moraju biti jednaki: */\n\tif (vel!=broj_rijeci) return 0;\n\t\n\treturn 1;\n}\n\nint main() {\n\tprintf(\"Zadaća 4, Zadatak 2\");\n\treturn 0;\n}\n",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 0.40585774058577406,
-              "calibrated": 1.8168714684560833e-05,
-              "flag": false,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 0.002185,
-              "calibrated": 2.0315244363855456e-05,
-              "flag": false,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 0.897,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        },
-        {
-          "caso": "different",
-          "autor": "Ejemplo: código de otro problema",
-          "origen": "data/golden_set/corpus/A2016_Z3_Z3/reference/student1624.c",
-          "contenido": "#include <stdio.h>\nint jesulisti(int *niz1,int*niz2,int vel)\n{\n\tint i;\n\tfor(i=0;i<vel;i++)\n\tif(niz1[i]!=niz2[i])return 0;\n\treturn 1;\n}\nint main() {\n\tint m,n,i,j,k,brm,brk,isti,l;\n\tint mat[200][200];\n\tprintf(\"Unesite brojeve M i N: \");\n\tscanf(\"%d%d\",&m,&n);\n\twhile(n<=0 || m<=0 || m>200 || n>200)\n\t{\n\t\tprintf(\"Brojevi nisu u trazenom opsegu.\\n\");\n\t\tprintf(\"Unesite brojeve M i N: \");\n\t\tscanf(\"%d%d\",&m,&n);\n\t}\n    printf(\"Unesite elemente matrice: \");\n\tfor(i=0;i<m;i++)\n\t{\n\t\tfor(j=0;j<n;j++)\n\t\t  scanf(\"%d\",&mat[i][j]);\n\t}\n\tbrm=0;\n\tfor(i=0;i<m;i++)\n\t{\n\t\tfor(k=i+1;k<m;k++)\n\t\t{\n\t\t\tfor(j=0;j<n;j++)\n\t\t\t   mat[k][j]=mat[k+brm][j];\n\t\t\tif(jesulisti(mat[i],mat[k],n)==1)\n\t\t\t{\n\t\t\t\tbrm++;\n\t\t\t\tk--;\n\t\t\t\tm--;\n\t\t\t}\n\t\t}\n\t}\n\tbrk=0;\n\tfor(i=0;i<n-brk;i++)\n\t{\n\t\tfor(k=i+1;k<n-brk;k++)\n\t\t{\n\t\t\tfor(j=0;j<m;j++)\n\t\t\t   mat[j][k]=mat[j][k+brk];\n\t\t\t\n\t\t\tisti=1;\n\t\t\tfor(l=0;l<m;l++)\n\t\t\t   if(mat[l][i]!=mat[l][k])isti=0;\n\t\t\tif(isti==1)\n\t\t\t{\n\t\t\t\tbrk++;\n\t\t\t\tk--;\n\t\t\t}\n\t\t}\n\t}\n\tn=n-brk;\n\tprintf(\"Nakon izbacivanja redova/kolona matrica glasi:\\n\");\n\tfor(i=0;i<m;i++)\n\t{\n\t\tfor(j=0;j<n;j++)\n\t\t  {\n\t\t  \tprintf(\"%5d\",mat[i][j]);\n\t\t  }\n\t\t printf(\"\\n\"); \t\n\t}\n\treturn 0;\n}\n",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 0.09693877551020408,
-              "calibrated": 3.997249892074253e-06,
-              "flag": false,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 0.003083,
-              "calibrated": 3.138672688857147e-05,
-              "flag": false,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 0.4674,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        },
-        {
-          "caso": "ai",
-          "autor": "Ejemplo: generado con IA",
-          "origen": "data/golden_set/corpus/A2017_Z4_Z2/ai/ref_comentado-malo_or-deepseek-chat_20260716_054419_0013.c",
-          "contenido": "#include <stdio.h>\n#include <string.h>\n#include <ctype.h>\n\n// Ovo je funkcija koja provjerava duzine rijeci\n// prima tekst i niz brojeva i broj elemenata\n// vraca 1 ako je tacno, 0 ako nije\nint provjeriDuzine(char* tekst, int* niz, int brojElemenata) {\n    int i = 0; // brojac za prolazak kroz tekst, i=0\n    int duzinaRijeci = 0; // duzina trenutne rijeci, pocetna 0\n    int indeks = 0; // indeks u nizu, pocinje od 0\n    int uRijeci = 0; // da li smo u rijeci, 0 znaci nismo\n\n    // Ovdje se prolazi kroz tekst dok ne dodjemo do kraja\n    while (tekst[i] != '\\0') {\n        // Provjera da li je karakter razmak, tab ili novi red\n        if (tekst[i] == ' ' || tekst[i] == '\\t' || tekst[i] == '\\n') {\n            // Ako smo bili u rijeci, onda smo je zavrsili\n            if (uRijeci) {\n                // Provjera da li indeks nije veci od broja elemenata\n                if (indeks >= brojElemenata) {\n                    return 0; // Vracamo 0 jer ima vise rijeci nego brojeva\n                }\n                // Provjera da li je duzina rijeci jednaka broju u nizu\n                if (duzinaRijeci != niz[indeks]) {\n                    return 0; // Nije tacno, vracamo 0\n                }\n                // Resetujemo duzinu i uRijeci za novu rijec\n                duzinaRijeci = 0;\n                uRijeci = 0;\n                indeks++; // Povecavamo indeks za sljedeci broj\n            }\n        } else {\n            // Ako nije razmak, onda je dio rijeci\n            uRijeci = 1;\n            duzinaRijeci++; // Povecava se duzina rijeci za jedan\n        }\n        i++; // Idemo na sljedeci karakter\n    }\n\n    // Nakon petlje, provjeravamo posljednju rijec ako je bila\n    if (uRijeci) {\n        // Opet provjera indeksa\n        if (indeks >= brojElemenata) {\n            return 0;\n        }\n        // Provjera duzine\n        if (duzinaRijeci != niz[indeks]) {\n            return 0;\n        }\n        indeks++; // Ovo je posljednja rijec, povecavamo indeks\n    }\n\n    // Provjera da li smo obradili tacno onoliko rijeci koliko ima brojeva\n    if (indeks != brojElemenata) {\n        return 0; // Nije isti broj, vracamo 0\n    }\n\n    return 1; // Sve je ok, vracamo 1\n}\n\nint main() {\n    // Ovdje testiramo funkciju sa primjerom\n    char tekst[] = \"Ovo je test\";\n    int niz[] = {3, 2, 4}; // Ovo=3, je=2, test=4\n    int broj = 3; // Broj elemenata niza\n\n    int rezultat = provjeriDuzine(tekst, niz, broj);\n    printf(\"Rezultat: %d\\n\", rezultat); // Stampa se rezultat, treba 1\n\n    // Drugi test, sa pogresnom duzinom\n    char tekst2[] = \"Dobro jutro\";\n    int niz2[] = {5, 6}; // Dobro=5, jutro=5, ali niz kaze 6, treba 0\n    int rezultat2 = provjeriDuzine(tekst2, niz2, 2);\n    printf(\"Rezultat 2: %d\\n\", rezultat2); // Stampa se rezultat 2, treba 0\n\n    return 0; // Kraj programa\n}",
-          "outcome": {
-            "channel_a": {
-              "estado": "OK",
-              "raw": 0.12693498452012383,
-              "calibrated": 3.997249892074253e-06,
-              "flag": false,
-              "threshold": 0.000588235294117647,
-              "threshold_key": "fpr_0.05",
-              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
-            },
-            "channel_b": {
-              "estado": "OK",
-              "raw": 0.999899,
-              "calibrated": 0.9997982615729559,
-              "flag": true,
-              "threshold": 0.1715360690019589,
-              "threshold_key": "fpr_0.01",
-              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
-            },
-            "gcb_similarity": 0.6165,
-            "engine": "real",
-            "provenance": {
-              "canal_a_metodo": "jaccard",
-              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
-              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
-              "gcb_estado": "OK",
-              "label": "not validated against reference-derived plagiarism"
-            }
-          }
-        }
-      ]
-    },
-    {
       "key": "A2016_Z3_Z3",
+      "fuente": "golden_set",
       "titulo": "Eliminar filas y columnas repetidas de una matriz",
       "descripcion": "Lee las dimensiones M y N (entre 1 y 200) y los elementos de una matriz de enteros, elimina las filas y las columnas que repiten el contenido de una anterior y muestra la matriz resultante.",
       "lenguaje": "c",
@@ -752,6 +451,363 @@
               "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
             },
             "gcb_similarity": 0.7675,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "escom:factorial_iterativo_for",
+      "fuente": "escom_catalogo",
+      "titulo": "Calcular el factorial de un número",
+      "descripcion": "Escribe un programa en C que lea un número entero, calcule su factorial y muestre el resultado. La referencia lo calcula con una función y un ciclo for. Nota: la solución propia de este ejemplo la escribió una persona sin ayuda de IA y aun así el estilo marca alto; la métrica de estilo no basta por sí sola.",
+      "lenguaje": "c",
+      "referencia": {
+        "autor": "Referencia del ejemplo",
+        "contenido": "#include <stdio.h>\n\nint factorialIterativo(int n) {\n    int res = 1;\n    for(int i = 1; i <= n; i++) {\n        res = res * i;\n    }\n    return res;\n}\n\nint main() {\n    int num;\n    printf(\"Dame el numero: \");\n    scanf(\"%d\", &num);\n    printf(\"Factorial de %d es: %d\\n\", num, factorialIterativo(num));\n    return 0;\n}\n"
+      },
+      "entregas": [
+        {
+          "caso": "identical",
+          "autor": "Ejemplo: copia de la referencia",
+          "origen": "backend/app/data/catalog_escom.json#factorial_iterativo_for.c",
+          "contenido": "#include <stdio.h>\n\nint factorialIterativo(int n) {\n    int res = 1;\n    for(int i = 1; i <= n; i++) {\n        res = res * i;\n    }\n    return res;\n}\n\nint main() {\n    int num;\n    printf(\"Dame el numero: \");\n    scanf(\"%d\", &num);\n    printf(\"Factorial de %d es: %d\\n\", num, factorialIterativo(num));\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 1.0,
+              "calibrated": 0.002231476112663188,
+              "flag": true,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.999017,
+              "calibrated": 0.996458045039953,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 1.0,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        },
+        {
+          "caso": "similar",
+          "autor": "Ejemplo: solución propia",
+          "origen": "backend/app/data/examples/escom/factorial.c",
+          "contenido": "#include <stdio.h>\nint main(){\n    int numero;\n    int resultado = 1;\n    printf(\"Ingresa un numero que no sea negativo para calcular el factorial: \");\n    scanf(\"%d\",&numero);\n\n    if(numero < 0){\n        printf(\"El numero no puede ser negativo.\\n\");\n    }else{\n        for(int i = 1; i<=numero; i++) {\n            resultado = resultado * i;\n        }\n        printf(\"El factorial de %d es: %d\\n\", numero, resultado);\n    }\n    return 0;\n}\n",
+          "autor_humano": true,
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.36936936936936937,
+              "calibrated": 1.8168714684560833e-05,
+              "flag": false,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.96495,
+              "calibrated": 0.7487109794469324,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 0.7963,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        },
+        {
+          "caso": "different",
+          "autor": "Ejemplo: código de otro problema",
+          "origen": "backend/app/data/catalog_escom.json#registro_alumno_estructura.c",
+          "contenido": "#include <stdio.h>\n\nstruct Alumno {\n    char nombre[30];\n    int boleta;\n    float promedio;\n};\n\nint main() {\n    struct Alumno a1;\n    \n    printf(\"Nombre: \");\n    scanf(\"%s\", a1.nombre);\n    printf(\"Boleta: \");\n    scanf(\"%d\", &a1.boleta);\n    printf(\"Promedio: \");\n    scanf(\"%f\", &a1.promedio);\n    \n    printf(\"\\nDatos capturados:\\n\");\n    printf(\"Nombre: %s | Boleta: %d | Promedio: %.2f\\n\", a1.nombre, a1.boleta, a1.promedio);\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.14655172413793102,
+              "calibrated": 3.997249892074253e-06,
+              "flag": false,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.998783,
+              "calibrated": 0.9953680029363006,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 0.5519,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "escom:01_ordenamiento_burbuja_iterativo",
+      "fuente": "escom_catalogo",
+      "titulo": "Ordenar un arreglo con el método de la burbuja",
+      "descripcion": "Escribe un programa en C que ordene un arreglo de enteros de menor a mayor con el método de la burbuja, usando dos ciclos for que intercambian elementos adyacentes, y muestre el resultado. Nota: la solución propia de este ejemplo la escribió una persona sin ayuda de IA y aun así el estilo marca alto; la métrica de estilo no basta por sí sola.",
+      "lenguaje": "c",
+      "referencia": {
+        "autor": "Referencia del ejemplo",
+        "contenido": "#include <stdio.h>\n\nint a[6] = {64, 34, 25, 12, 22, 11}; // arreglo global\nint n = 6;\n\nint main() {\n    int i, j, temp;\n    // burbuja clasica con dos for\n    for(i = 0; i < n - 1; i++) {\n        for(j = 0; j < n - i - 1; j++) {\n            if(a[j] > a[j + 1]) {\n                temp = a[j];\n                a[j] = a[j + 1];\n                a[j + 1] = temp;\n            }\n        }\n    }\n    printf(\"Arreglo ordenado por burbuja: \");\n    for(i = 0; i < n; i++) {\n        printf(\"%d \", a[i]);\n    }\n    printf(\"\\n\");\n    return 0;\n}\n"
+      },
+      "entregas": [
+        {
+          "caso": "identical",
+          "autor": "Ejemplo: copia de la referencia",
+          "origen": "backend/app/data/catalog_escom.json#01_ordenamiento_burbuja_iterativo.c",
+          "contenido": "#include <stdio.h>\n\nint a[6] = {64, 34, 25, 12, 22, 11}; // arreglo global\nint n = 6;\n\nint main() {\n    int i, j, temp;\n    // burbuja clasica con dos for\n    for(i = 0; i < n - 1; i++) {\n        for(j = 0; j < n - i - 1; j++) {\n            if(a[j] > a[j + 1]) {\n                temp = a[j];\n                a[j] = a[j + 1];\n                a[j + 1] = temp;\n            }\n        }\n    }\n    printf(\"Arreglo ordenado por burbuja: \");\n    for(i = 0; i < n; i++) {\n        printf(\"%d \", a[i]);\n    }\n    printf(\"\\n\");\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 1.0,
+              "calibrated": 0.002231476112663188,
+              "flag": true,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.998762,
+              "calibrated": 0.99526740143762,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 1.0,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        },
+        {
+          "caso": "similar",
+          "autor": "Ejemplo: solución propia",
+          "origen": "backend/app/data/examples/escom/burbuja.c",
+          "contenido": "#include <stdio.h>\nint main() {\n    int numeros[]={64, 34, 25, 12, 22, 11, 90};\n    int n=sizeof(numeros)/sizeof(numeros[0]);\n    int aux;\n\n    for (int i=0; i<n-1; i++) {\n        for (int j=0; j<n-i-1; j++) {\n            if (numeros[j]>numeros[j+1]){\n                aux=numeros[j];\n                numeros[j]=numeros[j + 1];\n                numeros[j+1]=aux;\n            }\n        }\n    }\n\n    printf(\"numeros ordenados de menor a mayor:\\n\");\n    for (int i=0; i<n; i++) {\n        printf(\"%d \", numeros[i]);\n    }\n    return 0;\n}\n",
+          "autor_humano": true,
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.5903614457831325,
+              "calibrated": 5.969436485195797e-05,
+              "flag": false,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.970167,
+              "calibrated": 0.7861121746954673,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 0.8376,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        },
+        {
+          "caso": "different",
+          "autor": "Ejemplo: código de otro problema",
+          "origen": "backend/app/data/catalog_escom.json#escritura_archivo_texto_fprintf.c",
+          "contenido": "#include <stdio.h>\n\nint main() {\n    FILE *arch = fopen(\"alumnos.txt\", \"w\");\n    \n    if(arch == NULL) {\n        printf(\"No se pudo crear el archivo\\n\");\n        return 1;\n    }\n    \n    fprintf(arch, \"Registro de Alumnos\\n\");\n    fprintf(arch, \"Rodrigo 9.5\\n\");\n    fprintf(arch, \"Mariana 8.0\\n\");\n    \n    fclose(arch);\n    printf(\"Archivo guardado con exito\\n\");\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.07058823529411765,
+              "calibrated": 3.997249892074253e-06,
+              "flag": false,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.965841,
+              "calibrated": 0.7549822135382391,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 0.5188,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "escom:busqueda_lineal_arreglo",
+      "fuente": "escom_catalogo",
+      "titulo": "Búsqueda lineal en un arreglo",
+      "descripcion": "Escribe un programa en C que capture un arreglo de enteros y un número a buscar, recorra el arreglo y muestre la posición donde lo encontró o que no existe.",
+      "lenguaje": "c",
+      "referencia": {
+        "autor": "Referencia del ejemplo",
+        "contenido": "#include <stdio.h>\n\nint main() {\n    int arr[100];\n    int n, buscar, encontrado = 0;\n    \n    printf(\"Cuantos datos vas a meter?: \");\n    scanf(\"%d\", &n);\n    \n    for(int i = 0; i < n; i++) {\n        printf(\"Dato [%d]: \", i);\n        scanf(\"%d\", &arr[i]);\n    }\n    \n    printf(\"Que numero buscas?: \");\n    scanf(\"%d\", &buscar);\n    \n    for(int i = 0; i < n; i++) {\n        if(arr[i] == buscar) {\n            printf(\"Si esta en la posicion %d\\n\", i);\n            encontrado = 1;\n            break;\n        }\n    }\n    \n    if(encontrado == 0) {\n        printf(\"No se encontro el numero\\n\");\n    }\n    return 0;\n}\n"
+      },
+      "entregas": [
+        {
+          "caso": "identical",
+          "autor": "Ejemplo: copia de la referencia",
+          "origen": "backend/app/data/catalog_escom.json#busqueda_lineal_arreglo.c",
+          "contenido": "#include <stdio.h>\n\nint main() {\n    int arr[100];\n    int n, buscar, encontrado = 0;\n    \n    printf(\"Cuantos datos vas a meter?: \");\n    scanf(\"%d\", &n);\n    \n    for(int i = 0; i < n; i++) {\n        printf(\"Dato [%d]: \", i);\n        scanf(\"%d\", &arr[i]);\n    }\n    \n    printf(\"Que numero buscas?: \");\n    scanf(\"%d\", &buscar);\n    \n    for(int i = 0; i < n; i++) {\n        if(arr[i] == buscar) {\n            printf(\"Si esta en la posicion %d\\n\", i);\n            encontrado = 1;\n            break;\n        }\n    }\n    \n    if(encontrado == 0) {\n        printf(\"No se encontro el numero\\n\");\n    }\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 1.0,
+              "calibrated": 0.002231476112663188,
+              "flag": true,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.996109,
+              "calibrated": 0.9801981557238377,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 1.0,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        },
+        {
+          "caso": "similar",
+          "autor": "Ejemplo: solución propia",
+          "origen": "backend/app/data/examples/escom/busqueda_lineal.c",
+          "contenido": "#include <stdio.h>\n\nint main() {\n    int tamano;\n    int a[50];\n    int x;\n    int pos=-1;\n\n    printf(\"dame la cantidad: \");\n    scanf(\"%d\", &tamano);\n\n    for(int i=0; i<tamano; i++){\n        printf(\"numero: \");\n        scanf(\"%d\", &a[i]);\n    }\n\n    printf(\"cual buscas: \");\n    scanf(\"%d\", &x);\n\n    for(int i=0; i<tamano; i++){\n        if(a[i]==x){\n            pos=i;\n        }\n    }\n\n    if(pos!=-1){\n        printf(\"si esta en la posicion %d\\n\", pos);\n    }\n    else{\n        printf(\"no existe\\n\");\n    }\n\n    return 0;\n}\n",
+          "autor_humano": true,
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.5746268656716418,
+              "calibrated": 5.969436485195797e-05,
+              "flag": false,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.332994,
+              "calibrated": 0.018672706286361085,
+              "flag": false,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 0.7101,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard",
+              "manifest_sha": "9baf2ec9d2a78e1d90fdb3a2ea71bb7bb5fecd93b5ac221b107e39545fe666c3",
+              "checkpoint_sha_b": "ec365f9803c2da452eafb9f4749feee62ca217fda9814e78accb3eccb6672bd6",
+              "gcb_estado": "OK",
+              "label": "not validated against reference-derived plagiarism"
+            }
+          }
+        },
+        {
+          "caso": "different",
+          "autor": "Ejemplo: código de otro problema",
+          "origen": "backend/app/data/catalog_escom.json#19_lista_doblemente_enlazada.c",
+          "contenido": "#include <stdio.h>\n#include <stdlib.h>\n\nstruct NodoDoble {\n    int dato;\n    struct NodoDoble* ant;\n    struct NodoDoble* sig;\n};\n\nint main() {\n    struct NodoDoble* n1 = (struct NodoDoble*)malloc(sizeof(struct NodoDoble));\n    struct NodoDoble* n2 = (struct NodoDoble*)malloc(sizeof(struct NodoDoble));\n    \n    n1->dato = 100; n1->ant = NULL; n1->sig = n2;\n    n2->dato = 200; n2->ant = n1; n2->sig = NULL;\n\n    printf(\"Hacia adelante: %d -> %d\\n\", n1->dato, n1->sig->dato);\n    printf(\"Hacia atras: %d -> %d\\n\", n2->dato, n2->ant->dato);\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.05056179775280899,
+              "calibrated": 3.997249892074253e-06,
+              "flag": false,
+              "threshold": 0.000588235294117647,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "077a95039545ca2d27d37cd18838a4c2152afaecb9593e51678596e94e8cd367"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.999312,
+              "calibrated": 0.9977387753324001,
+              "flag": true,
+              "threshold": 0.1715360690019589,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "f150ee19106db13b49c73b80947dc922215780630e193bfdd087c63c72fcd195"
+            },
+            "gcb_similarity": 0.4341,
             "engine": "real",
             "provenance": {
               "canal_a_metodo": "jaccard",

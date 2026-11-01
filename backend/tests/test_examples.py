@@ -32,6 +32,7 @@ from app.infrastructure.inference.stub_engine import StubInferenceEngine
 from app.presentation.api.v1.endpoints import auth as auth_endpoint
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ejemplo_fixture_test.json"
+ESCOM_FIXTURE = Path(__file__).parent / "fixtures" / "ejemplo_fixture_escom_test.json"  # + a 3-entrega problem
 DOC = json.loads(FIXTURE.read_text(encoding="utf-8"))
 ENSURE = "/api/v1/examples/ensure"
 CASOS = ["identical", "similar", "different", "ai"]
@@ -144,6 +145,62 @@ async def test_ensure_creates_the_group_with_problems_and_preanalysed_submission
             }
             assert ("CONVERGENCIA_ESTRUCTURAL" in kinds) == a["flag"]
             assert ("PATRON_SINTETICO" in kinds) == b["flag"]
+
+
+@pytest.mark.asyncio
+async def test_a_three_entrega_problem_is_seeded_with_its_three_reports(db_session, vector_store):
+    """The ESCOM-catalog problem has no AI case: 3 submissions and 3 reports, tour summary from problems[0]."""
+    doc = json.loads(ESCOM_FIXTURE.read_text(encoding="utf-8"))
+    escom = doc["problems"][1]
+    assert escom["fuente"] == "escom_catalogo"
+    assert [e["caso"] for e in escom["entregas"]] == ["identical", "similar", "different"]
+
+    docente = Docente(email="escom@escom.ipn.mx", hashed_password="x", nombre="Prof. Catalogo")
+    db_session.add(docente)
+    await db_session.commit()
+    await db_session.refresh(docente)
+
+    service = ExampleService(db_session, StubInferenceEngine(), vector_store, fixture_path=ESCOM_FIXTURE)
+    summary = await service.ensure_examples(docente.id)
+
+    assert summary.creado is True
+    assert [p.titulo for p in summary.problemas] == [p["titulo"] for p in doc["problems"]]
+    # the tour keeps pointing at problems[0] with its four cases, in order
+    assert summary.recorrido.problema_id == summary.problemas[0].problema_id
+    assert list(summary.recorrido.casos) == CASOS
+    assert all(isinstance(report_id, int) for report_id in summary.recorrido.casos.values())
+
+    assert await _count(db_session, Problema) == 2
+    assert await _count(db_session, ReporteAnalisis) == 4 + 3
+    escom_problem = (
+        await db_session.execute(select(Problema).where(Problema.catalogo_id == f"ejemplo:{escom['key']}"))
+    ).scalar_one()
+    submissions = (
+        (
+            await db_session.execute(
+                select(CodigoFuente).where(
+                    CodigoFuente.problema_id == escom_problem.id, CodigoFuente.tipo == TipoCodigoEnum.ENTREGA_ALUMNO
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert sorted(s.autor for s in submissions) == sorted(e["autor"] for e in escom["entregas"])
+    assert len(submissions) == 3
+    for submission in submissions:
+        reports = (
+            await db_session.execute(select(ReporteAnalisis).where(ReporteAnalisis.entrega_id == submission.id))
+        ).scalars().all()
+        assert len(reports) == 1 and reports[0].engine == "real"
+        fixture_entrega = next(e for e in escom["entregas"] if e["autor"] == submission.autor)
+        assert reports[0].similitud_semantica == round(fixture_entrega["outcome"]["channel_a"]["raw"], 4)
+        assert reports[0].gcb_similarity == fixture_entrega["outcome"]["gcb_similarity"]
+
+    again = await service.ensure_examples(docente.id)  # idempotent for the 3-entrega problem too
+    assert again.creado is False
+    assert again.recorrido == summary.recorrido
+    assert await _count(db_session, ReporteAnalisis) == 4 + 3
 
 
 @pytest.mark.asyncio
