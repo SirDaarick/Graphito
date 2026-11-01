@@ -17,6 +17,7 @@ every path (AS1.2, AS1.3).
 import asyncio
 import dataclasses
 import logging
+import time
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -24,6 +25,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.services.usage_events import elapsed_ms, timed
 from app.application.services.xai_service import XAIService
 from app.domain.errors import InferenceError
 from app.domain.ports.calibration_port import CalibrationPort
@@ -200,12 +202,16 @@ class ScoringService:
 
         The database-free core of `score` (also used by offline scripts). Writes nothing.
         """
+        timings: Dict[str, float] = {}
+        started = time.perf_counter()
         (channel_a, reference_id), channel_b, (gcb, gcb_estado) = await asyncio.gather(
-            self._channel_a(code, ref_pairs),
-            self._channel_b(code),
-            self._gcb(code, language, problema_id, bool(ref_pairs)),
+            timed(timings, "canal_a", self._channel_a(code, ref_pairs)),
+            timed(timings, "canal_b", self._channel_b(code)),
+            timed(timings, "gcb", self._gcb(code, language, problema_id, bool(ref_pairs))),
         )
+        timings["puntuacion"] = round(elapsed_ms(started), 2)
         provenance: Dict[str, Any] = {
+            "tiempos_ms": timings,
             "canal_a_metodo": self.lexical.method,
             "manifest_sha": self.calibration.manifest_sha256,
             "checkpoint_sha_b": self.calibration.checkpoint_sha256,

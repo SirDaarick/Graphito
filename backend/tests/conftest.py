@@ -93,12 +93,10 @@ class InMemoryVectorStore(VectorStorePort):
         return True
 
 
-test_engine = create_async_engine(
-    "sqlite+aiosqlite:///:memory:",
-    echo=False,
-    future=True,
-)
-test_session_maker = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+# One engine per test, built inside the test's event loop: the in-memory SQLite connection holds an
+# asyncio lock, and a lock first contended in an earlier test's loop fails ("bound to a different
+# event loop") as soon as two sessions of a later test (a batch worker plus a usage event) overlap.
+_current_session_maker = {}
 test_vector_store = InMemoryVectorStore()
 test_inference_engine = StubInferenceEngine()
 
@@ -112,6 +110,9 @@ def vector_store() -> InMemoryVectorStore:
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session()-> AsyncGenerator[AsyncSession, None]:
+    test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False, future=True)
+    test_session_maker = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    _current_session_maker["maker"] = test_session_maker
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -120,6 +121,7 @@ async def db_session()-> AsyncGenerator[AsyncSession, None]:
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    await test_engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -137,7 +139,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     import app.infrastructure.database.session as db_session_module
     orig_maker = db_session_module.async_session_maker
-    db_session_module.async_session_maker = test_session_maker
+    db_session_module.async_session_maker = _current_session_maker["maker"]
 
     # A ready STUB runtime, whatever INFERENCE_MODE a local .env sets (the lifespan does not run
     # under ASGITransport). Readiness tests swap it for a degraded one.

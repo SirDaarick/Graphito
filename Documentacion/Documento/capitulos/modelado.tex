@@ -305,7 +305,7 @@ El código original de Microsoft construye el grafo de flujo de datos solo para 
     \label{fig:dfg_ejemplo}
 \end{figure}
 
-Se probó también \textit{winnowing} \cite{Schleimer2003Winnowing}, una variante que compara una muestra de los fragmentos; se comporta casi igual que Jaccard, por lo que el capítulo toma Jaccard como método de texto. La Tabla~\ref{tab:ajustes_c_cpp} resume los ajustes que C y C++ requirieron.
+Como referencia de texto, el Canal A se compara con la similitud de Jaccard sobre fragmentos del código. Se probó también \textit{winnowing} \cite{Schleimer2003Winnowing}, una variante que compara una muestra de los fragmentos; se comporta casi igual que Jaccard, por lo que el capítulo toma Jaccard como método de texto. La Tabla~\ref{tab:ajustes_c_cpp} resume los ajustes que C y C++ requirieron.
 
 \begin{table}[H]
     \centering
@@ -387,7 +387,7 @@ Se entrenaron dos configuraciones, cada una con dos semillas (dos puntos de part
     Lote y tripletas & 16 problemas por paso; 150,000 tripletas (9,375 pasos) & Cada problema aporta un ancla, un positivo y un negativo difícil. \\ \hline
     Optimizador y tasa & AdamW \cite{Loshchilov2019AdamW}, $10^{-4}$ & Con un arranque gradual (5\,\%) y un descenso lineal al final. \\ \hline
     Semillas & 0 y 1 & Dos corridas por configuración. \\ \hline
-    Selección & Cada 1,000 pasos, en la validación de CodeNet & Se conserva la mejor copia; ESCOM no interviene. \\ \hline
+    Selección & Cada 1,000 pasos, en la validación de CodeNet & Se conserva la mejor copia; el corpus de Sarajevo no interviene. \\ \hline
 \end{xltabular}
 }
 
@@ -408,7 +408,7 @@ La configuración B ganó con el primer criterio (AUC de 0.634 en las dos semill
 \end{figure}
 
 \subsubsection{Qué Cambia en el Vector}
-La Figura~\ref{fig:coseno_ajuste} compara la similitud entre pares de programas de la validación de CodeNet. Sin ajuste, los programas de problemas distintos obtienen en promedio 0.96 y los del mismo problema 0.97: casi no hay diferencia, y cualquier programa parece parecerse a cualquier otro. Con el ajuste, los de problemas distintos bajan a 0.27 y los del mismo problema quedan en 0.75. Esta medición es de CodeNet; el efecto sobre los datos de ESCOM se presenta en la Sección~\ref{subsec:resultados_ajuste}.
+La Figura~\ref{fig:coseno_ajuste} compara la similitud entre pares de programas de la validación de CodeNet. Sin ajuste, los programas de problemas distintos obtienen en promedio 0.96 y los del mismo problema 0.97: casi no hay diferencia, y cualquier programa parece parecerse a cualquier otro. Con el ajuste, los de problemas distintos bajan a 0.27 y los del mismo problema quedan en 0.75. Esta medición es de CodeNet; el efecto sobre los datos de Sarajevo se presenta en la Sección~\ref{subsec:resultados_ajuste}.
 
 \begin{figure}[H]
     \centering
@@ -422,7 +422,7 @@ La Figura~\ref{fig:coseno_ajuste} compara la similitud entre pares de programas 
 \subsection{Canal A: Modelos Anteriores y por qué se Descartaron}
 \label{subsec:modelos_anteriores}
 
-Antes del modelo ajustado se probaron otras versiones del Canal A. La Tabla~\ref{tab:modelos_anteriores} resume qué era cada una, cómo le fue y por qué no se eligió. Aparecen como comparación en algunas gráficas de la Sección~\ref{subsec:canal_a_semantica}.
+Antes del modelo ajustado se probaron otras versiones del Canal A. La Tabla~\ref{tab:modelos_anteriores} resume qué era cada una, cómo le fue y por qué no se eligió. Aparecen como comparación en algunas gráficas de la Sección~\ref{subsec:canal_a_semantica}. Las dos métricas se explican allí; en resumen, el ROC-AUC mide qué tan bien un método pone los pares de plagio por encima de los que no lo son (1.0 es perfecto y 0.5 es azar), y el MAP@R mide qué tan arriba quedan los programas de la misma tarea al ordenar todos por similitud (1.0 es perfecto).
 
 \begin{table}[H]
     \centering
@@ -508,12 +508,12 @@ La calibración de \textbf{Platt} \cite{Platt1999Probabilistic} ajusta una curva
 \label{sec:evaluacion_modelos}
 % ======================================================================
 
-Esta sección responde dos preguntas muy importantes ¿qué tan bueno es CharCNN detectando código genrado por IA? y ¿qué tan bueno es GraphCodeBERT para detectar cuando dos códigos se parecen lógicamente? Todas las pruebas se hicieron con la versión final de cada modelo usando entregas que nunca vieron durante su entrenamiento.
+Esta sección responde dos preguntas muy importantes ¿qué tan bueno es CharCNN detectando código generado por IA? y ¿qué tan bueno es GraphCodeBERT para detectar cuando dos códigos se parecen lógicamente? Todas las pruebas se hicieron con la versión final de cada modelo usando entregas que nunca vieron durante su entrenamiento.
 
 \subsection{Protocolo de Evaluación}
 \label{subsec:protocolo_evaluacion}
 
-Para asegurarnos de que la evaluacion fue lo más justa posible, las reglas se fijaron antes de ver los resultados (Figura~\ref{fig:protocolo_evaluacion}). Los datos de entrenamiento sirven para que el modelo aprenda, los de validación son un simulacro para ajustar detalles, y los de prueba son la prueba definitiva de que tan bueno es el modelo, que se aplica una sola vez sin hacer cambios posteriores. Esta separación evita la fuga de información \cite{Allamanis2019Adverse,Kapoor2023Leakage}, siguiendo la partición por tarea explicada en el Capítulo~\ref{cap:ingenieria_datos}.
+Para asegurarnos de que la evaluación fue lo más justa posible, las reglas se fijaron antes de ver los resultados (Figura~\ref{fig:protocolo_evaluacion}). Los datos de entrenamiento sirven para que el modelo aprenda, los de validación son un simulacro para ajustar detalles, y los de prueba son la prueba definitiva de que tan bueno es el modelo, que se aplica una sola vez sin hacer cambios posteriores. Esta separación evita la fuga de información \cite{Allamanis2019Adverse,Kapoor2023Leakage}, siguiendo la partición por tarea explicada en el Capítulo~\ref{cap:ingenieria_datos}.
 
 \begin{figure}[H]
     \centering
@@ -557,7 +557,7 @@ En las tablas, las cifras incluyen entre corchetes su intervalo de confianza (IC
 \subsection{Canal B: Detección de Código de IA (CharCNN)}
 \label{subsec:resultados_charcnn}
 
-En problemas nuevos, el Canal B detecta casi 9 de cada 10 códigos de IA y solo confunde a 1 de cada 100 estudiantes humanos.
+En problemas nuevos, y con generadores de IA como los vistos al entrenar, el Canal B detecta casi 9 de cada 10 códigos de IA y solo confunde a 1 de cada 100 estudiantes humanos.
 
 La prueba se realizó con 4,531 archivos de tareas que el modelo no conocía (4,201 de estudiantes y 330 generados por IA). Como Graphito busca apoyar al profesor y no acusar injustamente al alumno, el sistema se configuró con una Tasa de Falsos Positivos estricta (\texttt{fpr\_0.01}), diseñado para no superar un 1\,\% de falsas alarmas. 
 
@@ -570,7 +570,7 @@ Con este ajuste, el modelo acertó en 4,161 archivos humanos y solo se equivocó
     \label{fig:matriz_confusion_charcnn}
 \end{figure}
 
-Si quisieramos aumentar los códigos de IA que detecta CharCNN ¿Qué pasaría? La Tabla~\ref{tab:puntos_operacion} compara nuestro ajuste actual con uno más permisivo (\texttt{fpr\_0.05}, que tolera hasta 5\,\% de falsas alarmas). Aunque el modo permisivo atrapa el 97.3\,\% de la IA, hace que casi 4 de cada 10 alertas sean falsos positivos contra alumnos reales, lo que confirma que el ajuste estricto es mucho más adecuado para apoyar en el análisis de tareas de estudiantes.
+Si quisiéramos aumentar los códigos de IA que detecta CharCNN ¿Qué pasaría? La Tabla~\ref{tab:puntos_operacion} compara nuestro ajuste actual con uno más permisivo (\texttt{fpr\_0.05}, que tolera hasta 5\,\% de falsas alarmas). Aunque el modo permisivo atrapa el 97.3\,\% de la IA, hace que casi 4 de cada 10 alertas sean falsos positivos contra alumnos reales, lo que confirma que el ajuste estricto es mucho más adecuado para apoyar en el análisis de tareas de estudiantes.
 
 \begin{table}[H]
     \centering
@@ -593,13 +593,13 @@ Al evaluar la capacidad global del modelo para separar ambos grupos, el resultad
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_roc.png}\hspace{0.04\textwidth}\includegraphics[width=0.42\textwidth]{figuras/charcnn_v2_pr.png}
-    \caption{Curvas de desempeño de CharCNN. En la izquierda (ROC), mientras más se pegue la curva a la esquina superior izquierda, más IA se detecta cometer errrores. En la derecha (PR), la línea se mantiene alta casi hasta el final, mostrando que las alertas siguen siendo certeras incluso siendo estricto con la precisión.}
+    \caption{Curvas de desempeño de CharCNN. En la izquierda (ROC), mientras más se pegue la curva a la esquina superior izquierda, más IA se detecta cometiendo menos errores. En la derecha (PR), la línea se mantiene alta casi hasta el final, mostrando que las alertas siguen siendo certeras incluso siendo estricto con la precisión.}
     \label{fig:roc_pr_charcnn}
 \end{figure}
 
-Apesar de estos resultados sobresalientes, conviene tener presentes dos matices importantes. El primero, en esta prueba el 7\,\% de los archivos eran de IA, en un grupo escolar donde casi nadie use IA, el porcentaje de falsas positivos entre los sospechosos parecerá mayor. Segundo, los códigos de IA provienen de \textit{DeepSeek-Chat} y \textit{Qwen3} (con tasas de detección del 88\,\% y 90\,\%, respectivamente), por lo que su eficacia ante otros modelos queda abierta a estudio. El experimento siguiente acota esta duda entre esos dos generadores.
+A pesar de estos resultados sobresalientes, conviene tener presentes dos matices importantes. El primero: en esta prueba el 7\,\% de los archivos eran de IA; en un grupo escolar donde casi nadie use IA, el porcentaje de falsos positivos entre los sospechosos será mayor. Segundo, los códigos de IA provienen de \textit{DeepSeek-Chat} y \textit{Qwen3} (con tasas de detección del 88\,\% y 90\,\%, respectivamente), por lo que su eficacia ante otros modelos no está demostrada. El experimento siguiente pone a prueba esa duda con esos dos generadores, y el resultado es una advertencia.
 
-Para saber si el detector reconoce a un generador que no vio al entrenar, se entrenó con uno de ellos y se probó con el otro (\textit{leave-one-LLM-out}), con tres semillas y reglas fijadas de antemano. Para que la comparación fuera justa, el entrenamiento con \textit{DeepSeek-Chat} se repitió con el mismo número de archivos que \textit{Qwen3}. La capacidad de separar IA de humano casi no cambia: el ROC-AUC sobre el generador no visto se mantiene entre 0.985 y 0.993 y la tasa de falsas alarmas en humanos sigue cerca del 1\,\%. En cambio, con el umbral fijo (\texttt{fpr\_0.01}) la detección baja: 0.08 al entrenar con \textit{DeepSeek-Chat} y probar con \textit{Qwen3} (mismo tamaño), y 0.15 al entrenar con \textit{Qwen3} y probar con \textit{DeepSeek-Chat} (Figura~\ref{fig:lolo_charcnn}). La regla fijada de antemano lo clasifica como un resultado \emph{mixto}: el modelo ordena bien a un generador desconocido, pero con el umbral actual dejaría escapar más código de IA. Solo se probaron estos dos generadores, con prompts idénticos y humanos del mismo curso, por lo que no permite concluir sobre otros modelos.
+Para saber si el detector reconoce a un generador que no vio al entrenar, se entrenó con uno de ellos y se probó con el otro (\textit{leave-one-LLM-out}), con tres semillas y reglas fijadas de antemano. Para que la comparación fuera justa, el entrenamiento con \textit{DeepSeek-Chat} se repitió con el mismo número de archivos que \textit{Qwen3}. La capacidad de separar IA de humano casi no cambia: el ROC-AUC sobre el generador no visto se mantiene entre 0.985 y 0.993 y la tasa de falsas alarmas en humanos sigue cerca del 1\,\%. En cambio, con el umbral fijo (\texttt{fpr\_0.01}) la detección baja: 0.08 al entrenar con \textit{DeepSeek-Chat} y probar con \textit{Qwen3} (mismo tamaño), y 0.15 al entrenar con \textit{Qwen3} y probar con \textit{DeepSeek-Chat} (Figura~\ref{fig:lolo_charcnn}). La regla fijada de antemano lo clasifica como un resultado \emph{mixto}: el modelo ordena bien a un generador desconocido, pero con el umbral actual dejaría escapar la mayor parte del código de IA de un generador nuevo (detectaría entre 8 y 15 de cada 100, frente a casi 9 de cada 10 con generadores vistos). Por eso la cifra de la Tabla~\ref{tab:puntos_operacion} solo debe leerse para generadores como los del entrenamiento. Solo se probaron estos dos generadores, con prompts idénticos y humanos del mismo curso, por lo que no permite concluir sobre otros modelos.
 
 \begin{figure}[H]
     \centering
@@ -616,7 +616,7 @@ Esta subsección evalúa el modelo que usa el Canal A: GraphCodeBERT ajustado co
 
 \subsubsection{Detección de pares de plagio}
 \label{subsec:pares_plagio}
-Entre casi dos millones de combinaciones posibles de 6,797 programas, se evaluó qué tan bien cada método coloca en los primeros lugares a los 338 pares previamente identificados como plagio en \textit{Programming Homework Dataset for Plagiarism Detection} \cite{Ljubovic2020} (Tabla~\ref{tab:pares_plagio}).
+Entre los unos 23 millones de pares posibles de 6,797 programas del corpus de Sarajevo, se evaluó qué tan bien cada método coloca en los primeros lugares a los 338 pares previamente identificados como plagio en \textit{Programming Homework Dataset for Plagiarism Detection} \cite{Ljubovic2020} (Tabla~\ref{tab:pares_plagio}).
 
 \begin{table}[H]
     \centering
@@ -657,7 +657,7 @@ Cuando un alumno copia código, suele disfrazarlo haciendo cambios superficiales
     \end{tabularx}
 \end{table}
 
-Jaccard casi no se mueve, porque cambia los nombres de variables por una marca genérica antes de comparar. El modelo ajustado tampoco sufre por los nombres, ya que su entrada los normaliza (Sección~\ref{subsec:prep_semantica}), ni por los cambios de estructura. Lo que sí lo afecta es el código muerto (baja a 0.865) y, sobre todo, la combinación de todos los trucos (0.829). Resiste mejor que el modelo sin ajuste, aunque los intervalos de ambos se solapan; la hipótesis de no empeorar se cumplió, porque ninguna prueba lo degrada más que al modelo sin ajuste. Jaccard sigue siendo el método más robusto.
+Jaccard casi no se mueve, porque cambia los nombres de variables por una marca genérica antes de comparar. El modelo ajustado tampoco sufre por los nombres, ya que su entrada los normaliza (Sección~\ref{subsec:prep_semantica}), ni por los cambios de estructura. Lo que sí lo afecta es el código muerto (baja a 0.865) y, sobre todo, la combinación de todos los trucos (0.829). Resiste mejor que el modelo sin ajuste con código muerto (0.865 frente a 0.794) y con los trucos combinados (0.829 frente a 0.708), aunque los intervalos de ambos se solapan. En los cambios de estructura, la peor diferencia en contra es de 0.003 (0.890 frente a 0.893), dentro del ruido, por lo que la hipótesis de no empeorar se cumple. Jaccard sigue siendo el método más robusto.
 
 \begin{figure}[H]
     \centering
@@ -686,7 +686,7 @@ Aquí evaluamos si el modelo es capaz de notar que dos alumnos están resolviend
     \end{tabularx}
 \end{table}
 
-Todos los métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). Con el ajuste, el modelo mejora frente a su versión sin ajuste en $+0.051$ puntos de MAP@R (intervalo $+0.028$ a $+0.077$, que excluye el cero), con lo que se cumple la hipótesis de que el ajuste mejora el agrupamiento. Frente a Jaccard, el modelo ajustado queda $0.022$ por debajo, pero el intervalo ($-0.045$ a $+0.004$) incluye el cero: no se puede afirmar que Jaccard agrupe mejor. En 84 de cada 100 entregas, el archivo que el modelo considera más parecido pertenece al mismo ejercicio. Los mapas de calor y visuales de las Figuras~\ref{fig:heatmap_logico}, \ref{fig:clusters_canal_a_v2norm} y~\ref{fig:clusters_canal_a_ajustado} lo ilustran.
+Todos los métodos superan por mucho al azar (Figura~\ref{fig:map_at_r_eval}). Con el ajuste, el modelo mejora frente a su versión sin ajuste en $+0.051$ puntos de MAP@R (intervalo $+0.028$ a $+0.077$, que excluye el cero), con lo que se cumple la hipótesis de que el ajuste mejora el agrupamiento. Frente a Jaccard, el modelo ajustado queda $0.022$ por debajo (diferencia calculada con los valores sin redondear de la tabla), pero el intervalo ($-0.045$ a $+0.004$) incluye el cero: no se puede afirmar que Jaccard agrupe mejor. En 84 de cada 100 entregas, el archivo que el modelo considera más parecido pertenece al mismo ejercicio. Los mapas de calor y visuales de las Figuras~\ref{fig:heatmap_logico}, \ref{fig:clusters_canal_a_v2norm} y~\ref{fig:clusters_canal_a_ajustado} lo ilustran.
 
 \begin{figure}[H]
     \centering
@@ -744,7 +744,7 @@ Antes de evaluar se fijaron tres hipótesis y qué se consideraría confirmarlas
         \textbf{Hipótesis} & \textbf{Resultado} & \textbf{Veredicto} \\ \hline
         Mejora la relación entre parecerse a una solución correcta y funcionar & $+0.031$ [$-0.014$, $+0.086$] & No concluyente \\ \hline
         Mejora el agrupamiento por tarea & $+0.051$ [$+0.028$, $+0.077$] & Confirmada \\ \hline
-        No empeora la resistencia a los trucos & Ninguna prueba empeora más que sin ajuste & Confirmada \\ \hline
+        No empeora la resistencia a los trucos & Ninguna prueba empeora más allá del ruido (la peor diferencia en contra es de $0.003$) & Confirmada \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -753,7 +753,7 @@ Antes de evaluar se fijaron tres hipótesis y qué se consideraría confirmarlas
 \label{subsec:explicabilidad}
 \label{subsec:limitaciones}
 
-Para que el docente confíe en la herramienta y le resule útil, necesita entender el significado de las métricas. Aunque las redes neuronales y transformers no explican por que toman las decisiones de forma entendible, Graphito ofrece transparencia práctica de tres maneras:
+Para que el docente confíe en la herramienta y le resulte útil, necesita entender el significado de las métricas. Aunque las redes neuronales y transformers no explican por que toman las decisiones de forma entendible, Graphito ofrece transparencia práctica de tres maneras:
 \begin{itemize}
     \item \textbf{Evidencia directa en texto:} La métrica de Jaccard es transparente por naturaleza (\textit{``estos dos archivos comparten el X\,\% de sus fragmentos''}) y permite mostrar cuál es la entrega más parecida.
     \item \textbf{Reglas visibles en pantalla:} La interfaz resalta líneas sospechosas mediante reglas fijas y las etiqueta claramente como indicadores de apoyo para no confundirlas con el veredicto del modelo.
@@ -767,13 +767,13 @@ Asimismo, toda evaluación honesta debe señalar las fronteras de sus datos. Los
     \item \textbf{Contexto de los datos:} Los programas base provienen de cursos de la Universidad de Sarajevo (2016--2017) y se compararon contra entregas aprobadas de alumnos, no contra soluciones oficiales del profesor. Validar el sistema con entregas reales de la ESCOM es el paso natural siguiente.
 \end{enumerate}
 
-Superar estas barreras abre rutas claras para el trabajo futuro que se detalla en el Capítulo~\ref{cap:conclusiones}: desde repetir el ajuste de GraphCodeBERT con programas escolares o de más lenguajes (el hecho con CodeNet, Sección~\ref{subsec:ajuste_contrastivo}, usó problemas de concursos en C++), utilizar un LLM clasificador de frontera como Jev para complementar las métricas, hasta incorporar mapas de calor palabra por palabra (\textit{saliencia}) y un modelo de lenguaje que explique los hallazgos en lenguaje natural.
+Superar estas barreras abre rutas claras para el trabajo futuro que se detalla en el Capítulo~\ref{cap:conclusiones}: desde repetir el ajuste de GraphCodeBERT con programas escolares o de más lenguajes (el hecho con CodeNet, Sección~\ref{subsec:ajuste_contrastivo}, usó problemas de concursos en C++), utilizar un LLM clasificador de frontera como clasificador para complementar las métricas, hasta incorporar mapas de calor palabra por palabra (\textit{saliencia}) y un modelo de lenguaje que explique los hallazgos en lenguaje natural.
 
 % ----------------------------------------------------------------------
 \subsection{Discusión y Resumen}
 \label{subsec:discusion_modelado}
 
-Los experimentos demuestran que ambos canales se complementan porque ven cosas distintas. Una prueba preliminar intentando fusionar ambos puntajes en un solo número redujo el rendimiento (ROC-AUC de 0.874), lo que confirmó la mejor decisión de diseño para Graphito: mantener ambos canales como indicadores independientespue para que el profesor tenga el panorama completo. La Tabla~\ref{tab:hallazgos} condensa todo lo aprendido en esta sección y cómo debe interpretarse en la práctica.
+Los dos canales miden cosas distintas: el estilo de escritura y la lógica del programa. Una prueba preliminar intentando fusionar ambos puntajes en un solo número redujo el rendimiento (ROC-AUC de 0.874), lo que confirmó la mejor decisión de diseño para Graphito: mantener ambos canales como indicadores independientes para que el profesor tenga el panorama completo. La Tabla~\ref{tab:hallazgos} condensa todo lo aprendido en esta sección y cómo debe interpretarse en la práctica.
 
 \begin{table}[H]
     \centering
@@ -784,9 +784,9 @@ Los experimentos demuestran que ambos canales se complementan porque ven cosas d
     \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
         \hline
         \textbf{Pregunta evaluada} & \textbf{Resultado clave} & \textbf{Utilidad práctica para el docente} \\ \hline
-        ¿El Canal B distingue código hecho por IA? & Detecta el 89\,\% de la IA equivocándose solo en 1 de cada 100 humanos (ROC-AUC de 0.994). & Excelente filtro de alerta temprana, siempre como apoyo y no como sanción automática. \\ \hline
+        ¿El Canal B distingue código hecho por IA? & Con los generadores vistos al entrenar, detecta el 89\,\% de la IA equivocándose solo en 1 de cada 100 humanos (ROC-AUC de 0.994); ante un generador no visto, la detección con el mismo umbral baja a 0.08--0.15. & Excelente filtro de alerta temprana, siempre como apoyo y no como sanción automática. \\ \hline
         ¿El Canal A detecta copias entre alumnos? & El modelo ajustado ordena bien el 90\,\% de los casos, pero la comparación de texto (Jaccard) llega al 95\,\%. & Conviene apoyarse primero en el indicador de texto y usar el Canal A como respaldo estructural. \\ \hline
-        ¿Qué pasa si disfrazan la copia cambiando el código? & El modelo ajustado resiste cambios de bucles y orden y no le afecta renombrar las variables (0.90 en ambos casos); el código muerto (0.87) y todos los trucos combinados (0.83) sí bajan su precisión, menos que en el modelo sin ajuste (0.79 y 0.71). & Si un alumno cambia la estructura o renombra variables, el Canal A lo detectará sin problema; ante código muerto o trucos combinados, el indicador de texto sigue siendo el más robusto. \\ \hline
+        ¿Qué pasa si disfrazan la copia cambiando el código? & El modelo ajustado resiste cambios de bucles y orden y no le afecta renombrar las variables (0.90 en ambos casos); el código muerto (0.87) y todos los trucos combinados (0.83) sí bajan su precisión, menos que en el modelo sin ajuste (0.79 y 0.71). & Si un alumno cambia la estructura o renombra variables, el Canal A mantiene su desempeño (ROC-AUC de 0.89 a 0.90 frente a 0.90); ante código muerto o trucos combinados, el indicador de texto sigue siendo el más robusto. \\ \hline
         ¿Reconoce qué tarea resuelve cada entrega? & El modelo ajustado acierta el ejercicio en el 84\,\% de los casos (40 veces mejor que el azar); Jaccard, en el 85\,\%. & Agrupa bien las entregas por lógica para revisar soluciones parecidas en bloque. \\ \hline
         ¿Sirve la similitud para calificar si el código funciona? & Señal muy débil (0.586 con el modelo ajustado, casi equivalente al azar). & Ayuda a ordenar qué revisar primero, pero no sustituye las pruebas unitarias. \\ \hline
         ¿Qué aportó entrenar el Canal A con CodeNet? & Frente al modelo anterior sin ajuste, agrupa mejor (de 0.379 a 0.431) y resiste mejor el código muerto y los trucos combinados (de 0.71 a 0.83); la relación con que el código funcione sube de 0.555 a 0.586, sin poder afirmarse. & El modelo ajustado agrupa mejor y resiste mejor el código muerto y los trucos combinados; en lo demás no se distingue con claridad del modelo sin ajuste (en dos trucos individuales queda ligeramente por debajo). El indicador de texto sigue siendo el más fiable; el modelo ajustado sirve como respaldo estructural. \\ \hline

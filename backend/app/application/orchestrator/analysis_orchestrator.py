@@ -1,5 +1,6 @@
 import uuid
 import asyncio
+import time
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import select
@@ -18,6 +19,7 @@ from app.infrastructure.database.models import (
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.application.services.scoring_service import ScoringService
+from app.application.services.usage_events import elapsed_ms, record_analysis, record_event
 from app.presentation.schemas.analysis import (
     AnalysisRunRequest,
     ReporteAnalisisResponse,
@@ -69,6 +71,7 @@ class AnalysisOrchestrator:
         scoring.warn_client_thresholds(request.threshold_sem, request.threshold_ai)
         entrega = await self._load_entrega(request.entrega_id)
 
+        started = time.perf_counter()
         # S3-S6: medir y decidir antes de escribir nada (un error aquí no deja filas).
         outcome = await scoring.score(self.db, entrega, request.referencia_id)
 
@@ -78,6 +81,9 @@ class AnalysisOrchestrator:
         await self.db.flush()
         scoring.persist(self.db, reporte, outcome, entrega)
         await self.db.commit()
+        await record_analysis(
+            "individual", docente_id=docente_id, outcome=outcome, entrega=entrega, duracion_ms=elapsed_ms(started)
+        )
         return await self.get_report(reporte.id)
 
     async def start_async_analysis(
@@ -107,6 +113,7 @@ class AnalysisOrchestrator:
                 report_id=reporte.id,
                 entrega_id=entrega.id,
                 referencia_id=request.referencia_id,
+                docente_id=docente_id,
             )
         )
         return response
@@ -116,10 +123,12 @@ class AnalysisOrchestrator:
         report_id: int,
         entrega_id: uuid.UUID,
         referencia_id: Optional[uuid.UUID],
+        docente_id: Optional[int] = None,
     ):
         from app.infrastructure.database.session import async_session_maker
 
         scoring = self._require_scoring()
+        started = time.perf_counter()
         async with async_session_maker() as session:
             try:
                 res = await session.execute(select(CodigoFuente).where(CodigoFuente.id == entrega_id))
@@ -132,8 +141,16 @@ class AnalysisOrchestrator:
                 scoring.persist(session, reporte, outcome, entrega)
                 await session.commit()
                 logger.info(f"Reporte {report_id} completado con éxito de forma asíncrona.")
+                await record_analysis(
+                    "asincrono", docente_id=docente_id, outcome=outcome, entrega=entrega,
+                    duracion_ms=elapsed_ms(started),
+                )
             except Exception as e:
                 logger.error(f"Error en inferencia asíncrona para reporte {report_id}: {e}", exc_info=True)
+                await record_event(
+                    "analisis_error", docente_id=docente_id, duracion_ms=elapsed_ms(started),
+                    detalle={"modo": "asincrono", "error": str(getattr(e, "reason", None) or type(e).__name__)},
+                )
                 await session.rollback()
                 rep_res = await session.execute(select(ReporteAnalisis).where(ReporteAnalisis.id == report_id))
                 reporte = rep_res.scalar_one_or_none()

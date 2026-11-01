@@ -6,6 +6,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     Enum,
@@ -230,3 +231,23 @@ class ComentarioRevision(Base):
 
     reporte = relationship("ReporteAnalisis", back_populates="comentarios")
     docente = relationship("Docente", back_populates="comentarios")
+
+
+class EventoUso(Base):
+    """One usage event (HTTP request, analysis, batch upload) with its duration and outcome.
+
+    Holds ids, routes, durations and outcomes only: never source code, emails or names. `docente_id`
+    is a plain integer, not a foreign key, so the log survives deleting an account.
+    """
+
+    __tablename__ = "eventos_uso"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True, nullable=False)
+    tipo = Column(String(30), nullable=False, index=True)  # peticion | analisis | analisis_error | carga_lote
+    docente_id = Column(Integer, nullable=True, index=True)
+    metodo = Column(String(10), nullable=True)
+    ruta = Column(String(200), nullable=True)
+    estado_http = Column(Integer, nullable=True)
+    duracion_ms = Column(Float, nullable=True)
+    detalle = Column(JSON, nullable=True)

@@ -3,7 +3,7 @@
 
 Con los modelos entrenados y evaluados (Capítulo~\ref{cap:modelado}), la metodología \textbf{Komorebi} \cite{verges_como_2023} llega a su última fase: llevarlos a una plataforma que los docentes puedan usar y comprobar que sigue funcionando bien. La Sección~\ref{sec:despliegue_modelos} explica cómo se instalan los modelos y cómo se protege al docente de resultados erróneos. La Sección~\ref{sec:monitorizacion_modelos} muestra las pruebas realizadas y cómo se validará la plataforma con docentes.
 
-La Figura~\ref{fig:panorama_despliegue} resume el recorrido completo, del modelo entrenado al docente que toma la decisión final.
+La Figura~\ref{fig:panorama_despliegue} resume el recorrido, del modelo entrenado al docente que toma la decisión final.
 
 \begin{figure}[H]
     \centering
@@ -13,7 +13,7 @@ La Figura~\ref{fig:panorama_despliegue} resume el recorrido completo, del modelo
         arrow/.style={->, >=stealth, thick, draw=black!75}
     ]
         \node[st] (a) at (0,0) {\textbf{Modelos entrenados}\\Capítulo~\ref{cap:modelado}};
-        \node[st] (b) at (3.1,0) {\textbf{Paquete verificado}\\con sello de garantía};
+        \node[st] (b) at (3.1,0) {\textbf{Paquete verificado}\\con huella digital};
         \node[st] (c) at (6.2,0) {\textbf{Servidor}\\ejecuta el análisis};
         \node[st] (d) at (9.3,0) {\textbf{Reporte}\\información para revisar};
         \node[gr] (e) at (12.4,0) {\textbf{El docente decide}};
@@ -35,7 +35,7 @@ La Figura~\ref{fig:panorama_despliegue} resume el recorrido completo, del modelo
 \subsection{Empaquetado y Verificación}
 \label{subsec:empaquetado}
 
-Los modelos no se copian a mano al servidor. Un programa de empaquetado toma los resultados de las corridas de entrenamiento, los reúne en un solo paquete y le asigna a cada archivo una \textbf{huella digital} (sha256)\footnote{El paquete vive en \texttt{models/deploy/} y lo genera el script \texttt{scripts/build\_deploy\_artifacts.py}.}. Es como el sello de garantía de un medicamento: si el envase fue alterado, se nota antes de usarlo. La plataforma comprueba las huellas cada vez que arranca (Figura~\ref{fig:empaquetado}).
+Los modelos no se copian a mano al servidor. Un programa de empaquetado reúne los resultados del entrenamiento en un solo paquete y le asigna a cada archivo una \textbf{huella digital} (sha256)\footnote{El paquete vive en \texttt{models/deploy/} y lo genera el script \texttt{scripts/build\_deploy\_artifacts.py}.}. Funciona como el sello de garantía de un medicamento: si el envase fue alterado, se nota antes de usarlo. La plataforma comprueba las huellas cada vez que arranca (Figura~\ref{fig:empaquetado}), y el empaquetado se niega a sobrescribir archivos distintos de los ya existentes.
 
 \begin{figure}[H]
     \centering
@@ -57,7 +57,7 @@ Los modelos no se copian a mano al servidor. Un programa de empaquetado toma los
     \label{fig:empaquetado}
 \end{figure}
 
-El paquete no sobrescribe versiones anteriores. La Tabla~\ref{tab:desplegado} resume qué contiene y qué papel cumple cada pieza.
+La Tabla~\ref{tab:desplegado} resume qué contiene el paquete y qué papel cumple cada pieza. Los dos componentes que \textbf{deciden} son los que mejor midieron en el Capítulo~\ref{cap:modelado}; GraphCodeBERT se conserva como información adicional.
 
 \begin{table}[H]
     \centering
@@ -65,61 +65,78 @@ El paquete no sobrescribe versiones anteriores. La Tabla~\ref{tab:desplegado} re
     \label{tab:desplegado}
     \renewcommand{\arraystretch}{1.25}
     \small
-    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}p{4.6cm}|X|}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}p{5.0cm}|X|}
         \hline
-        \textbf{Componente} & \textbf{Umbral de alerta} & \textbf{Papel} \\ \hline
-        Similitud léxica (Jaccard, Canal A) & \texttt{fpr\_0.05}: en validación, 4.6~\% de falsas alertas y 84.5~\% de casos detectados & \textbf{Decide} la alerta de similitud \\ \hline
-        CharCNN v2 (Canal B) & \texttt{fpr\_0.01}: 0.1715; en validación, 0.98~\% de falsas alertas y 97.1~\% de casos detectados & \textbf{Decide} el indicador de estilo \\ \hline
-        GraphCodeBERT ajustado (Canal A) & No tiene & Se calcula y se muestra como \emph{exploratorio}; \textbf{no decide} \\ \hline
+        \textbf{Componente} & \textbf{Umbral (en validación)} & \textbf{Papel} \\ \hline
+        Similitud léxica (Jaccard, Canal A) & \texttt{fpr\_0.05}: 4.6~\% de falsas alertas y 84.5~\% de casos detectados & \textbf{Decide} la alerta de similitud \\ \hline
+        CharCNN v2 (Canal B) & \texttt{fpr\_0.01} (0.1715): 0.98~\% de falsas alertas y 97.1~\% de casos detectados & \textbf{Decide} el indicador de estilo \\ \hline
+        GraphCodeBERT ajustado (Canal A) & Sin umbral & Se muestra como \emph{exploratorio}; \textbf{no decide} \\ \hline
     \end{tabularx}
 \end{table}
 
-El paquete incluye el adaptador entrenado de GraphCodeBERT (ajuste contrastivo con CodeNet, Capítulo~\ref{cap:modelado}), con su huella digital registrada en el manifiesto; el modelo base se toma preentrenado y, al arrancar, se le fusiona el adaptador. Si la huella no coincide, el sistema no analiza y avisa en lugar de recurrir a otro modelo. El embedding desplegado aplica antes un renombrado canónico de los identificadores, y la colección de Chroma está versionada con la identidad del adaptador: cuando cambia ese procesamiento o el adaptador, las referencias se reindexan. Un ajuste de configuración permite volver al modelo sin ajuste si fuera necesario.
+Los porcentajes de la tabla corresponden a los datos de validación con los que se fijó cada umbral; sobre datos de prueba el CharCNN detecta el 89~\% de la IA con 1 falsa alerta por cada 100 programas humanos (Sección~\ref{subsec:discusion_modelado}), que es la cifra que debe esperarse en uso real.
+
+El paquete incluye el adaptador entrenado de GraphCodeBERT (Capítulo~\ref{cap:modelado}), con su huella en el manifiesto; el modelo base se toma preentrenado y, al arrancar, se le fusiona el adaptador. Si una huella no coincide, el sistema no analiza y avisa, sin recurrir a otro modelo. Antes del embedding se renombran los identificadores a nombres genéricos, y la colección de Chroma lleva la identidad del adaptador: si cambia el adaptador o ese procesamiento, las referencias se reindexan.
 
 % ----------------------------------------------------------------------
 \subsection{Cómo Decide la Plataforma}
 \label{subsec:decision}
 
-La alerta de similitud la decide la comparación léxica (Jaccard), no GraphCodeBERT. La razón está en la evaluación del Capítulo~\ref{cap:modelado}: al distinguir pares de plagio, Jaccard obtuvo 0.945 y GraphCodeBERT 0.902 (0.856 sin el renombrado canónico de identificadores), y este último sigue siendo más sensible que Jaccard al código muerto y a los trucos combinados. Por eso la plataforma usa la señal que mejor midió, y conserva el coseno de GraphCodeBERT como información adicional sobre la similitud lógica, sin que active alertas. Los umbrales los fija el servidor; cualquier umbral enviado desde fuera se ignora.
+La alerta de similitud la decide Jaccard, no GraphCodeBERT, porque al distinguir pares de plagio Jaccard obtuvo 0.945 y GraphCodeBERT 0.902 (Capítulo~\ref{cap:modelado}). El coseno de GraphCodeBERT se muestra aparte como información sobre la similitud lógica, sin activar alertas. Los umbrales los fija el servidor; cualquier umbral enviado desde fuera se ignora.
 
-Dos preguntas determinan lo que ve el docente: ¿la similitud con la referencia es alta?, ¿el estilo es atípico? La Tabla~\ref{tab:decision} muestra las cuatro combinaciones.
-
-\begin{table}[H]
-    \centering
-    \caption{Etiqueta mostrada según las dos preguntas de la plataforma.}
-    \label{tab:decision}
-    \renewcommand{\arraystretch}{1.3}
-    \small
-    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.8cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
-        \hline
-        & \textbf{Estilo atípico} & \textbf{Estilo habitual} \\ \hline
-        \textbf{Similitud alta} & Similitud alta y estilo atípico & Similitud alta con la referencia \\ \hline
-        \textbf{Similitud no alta} & Estilo atípico & Similitud dentro de lo habitual \\ \hline
-    \end{tabularx}
-\end{table}
-
-Además existen dos estados en que no se emite una valoración. \emph{No evaluable} aparece cuando el código es demasiado corto para que el indicador de estilo sea confiable. \emph{Sin referencia} aparece cuando el docente aún no ha cargado una solución con la cual comparar. Ninguna etiqueta es un veredicto: orienta qué entregas conviene revisar primero.
-
-% ----------------------------------------------------------------------
-\subsection{Flujo de un Análisis}
-\label{subsec:flujo}
-
-Cuando el docente sube una entrega, el sistema la limpia y realiza tres cálculos al mismo tiempo (Figura~\ref{fig:flujo}). Se ejecutan en un proceso aparte para que la plataforma siga respondiendo mientras tanto. El mismo servicio atiende el análisis de una entrega, el que corre en segundo plano y el de un grupo completo, de modo que los tres dan el mismo resultado.
+La Figura~\ref{fig:decision} muestra qué etiqueta recibe cada entrega: primero se comprueba que pueda evaluarse y después se responden dos preguntas, ¿la similitud con la referencia es alta? y ¿el estilo es atípico?
 
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}[
         st/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=3.3cm, align=center, inner sep=5pt, font=\footnotesize},
-        ca/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=3.3cm, align=center, inner sep=5pt, font=\footnotesize},
-        cb/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=3.3cm, align=center, inner sep=5pt, font=\footnotesize},
-        gr/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=3.3cm, align=center, inner sep=5pt, font=\footnotesize},
+        neu/.style={rectangle, draw=black!60, fill=gray!28, rounded corners=3pt, text width=3.3cm, align=center, inner sep=5pt, font=\footnotesize},
+        cel/.style={rectangle, draw=black!60, rounded corners=3pt, text width=2.7cm, minimum height=1.1cm, align=center, inner sep=4pt, font=\footnotesize},
+        hd/.style={font=\footnotesize\bfseries, align=center},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[st] (e) at (0.3,0) {\textbf{Entrega analizada}};
+        \node[neu] (sr) at (-3.6,-1.9) {\textbf{Sin referencia}\\el docente aún no cargó una solución};
+        \node[neu] (ne) at (0.3,-1.9) {\textbf{No evaluable}\\código muy corto para el estilo};
+        \node[st] (ev) at (4.2,-1.9) {\textbf{Evaluable}\\se responden las dos preguntas};
+        \draw[arrow] (e.south) -- (sr.north);
+        \draw[arrow] (e.south) -- (ne.north);
+        \draw[arrow] (e.south) -- (ev.north);
+
+        \node[hd] (h1) at (2.9,-3.7) {Estilo atípico};
+        \node[hd] (h2) at (5.9,-3.7) {Estilo habitual};
+        \node[hd] (r1) at (0.3,-4.7) {Similitud\\alta};
+        \node[hd] (r2) at (0.3,-6.0) {Similitud\\no alta};
+        \node[cel, fill=red!18] (c11) at (2.9,-4.7) {Similitud alta y estilo atípico};
+        \node[cel, fill=purple!15] (c12) at (5.9,-4.7) {Similitud alta con la referencia};
+        \node[cel, fill=orange!20] (c21) at (2.9,-6.0) {Estilo atípico};
+        \node[cel, fill=green!12] (c22) at (5.9,-6.0) {Similitud dentro de lo habitual};
+        \draw[arrow] (ev.south) -- (4.2,-3.3);
+    \end{tikzpicture}
+    \caption{Etiqueta mostrada al docente. Ninguna etiqueta es un veredicto: orienta qué entregas conviene revisar primero.}
+    \label{fig:decision}
+\end{figure}
+
+% ----------------------------------------------------------------------
+\subsection{Flujo de un Análisis}
+\label{subsec:flujo}
+
+Cuando el docente sube una entrega, el sistema la limpia y realiza tres cálculos al mismo tiempo (Figura~\ref{fig:flujo}). Los modelos corren en hilos aparte para que la plataforma siga respondiendo. El mismo servicio atiende una entrega, un análisis en segundo plano y un grupo completo, por lo que los tres dan el mismo resultado.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        st/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\footnotesize},
+        ca/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\footnotesize},
+        cb/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\footnotesize},
+        gr/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=3.9cm, align=center, inner sep=5pt, font=\footnotesize},
         arrow/.style={->, >=stealth, thick, draw=black!75}
     ]
         \node[st] (in) at (0,0) {\textbf{Entrega del estudiante}\\el docente la sube};
         \node[st] (nm) at (0,-1.6) {\textbf{Se prepara el código}\\limpieza y normalización};
-        \node[ca] (j) at (-4.2,-3.6) {\textbf{Jaccard}\\fragmentos compartidos};
+        \node[ca] (j) at (-4.6,-3.6) {\textbf{Jaccard}\\fragmentos compartidos};
         \node[ca] (g) at (0,-3.6) {\textbf{GraphCodeBERT}\\coseno (exploratorio)};
-        \node[cb] (c) at (4.2,-3.6) {\textbf{CharCNN}\\estilo de escritura};
+        \node[cb] (c) at (4.6,-3.6) {\textbf{CharCNN}\\estilo de escritura};
         \node[st] (d) at (0,-5.6) {\textbf{Decisión}\\aplica los umbrales};
         \node[st] (s) at (0,-7.2) {\textbf{Se guarda}\\resultado y versión del modelo};
         \node[gr] (r) at (0,-8.8) {\textbf{Reporte para el docente}};
@@ -141,61 +158,71 @@ Cuando el docente sube una entrega, el sistema la limpia y realiza tres cálculo
 \subsection{Falla Segura}
 \label{subsec:falla_segura}
 
-El principio es ``mejor no responder que responder mal''. Si algo no está en orden, la plataforma se detiene y lo dice, en lugar de mostrar un resultado dudoso (Tabla~\ref{tab:falla_segura}). Una ruta de consulta de estado informa si los modelos están listos y qué huella tiene cada archivo.
+El principio es ``mejor no responder que responder mal''. La Figura~\ref{fig:falla_segura} muestra la comprobación que hace la plataforma antes de analizar: si algo no está en orden, se declara no lista y lo dice, en lugar de mostrar un resultado dudoso. Una ruta de consulta de estado (\texttt{/health}) informa si los modelos están listos y qué huella tiene cada archivo.
 
-\begin{table}[H]
+\begin{figure}[H]
     \centering
-    \caption{Situaciones anómalas y respuesta del sistema.}
-    \label{tab:falla_segura}
-    \renewcommand{\arraystretch}{1.25}
-    \small
-    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{5.2cm}|X|}
-        \hline
-        \textbf{Situación} & \textbf{Qué hace el sistema} \\ \hline
-        Un archivo del paquete fue alterado o no coincide con su huella & Se declara no listo; el análisis responde que no está disponible y no guarda nada \\ \hline
-        Un modelo no logra cargarse & Igual que el caso anterior; nunca se sustituye en silencio por un modelo de prueba \\ \hline
-        Código demasiado corto para el indicador de estilo & Muestra \emph{No evaluable} en lugar de un número poco confiable \\ \hline
-        El docente no ha cargado una solución de referencia & Muestra \emph{Sin referencia} \\ \hline
-        Un modelo sin calibrar en producción & Está prohibido; la plataforma no arranca así \\ \hline
-    \end{tabularx}
-\end{table}
+    \begin{tikzpicture}[
+        st/.style={rectangle, draw=black!60, fill=gray!12, rounded corners=3pt, text width=3.0cm, align=center, inner sep=5pt, font=\footnotesize},
+        ck/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=4.2cm, align=center, inner sep=5pt, font=\footnotesize},
+        ok/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=4.2cm, align=center, inner sep=5pt, font=\footnotesize},
+        bad/.style={rectangle, draw=black!60, fill=red!15, rounded corners=3pt, text width=4.2cm, align=center, inner sep=5pt, font=\footnotesize},
+        arrow/.style={->, >=stealth, thick, draw=black!75},
+        lb/.style={font=\scriptsize\bfseries, fill=white, inner sep=1pt}
+    ]
+        \node[st] (a) at (0,0) {\textbf{Arranque}\\de la plataforma};
+        \node[ck] (c) at (4.4,0) {\textbf{¿Todo en orden?}\\huellas correctas, modelos cargados y calibrados};
+        \node[ok] (y) at (9.8,1.0) {\textbf{Lista}\\analiza y guarda el resultado};
+        \node[bad] (n) at (9.8,-1.2) {\textbf{No lista}\\responde ``no disponible'', no guarda nada y nunca usa un modelo de prueba};
+        \draw[arrow] (a) -- (c);
+        \draw[arrow] (c.east) -- (y.west) node[lb, pos=0.45] {sí};
+        \draw[arrow] (c.east) -- (n.west) node[lb, pos=0.45] {no};
+    \end{tikzpicture}
+    \caption{Falla segura: ante cualquier anomalía, la plataforma no responde en lugar de responder mal.}
+    \label{fig:falla_segura}
+\end{figure}
+
+Una configuración con modelos sin calibrar se rechaza en producción y la plataforma no arranca. Dos situaciones más no impiden el análisis, pero no emiten valoración: \emph{No evaluable} y \emph{Sin referencia} (Figura~\ref{fig:decision}).
 
 % ----------------------------------------------------------------------
 \subsection{Arquitectura e Infraestructura}
 \label{subsec:infraestructura}
 
-El código del servidor está organizado en capas (Arquitectura Limpia, descrita en el diseño del sistema \cite{Martin2017CleanArchitecture}): las reglas de decisión no dependen de los modelos ni de la base de datos, por lo que cada pieza puede cambiarse sin romper las demás. La Figura~\ref{fig:arquitectura_despliegue} muestra dónde vive cada parte.
+El código del servidor está organizado en capas (Arquitectura Limpia, descrita en el diseño del sistema \cite{Martin2017CleanArchitecture}): las reglas de decisión no dependen de los modelos ni de la base de datos, por lo que cada pieza puede cambiarse sin romper las demás. La Figura~\ref{fig:arquitectura_despliegue} muestra dónde se ejecuta cada parte.
 
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}[
-        box/.style={rectangle, rounded corners=4pt, draw=black!70, thick, fill=white, text width=4.2cm, align=center, inner sep=6pt, font=\footnotesize},
-        cloudbox/.style={rectangle, rounded corners=4pt, draw=blue!70!black, thick, fill=blue!5, text width=4.2cm, align=center, inner sep=6pt, font=\footnotesize},
-        localbox/.style={rectangle, rounded corners=4pt, draw=teal!70!black, thick, fill=teal!5, text width=4.6cm, align=center, inner sep=6pt, font=\footnotesize},
+        box/.style={rectangle, rounded corners=4pt, draw=black!70, thick, fill=white, text width=3.6cm, align=center, inner sep=6pt, font=\footnotesize},
+        cloudbox/.style={rectangle, rounded corners=4pt, draw=blue!70!black, thick, fill=blue!5, text width=3.6cm, align=center, inner sep=6pt, font=\footnotesize},
+        localbox/.style={rectangle, rounded corners=4pt, draw=teal!70!black, thick, fill=teal!5, text width=3.2cm, align=center, inner sep=6pt, font=\footnotesize},
         arrow/.style={->, >=stealth, thick, draw=black!75}
     ]
         \node[box] (docente) at (0,0) {\textbf{Docente}\\navegador web};
-        \node[cloudbox] (vercel) at (0,-1.9) {\textbf{Vercel}\\página web (interfaz)};
-        \node[cloudbox] (supabase) at (-4.2,-4.3) {\textbf{Supabase}\\base de datos PostgreSQL: cuentas, grupos y reportes};
-        \node[box] (cloudflare) at (4.2,-4.3) {\textbf{Túnel de Cloudflare}\\conexión segura al servidor};
-        \node[localbox] (srv) at (4.2,-6.9) {\textbf{Servidor con GPU (Docker)}\\backend, modelos y Chroma (almacén de vectores)};
+        \node[cloudbox] (vercel) at (4.4,0) {\textbf{Vercel}\\página web (interfaz)};
+        \node[box] (ngrok) at (8.8,0) {\textbf{Túnel ngrok}\\entrada al servidor};
+        \node[localbox] (be) at (8.8,-2.4) {\textbf{Backend}\\API y modelos};
+        \node[localbox] (ch) at (4.4,-4.8) {\textbf{Chroma}\\base de vectores};
+        \node[cloudbox] (sb) at (8.8,-4.8) {\textbf{Supabase}\\PostgreSQL: cuentas, grupos y reportes};
+        \node[localbox] (pk) at (13.0,-2.4) {\textbf{Paquete verificado}\\solo lectura};
         \draw[arrow] (docente) -- (vercel);
-        \draw[arrow] (vercel.south west) -- (supabase.north);
-        \draw[arrow] (vercel.south east) -- (cloudflare.north);
-        \draw[arrow] (cloudflare) -- (srv);
-        \draw[arrow] (srv.west) -| (supabase.south);
+        \draw[arrow] (vercel) -- (ngrok);
+        \draw[arrow] (ngrok) -- (be);
+        \draw[arrow] (be.south) -- (sb.north);
+        \draw[arrow] (be.south west) -- (ch.north east);
+        \draw[arrow] (pk) -- (be);
     \end{tikzpicture}
-    \caption{Dónde se ejecuta cada parte de Graphito.}
+    \caption{Dónde se ejecuta cada parte de Graphito. Azul: servicios en la nube; verde: servidor propio, donde backend y Chroma corren en contenedores Docker.}
     \label{fig:arquitectura_despliegue}
 \end{figure}
 
-La página web se publica en Vercel; los datos de los docentes viven en una base PostgreSQL de Supabase; los modelos se ejecutan en un servidor propio con tarjeta gráfica (GPU), empaquetado con Docker para que funcione igual en cualquier equipo. Como ese servidor está en una red privada, el túnel de Cloudflare permite que la página le envíe trabajo sin abrir puertos en la red.
+La página web se publica en Vercel y solo habla con el backend. El backend, la base de vectores y los modelos corren en un servidor propio con Docker, para que funcione igual en cualquier equipo; los datos de los docentes viven en PostgreSQL de Supabase. Como el servidor está en una red privada, el túnel ngrok recibe las peticiones de la página sin abrir puertos en la red; el backend solo escucha en la dirección local.
 
 % ----------------------------------------------------------------------
 \subsection{Presentación al Docente}
 \label{subsec:presentacion}
 
-La plataforma presenta la similitud como información. Cada reporte (Figura~\ref{fig:captura_reporte}) trae la etiqueta, los valores y un aviso: \emph{apoya la revisión; la evaluación final corresponde al docente}. La Tabla~\ref{tab:reporte} lista su contenido.
+La plataforma presenta la similitud como información. Cada reporte (Figura~\ref{fig:captura_reporte}) muestra los elementos de la Tabla~\ref{tab:reporte} y un aviso: \emph{apoya la revisión; la evaluación final corresponde al docente}.
 
 \begin{figure}[H]
     \centering
@@ -214,7 +241,7 @@ La plataforma presenta la similitud como información. Cada reporte (Figura~\ref
     \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{4.4cm}|X|}
         \hline
         \textbf{Elemento} & \textbf{Qué muestra} \\ \hline
-        Etiqueta & Una de las descritas en la Tabla~\ref{tab:decision}, con nombre neutro \\ \hline
+        Etiqueta & Una de las de la Figura~\ref{fig:decision}, con nombre neutro \\ \hline
         Similitudes & Fragmentos compartidos con la referencia (Jaccard) y coseno de GraphCodeBERT, rotulado como exploratorio \\ \hline
         Indicador de estilo & Probabilidad del CharCNN frente a su umbral \\ \hline
         Umbrales y calibración & Los umbrales aplicados y si el modelo está calibrado \\ \hline
@@ -232,7 +259,7 @@ La plataforma presenta la similitud como información. Cada reporte (Figura~\ref
 \subsection{Pruebas Automatizadas}
 \label{subsec:pruebas}
 
-Antes de cada cambio se ejecutan pruebas automáticas que revisan, en segundos, que nada se haya roto. Hoy se recolectan 1,412 pruebas del lado del servidor y de los modelos; al cierre de la integración, 1,307 pasaron y 1 se omitió. La interfaz web tiene 58 pruebas y además pasa las revisiones de estilo, de tipos y de construcción. La Tabla~\ref{tab:pruebas} explica qué revisa cada tipo.
+Antes de cada cambio se ejecutan pruebas automáticas que revisan, en segundos o pocos minutos, que nada se haya roto. Hoy se recolectan 1,582 pruebas del servidor y de los modelos; al cierre de este capítulo, 1,581 pasaron y 1 se omitió. La interfaz web tiene 92 pruebas, que también pasan, además de las revisiones de estilo, de tipos y de construcción. La Tabla~\ref{tab:pruebas} explica qué revisa cada tipo.
 
 \begin{table}[H]
     \centering
@@ -247,7 +274,7 @@ Antes de cada cambio se ejecutan pruebas automáticas que revisan, en segundos, 
         De la API & Que la plataforma reciba, analice y responda correctamente, sin necesidad de los modelos reales \\ \hline
         De integridad de artefactos & Que un paquete alterado sea detectado y rechazado \\ \hline
         De contrato del frontend & Que la interfaz y el servidor se entiendan entre sí \\ \hline
-        De la interfaz (58) & Que los componentes visibles se comporten como se espera \\ \hline
+        De la interfaz (92) & Que los componentes visibles se comporten como se espera \\ \hline
         Revisión de estilo, tipos y construcción & Que el código de la interfaz esté ordenado y compile sin errores \\ \hline
     \end{tabularx}
 \end{table}
@@ -279,19 +306,75 @@ Se probó el sistema completo con los modelos reales y los contenedores Docker. 
 \subsection{Seguimiento en Operación}
 \label{subsec:operacion}
 
-La plataforma deja huellas para revisar su comportamiento: la ruta de estado informa si está lista y con qué archivos; cada reporte guarda la versión del modelo y los umbrales usados; y la interfaz muestra si el modelo está calibrado. Así, cualquier resultado puede explicarse y reproducirse después. Los generadores de código cambian con rapidez \cite{Gama2014ConceptDrift}, por lo que el indicador de estilo debe revisarse periódicamente; se considera trabajo futuro.
+Cada resultado se puede explicar y reproducir después: la ruta de estado informa si la plataforma está lista y con qué archivos, cada reporte guarda la versión del modelo y los umbrales usados, y la interfaz muestra si el modelo está calibrado.
+
+Además, la plataforma registra su propio uso en una tabla de la base de datos (\texttt{eventos\_uso}). Cada evento guarda solo identificadores, rutas, duraciones y resultados: nunca el código de las entregas, ni correos ni nombres. Si el registro falla, la petición del docente sigue funcionando. La Figura~\ref{fig:eventos} muestra el recorrido y la Tabla~\ref{tab:eventos} lo que se guarda.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        st/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=2.5cm, align=center, inner sep=5pt, font=\footnotesize},
+        pk/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=2.5cm, align=center, inner sep=5pt, font=\footnotesize},
+        gr/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=2.5cm, align=center, inner sep=5pt, font=\footnotesize},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[st] (a) at (0,0) {\textbf{Docente}\\carga, analiza, consulta};
+        \node[st] (b) at (3.3,0) {\textbf{Plataforma}\\mide el tiempo de cada etapa};
+        \node[pk] (c) at (6.6,0) {\textbf{Tabla de eventos}\\una fila por suceso};
+        \node[gr] (d) at (9.9,0) {\textbf{Resumen}\\script de uso};
+        \draw[arrow] (a) -- (b);
+        \draw[arrow] (b) -- (c);
+        \draw[arrow] (c) -- (d);
+    \end{tikzpicture}
+    \caption{Registro de uso: cada acción deja un evento con su duración y resultado, y un script lo resume.}
+    \label{fig:eventos}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Eventos de uso registrados y para qué sirven.}
+    \label{tab:eventos}
+    \renewcommand{\arraystretch}{1.25}
+    \small
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+        \hline
+        \textbf{Evento} & \textbf{Qué guarda} & \textbf{Qué permite saber} \\ \hline
+        Petición & Ruta (sin identificadores), método, código de respuesta, duración y docente & Quién usa la plataforma, con qué frecuencia y si hay errores \\ \hline
+        Carga por lote & Número de archivos, ignorados y tamaño total & Cuánto material suben los docentes \\ \hline
+        Análisis & Modo (individual, segundo plano o lote), etiqueta, estado de cada canal y duración total y por etapa (Jaccard, GraphCodeBERT, CharCNN) & Cuánto tarda cada modelo y qué etiquetas se muestran \\ \hline
+        Error de análisis & Modo y tipo de error & Con qué frecuencia fallan los modelos \\ \hline
+    \end{tabularx}
+\end{table}
+
+El script \texttt{scripts/resumen\_uso.py} resume ese registro: docentes activos, peticiones por día, errores, análisis por etiqueta y percentiles de duración por etapa, además de la proporción semanal de alertas. Los generadores de código cambian con rapidez \cite{Gama2014ConceptDrift}, por lo que esa proporción sirve para notar si el indicador de estilo empieza a comportarse distinto; revisarlo periódicamente sigue siendo trabajo futuro.
 
 % ----------------------------------------------------------------------
 \subsection{Validación con Docentes}
 \label{subsec:validacion_docentes}
 
-Los experimentos de los capítulos anteriores no miden si la plataforma ayuda a evaluar mejor. Esta validación aborda esa parte del objetivo, con la \emph{percepción} de docentes de programación.
+Los experimentos de los capítulos anteriores no miden si la plataforma ayuda a evaluar mejor. Esta validación aborda esa parte del objetivo midiendo la \emph{utilidad percibida}, la facilidad de uso y la expectativa de reducir el tiempo de evaluación, con la opinión de docentes de programación. La Figura~\ref{fig:validacion} resume el procedimiento.
 
-\subsubsection{Objetivo}
-Medir la utilidad percibida, la facilidad de uso y la expectativa de reducir el tiempo de evaluación.
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        st/.style={rectangle, draw=black!60, fill=cyan!10, rounded corners=3pt, text width=2.5cm, align=center, inner sep=5pt, font=\footnotesize},
+        gr/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, text width=2.5cm, align=center, inner sep=5pt, font=\footnotesize},
+        arrow/.style={->, >=stealth, thick, draw=black!75}
+    ]
+        \node[st] (a) at (0,0) {\textbf{Uso guiado}\\15 a 20 minutos con el catálogo};
+        \node[st] (b) at (3.3,0) {\textbf{Tarea}\\elegir 3 entregas para revisar primero};
+        \node[st] (c) at (6.6,0) {\textbf{Cuestionario}\\anónimo: SUS, utilidad y tiempo};
+        \node[gr] (d) at (9.9,0) {\textbf{Análisis}\\descriptivo};
+        \draw[arrow] (a) -- (b);
+        \draw[arrow] (b) -- (c);
+        \draw[arrow] (c) -- (d);
+    \end{tikzpicture}
+    \caption{Procedimiento de la validación con docentes.}
+    \label{fig:validacion}
+\end{figure}
 
 \subsubsection{Catálogo y tarea guiada}
-La plataforma incluye un catálogo ESCOM de 124 programas en C/C++. Cada docente puede adoptar un programa como problema y como solución de referencia, compararlo con otro o cargar entregas de sus alumnos sin escribir nada desde cero (Figura~\ref{fig:captura_catalogo}). Tras 15 a 20 minutos de uso guiado, se pide una tarea: abrir un problema y, sin leer el código, indicar qué tres entregas se revisarían primero y por qué.
+La plataforma incluye un catálogo ESCOM de 124 programas en C/C++. El docente puede adoptar un programa como problema y como solución de referencia, compararlo con otro o cargar entregas de sus alumnos sin escribir nada desde cero (Figura~\ref{fig:captura_catalogo}). En la tarea abre un problema y, sin leer el código, indica qué tres entregas revisaría primero y por qué.
 
 \begin{figure}[H]
     \centering
@@ -302,7 +385,7 @@ La plataforma incluye un catálogo ESCOM de 124 programas en C/C++. Cada docente
 \end{figure}
 
 \subsubsection{Instrumento}
-Después de la tarea se aplica un cuestionario anónimo (Tabla~\ref{tab:instrumento}). La escala SUS \cite{Brooke1996SUS} da una calificación de 0 a 100 comparable con otros estudios; los ítems de utilidad se adaptan del modelo de aceptación de tecnología TAM \cite{Davis1989TAM}.
+El cuestionario (Tabla~\ref{tab:instrumento}) combina la escala SUS \cite{Brooke1996SUS}, que da una calificación de 0 a 100 comparable con otros estudios, con ítems de utilidad adaptados del modelo de aceptación de tecnología TAM \cite{Davis1989TAM}.
 
 \begin{table}[H]
     \centering
@@ -325,61 +408,16 @@ Después de la tarea se aplica un cuestionario anónimo (Tabla~\ref{tab:instrume
 Se busca reunir entre 8 y 15 docentes de programación introductoria, de ESCOM y de otras instituciones; se reportará el número exacto obtenido. La participación es voluntaria, con consentimiento informado, respuestas anónimas y uso exclusivamente académico. El análisis es descriptivo: media e intervalo de la calificación SUS, mediana y rango intercuartílico por ítem, distribución del ahorro de tiempo estimado y temas recurrentes de las respuestas abiertas.
 
 \subsubsection{Resultados}
-% TODO resultados de la encuesta: completar las tablas con los datos reales; no se ha recibido ninguna respuesta todavía.
-Los resultados se presentarán al cerrar la encuesta. Las tablas \ref{tab:res_sus}, \ref{tab:res_likert} y \ref{tab:res_tiempo} muestran la estructura prevista; sus valores están pendientes.
-
-\begin{table}[H]
-    \centering
-    \caption{Calificación SUS (pendiente).}
-    \label{tab:res_sus}
-    \renewcommand{\arraystretch}{1.25}
-    \small
-    \begin{tabularx}{\textwidth}{|X|X|X|}
-        \hline
-        \textbf{Participantes (n)} & \textbf{Media SUS} & \textbf{Intervalo de confianza} \\ \hline
-        \textit{pendiente} & \textit{pendiente} & \textit{pendiente} \\ \hline
-    \end{tabularx}
-\end{table}
-
-\begin{table}[H]
-    \centering
-    \caption{Utilidad percibida por ítem (pendiente).}
-    \label{tab:res_likert}
-    \renewcommand{\arraystretch}{1.25}
-    \small
-    \begin{tabularx}{\textwidth}{|X|c|c|}
-        \hline
-        \textbf{Ítem} & \textbf{Mediana} & \textbf{Rango intercuartílico} \\ \hline
-        Priorizar la revisión & \textit{pendiente} & \textit{pendiente} \\ \hline
-        Claridad del reporte & \textit{pendiente} & \textit{pendiente} \\ \hline
-        Confianza como apoyo & \textit{pendiente} & \textit{pendiente} \\ \hline
-        Intención de uso & \textit{pendiente} & \textit{pendiente} \\ \hline
-        Utilidad del indicador de estilo & \textit{pendiente} & \textit{pendiente} \\ \hline
-    \end{tabularx}
-\end{table}
-
-\begin{table}[H]
-    \centering
-    \caption{Reducción estimada del tiempo de revisión (pendiente).}
-    \label{tab:res_tiempo}
-    \renewcommand{\arraystretch}{1.25}
-    \small
-    \begin{tabularx}{\textwidth}{|X|c|c|}
-        \hline
-        \textbf{Reducción estimada} & \textbf{Docentes (n)} & \textbf{Porcentaje} \\ \hline
-        0~\% & \textit{pendiente} & \textit{pendiente} \\ \hline
-        1--25~\% & \textit{pendiente} & \textit{pendiente} \\ \hline
-        26--50~\% & \textit{pendiente} & \textit{pendiente} \\ \hline
-        Más de 50~\% & \textit{pendiente} & \textit{pendiente} \\ \hline
-    \end{tabularx}
-\end{table}
+% TODO resultados de la encuesta: no se ha recibido ninguna respuesta todavía. Al cerrar la encuesta, agregar aquí la tabla de calificación SUS (n, media, intervalo de confianza), la de utilidad por ítem (mediana y rango intercuartílico) y la de reducción estimada del tiempo (0 %, 1--25 %, 26--50 %, más de 50 %).
+Los resultados se presentarán al cerrar la encuesta; hasta ahora no se ha recibido ninguna respuesta.
 
 \subsubsection{Limitaciones}
-La encuesta mide \emph{percepción}, no el tiempo real de revisión. La muestra será pequeña y autoseleccionada, por lo que los resultados no se generalizan a todos los docentes. Además, la novedad de la herramienta puede inflar las opiniones favorables. Estas limitaciones se retoman en la Sección~\ref{subsec:limitaciones}.
+La encuesta mide \emph{percepción}, no el tiempo real de revisión. La muestra será pequeña y autoseleccionada, por lo que los resultados no se generalizan a todos los docentes, y la novedad de la herramienta puede inflar las opiniones favorables. Estas limitaciones se retoman en la Sección~\ref{subsec:limitaciones}.
 
 % ======================================================================
 \section{Conclusión del Capítulo}
 \label{sec:conclusion_despliegue}
 % ======================================================================
 
-Los modelos se instalan en un paquete con sello de verificación, deciden con las señales que mejor midieron y, ante cualquier anomalía, la plataforma prefiere no responder. Las pruebas automáticas y la prueba de extremo a extremo respaldan su funcionamiento, y la validación con docentes aportará la visión de quienes la usarían. El Capítulo~\ref{cap:conclusiones} reúne los resultados de todo el trabajo.
+Los modelos se instalan en un paquete con huellas de verificación, deciden con las señales que mejor midieron y, ante cualquier anomalía, la plataforma prefiere no responder. Las pruebas automáticas y la prueba de extremo a extremo respaldan su funcionamiento, y la validación con docentes aportará la visión de quienes la usarían. El Capítulo~\ref{cap:conclusiones} reúne los resultados de todo el trabajo.
+
