@@ -101,7 +101,7 @@ describe("tourReducer", () => {
         it("stores the problem and advances in one action", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
             expect(picked.context.problemId).toBe(32);
-            expect(currentStep(picked)?.id).toBe("ex-identical-literal");
+            expect(currentStep(picked)?.id).toBe("ex-identical-semantic");
             expect(stepEntryPath(currentStep(picked)!, picked.context)).toBe("/reporte/201");
         });
 
@@ -112,20 +112,20 @@ describe("tourReducer", () => {
             expect(run([{ type: "pick", problemId: 31 }], INITIAL_TOUR_STATE)).toBe(INITIAL_TOUR_STATE);
         });
 
-        it("a problem with four cases walks all eleven steps", () => {
+        it("a problem with four cases walks all twelve steps", () => {
             const picked = run([{ type: "pick", problemId: 31, from: "ex-library" }], started);
             expect(ids(picked)).toHaveLength(getSteps("examples").length);
-            expect(stepProgress(picked)).toEqual({ current: 2, total: 11 });
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 12 });
         });
 
         it("a problem without an AI case skips that step in next, back, goTo and progress", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
-            expect(stepProgress(picked)).toEqual({ current: 2, total: 10 });
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 11 });
             const atDifferentCode = run([{ type: "goTo", stepId: "ex-different-code" }], picked);
             expect(currentStep(atDifferentCode)?.id).toBe("ex-different-code");
             const afterIt = run([{ type: "next" }], atDifferentCode);
             expect(currentStep(afterIt)?.id).toBe("ex-done");
-            expect(stepProgress(afterIt)).toEqual({ current: 10, total: 10 });
+            expect(stepProgress(afterIt)).toEqual({ current: 11, total: 11 });
             expect(currentStep(run([{ type: "back" }], afterIt))?.id).toBe("ex-different-code");
             expect(run([{ type: "goTo", stepId: "ex-ai-style" }], picked)).toBe(picked);
             expect(run([{ type: "next" }], afterIt)).toEqual(INITIAL_TOUR_STATE);
@@ -135,7 +135,7 @@ describe("tourReducer", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
             const again = run([{ type: "goTo", stepId: "ex-library" }, { type: "pick", problemId: 31 }], picked);
             expect(again.context.problemId).toBe(31);
-            expect(stepProgress(again).total).toBe(11);
+            expect(stepProgress(again).total).toBe(12);
         });
     });
 

@@ -110,13 +110,14 @@ describe("examples flow", () => {
     it("walks the cases in order: identical, similar, different, ai", () => {
         expect(steps.map((s) => s.id)).toEqual([
             "ex-library",
-            "ex-identical-literal",
             "ex-identical-semantic",
+            "ex-identical-literal-extra",
             "ex-code-open",
             "ex-code-panes",
-            "ex-similar-literal",
+            "ex-code-comment",
+            "ex-similar-semantic",
             "ex-similar-code",
-            "ex-different-literal",
+            "ex-different-semantic",
             "ex-different-code",
             "ex-ai-style",
             "ex-done",
@@ -124,8 +125,8 @@ describe("examples flow", () => {
     });
 
     it.each([
-        ["ex-similar-code", "/reporte/102", "ex-similar-literal"],
-        ["ex-different-code", "/reporte/103", "ex-different-literal"],
+        ["ex-similar-code", "/reporte/102", "ex-similar-semantic"],
+        ["ex-different-code", "/reporte/103", "ex-different-semantic"],
     ])("%s shows the code panes of its own case", (id, route, recoverTo) => {
         expect(byId(id)).toMatchObject({ target: "code-panes", reportView: "code", advance: { kind: "manual" }, recoverTo });
         expect(byId(id).enterRoute?.({ problemId: 31, examples: EXAMPLES })).toBe(route);
@@ -134,27 +135,52 @@ describe("examples flow", () => {
     it("opens the report of each case through enterRoute", () => {
         const route = (id: string) => byId(id).enterRoute?.({ problemId: 31, examples: EXAMPLES });
         expect(route("ex-library")).toBe("/biblioteca");
-        expect(route("ex-identical-literal")).toBe("/reporte/101");
+        expect(route("ex-identical-semantic")).toBe("/reporte/101");
         expect(route("ex-code-open")).toBe("/reporte/101");
         expect(route("ex-code-panes")).toBe("/reporte/101");
-        expect(route("ex-similar-literal")).toBe("/reporte/102");
-        expect(route("ex-different-literal")).toBe("/reporte/103");
+        expect(route("ex-code-comment")).toBe("/reporte/101");
+        expect(route("ex-similar-semantic")).toBe("/reporte/102");
+        expect(route("ex-different-semantic")).toBe("/reporte/103");
         expect(route("ex-ai-style")).toBe("/reporte/104");
         expect(route("ex-done")).toBe("/biblioteca");
     });
 
     it("has no report to open without the examples summary", () => {
         const route = (id: string) => byId(id).enterRoute?.({ problemId: null });
-        expect(route("ex-identical-literal")).toBeNull();
+        expect(route("ex-identical-semantic")).toBeNull();
         expect(route("ex-ai-style")).toBeNull();
     });
 
-    it("explains Channel A on the literal card and Channel B on the style card", () => {
-        expect(byId("ex-identical-literal").target).toBe("metric-literal");
-        expect(byId("ex-similar-literal").target).toBe("metric-literal");
-        expect(byId("ex-different-literal").target).toBe("metric-literal");
-        expect(byId("ex-ai-style").target).toBe("metric-style");
+    it("explains every case on the semantic card and Channel B on the style card", () => {
         expect(byId("ex-identical-semantic").target).toBe("metric-semantic");
+        expect(byId("ex-similar-semantic").target).toBe("metric-semantic");
+        expect(byId("ex-different-semantic").target).toBe("metric-semantic");
+        expect(byId("ex-ai-style").target).toBe("metric-style");
+    });
+
+    it("mentions the literal (Jaccard) card in exactly one step, as an extra after the semantic one", () => {
+        const literal = steps.filter((s) => s.target === "metric-literal");
+        expect(literal.map((s) => s.id)).toEqual(["ex-identical-literal-extra"]);
+        expect(literal[0].text).toMatch(/dato extra/i);
+        const ids = steps.map((s) => s.id);
+        expect(ids.indexOf("ex-identical-literal-extra")).toBe(ids.indexOf("ex-identical-semantic") + 1);
+    });
+
+    it("shows how to write a review comment right after the code panes", () => {
+        const ids = steps.map((s) => s.id);
+        expect(ids.indexOf("ex-code-comment")).toBe(ids.indexOf("ex-code-panes") + 1);
+        expect(byId("ex-code-comment")).toMatchObject({
+            target: "add-comment",
+            reportView: "code",
+            advance: { kind: "manual" },
+        });
+        expect(byId("ex-code-comment").enterRoute?.({ problemId: 31, examples: EXAMPLES })).toBe("/reporte/101");
+    });
+
+    it("keeps non-final step texts short", () => {
+        for (const step of steps.filter((s) => !s.final)) {
+            expect(step.text.length, step.id).toBeLessThanOrEqual(80);
+        }
     });
 
     it("asks the user to open the code view, then shows the code panes", () => {
@@ -163,7 +189,7 @@ describe("examples flow", () => {
     });
 
     it("shows the summary of every report it opens", () => {
-        for (const id of ["ex-identical-literal", "ex-code-open", "ex-similar-literal", "ex-different-literal", "ex-ai-style"]) {
+        for (const id of ["ex-identical-semantic", "ex-identical-literal-extra", "ex-code-open", "ex-similar-semantic", "ex-different-semantic", "ex-ai-style"]) {
             expect(byId(id).reportView, id).toBe("summary");
         }
     });
@@ -183,11 +209,11 @@ describe("examples flow", () => {
     it("opens the reports of the picked problem, falling back to the showcase", () => {
         const route = (id: string, problemId: number | null) =>
             byId(id).enterRoute?.({ problemId, examples: EXAMPLES });
-        expect(route("ex-identical-literal", 32)).toBe("/reporte/201");
+        expect(route("ex-identical-semantic", 32)).toBe("/reporte/201");
         expect(route("ex-different-code", 32)).toBe("/reporte/203");
         expect(route("ex-ai-style", 31)).toBe("/reporte/104");
-        expect(route("ex-identical-literal", null)).toBe("/reporte/101");
-        expect(route("ex-identical-literal", 999)).toBe("/reporte/101"); // not in the summary
+        expect(route("ex-identical-semantic", null)).toBe("/reporte/101");
+        expect(route("ex-identical-semantic", 999)).toBe("/reporte/101"); // not in the summary
     });
 
     it("only the AI step depends on a case, and it is skipped for a problem without one", () => {
