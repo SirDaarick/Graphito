@@ -1,6 +1,7 @@
 import uuid
 import asyncio
 import logging
+import time
 
 from typing import List, Tuple, Optional, Dict, Any
 from sqlalchemy import select, and_
@@ -20,6 +21,7 @@ from app.infrastructure.database.models import (
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
 from app.application.services.scoring_service import ScoringService
+from app.application.services.usage_events import elapsed_ms, record_analysis, record_event
 from app.presentation.schemas.batch import BatchStatusResponse
 
 logger = logging.getLogger("graphito-batch")
@@ -212,6 +214,7 @@ class BatchAnalysisService:
                             return
 
                         # Misma medición, dictamen e indicadores que el análisis individual.
+                        started = time.perf_counter()
                         outcome = await scoring.score(inner_session, entrega)
 
                         r_res = await inner_session.execute(
@@ -226,10 +229,19 @@ class BatchAnalysisService:
                         lote_obj = l_res.scalar_one_or_none()
                         if lote_obj:
                             lote_obj.procesados += 1
+                        docente_id = lote_obj.docente_id if lote_obj else None
 
                         await inner_session.commit()
+                        await record_analysis(
+                            "lote", docente_id=docente_id, outcome=outcome, entrega=entrega,
+                            duracion_ms=elapsed_ms(started),
+                        )
                     except Exception as err:
                         logger.error(f"Error procesando reporte {rep_id} del lote {batch_id}: {err}", exc_info=True)
+                        await record_event(
+                            "analisis_error", detalle={"modo": "lote", "lote_id": str(batch_id),
+                                                       "error": str(getattr(err, "reason", None) or type(err).__name__)},
+                        )
                         try:
                             await inner_session.rollback()
                             r_res = await inner_session.execute(

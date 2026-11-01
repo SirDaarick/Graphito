@@ -1,10 +1,12 @@
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import settings
+from app.application.services.usage_events import elapsed_ms, record_event, route_template
 from app.domain.errors import GraphitoError, InferenceError, NotReadyError, VectorStoreError
 from app.infrastructure.database.session import engine, Base
 import app.infrastructure.database.models  # Registra todas las entidades en Base.metadata
@@ -52,6 +54,30 @@ async def inference_readiness_gate(request: Request, call_next):
     if blocked is not None:
         return blocked
     return await call_next(request)
+
+
+# Usage events: one row per API request (route template, status, duration, teacher id). Registered
+# after the gate so it also records the gate's 503s, and before CORS so CORS stays outermost.
+_UNLOGGED_ROUTES = {"/health", "/api/v1/analysis/batch/{batch_id}/status"}  # health checks, UI polling
+
+
+@app.middleware("http")
+async def usage_event_middleware(request: Request, call_next):
+    if request.method == "OPTIONS" or request.url.path == "/health":
+        return await call_next(request)
+    started = time.perf_counter()
+    response = await call_next(request)
+    path = route_template(request.url.path, request.scope.get("path_params"))
+    if path not in _UNLOGGED_ROUTES:
+        await record_event(
+            "peticion",
+            docente_id=getattr(request.state, "docente_id", None),
+            metodo=request.method,
+            ruta=path,
+            estado_http=response.status_code,
+            duracion_ms=elapsed_ms(started),
+        )
+    return response
 
 
 @app.exception_handler(NotReadyError)

@@ -11,6 +11,7 @@ from app.application.services.pdf_service import PdfReportService
 from app.application.services.batch_analysis_service import BatchAnalysisService
 from app.application.services.xai_service import XAIService
 from app.application.services.scoring_service import ScoringService
+from app.application.services.usage_events import record_event
 from app.presentation.api.v1.deps import get_current_docente, get_scoring_service
 from app.presentation.schemas.analysis import (
     AnalysisRunRequest,
@@ -172,10 +173,12 @@ async def upload_batch_submissions(
     Encola la inferencia bimodal en segundo plano evitando timeouts HTTP (Patrón 202 Accepted).
     """
     files_data = []
+    n_bytes = 0
     for f in files:
         if not f.filename.lower().endswith((".c", ".cpp", ".cc", ".h")):
             continue
         raw_bytes = await f.read()
+        n_bytes += len(raw_bytes)
         # Same decoding as the evaluation data (`errors="replace"`), so Channel A sees the same text.
         content = raw_bytes.decode("utf-8", errors="replace")
         # Extraer nombre preliminar del archivo si no viene en metadatos
@@ -192,6 +195,18 @@ async def upload_batch_submissions(
         problema_id=problema_id,
         grupo_id=grupo_id,
         files_data=files_data,
+    )
+
+    await record_event(
+        "carga_lote",
+        docente_id=current_user.id,
+        detalle={
+            "problema_id": problema_id,
+            "grupo_id": grupo_id,
+            "n_archivos": len(files_data),
+            "n_ignorados": len(files) - len(files_data),
+            "bytes": n_bytes,
+        },
     )
 
     # Lanzar worker en segundo plano (mismo ScoringService que el análisis individual)

@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
@@ -32,6 +32,7 @@ def get_scoring_service(
 
 
 async def get_current_docente(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> Docente:
@@ -51,4 +52,5 @@ async def get_current_docente(
             detail="Docente no encontrado.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    request.state.docente_id = docente.id  # read by the usage-event middleware
     return docente
