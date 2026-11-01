@@ -79,7 +79,8 @@ async def test_ensure_creates_the_group_with_problems_and_preanalysed_submission
     assert len(groups) == 1
     group = groups[0]
     assert (group.nombre, group.es_ejemplo, group.id) == ("Ejemplo", True, body["grupo_id"])
-    assert group.descripcion
+    assert group.descripcion.startswith("Entregas de muestra ya analizadas")
+    assert "resultados pueden variar" in group.descripcion
 
     assert [p["titulo"] for p in body["problemas"]] == [p["titulo"] for p in DOC["problems"]]
     assert body["recorrido"]["problema_id"] == body["problemas"][0]["problema_id"]

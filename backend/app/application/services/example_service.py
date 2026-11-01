@@ -43,7 +43,10 @@ GROUP_CODE = "EJEMPLO"
 GROUP_PERIOD = "Ejemplo"
 GROUP_DESCRIPTION = (
     "Entregas de muestra ya analizadas para que pruebes Graphito: un código idéntico a la referencia, "
-    "una solución propia del mismo problema, código de otro problema y código generado con IA."
+    "una solución propia del mismo problema, código de otro problema y código generado con IA. "
+    "Estos ejemplos vienen del mismo corpus con el que se entrenaron los modelos, pero sus códigos no se "
+    "usaron en el entrenamiento. Se eligieron porque muestran bien cada caso; con otros códigos los "
+    "resultados pueden variar."
 )
 CATALOG_PREFIX = "ejemplo:"
 FIXTURE_VERSION = 1

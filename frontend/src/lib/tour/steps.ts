@@ -294,7 +294,7 @@ const EXAMPLE_STEPS: TourStep[] = [
     {
         id: "ex-done",
         title: "¡Eso es todo!",
-        text: "Las métricas orientan y la decisión es del docente. Puedes eliminar el grupo Ejemplo y restaurarlo desde «Ver ejemplos».",
+        text: "Estos ejemplos se eligieron porque muestran bien cada caso; con otros códigos los resultados pueden variar. La decisión siempre es del docente. Puedes restaurar el grupo desde «Ver ejemplos».",
         placement: "bottom",
         advance: { kind: "manual" },
         enterRoute: LIBRARY_ROUTE,

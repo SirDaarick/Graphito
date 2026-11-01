@@ -180,4 +180,8 @@ describe("examples flow", () => {
     it("closes by saying the teacher decides", () => {
         expect(byId("ex-done").text).toMatch(/docente/i);
     });
+
+    it("warns on the last step that results may vary with other codes", () => {
+        expect(byId("ex-done").text).toMatch(/pueden variar/i);
+    });
 });
