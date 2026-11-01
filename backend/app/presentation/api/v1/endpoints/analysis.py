@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
-from app.infrastructure.database.models import Docente, CodigoFuente, TipoCodigoEnum
+from app.infrastructure.database.models import Docente, CodigoFuente, Grupo, ReporteAnalisis, TipoCodigoEnum
 from sqlalchemy import select
 from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
 from app.application.services.pdf_service import PdfReportService
@@ -49,7 +49,16 @@ async def get_report(
     db: AsyncSession = Depends(get_db),
 ):
     orchestrator = AnalysisOrchestrator(db)
-    return await orchestrator.get_report(report_id)
+    report = await orchestrator.get_report(report_id)
+    in_example_group = await db.execute(
+        select(Grupo.id)
+        .join(CodigoFuente, CodigoFuente.grupo_id == Grupo.id)
+        .join(ReporteAnalisis, ReporteAnalisis.entrega_id == CodigoFuente.id)
+        .where(ReporteAnalisis.id == report_id, Grupo.es_ejemplo.is_(True))
+        .limit(1)
+    )
+    report.es_ejemplo = in_example_group.scalars().first() is not None
+    return report
 
 
 @router.get("/reports/{report_id}/pdf")

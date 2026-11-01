@@ -1,0 +1,312 @@
+{
+  "version": 1,
+  "generated_at": "2026-11-01T00:00:00Z",
+  "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "engine": "real",
+  "problems": [
+    {
+      "key": "T_SUMA",
+      "titulo": "Suma de enteros (prueba)",
+      "descripcion": "Lee N enteros y muestra su suma.",
+      "lenguaje": "c",
+      "referencia": {
+        "autor": "Referencia del ejemplo",
+        "contenido": "#include <stdio.h>\nint main(void) {\n    int n, total = 0, x;\n    scanf(\"%d\", &n);\n    for (int i = 0; i < n; i++) {\n        scanf(\"%d\", &x);\n        total += x;\n    }\n    printf(\"%d\\n\", total);\n    return 0;\n}\n"
+      },
+      "entregas": [
+        {
+          "caso": "identical",
+          "autor": "Ejemplo: copia de la referencia",
+          "origen": "test/a.c",
+          "contenido": "#include <stdio.h>\nint main(void) {\n    int n, total = 0, x;\n    scanf(\"%d\", &n);\n    for (int i = 0; i < n; i++) {\n        scanf(\"%d\", &x);\n        total += x;\n    }\n    printf(\"%d\\n\", total);\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 1.0,
+              "calibrated": 1.0,
+              "flag": true,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.1,
+              "calibrated": 0.02,
+              "flag": false,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 1.0,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        },
+        {
+          "caso": "similar",
+          "autor": "Ejemplo: solución propia",
+          "origen": "test/b.c",
+          "contenido": "#include <stdio.h>\nint main(void) {\n    int cantidad, suma = 0;\n    scanf(\"%d\", &cantidad);\n    while (cantidad--) {\n        int dato;\n        scanf(\"%d\", &dato);\n        suma = suma + dato;\n    }\n    printf(\"%d\\n\", suma);\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.31,
+              "calibrated": 0.21,
+              "flag": false,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.2,
+              "calibrated": 0.04,
+              "flag": false,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 0.93,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        },
+        {
+          "caso": "different",
+          "autor": "Ejemplo: código de otro problema",
+          "origen": "test/c.c",
+          "contenido": "#include <stdio.h>\nlong fact(int n) {\n    return n <= 1 ? 1 : n * fact(n - 1);\n}\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    printf(\"%ld\\n\", fact(n));\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.06,
+              "calibrated": 0.0,
+              "flag": false,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.15,
+              "calibrated": 0.03,
+              "flag": false,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 0.71,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        },
+        {
+          "caso": "ai",
+          "autor": "Ejemplo: generado con IA",
+          "origen": "test/d.c",
+          "contenido": "#include <stdio.h>\n\n/* Here is a solution that reads N integers and prints their sum. */\nint main(void) {\n    int count = 0;\n    int sum = 0;\n    if (scanf(\"%d\", &count) != 1) {\n        return 1;\n    }\n    for (int index = 0; index < count; ++index) {\n        int value = 0;\n        if (scanf(\"%d\", &value) != 1) {\n            return 1;\n        }\n        sum += value;\n    }\n    printf(\"%d\\n\", sum);\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.27,
+              "calibrated": 0.12,
+              "flag": false,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.92,
+              "calibrated": 0.81,
+              "flag": true,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 0.88,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "T_FACT",
+      "titulo": "Factorial (prueba)",
+      "descripcion": "Lee N y muestra N factorial.",
+      "lenguaje": "c",
+      "referencia": {
+        "autor": "Referencia del ejemplo",
+        "contenido": "#include <stdio.h>\nlong fact(int n) {\n    return n <= 1 ? 1 : n * fact(n - 1);\n}\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    printf(\"%ld\\n\", fact(n));\n    return 0;\n}\n"
+      },
+      "entregas": [
+        {
+          "caso": "identical",
+          "autor": "Ejemplo: copia de la referencia",
+          "origen": "test/a.c",
+          "contenido": "#include <stdio.h>\nlong fact(int n) {\n    return n <= 1 ? 1 : n * fact(n - 1);\n}\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    printf(\"%ld\\n\", fact(n));\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 1.0,
+              "calibrated": 1.0,
+              "flag": true,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.1,
+              "calibrated": 0.02,
+              "flag": false,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 1.0,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        },
+        {
+          "caso": "similar",
+          "autor": "Ejemplo: solución propia",
+          "origen": "test/b.c",
+          "contenido": "#include <stdio.h>\nint main(void) {\n    int n;\n    long r = 1;\n    scanf(\"%d\", &n);\n    for (int k = 2; k <= n; k++) r *= k;\n    printf(\"%ld\\n\", r);\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.31,
+              "calibrated": 0.21,
+              "flag": false,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.2,
+              "calibrated": 0.04,
+              "flag": false,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 0.93,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        },
+        {
+          "caso": "different",
+          "autor": "Ejemplo: código de otro problema",
+          "origen": "test/c.c",
+          "contenido": "#include <stdio.h>\nint main(void) {\n    int n, total = 0, x;\n    scanf(\"%d\", &n);\n    for (int i = 0; i < n; i++) {\n        scanf(\"%d\", &x);\n        total += x;\n    }\n    printf(\"%d\\n\", total);\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.06,
+              "calibrated": 0.0,
+              "flag": false,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.15,
+              "calibrated": 0.03,
+              "flag": false,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 0.71,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        },
+        {
+          "caso": "ai",
+          "autor": "Ejemplo: generado con IA",
+          "origen": "test/d.c",
+          "contenido": "#include <stdio.h>\n\n/* Here is a solution: iterative factorial with validation. */\nunsigned long long factorial(int number) {\n    unsigned long long result = 1ULL;\n    for (int current = 2; current <= number; ++current) {\n        result *= (unsigned long long)current;\n    }\n    return result;\n}\n\nint main(void) {\n    int number = 0;\n    if (scanf(\"%d\", &number) != 1 || number < 0) {\n        return 1;\n    }\n    printf(\"%llu\\n\", factorial(number));\n    return 0;\n}\n",
+          "outcome": {
+            "channel_a": {
+              "estado": "OK",
+              "raw": 0.27,
+              "calibrated": 0.12,
+              "flag": false,
+              "threshold": 0.5,
+              "threshold_key": "fpr_0.05",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "channel_b": {
+              "estado": "OK",
+              "raw": 0.92,
+              "calibrated": 0.81,
+              "flag": true,
+              "threshold": 0.1715,
+              "threshold_key": "fpr_0.01",
+              "calibration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "gcb_similarity": 0.88,
+            "engine": "real",
+            "provenance": {
+              "canal_a_metodo": "jaccard_5gram",
+              "manifest_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "checkpoint_sha_b": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "gcb_estado": "OK",
+              "label": "fixture de prueba"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

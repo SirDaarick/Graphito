@@ -1,8 +1,9 @@
 from typing import List
 from fastapi import APIRouter, Depends, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
-from app.infrastructure.database.models import Docente
+from app.infrastructure.database.models import Docente, Grupo
 from app.presentation.api.v1.deps import get_current_docente
 from app.application.services.group_service import GroupService
 from app.presentation.schemas.group import (
@@ -45,11 +46,21 @@ async def list_groups(
     db: AsyncSession = Depends(get_db),
 ):
     service = GroupService(db)
-    return await service.list_groups(current_user.id, include_archived)
+    return await _mark_examples(db, current_user.id, await service.list_groups(current_user.id, include_archived))
+
+
+async def _mark_examples(db: AsyncSession, docente_id: int, grupos: List[GrupoResponse]) -> List[GrupoResponse]:
+    """Set `es_ejemplo` on the summaries built by `GroupService.list_groups`."""
+    rows = await db.execute(select(Grupo.id).where(Grupo.docente_id == docente_id, Grupo.es_ejemplo.is_(True)))
+    example_ids = set(rows.scalars().all())
+    for g in grupos:
+        g.es_ejemplo = g.id in example_ids
+    return grupos
 
 
 async def _group_response(service: GroupService, docente_id: int, group_id: int) -> GrupoResponse:
     grupos = await service.list_groups(docente_id, include_archived=True)
+    await _mark_examples(service.db, docente_id, grupos)
     return next(g for g in grupos if g.id == group_id)
 
 

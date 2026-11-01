@@ -46,6 +46,7 @@ class GrupoResponse(BaseModel):
     descripcion: Optional[str] = None
     created_at: datetime
     archivado: bool = False
+    es_ejemplo: bool = False  # the preloaded "Ejemplo" group
     total_problemas: Optional[int] = 0
     total_entregas: Optional[int] = 0
 
