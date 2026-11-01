@@ -395,6 +395,85 @@ async def test_group_list_shows_es_ejemplo(client: AsyncClient):
     assert detail["es_ejemplo"] is True
 
 
+# --- fast path: a complete group is answered by reads only ----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_complete_group_is_answered_with_few_reads_and_no_writes(db_session, vector_store):
+    from sqlalchemy import event
+
+    docente = Docente(email="rapido@escom.ipn.mx", hashed_password="x", nombre="Prof. Rapido")
+    db_session.add(docente)
+    await db_session.commit()
+    await db_session.refresh(docente)
+    docente_id = docente.id
+
+    service = ExampleService(db_session, StubInferenceEngine(), vector_store)
+    first = await service.ensure_examples(docente_id)
+
+    statements: list = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        second = await ExampleService(db_session, StubInferenceEngine(), vector_store).ensure_examples(docente_id)
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+
+    assert second.model_dump() == first.model_copy(update={"creado": False}).model_dump()
+    assert second.creado is False
+    assert len(statements) <= 3, statements
+    assert all(s.lstrip().upper().startswith("SELECT") for s in statements), statements
+    assert len(vector_store.upserts) == 2
+
+
+@pytest.mark.asyncio
+async def test_incomplete_groups_are_still_reconciled(client: AsyncClient, db_session):
+    headers = await _headers(client)
+    first = await _ensure(client, headers)
+
+    async def settle(expected_creado: bool) -> dict:
+        body = await _ensure(client, headers)
+        assert body["creado"] is expected_creado
+        assert await _count(db_session, Grupo) == 1
+        assert await _count(db_session, Problema) == 2
+        assert await _count(db_session, GrupoProblema) == 2
+        assert await _count(db_session, ReporteAnalisis) == 8
+        assert await _count(db_session, CodigoFuente) == 2 + 8
+        entregas = (
+            await db_session.execute(select(CodigoFuente).where(CodigoFuente.tipo == TipoCodigoEnum.ENTREGA_ALUMNO))
+        ).scalars().all()
+        assert {e.grupo_id for e in entregas} == {body["grupo_id"]}
+        return body
+
+    # one report deleted
+    report = (await db_session.execute(select(ReporteAnalisis).limit(1))).scalars().first()
+    await db_session.delete(report)
+    await db_session.commit()
+    assert await _count(db_session, ReporteAnalisis) == 7
+    await settle(False)
+
+    # one submission unlinked from the group
+    entrega = (
+        await db_session.execute(select(CodigoFuente).where(CodigoFuente.tipo == TipoCodigoEnum.ENTREGA_ALUMNO).limit(1))
+    ).scalars().first()
+    entrega.grupo_id = None
+    await db_session.commit()
+    await settle(False)
+
+    # one problem deleted
+    gone = first["problemas"][1]["problema_id"]
+    assert (await client.delete(f"/api/v1/problems/{gone}", headers=headers)).status_code == 204
+    await settle(False)
+
+    # the group deleted
+    assert (await client.delete(f"/api/v1/groups/{first['grupo_id']}", headers=headers)).status_code == 204
+    await settle(True)
+
+
 # --- behaviour that must not change ---------------------------------------------------------------
 
 

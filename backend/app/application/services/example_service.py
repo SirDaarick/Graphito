@@ -78,10 +78,17 @@ class ExampleService:
 
     # --- fixture ----------------------------------------------------------------------------
 
+    _fixture_cache: Dict[tuple, Dict[str, Any]] = {}  # per process, keyed by path and mtime
+
     def _load_fixture(self) -> Dict[str, Any]:
+        key = (str(self.fixture_path), self.fixture_path.stat().st_mtime_ns)
+        cached = self._fixture_cache.get(key)
+        if cached is not None:
+            return cached
         fixture = json.loads(self.fixture_path.read_text(encoding="utf-8"))
         if fixture.get("version") != FIXTURE_VERSION or not fixture.get("problems"):
             raise ValueError(f"unsupported example fixture: {self.fixture_path.name}")
+        self._fixture_cache[key] = fixture
         return fixture
 
     @staticmethod
@@ -100,6 +107,9 @@ class ExampleService:
     async def ensure_examples(self, docente_id: int) -> ExampleSummary:
         """Make sure the teacher has the example group with every example problem and report."""
         fixture = self._load_fixture()
+        complete = await self._complete_summary(docente_id, fixture)
+        if complete is not None:
+            return complete
         created = _Created()
         resolved: List[tuple] = []
         try:
@@ -116,6 +126,78 @@ class ExampleService:
             await self._cleanup(docente_id, created)
             raise
         return await self._summary(grupo.id, group_created, resolved)
+
+    async def _complete_summary(self, docente_id: int, fixture: Dict[str, Any]) -> Optional[ExampleSummary]:
+        """Read-only fast path: the summary when the group is already complete, else None (3 queries).
+
+        Complete = the example group exists and every fixture problem has its reference, its group link,
+        and every submission (by author) linked to the group with a report.
+        """
+        grupo_id = (
+            await self.db.execute(
+                select(Grupo.id)
+                .where(Grupo.docente_id == docente_id, Grupo.es_ejemplo.is_(True))
+                .order_by(Grupo.id)
+                .limit(1)
+            )
+        ).scalars().first()
+        if grupo_id is None:
+            return None
+
+        has_reference = (
+            select(CodigoFuente.id)
+            .where(CodigoFuente.problema_id == Problema.id, CodigoFuente.tipo == TipoCodigoEnum.REFERENCIA)
+            .exists()
+        )
+        problem_rows = (
+            await self.db.execute(
+                select(Problema.id, Problema.titulo, Problema.catalogo_id, GrupoProblema.id, has_reference)
+                .outerjoin(
+                    GrupoProblema, (GrupoProblema.problema_id == Problema.id) & (GrupoProblema.grupo_id == grupo_id)
+                )
+                .where(Problema.docente_id == docente_id, Problema.catalogo_id.like(f"{CATALOG_PREFIX}%"))
+                .order_by(Problema.id)
+            )
+        ).all()
+        problems: Dict[str, tuple] = {}  # first (lowest id) problem per catalogo_id, like the reconcile
+        for problema_id, titulo, catalogo_id, link_id, referenced in problem_rows:
+            problems.setdefault(catalogo_id, (problema_id, titulo, link_id, referenced))
+
+        entrega_rows = (
+            await self.db.execute(
+                select(CodigoFuente.problema_id, CodigoFuente.autor, ReporteAnalisis.id)
+                .join(Problema, Problema.id == CodigoFuente.problema_id)
+                .outerjoin(ReporteAnalisis, ReporteAnalisis.entrega_id == CodigoFuente.id)
+                .where(
+                    Problema.docente_id == docente_id,
+                    Problema.catalogo_id.like(f"{CATALOG_PREFIX}%"),
+                    CodigoFuente.tipo == TipoCodigoEnum.ENTREGA_ALUMNO,
+                    CodigoFuente.grupo_id == grupo_id,
+                )
+            )
+        ).all()
+        reports: Dict[tuple, int] = {}  # (problema, autor) -> lowest report id
+        for problema_id, autor, report_id in entrega_rows:
+            if report_id is not None:
+                key = (problema_id, autor)
+                reports[key] = min(report_id, reports.get(key, report_id))
+
+        entries = []
+        for fixture_problem in fixture["problems"]:
+            found = problems.get(f"{CATALOG_PREFIX}{fixture_problem['key']}")
+            if found is None:
+                return None
+            problema_id, titulo, link_id, referenced = found
+            if link_id is None or not referenced:
+                return None
+            casos: Dict[str, int] = {}
+            for fixture_entrega in fixture_problem["entregas"]:
+                report_id = reports.get((problema_id, fixture_entrega["autor"]))
+                if report_id is None:
+                    return None
+                casos[fixture_entrega["caso"]] = report_id
+            entries.append((problema_id, titulo, casos))
+        return self._build_summary(grupo_id, False, entries)
 
     # --- steps ------------------------------------------------------------------------------
 
@@ -239,10 +321,15 @@ class ExampleService:
     # --- result and cleanup ----------------------------------------------------------------
 
     async def _summary(self, grupo_id: int, creado: bool, resolved: List[tuple]) -> ExampleSummary:
-        problemas = []
+        entries = []
         for fixture_problem, problema in resolved:
-            casos = await self._cases(fixture_problem, problema)
-            problemas.append(ExampleProblem(problema_id=problema.id, titulo=problema.titulo, casos=casos))
+            entries.append((problema.id, problema.titulo, await self._cases(fixture_problem, problema)))
+        return self._build_summary(grupo_id, creado, entries)
+
+    @staticmethod
+    def _build_summary(grupo_id: int, creado: bool, entries: List[tuple]) -> ExampleSummary:
+        """The one summary shape: `entries` are (problema_id, titulo, casos) in fixture order."""
+        problemas = [ExampleProblem(problema_id=pid, titulo=titulo, casos=casos) for pid, titulo, casos in entries]
         showcase = problemas[0]  # the tour's original showcase: the first problem of the fixture
         return ExampleSummary(
             grupo_id=grupo_id,
