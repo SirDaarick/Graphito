@@ -336,13 +336,14 @@ export function SideBySideDiffViewer({
                                                                 title={`${lineComments.length} comentarios`}
                                                             />
                                                         )}
-                                                        <span className="group-hover:hidden">{lineNum}</span>
+                                                        <span className={index === 0 ? undefined : "group-hover:hidden"}>{lineNum}</span>
                                                         <button
+                                                            data-tour={index === 0 ? "add-comment" : undefined}
                                                             onClick={() => {
                                                                 setActiveCommentLine(isComposerActive ? null : lineNum);
                                                                 setCommentText("");
                                                             }}
-                                                            className="hidden group-hover:flex items-center justify-center w-5 h-5 rounded-md bg-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500 hover:text-white transition-all shadow-[0_0_6px_rgba(255,126,219,0.5)]"
+                                                            className={`${index === 0 ? "flex opacity-60 group-hover:opacity-100" : "hidden group-hover:flex"} items-center justify-center w-5 h-5 rounded-md bg-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500 hover:text-white transition-all shadow-[0_0_6px_rgba(255,126,219,0.5)]`}
                                                             title="Agregar observación en esta línea"
                                                         >
                                                             <Plus size={11} />
