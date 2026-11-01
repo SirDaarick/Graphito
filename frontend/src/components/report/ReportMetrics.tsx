@@ -93,31 +93,36 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
         <div className="flex flex-col gap-4">
             {/* Top Row: Two Radial Progress Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <RadialProgressCard
-                    title="Similitud semántica"
-                    centerLabel="Lógica"
-                    pct={semantic.pct}
-                    unavailableReason={semantic.reason}
-                    description="Qué tan parecida es la lógica frente a la referencia, aun si cambian nombres."
-                    helpLabel="Cómo se calcula la similitud semántica"
-                    helpTitle="Similitud semántica"
-                    help={<SemanticHelp />}
-                    accent="blue"
-                    animate={animate}
-                />
+                {/* The wrappers are guided-tour anchors; they stretch the card like a direct grid child. */}
+                <div data-tour="metric-semantic" className="flex flex-col rounded-3xl [&>article]:flex-1">
+                    <RadialProgressCard
+                        title="Similitud semántica"
+                        centerLabel="Lógica"
+                        pct={semantic.pct}
+                        unavailableReason={semantic.reason}
+                        description="Qué tan parecida es la lógica frente a la referencia, aun si cambian nombres."
+                        helpLabel="Cómo se calcula la similitud semántica"
+                        helpTitle="Similitud semántica"
+                        help={<SemanticHelp />}
+                        accent="blue"
+                        animate={animate}
+                    />
+                </div>
 
-                <RadialProgressCard
-                    title="Estilo del código"
-                    centerLabel="Prob. IA"
-                    pct={styleScore}
-                    unavailableReason={styleReason}
-                    description="Qué tan parecida es la forma de escribir frente a código generado por IA."
-                    helpLabel="Cómo se calcula el estilo del código"
-                    helpTitle="Estilo del código"
-                    help={<StyleHelp />}
-                    accent="violet"
-                    animate={animate}
-                />
+                <div data-tour="metric-style" className="flex flex-col rounded-3xl [&>article]:flex-1">
+                    <RadialProgressCard
+                        title="Estilo del código"
+                        centerLabel="Prob. IA"
+                        pct={styleScore}
+                        unavailableReason={styleReason}
+                        description="Qué tan parecida es la forma de escribir frente a código generado por IA."
+                        helpLabel="Cómo se calcula el estilo del código"
+                        helpTitle="Estilo del código"
+                        help={<StyleHelp />}
+                        accent="violet"
+                        animate={animate}
+                    />
+                </div>
             </div>
 
             {/* Bottom Row: how to read the numbers. Context only; the teacher decides what they mean. */}
@@ -146,7 +151,7 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                 </p>
                 <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 italic">{VALIDATION_LABEL}</p>
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#2b3346]/40 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                    <div data-tour="metric-literal" className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                         <span>
                             Coincidencia literal de texto:{" "}
                             <span className="font-semibold text-slate-700 dark:text-slate-300">

@@ -76,6 +76,7 @@ class Grupo(Base):
     periodo = Column(String(50), nullable=False)
     descripcion = Column(Text, nullable=True)
     archivado = Column(Boolean, default=False, nullable=False, server_default=false())
+    es_ejemplo = Column(Boolean, default=False, nullable=False, server_default=false())  # grupo "Ejemplo" precargado
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     docente = relationship("Docente", back_populates="grupos")

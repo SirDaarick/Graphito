@@ -7,6 +7,8 @@ import { clearVerdict, getVerdict, saveVerdict } from "../lib/verdicts";
 import { calibrationLabel } from "../lib/dictamen";
 import { evidenceByLine } from "../lib/evidence";
 import { useDialogFocus } from "../lib/focusTrap";
+import { TOUR_REPORT_VIEW_EVENT } from "../lib/tour/reportView";
+import type { TourReportView } from "../lib/tour/types";
 import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
 import { ReportMetrics } from "../components/report/ReportMetrics";
 
@@ -261,6 +263,16 @@ export function SimilarityReportModal({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, inCodeView, reportId]);
 
+    // The guided tour switches between the summary and the code view of the open report.
+    useEffect(() => {
+        const onTourView = (event: Event) => {
+            const view = (event as CustomEvent<TourReportView>).detail;
+            setViewMode(view === "code" ? "code_diff" : "report");
+        };
+        window.addEventListener(TOUR_REPORT_VIEW_EVENT, onTourView);
+        return () => window.removeEventListener(TOUR_REPORT_VIEW_EVENT, onTourView);
+    }, []);
+
     // Keep keyboard focus on the control that replaces the one just used.
     useEffect(() => {
         if (previousViewMode.current === viewMode) return;
@@ -364,8 +376,12 @@ export function SimilarityReportModal({
         }
     }, [isOpen]);
 
+    // The dialog renders nothing until the report arrives (a deep link or the tour opens the route first),
+    // so the animation must wait for it: its targets do not exist before. Switching reports keeps it true.
+    const hasComparison = Boolean(comparison);
+
     useGSAP(() => {
-        if (!shouldRender) return;
+        if (!shouldRender || !hasComparison) return;
 
         if (isOpen) {
             gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" });
@@ -374,19 +390,19 @@ export function SimilarityReportModal({
             gsap.to(backdropRef.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
             gsap.to(contentRef.current, { opacity: 0, scale: 0.97, y: 24, duration: 0.3, ease: "power2.in", onComplete: () => setShouldRender(false) });
         }
-    }, [isOpen, shouldRender]);
+    }, [isOpen, shouldRender, hasComparison]);
 
     useDialogFocus(contentRef, isOpen && shouldRender);
 
     // Smooth transition when switching between report summary and code diff view
     useGSAP(() => {
-        if (!shouldRender || !bodyContainerRef.current) return;
+        if (!shouldRender || !hasComparison || !bodyContainerRef.current) return;
         gsap.fromTo(
             bodyContainerRef.current,
             { opacity: 0.6, y: inCodeView ? 10 : -8 },
             { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }
         );
-    }, [inCodeView, shouldRender]);
+    }, [inCodeView, shouldRender, hasComparison]);
 
     // Line-level evidence for the code view: the report's own rows, or the ones that came with the code.
     const lineEvidence = useMemo(() => {
@@ -495,6 +511,14 @@ export function SimilarityReportModal({
                                         STUB
                                     </span>
                                 )}
+                                {comparison.es_ejemplo && (
+                                    <span
+                                        title="Los códigos de estos ejemplos no se usaron para entrenar los modelos. Se eligieron porque muestran bien cada caso; con otros códigos los resultados pueden variar."
+                                        className="px-2.5 py-1 rounded-full text-xs font-semibold border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-300 dark:border-graphito-subtle"
+                                    >
+                                        Ejemplo
+                                    </span>
+                                )}
                                 {comparison.estado_calibracion && !isSample && (
                                     <span className="hidden md:inline px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-graphito-subtle">
                                         {calibrationLabel(comparison.estado_calibracion)}
@@ -532,6 +556,7 @@ export function SimilarityReportModal({
                                     <button
                                         ref={viewCodeButtonRef}
                                         type="button"
+                                        data-tour="view-code"
                                         onClick={() => setViewMode("code_diff")}
                                         className="inline-flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-xl bg-gradient-to-r from-graphito-blue to-graphito-violet text-white text-xs sm:text-sm font-bold shadow-md shadow-graphito-blue/20 hover:brightness-110 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue shrink-0 ml-1"
                                     >

@@ -106,6 +106,8 @@ export function ReferenceCard({
 
     return (
         <div
+            data-tour="problem-card"
+            data-problem-id={problemId}
             className={cn(
                 "mb-5 bg-white/25 dark:bg-graphito-card/15 backdrop-blur-[3px] border border-slate-200/60 dark:border-white/15 rounded-2xl transition-all duration-200 hover:shadow-xl hover:shadow-graphito-blue/5 hover:border-graphito-blue/40 dark:hover:border-graphito-blue/40 shadow-sm",
                 archived && "opacity-70"

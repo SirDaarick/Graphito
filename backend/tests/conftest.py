@@ -101,6 +101,15 @@ test_vector_store = InMemoryVectorStore()
 test_inference_engine = StubInferenceEngine()
 
 
+@pytest.fixture(autouse=True)
+def _no_example_seeding_on_signup(monkeypatch):
+    """Sign-up seeds the example group in production; tests start from an empty account unless
+    they opt in (tests/test_examples.py)."""
+    from app.presentation.api.v1.endpoints import auth as auth_endpoint
+
+    monkeypatch.setattr(auth_endpoint, "SEED_EXAMPLES_ON_SIGNUP", False)
+
+
 @pytest.fixture
 def vector_store() -> InMemoryVectorStore:
     """The shared in-memory store injected into the app by the `client` fixture."""

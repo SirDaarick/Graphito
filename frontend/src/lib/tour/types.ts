@@ -1,4 +1,9 @@
-export type TourFlow = "own" | "library";
+import type { ExampleCase, ExampleSummary } from "../api";
+
+export type TourFlow = "own" | "library" | "examples";
+
+/** Side of the report modal a step needs: the metric cards or the side-by-side code. */
+export type TourReportView = "summary" | "code";
 
 export type TourPlacement = "top" | "bottom" | "left" | "right";
 
@@ -14,7 +19,12 @@ export type TourAdvance =
     /** The URL matches the pattern (same syntax as `matchRoute`). */
     | { kind: "route"; pattern: string }
     /** The user presses the tooltip's own button. */
-    | { kind: "manual" };
+    | { kind: "manual" }
+    /**
+     * The user clicks any `problem-card` inside the highlighted list; that card's problem becomes the
+     * tour's problem. The click is swallowed so the card's own buttons do not also fire.
+     */
+    | { kind: "pick" };
 
 export interface TourStep {
     id: string;
@@ -34,10 +44,20 @@ export interface TourStep {
     scopedToProblem?: boolean;
     /** Last card of a flow. */
     final?: boolean;
+    /** Route to open when the step starts (e.g. a report); null/absent means stay where the user is. */
+    enterRoute?: (context: TourContext) => string | null;
+    /** Report modal view to show when the step starts. */
+    reportView?: TourReportView;
+    /** The library page selects the example group while this step is current. */
+    showGroup?: boolean;
+    /** Examples flow: the step is skipped when the chosen problem has no report of this case. */
+    requiresCase?: ExampleCase;
 }
 
 export interface TourContext {
     problemId: number | null;
+    /** Set only by the examples flow: the group and reports it walks through. */
+    examples?: ExampleSummary;
 }
 
 export type TourStatus = "idle" | "choosing" | "running";

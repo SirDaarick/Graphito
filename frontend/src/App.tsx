@@ -98,8 +98,12 @@ function App() {
                         try {
                             const siblings = siblingSubmissions(await api.problems.list(true, true), report.id);
                             if (siblings) {
-                                comp = siblings.current;
-                                list = siblings.list;
+                                // The problem list does not say which group is the example one; the single report does.
+                                const exampleGroup = report.es_ejemplo ? siblings.current.grupo_id : undefined;
+                                const mark = (c: ComparisonView): ComparisonView =>
+                                    exampleGroup !== undefined && c.grupo_id === exampleGroup ? { ...c, es_ejemplo: true } : c;
+                                comp = mark(siblings.current);
+                                list = siblings.list.map(mark);
                             }
                         } catch (err) {
                             console.warn("No se pudieron cargar las demás entregas del problema:", err);

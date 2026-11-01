@@ -70,6 +70,9 @@ class ReporteAnalisisResponse(BaseModel):
     error_mensaje: Optional[str] = None
     fecha_analisis: datetime
     indicadores: List[IndicadorResponse] = []
+    # True when the submission belongs to the preloaded "Ejemplo" group; only the single-report
+    # endpoint (GET /analysis/reports/{id}) fills it, every other response leaves it False.
+    es_ejemplo: bool = False
 
     # --- provenance and decision inputs (spec AR1.1, additive) -----------------------------------
     # A row without an engine predates SDD-4: it is served as "legacy" and never rescored (AR1.5).

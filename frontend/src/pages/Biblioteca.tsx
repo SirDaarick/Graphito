@@ -5,6 +5,8 @@ import { SearchBar } from "../components/layout/SearchBar";
 import { api, Grupo, CodigoFuente } from "../lib/api";
 import { toComparison } from "../lib/dictamen";
 import { navigate } from "../lib/router";
+import { tourGroupId } from "../lib/tour/machine";
+import { useTour } from "../components/tour/TourContext";
 import {
     Loader2,
     UploadCloud,
@@ -77,6 +79,15 @@ export function Biblioteca({
     const [failedSubmissions, setFailedSubmissions] = useState<string[]>([]);
     const [loadFailed, setLoadFailed] = useState(false);
     const itemsPerPage = 10;
+
+    // The "Ver ejemplos" tour shows the example group's problems only.
+    const tour = useTour();
+    const tourGroup = tourGroupId(tour.state);
+    useEffect(() => {
+        if (tourGroup === null) return;
+        setSelectedGroupId(tourGroup);
+        setCurrentPage(1);
+    }, [tourGroup]);
 
     const fetchGroups = async () => {
         try {
@@ -182,7 +193,12 @@ export function Biblioteca({
                                 const rep = s.reporte;
                                 if (rep) {
                                     const view = toComparison(rep, `${s.autor}`, s.grupo_id);
-                                    return { ...view, subtitle: `${view.subtitle} (${s.lenguaje})` };
+                                    const inExampleGroup = currentGroups.some((g) => g.id === s.grupo_id && g.es_ejemplo);
+                                    return {
+                                        ...view,
+                                        subtitle: `${view.subtitle} (${s.lenguaje})`,
+                                        ...(inExampleGroup && { es_ejemplo: true }),
+                                    };
                                 }
                                 return {
                                     id: String(s.id),
@@ -787,7 +803,7 @@ export function Biblioteca({
             ) : (
                 /* Vista de Lista Plana con Paginación */
                 <>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col" data-tour={tourGroup !== null ? "example-problems" : undefined}>
                         {paginatedReferences.map((ref) => renderCard(ref))}
                     </div>
 

@@ -284,10 +284,14 @@ class ScoringService:
             })
         return indicators
 
-    def persist(self, db: AsyncSession, reporte: ReporteAnalisis, outcome: ScoringOutcome, entrega: CodigoFuente) -> None:
-        """Apply the outcome and add decision + heuristic XAI indicators (the caller commits)."""
-        self.apply_outcome(reporte, outcome)
-        for ind in self.build_indicators(outcome):
+    @staticmethod
+    def persist(db: AsyncSession, reporte: ReporteAnalisis, outcome: ScoringOutcome, entrega: CodigoFuente) -> None:
+        """Apply the outcome and add decision + heuristic XAI indicators (the caller commits).
+
+        Uses no instance state, so a frozen outcome (the example group) persists without an engine.
+        """
+        ScoringService.apply_outcome(reporte, outcome)
+        for ind in ScoringService.build_indicators(outcome):
             db.add(IndicadorIntegridad(reporte_id=reporte.id, numero_linea=None, categoria="GENERAL", **ind))
         # XAI rows are derived from the decision flags so they never contradict them (AR4.2, AR4.3).
         explanations = XAIService.extract_explanations(entrega.contenido, entrega.lenguaje, outcome)

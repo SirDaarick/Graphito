@@ -1,5 +1,6 @@
+import logging
 import secrets
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
@@ -9,9 +10,25 @@ from app.core.security import get_password_hash, verify_password, create_access_
 from app.presentation.schemas.auth import DocenteCreate, LoginRequest, TokenResponse, DocenteResponse
 
 
+logger = logging.getLogger(__name__)
+
+# Called with the new teacher's id once the account is committed (register and first Google login).
+DocenteCreatedHook = Callable[[int], Awaitable[None]]
+
+
 class AuthService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, on_docente_created: Optional[DocenteCreatedHook] = None):
         self.db = db
+        self.on_docente_created = on_docente_created
+
+    async def _notify_created(self, docente_id: int) -> None:
+        """Run the account-created hook; a failure is logged and never fails the sign-up or login."""
+        if self.on_docente_created is None:
+            return
+        try:
+            await self.on_docente_created(docente_id)
+        except Exception:
+            logger.exception("Post-signup hook failed for teacher %s; the account is unaffected.", docente_id)
 
     async def register(self, data: DocenteCreate) -> DocenteResponse:
         result = await self.db.execute(select(Docente).where(Docente.email == data.email))
@@ -30,7 +47,10 @@ class AuthService:
         self.db.add(docente)
         await self.db.commit()
         await self.db.refresh(docente)
-        return DocenteResponse.model_validate(docente)
+        # Built first: a rolled-back hook expires the ORM row.
+        response = DocenteResponse.model_validate(docente)
+        await self._notify_created(response.id)
+        return response
 
     async def login(self, data: LoginRequest) -> TokenResponse:
         result = await self.db.execute(select(Docente).where(Docente.email == data.email))
@@ -90,7 +110,8 @@ class AuthService:
             result = await self.db.execute(select(Docente).where(Docente.email == email))
             docente = result.scalar_one_or_none()
 
-            if not docente:
+            is_new = not docente
+            if is_new:
                 random_secret = secrets.token_urlsafe(32)
                 docente = Docente(
                     email=email,
@@ -101,12 +122,16 @@ class AuthService:
                 await self.db.commit()
                 await self.db.refresh(docente)
 
+            # Built before the hook: a rolled-back hook expires the ORM row.
             access_token = create_access_token(subject=docente.id)
-            return TokenResponse(
+            token_response = TokenResponse(
                 access_token=access_token,
                 token_type="bearer",
                 docente=DocenteResponse.model_validate(docente),
             )
+            if is_new:
+                await self._notify_created(token_response.docente.id)
+            return token_response
         except HTTPException:
             raise
         except ValueError as e:
