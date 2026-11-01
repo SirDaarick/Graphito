@@ -1,6 +1,6 @@
-import { Sparkles } from "lucide-react";
+﻿import { Info } from "lucide-react";
 import type { ReportScoring } from "../../lib/api";
-import { gcbHeadline, isAbstained, plainVerdict, toPct } from "../../lib/dictamen";
+import { gcbHeadline, isAbstained, toPct, VALIDATION_LABEL } from "../../lib/dictamen";
 import { InfoPopover } from "../ui/InfoPopover";
 import { RadialProgressCard } from "./RadialProgressCard";
 
@@ -72,46 +72,6 @@ function LiteralHelp() {
     );
 }
 
-interface InterpretationData {
-    headline: string;
-    body: string;
-}
-
-function getSimulatedInterpretation(
-    report: ReportScoring,
-    semanticPct: number | null,
-    stylePct: number | null
-): InterpretationData {
-    const sem = semanticPct ?? 0;
-    const sty = stylePct ?? 0;
-
-    if ((report.flag_a && report.flag_b) || (sem >= 80 && sty >= 70)) {
-        return {
-            headline: "Convergencia lógica elevada y huella estilométrica característica de IA.",
-            body: "El análisis bimodal detectó una correspondencia estructural del 94% con la solución de referencia en bloques de iteración y condicionales, conservando la lógica a pesar del renombrado de variables. Simultáneamente, la uniformidad en comentarios y distribución de sangrías coincide con la firma generativa de modelos de lenguaje.",
-        };
-    }
-
-    if (report.flag_a || sem >= 75) {
-        return {
-            headline: "Estructura lógica análoga a la solución canónica de referencia.",
-            body: "El grafo de control y flujo de datos reproduce el algoritmo de referencia con mínimas desviaciones en la secuencia de ejecución. Aunque los identificadores fueron adaptados, el núcleo algorítmico mantiene una correspondencia directa.",
-        };
-    }
-
-    if (report.flag_b || sty >= 65) {
-        return {
-            headline: "Patrones sintácticos consistentes con asistencia generativa por IA.",
-            body: "La lógica algorítmica es independiente, pero la cadencia estilística, nomenclatura exhaustiva de variables y convenciones de sangría presentan una alta correlación con código generado por IA.",
-        };
-    }
-
-    return {
-        headline: "Desarrollo independiente sin anomalías estructurales detectadas.",
-        body: "La entrega muestra un razonamiento algorítmico propio con variaciones naturales en el flujo y un estilo de escritura manual consistente con desarrollo estudiantil independiente.",
-    };
-}
-
 interface ReportMetricsProps {
     report: ReportScoring;
     animate: boolean;
@@ -119,7 +79,7 @@ interface ReportMetricsProps {
 
 /**
  * Clean metrics overview with shadcn Radial Charts at the top
- * and objective AI diagnostic analysis below.
+ * and plain context on how to read them below (no conclusion about the student).
  */
 export function ReportMetrics({ report, animate }: ReportMetricsProps) {
     const semantic = gcbHeadline(report);
@@ -128,8 +88,6 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
         ? "El código es demasiado corto para analizar su estilo."
         : "No se pudo analizar el estilo de esta entrega.";
     const literalPct = toPct(report.similitud_semantica);
-
-    const interpretation = getSimulatedInterpretation(report, semantic.pct, styleScore);
 
     return (
         <div className="flex flex-col gap-4">
@@ -162,21 +120,31 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                 />
             </div>
 
-            {/* Bottom Row: AI Interpretation Card */}
+            {/* Bottom Row: how to read the numbers. Context only; the teacher decides what they mean. */}
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                    <Sparkles size={16} className="text-graphito-violet shrink-0" />
-                    <span>Interpretación del análisis con IA</span>
+                    <Info size={16} className="text-graphito-blue shrink-0" aria-hidden="true" />
+                    <h3>Cómo leer estas métricas</h3>
                 </div>
 
-                <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
-                    {interpretation.headline}
-                </h3>
+                <ul className="space-y-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed list-disc pl-4">
+                    <li>
+                        <strong className="font-semibold text-slate-800 dark:text-slate-100">Similitud semántica</strong>{" "}
+                        mide cuánto se parece la lógica a la solución de referencia. Una solución correcta también
+                        se parece a la referencia, así que un valor alto no indica por sí solo un problema.
+                    </li>
+                    <li>
+                        <strong className="font-semibold text-slate-800 dark:text-slate-100">Estilo del código</strong>{" "}
+                        mide la cercanía de la escritura con código generado por modelos de lenguaje. Quien escribe
+                        de forma ordenada o con ayuda de un editor también puede acercarse a ese estilo.
+                    </li>
+                </ul>
 
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {interpretation.body}
+                <p className="mt-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Los modelos pueden equivocarse, y estas cifras no son evidencia concluyente sobre ninguna entrega.
+                    Qué significan y qué hacer con ellas lo decide el docente.
                 </p>
-
+                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 italic">{VALIDATION_LABEL}</p>
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#2b3346]/40 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                         <span>

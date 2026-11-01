@@ -13,20 +13,15 @@ import {
 import { GradientButton } from "../ui/GradientButton";
 import { cn } from "../../lib/utils";
 import { getSavedVerdicts, VerdictType } from "../../lib/verdicts";
-import { ComparisonView, describeDictamen } from "../../lib/dictamen";
+import { ComparisonView } from "../../lib/dictamen";
 import { Grupo } from "../../lib/api";
 
 export interface Comparison extends ComparisonView {
     veredicto?: VerdictType | null;
 }
 
-// Color from the backend verdict (calibrated flags), never from fixed score cut-offs.
-function scoreColor(comparison: Comparison): string {
-    const verdict = describeDictamen(comparison.dictamen, comparison.estado);
-    if (verdict.flagged) return "text-risk-high";
-    if (verdict.tone === "clear") return "text-risk-low";
-    return "text-slate-400 dark:text-slate-400";
-}
+// One neutral color for every score: the color never says whether a value is good or bad (the teacher decides).
+const SCORE_COLOR = "text-slate-700 dark:text-slate-200";
 
 interface ReferenceCardProps {
     /** Backend problem id; lets the guided tour point at one specific card. */
@@ -345,15 +340,15 @@ export function ReferenceCard({
                                                             STUB
                                                         </span>
                                                     )}
-                                                    <div
-                                                        className={cn(
-                                                            "text-sm font-black font-mono",
-                                                            scoreColor(comparison)
-                                                        )}
-                                                    >
-                                                        {comparison.similarity == null
-                                                            ? "—"
-                                                            : `${comparison.similarity}%`}
+                                                    <div className="flex items-baseline gap-1.5">
+                                                        <span className="sr-only sm:not-sr-only text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                                            Similitud lógica
+                                                        </span>
+                                                        <span className={cn("text-sm font-black font-mono", SCORE_COLOR)}>
+                                                            {comparison.similarity == null
+                                                                ? "—"
+                                                                : `${comparison.similarity}%`}
+                                                        </span>
                                                     </div>
                                                     <ChevronDown className="h-4 w-4 text-slate-400 dark:text-slate-500 -rotate-90 group-hover:translate-x-0.5 transition-transform" />
                                                 </div>

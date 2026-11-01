@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file dictamen.ts
  * @description Single mapping from the backend verdict (dictamen) and analysis state to UI copy.
  *
@@ -42,23 +42,20 @@ export type VerdictTone = "dual" | "semantic" | "stylometric" | "clear" | "neutr
 
 export interface VerdictInfo {
     label: string;
-    /** Text color class for the verdict label. */
-    color: string;
+    /** Descriptive grouping only; it carries no color and no severity. */
     tone: VerdictTone;
-    /** True only when at least one calibrated flag is raised. */
-    flagged: boolean;
 }
 
 const VERDICTS: Record<string, VerdictInfo> = {
-    DISCREPANCIA_DUAL: { label: "Similitud alta y estilo atípico", color: "text-rose-400", tone: "dual", flagged: true },
-    REVISION_SEMANTICA: { label: "Similitud alta con la referencia", color: "text-purple-400", tone: "semantic", flagged: true },
-    REVISION_ESTILOMETRICA: { label: "Estilo atípico", color: "text-amber-400", tone: "stylometric", flagged: true },
-    SIN_ALERTAS: { label: "Similitud dentro de lo habitual", color: "text-emerald-400", tone: "clear", flagged: false },
-    NO_EVALUABLE: { label: "No evaluable", color: "text-slate-400", tone: "neutral", flagged: false },
-    SIN_REFERENCIA: { label: "Sin referencia", color: "text-slate-400", tone: "neutral", flagged: false },
+    DISCREPANCIA_DUAL: { label: "Similitud alta y estilo atípico", tone: "dual" },
+    REVISION_SEMANTICA: { label: "Similitud alta con la referencia", tone: "semantic" },
+    REVISION_ESTILOMETRICA: { label: "Estilo atípico", tone: "stylometric" },
+    SIN_ALERTAS: { label: "Similitud dentro de lo habitual", tone: "clear" },
+    NO_EVALUABLE: { label: "No evaluable", tone: "neutral" },
+    SIN_REFERENCIA: { label: "Sin referencia", tone: "neutral" },
 };
 
-const NOT_EVALUABLE: VerdictInfo = { label: "No evaluable", color: "text-slate-400", tone: "neutral", flagged: false };
+const NOT_EVALUABLE: VerdictInfo = { label: "No evaluable", tone: "neutral" };
 
 const PENDING_STATES: Record<string, string> = {
     PENDIENTE: "Pendiente",
@@ -68,10 +65,10 @@ const PENDING_STATES: Record<string, string> = {
 
 export function describeDictamen(dictamen?: string | null, estado?: string | null): VerdictInfo {
     if (estado && estado !== "COMPLETADO") {
-        return { label: lookupLabel(PENDING_STATES, estado) ?? "Pendiente", color: "text-slate-400", tone: "pending", flagged: false };
+        return { label: lookupLabel(PENDING_STATES, estado) ?? "Pendiente", tone: "pending" };
     }
     if (dictamen === null || dictamen === undefined || dictamen === "") {
-        return { label: "Pendiente", color: "text-slate-400", tone: "pending", flagged: false };
+        return { label: "Pendiente", tone: "pending" };
     }
     return lookupLabel(VERDICTS, dictamen) ?? NOT_EVALUABLE;
 }
@@ -135,28 +132,6 @@ export function engineLabel(engine?: string | null): string {
 /** Channel B is abstained when the code is too short for CharCNN. */
 export function isAbstained(report: ReportScoring): boolean {
     return report.estado_canal_b === "ABSTENIDO";
-}
-
-/** Plain-language verdict for teachers: one sentence, built only from the backend verdict. */
-export interface PlainVerdict {
-    text: string;
-    tone: VerdictTone;
-    flagged: boolean;
-}
-
-const PLAIN_VERDICTS: Record<VerdictTone, string> = {
-    dual: "Conviene revisarla: se parece mucho a la referencia y su estilo es poco habitual.",
-    semantic: "Conviene revisarla: se parece mucho a la referencia.",
-    stylometric: "Conviene revisarla: su estilo de escritura es poco habitual.",
-    clear: "Sin señales de alerta en esta entrega.",
-    neutral: "No se pudo evaluar esta entrega con la información disponible.",
-    pending: "",
-};
-
-export function plainVerdict(dictamen?: string | null, estado?: string | null): PlainVerdict {
-    const info = describeDictamen(dictamen, estado);
-    const text = info.tone === "pending" ? `${info.label}.` : PLAIN_VERDICTS[info.tone];
-    return { text, tone: info.tone, flagged: info.flagged };
 }
 
 export interface GcbHeadline {

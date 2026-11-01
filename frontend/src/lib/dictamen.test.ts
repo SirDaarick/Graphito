@@ -1,24 +1,23 @@
-import { describe, expect, it } from "vitest";
-import { channelAMethod, describeDictamen, engineLabel, gcbHeadline, plainVerdict, toComparison } from "./dictamen";
+﻿import { describe, expect, it } from "vitest";
+import { channelAMethod, describeDictamen, engineLabel, gcbHeadline, toComparison } from "./dictamen";
 import type { ReporteAnalisis, ReportScoring } from "./api";
 
-const KNOWN: Array<[string, string, string, boolean]> = [
-    ["DISCREPANCIA_DUAL", "Similitud alta y estilo atípico", "dual", true],
-    ["REVISION_SEMANTICA", "Similitud alta con la referencia", "semantic", true],
-    ["REVISION_ESTILOMETRICA", "Estilo atípico", "stylometric", true],
-    ["SIN_ALERTAS", "Similitud dentro de lo habitual", "clear", false],
-    ["NO_EVALUABLE", "No evaluable", "neutral", false],
-    ["SIN_REFERENCIA", "Sin referencia", "neutral", false],
+const KNOWN: Array<[string, string, string]> = [
+    ["DISCREPANCIA_DUAL", "Similitud alta y estilo atípico", "dual"],
+    ["REVISION_SEMANTICA", "Similitud alta con la referencia", "semantic"],
+    ["REVISION_ESTILOMETRICA", "Estilo atípico", "stylometric"],
+    ["SIN_ALERTAS", "Similitud dentro de lo habitual", "clear"],
+    ["NO_EVALUABLE", "No evaluable", "neutral"],
+    ["SIN_REFERENCIA", "Sin referencia", "neutral"],
 ];
 
 const PROTOTYPE_KEYS = ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"];
 
 describe("describeDictamen", () => {
-    it.each(KNOWN)("maps %s to its label and tone", (dictamen, label, tone, flagged) => {
+    it.each(KNOWN)("maps %s to its label and tone", (dictamen, label, tone) => {
         const info = describeDictamen(dictamen, "COMPLETADO");
         expect(info.label).toBe(label);
         expect(info.tone).toBe(tone);
-        expect(info.flagged).toBe(flagged);
     });
 
     it.each(["SOSPECHA_IA", "PLAGIO_PROBABLE", "INTEGRO", "CONFORME", "algo_nuevo", ...PROTOTYPE_KEYS])(
@@ -27,7 +26,6 @@ describe("describeDictamen", () => {
             const info = describeDictamen(dictamen, "COMPLETADO");
             expect(info.label).toBe("No evaluable");
             expect(info.tone).toBe("neutral");
-            expect(info.flagged).toBe(false);
         },
     );
 
@@ -35,7 +33,6 @@ describe("describeDictamen", () => {
         const info = describeDictamen(dictamen, "COMPLETADO");
         expect(info.label).toBe("Pendiente");
         expect(info.tone).toBe("pending");
-        expect(info.flagged).toBe(false);
     });
 
     it.each([
@@ -51,7 +48,6 @@ describe("describeDictamen", () => {
         const info = describeDictamen("DISCREPANCIA_DUAL", "PROCESANDO");
         expect(info.label).toBe("En proceso");
         expect(info.tone).toBe("pending");
-        expect(info.flagged).toBe(false);
     });
 
     it.each(["DESCONOCIDO", ...PROTOTYPE_KEYS])("falls back to Pendiente for an unknown state %s", (estado) => {
@@ -117,31 +113,6 @@ describe("gcbHeadline", () => {
         const result = gcbHeadline({ gcb_similarity: null, gcb_estado: estado });
         expect(result.pct).toBeNull();
         expect(result.reason).toMatch(/reindex/i);
-    });
-});
-
-describe("plainVerdict", () => {
-    it.each([
-        ["DISCREPANCIA_DUAL", true],
-        ["REVISION_SEMANTICA", true],
-        ["REVISION_ESTILOMETRICA", true],
-        ["SIN_ALERTAS", false],
-        ["NO_EVALUABLE", false],
-        ["SIN_REFERENCIA", false],
-    ])("gives %s one short sentence", (dictamen, flagged) => {
-        const v = plainVerdict(dictamen, "COMPLETADO");
-        expect(v.text.length).toBeGreaterThan(10);
-        expect(v.flagged).toBe(flagged);
-    });
-
-    it("never turns an unknown verdict into a positive one", () => {
-        const v = plainVerdict("SOSPECHA_IA", "COMPLETADO");
-        expect(v.flagged).toBe(false);
-        expect(v.text).toMatch(/no se pudo evaluar/i);
-    });
-
-    it("shows the analysis state while the report is not completed", () => {
-        expect(plainVerdict("DISCREPANCIA_DUAL", "PROCESANDO").text).toMatch(/en proceso/i);
     });
 });
 
