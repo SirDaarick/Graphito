@@ -50,6 +50,18 @@ def test_summary_counts_people_days_and_analyses():
     assert s["cargas"] == {"lotes": 1, "archivos": 12, "bytes": 2048, "ignorados": 1}
 
 
+def test_days_follow_the_requested_time_zone_and_default_to_utc():
+    from zoneinfo import ZoneInfo
+
+    # 2026-11-02 03:30 UTC is still the evening of Nov 1 in Mexico City (UTC-6).
+    late = {**_ev("peticion", 2, 1, 5.0, 200, "/x"), "created_at": datetime(2026, 11, 2, 3, 30, tzinfo=timezone.utc)}
+    naive = {**_ev("peticion", 2, 1, 5.0, 200, "/x"), "created_at": datetime(2026, 11, 2, 3, 45)}  # SQLite: no tzinfo
+
+    assert summarize_events([late, naive])["peticiones_por_dia"] == {"2026-11-02": 2}
+    local = summarize_events([late, naive], tz=ZoneInfo("America/Mexico_City"))
+    assert local["peticiones_por_dia"] == {"2026-11-01": 2}
+
+
 def test_summary_of_an_empty_log_is_all_zeros_not_an_error():
     s = summarize_events([])
 

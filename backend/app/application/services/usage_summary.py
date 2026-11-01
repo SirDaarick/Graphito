@@ -4,6 +4,7 @@ Pure functions over event dicts (`tipo`, `created_at`, `docente_id`, `duracion_m
 `ruta`, `detalle`), so they run on any database and are easy to test.
 """
 from collections import Counter, defaultdict
+from datetime import datetime, timezone, tzinfo
 from typing import Any, Dict, Iterable, List, Optional
 
 
@@ -31,13 +32,21 @@ def _stats(values: List[float]) -> Optional[Dict[str, Any]]:
     }
 
 
-def summarize_events(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+def in_zone(moment: datetime, tz: Optional[tzinfo]) -> datetime:
+    """`moment` in `tz` (UTC when None); a naive datetime (SQLite) is taken as UTC."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(tz or timezone.utc)
+
+
+def summarize_events(events: Iterable[Dict[str, Any]], tz: Optional[tzinfo] = None) -> Dict[str, Any]:
+    """Summary of the log; the per-day counts use `tz` days (UTC by default)."""
     rows = list(events)
     by_type = Counter(r["tipo"] for r in rows)
     teachers = {r["docente_id"] for r in rows if r.get("docente_id") is not None}
 
     requests = [r for r in rows if r["tipo"] == "peticion"]
-    per_day = Counter(r["created_at"].strftime("%Y-%m-%d") for r in requests)
+    per_day = Counter(in_zone(r["created_at"], tz).strftime("%Y-%m-%d") for r in requests)
     http_errors = Counter(str(r["estado_http"]) for r in requests if (r.get("estado_http") or 0) >= 400)
 
     analyses = [r for r in rows if r["tipo"] == "analisis"]
