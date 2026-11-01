@@ -2,3 +2,4 @@ Documentacion/** linguist-vendored
 data/splits/*.json -diff eol=lf linguist-generated
 data/splits/*.json.gz binary
 models/deploy/** -text
+backend/app/data/examples/escom/*.c text eol=lf
