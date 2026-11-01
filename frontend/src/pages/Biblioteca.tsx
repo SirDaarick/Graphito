@@ -803,7 +803,7 @@ export function Biblioteca({
             ) : (
                 /* Vista de Lista Plana con Paginación */
                 <>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col" data-tour={tourGroup !== null ? "example-problems" : undefined}>
                         {paginatedReferences.map((ref) => renderCard(ref))}
                     </div>
 

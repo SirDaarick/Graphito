@@ -10,14 +10,17 @@ import {
     tourGroupId,
     tourReducer,
 } from "./machine";
-import { getSteps } from "./steps";
+import { getSteps, stepApplies } from "./steps";
 import type { TourAction } from "./machine";
 import type { TourState } from "./types";
 
 const EXAMPLES: ExampleSummary = {
     grupo_id: 7,
     creado: false,
-    problemas: [{ problema_id: 31, titulo: "Ejemplo" }],
+    problemas: [
+        { problema_id: 31, titulo: "Ejemplo", casos: { identical: 101, similar: 102, different: 103, ai: 104 } },
+        { problema_id: 32, titulo: "Catálogo", casos: { identical: 201, similar: 202, different: 203 } },
+    ],
     recorrido: { problema_id: 31, casos: { identical: 101, similar: 102, different: 103, ai: 104 } },
 };
 
@@ -81,11 +84,59 @@ describe("tourReducer", () => {
         expect(run([{ type: "choose", flow: "library" }], started).context.problemId).toBeNull();
     });
 
-    it("starts the examples flow with its summary and the showcase problem", () => {
+    it("starts the examples flow with its summary and no problem picked yet", () => {
         const state = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }]);
         expect(state).toMatchObject({ status: "running", flow: "examples", stepIndex: 0 });
-        expect(state.context).toEqual({ problemId: 31, examples: EXAMPLES });
+        expect(state.context).toEqual({ problemId: null, examples: EXAMPLES });
         expect(currentStep(state)?.id).toBe("ex-library");
+    });
+
+    describe("picking a problem in the examples flow", () => {
+        const started = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }]);
+        const ids = (state: TourState) =>
+            getSteps("examples")
+                .filter((s) => stepApplies(s, state.context))
+                .map((s) => s.id);
+
+        it("stores the problem and advances in one action", () => {
+            const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
+            expect(picked.context.problemId).toBe(32);
+            expect(currentStep(picked)?.id).toBe("ex-identical-literal");
+            expect(stepEntryPath(currentStep(picked)!, picked.context)).toBe("/reporte/201");
+        });
+
+        it("is idempotent for the step it came from and ignored on other steps", () => {
+            const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
+            expect(run([{ type: "pick", problemId: 31, from: "ex-library" }], picked)).toBe(picked);
+            expect(run([{ type: "pick", problemId: 31 }], picked)).toBe(picked); // not a pick step
+            expect(run([{ type: "pick", problemId: 31 }], INITIAL_TOUR_STATE)).toBe(INITIAL_TOUR_STATE);
+        });
+
+        it("a problem with four cases walks all eleven steps", () => {
+            const picked = run([{ type: "pick", problemId: 31, from: "ex-library" }], started);
+            expect(ids(picked)).toHaveLength(getSteps("examples").length);
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 11 });
+        });
+
+        it("a problem without an AI case skips that step in next, back, goTo and progress", () => {
+            const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 10 });
+            const atDifferentCode = run([{ type: "goTo", stepId: "ex-different-code" }], picked);
+            expect(currentStep(atDifferentCode)?.id).toBe("ex-different-code");
+            const afterIt = run([{ type: "next" }], atDifferentCode);
+            expect(currentStep(afterIt)?.id).toBe("ex-done");
+            expect(stepProgress(afterIt)).toEqual({ current: 10, total: 10 });
+            expect(currentStep(run([{ type: "back" }], afterIt))?.id).toBe("ex-different-code");
+            expect(run([{ type: "goTo", stepId: "ex-ai-style" }], picked)).toBe(picked);
+            expect(run([{ type: "next" }], afterIt)).toEqual(INITIAL_TOUR_STATE);
+        });
+
+        it("picking again from the first step switches the problem", () => {
+            const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
+            const again = run([{ type: "goTo", stepId: "ex-library" }, { type: "pick", problemId: 31 }], picked);
+            expect(again.context.problemId).toBe(31);
+            expect(stepProgress(again).total).toBe(11);
+        });
     });
 
     it("does not start the examples flow without its summary", () => {

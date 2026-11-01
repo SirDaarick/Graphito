@@ -127,7 +127,13 @@ export interface ExampleSummary {
     grupo_id: number;
     /** False when the group already existed. */
     creado: boolean;
-    problemas: { problema_id: number; titulo: string }[];
+    problemas: {
+        problema_id: number;
+        titulo: string;
+        /** Report id of each case this problem has (no `ai` for the ESCOM catalog problems). */
+        casos: Partial<Record<ExampleCase, number>>;
+    }[];
+    /** The first problem and its four cases, kept for compatibility with the fixed showcase. */
     recorrido: {
         problema_id: number;
         /** Report id of each case, openable at `/reporte/:id`. */

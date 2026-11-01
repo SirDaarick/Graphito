@@ -26,7 +26,7 @@ function isFilled(element: HTMLElement | null): boolean {
 }
 
 export function TourOverlay() {
-    const { state, next, back, goTo, exit, choose, open } = useTour();
+    const { state, next, back, goTo, exit, choose, open, pick } = useTour();
     const step = currentStep(state);
     const { current, total } = stepProgress(state);
     const problemId = state.context.problemId;
@@ -106,6 +106,24 @@ export function TourOverlay() {
         document.addEventListener("click", onClick, true);
         return () => document.removeEventListener("click", onClick, true);
     }, [step, selectors, next]);
+
+    // Pick steps move on when the user clicks any problem card inside the highlighted list.
+    useEffect(() => {
+        if (!step || step.advance.kind !== "pick") return;
+        const onClick = (event: MouseEvent) => {
+            const clicked = event.target instanceof Element ? event.target : null;
+            if (!clicked || !selectors.some((selector) => clicked.closest(selector))) return;
+            const card = clicked.closest<HTMLElement>('[data-tour="problem-card"][data-problem-id]');
+            const id = Number(card?.dataset.problemId);
+            if (!card || !Number.isInteger(id)) return;
+            // The card holds buttons (compare, menu, expand): the click only chooses the problem.
+            event.preventDefault();
+            event.stopPropagation();
+            pick(id, step.id);
+        };
+        document.addEventListener("click", onClick, true);
+        return () => document.removeEventListener("click", onClick, true);
+    }, [step, selectors, pick]);
 
     // "untilGone" steps finish once the clicked element is gone (modal closed, button swapped).
     useEffect(() => {

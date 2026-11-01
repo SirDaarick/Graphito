@@ -6,6 +6,9 @@ from pydantic import BaseModel
 class ExampleProblem(BaseModel):
     problema_id: int
     titulo: str
+    # Only the cases this problem has (identical | similar | different, plus ai when it has one)
+    # -> ReporteAnalisis.id, openable at /reporte/:id.
+    casos: Dict[str, int]
 
 
 class ExampleTour(BaseModel):

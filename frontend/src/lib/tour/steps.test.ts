@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExampleSummary } from "../api";
-import { TOUR_FLOWS, getSteps, otherFlow } from "./steps";
+import { TOUR_FLOWS, getSteps, otherFlow, stepApplies } from "./steps";
 import type { TourFlow } from "./types";
 
 const FLOWS: TourFlow[] = ["own", "library", "examples"];
@@ -9,7 +9,10 @@ const SHARED_TAIL_FLOWS: TourFlow[] = ["own", "library"];
 const EXAMPLES: ExampleSummary = {
     grupo_id: 7,
     creado: true,
-    problemas: [{ problema_id: 31, titulo: "Ejemplo" }],
+    problemas: [
+        { problema_id: 31, titulo: "Ejemplo", casos: { identical: 101, similar: 102, different: 103, ai: 104 } },
+        { problema_id: 32, titulo: "Catálogo", casos: { identical: 201, similar: 202, different: 203 } },
+    ],
     recorrido: { problema_id: 31, casos: { identical: 101, similar: 102, different: 103, ai: 104 } },
 };
 
@@ -165,9 +168,36 @@ describe("examples flow", () => {
         }
     });
 
-    it("selects the example group in the library on the first step", () => {
-        expect(byId("ex-library")).toMatchObject({ target: "problem-card", scopedToProblem: true, showGroup: true });
+    it("selects the example group on the first step and lets the teacher pick any problem", () => {
+        expect(byId("ex-library")).toMatchObject({
+            target: "example-problems",
+            advance: { kind: "pick" },
+            showGroup: true,
+        });
+        expect(byId("ex-library").scopedToProblem).toBeUndefined();
+        expect(byId("ex-library").text).toBe("Elige el problema que más te interese.");
         expect(steps.filter((s) => s.showGroup)).toHaveLength(1);
+        expect(steps.filter((s) => s.advance.kind === "pick").map((s) => s.id)).toEqual(["ex-library"]);
+    });
+
+    it("opens the reports of the picked problem, falling back to the showcase", () => {
+        const route = (id: string, problemId: number | null) =>
+            byId(id).enterRoute?.({ problemId, examples: EXAMPLES });
+        expect(route("ex-identical-literal", 32)).toBe("/reporte/201");
+        expect(route("ex-different-code", 32)).toBe("/reporte/203");
+        expect(route("ex-ai-style", 31)).toBe("/reporte/104");
+        expect(route("ex-identical-literal", null)).toBe("/reporte/101");
+        expect(route("ex-identical-literal", 999)).toBe("/reporte/101"); // not in the summary
+    });
+
+    it("only the AI step depends on a case, and it is skipped for a problem without one", () => {
+        expect(steps.filter((s) => s.requiresCase).map((s) => [s.id, s.requiresCase])).toEqual([["ex-ai-style", "ai"]]);
+        const ai = byId("ex-ai-style");
+        expect(stepApplies(ai, { problemId: 31, examples: EXAMPLES })).toBe(true);
+        expect(stepApplies(ai, { problemId: 32, examples: EXAMPLES })).toBe(false);
+        expect(stepApplies(ai, { problemId: null, examples: EXAMPLES })).toBe(true); // showcase has it
+        expect(stepApplies(ai, { problemId: null })).toBe(true); // no summary: nothing to judge by
+        expect(stepApplies(byId("ex-similar-code"), { problemId: 32, examples: EXAMPLES })).toBe(true);
     });
 
     it("describes metrics without verdict words", () => {

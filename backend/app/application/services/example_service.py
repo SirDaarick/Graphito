@@ -239,15 +239,27 @@ class ExampleService:
     # --- result and cleanup ----------------------------------------------------------------
 
     async def _summary(self, grupo_id: int, creado: bool, resolved: List[tuple]) -> ExampleSummary:
-        problemas = [ExampleProblem(problema_id=p.id, titulo=p.titulo) for _, p in resolved]
-        showcase_fixture, showcase = resolved[0]
+        problemas = []
+        for fixture_problem, problema in resolved:
+            casos = await self._cases(fixture_problem, problema)
+            problemas.append(ExampleProblem(problema_id=problema.id, titulo=problema.titulo, casos=casos))
+        showcase = problemas[0]  # the tour's original showcase: the first problem of the fixture
+        return ExampleSummary(
+            grupo_id=grupo_id,
+            creado=creado,
+            problemas=problemas,
+            recorrido=ExampleTour(problema_id=showcase.problema_id, casos=dict(showcase.casos)),
+        )
+
+    async def _cases(self, fixture_problem: Dict[str, Any], problema: Problema) -> Dict[str, int]:
+        """Report id of each case this problem has, in fixture order."""
         casos: Dict[str, int] = {}
-        for fixture_entrega in showcase_fixture["entregas"]:
+        for fixture_entrega in fixture_problem["entregas"]:
             res = await self.db.execute(
                 select(ReporteAnalisis.id)
                 .join(CodigoFuente, ReporteAnalisis.entrega_id == CodigoFuente.id)
                 .where(
-                    CodigoFuente.problema_id == showcase.id,
+                    CodigoFuente.problema_id == problema.id,
                     CodigoFuente.tipo == TipoCodigoEnum.ENTREGA_ALUMNO,
                     CodigoFuente.autor == fixture_entrega["autor"],
                 )
@@ -255,12 +267,7 @@ class ExampleService:
                 .limit(1)
             )
             casos[fixture_entrega["caso"]] = res.scalars().first()
-        return ExampleSummary(
-            grupo_id=grupo_id,
-            creado=creado,
-            problemas=problemas,
-            recorrido=ExampleTour(problema_id=showcase.id, casos=casos),
-        )
+        return casos
 
     async def _cleanup(self, docente_id: int, created: _Created) -> None:
         """Delete what this call created (best effort, like a failed catalog adoption)."""

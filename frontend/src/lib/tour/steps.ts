@@ -155,10 +155,28 @@ const SHARED_TAIL: TourStep[] = [
     },
 ];
 
+/**
+ * Reports of the problem the teacher picked in the examples flow. A problem that is not in the
+ * summary (or none picked yet) falls back to the original showcase, `recorrido`.
+ */
+export function exampleCases(context: TourContext): Partial<Record<ExampleCase, number>> | null {
+    const summary = context.examples;
+    if (!summary) return null;
+    const picked = summary.problemas.find((problem) => problem.problema_id === context.problemId);
+    return picked?.casos ?? summary.recorrido.casos;
+}
+
+/** False when the step needs a case the picked problem does not have (it is skipped). */
+export function stepApplies(step: TourStep, context: TourContext): boolean {
+    if (!step.requiresCase) return true;
+    const cases = exampleCases(context);
+    return cases === null || cases[step.requiresCase] !== undefined;
+}
+
 /** Route of the example report for one case, or null when the summary is not loaded. */
 function exampleReport(caso: ExampleCase): (context: TourContext) => string | null {
     return (context) => {
-        const id = context.examples?.recorrido.casos[caso];
+        const id = exampleCases(context)?.[caso];
         return id === undefined ? null : `/reporte/${id}`;
     };
 }
@@ -175,12 +193,11 @@ const REPORT_GRACE_MS = 8000;
 const EXAMPLE_STEPS: TourStep[] = [
     {
         id: "ex-library",
-        target: "problem-card",
+        target: "example-problems",
         title: "Tu grupo Ejemplo",
-        text: "Trae un problema ya analizado con cuatro entregas de muestra.",
+        text: "Elige el problema que más te interese.",
         placement: "bottom",
-        advance: { kind: "manual" },
-        scopedToProblem: true,
+        advance: { kind: "pick" },
         // The library may still be reloading right after the group was created.
         graceMs: 8000,
         enterRoute: LIBRARY_ROUTE,
@@ -289,6 +306,7 @@ const EXAMPLE_STEPS: TourStep[] = [
         graceMs: REPORT_GRACE_MS,
         enterRoute: exampleReport("ai"),
         reportView: "summary",
+        requiresCase: "ai",
         recoverTo: "ex-library",
     },
     {

@@ -1,4 +1,4 @@
-import type { ExampleSummary } from "../api";
+import type { ExampleCase, ExampleSummary } from "../api";
 
 export type TourFlow = "own" | "library" | "examples";
 
@@ -19,7 +19,12 @@ export type TourAdvance =
     /** The URL matches the pattern (same syntax as `matchRoute`). */
     | { kind: "route"; pattern: string }
     /** The user presses the tooltip's own button. */
-    | { kind: "manual" };
+    | { kind: "manual" }
+    /**
+     * The user clicks any `problem-card` inside the highlighted list; that card's problem becomes the
+     * tour's problem. The click is swallowed so the card's own buttons do not also fire.
+     */
+    | { kind: "pick" };
 
 export interface TourStep {
     id: string;
@@ -45,6 +50,8 @@ export interface TourStep {
     reportView?: TourReportView;
     /** The library page selects the example group while this step is current. */
     showGroup?: boolean;
+    /** Examples flow: the step is skipped when the chosen problem has no report of this case. */
+    requiresCase?: ExampleCase;
 }
 
 export interface TourContext {

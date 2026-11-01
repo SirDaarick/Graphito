@@ -16,6 +16,8 @@ export interface TourApi {
     goTo: (stepId: string) => void;
     /** Remembers the problem created or added during the tour, to highlight its card. */
     setProblem: (problemId: number | null) => void;
+    /** Examples flow: the teacher picked a problem on the current step; remember it and advance. */
+    pick: (problemId: number, fromStepId?: string) => void;
 }
 
 export const TourContext = createContext<TourApi | null>(null);

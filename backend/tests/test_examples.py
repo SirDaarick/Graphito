@@ -204,6 +204,38 @@ async def test_a_three_entrega_problem_is_seeded_with_its_three_reports(db_sessi
 
 
 @pytest.mark.asyncio
+async def test_every_problem_lists_the_report_of_each_of_its_own_cases(db_session, vector_store):
+    """C2: `problemas[].casos` has one report id per case the problem has (no `ai` for a 3-entrega problem)."""
+    doc = json.loads(ESCOM_FIXTURE.read_text(encoding="utf-8"))
+    docente = Docente(email="casos@escom.ipn.mx", hashed_password="x", nombre="Prof. Casos")
+    db_session.add(docente)
+    await db_session.commit()
+    await db_session.refresh(docente)
+
+    service = ExampleService(db_session, StubInferenceEngine(), vector_store, fixture_path=ESCOM_FIXTURE)
+    summary = await service.ensure_examples(docente.id)
+
+    four, three = summary.problemas
+    assert list(four.casos) == CASOS
+    assert list(three.casos) == ["identical", "similar", "different"]
+    assert len(three.casos) == len(doc["problems"][1]["entregas"]) == 3
+    all_ids = [report_id for p in summary.problemas for report_id in p.casos.values()]
+    assert len(set(all_ids)) == len(all_ids) == 7  # each case points at its own report
+    # `recorrido` is unchanged: the showcase problem and the same four reports
+    assert summary.recorrido.problema_id == four.problema_id
+    assert summary.recorrido.casos == four.casos
+
+
+@pytest.mark.asyncio
+async def test_ensure_response_carries_casos_per_problem(client: AsyncClient):
+    headers = await _headers(client)
+    body = await _ensure(client, headers)
+
+    assert all(list(p["casos"]) == CASOS for p in body["problemas"])
+    assert body["problemas"][0]["casos"] == body["recorrido"]["casos"]
+
+
+@pytest.mark.asyncio
 async def test_second_call_changes_nothing(client: AsyncClient, db_session, vector_store):
     headers = await _headers(client)
     first = await _ensure(client, headers)

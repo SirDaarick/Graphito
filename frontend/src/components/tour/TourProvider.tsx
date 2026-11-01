@@ -50,6 +50,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
             back: () => dispatch({ type: "back" }),
             goTo: (stepId) => dispatch({ type: "goTo", stepId }),
             setProblem: (problemId) => dispatch({ type: "setProblem", problemId }),
+            pick: (problemId, from) => dispatch({ type: "pick", problemId, from }),
         }),
         [state, hasSeen]
     );

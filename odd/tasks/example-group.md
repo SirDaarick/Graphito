@@ -57,11 +57,14 @@ Plan file: C:\Users\edani\.claude\plans\por-favor-ayudame-a-ticklish-swing.md
 {
   "grupo_id": 7,
   "creado": true,
-  "problemas": [{"problema_id": 31, "titulo": "..."}],
+  "problemas": [
+    {"problema_id": 31, "titulo": "...", "casos": {"identical": 101, "similar": 102, "different": 103, "ai": 104}},
+    {"problema_id": 32, "titulo": "...", "casos": {"identical": 201, "similar": 202, "different": 203}}
+  ],
   "recorrido": {"problema_id": 31, "casos": {"identical": 101, "similar": 102, "different": 103, "ai": 104}}
 }
 ```
-`creado` is false when the group already existed. Report ids are `ReporteAnalisis.id` (int), openable at `/reporte/:id`.
+`creado` is false when the group already existed. Report ids are `ReporteAnalisis.id` (int), openable at `/reporte/:id`. `problemas[].casos` (added by L4) holds only the cases that problem has (ESCOM catalog problems have no `ai`); `recorrido` is unchanged and equals `problemas[0]`.
 
 ### C3 Exposed flags
 - Group schemas (list/get) include `es_ejemplo: bool`.
@@ -83,4 +86,5 @@ Plan file: C:\Users\edani\.claude\plans\por-favor-ayudame-a-ticklish-swing.md
 - Review changes requested: (1) GCB was null (no vector store in the builder) → re-measured with an ephemeral Chroma; (2) tour showed code only for the identical case → added code steps for similar and different (L1 asks for all three); (3) layout-dependent "izquierda/derecha" copy → neutral.
 - E2E (STUB backend, scratch SQLite, :8123/:3000): sign-up seeds group Ejemplo with 5×4 reports carrying fixture values and es_ejemplo=true; tour 11/11 steps observed incl. the code view of identical/similar/different and the AI style card; DELETE group → ensure restores it (creado=true, same 5 problems, 20 submissions relinked), second ensure creado=false.
 - Bug found in E2E (pre-existing, exposed by the tour): a deep link to /reporte/:id left the modal at opacity 0 because the GSAP entrance ran while `comparison` was still null → animations now depend on `hasComparison`. No component test (vitest node env, no jsdom).
+- L4 (2026-11-01): "para el modo guia, en lugar como de decir que de click en un problema especifico, le muestre la seccion y pueda elegir cualquiera de los problemas que mas le interese" → C2 gains `problemas[].casos`; the examples flow's first step highlights the list of example problems (`data-tour="example-problems"`, advance `pick`), the click on any problem card stores its id in `context.problemId` (action `pick`, the click is swallowed so Comparar/menu do not fire), later steps open that problem's reports (fallback `recorrido`), and the `ai` step (`requiresCase`) is skipped when the problem has no `ai` report (next/back/goTo/progress all use the filtered list).
 - Known limits: seeding runs inside the sign-up request (REAL engine embeds 5 references); concurrent ensure calls for one teacher are not guarded; Google first-login hook is wired but untested; fixture code has Bosnian identifiers/comments (same corpus as the survey example).
