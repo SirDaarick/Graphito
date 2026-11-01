@@ -475,11 +475,11 @@ export const api = {
                 const codeComp = DEMO_CODE_COMPARISONS[reportId] || DEMO_CODE_COMPARISONS[101];
                 const textContent = [
                     "========================================================",
-                    "REPORTE DE INTEGRIDAD ACADÉMICA - GRAPHITO (MODO DEMO)",
+                    "REPORTE DE MÉTRICAS DE SIMILITUD - GRAPHITO (MODO DEMO)",
                     "========================================================",
                     "",
                     `Problema: ${codeComp.problem_title}`,
-                    `Estudiante Evaluado: ${codeComp.student_author}`,
+                    `Estudiante: ${codeComp.student_author}`,
                     `Resumen de similitud: ${describeDictamen(rep.dictamen, rep.estado).label}`,
                     `Canal A (${channelAMethod(rep)}): ${formatPct(rep.similitud_semantica)}`,
                     `Canal B (CharCNN v2, calibrado): ${formatPct(rep.probabilidad_ia)}`,
@@ -487,12 +487,14 @@ export const api = {
                     `Motor: ${engineLabel(rep.engine)}`,
                     VALIDATION_LABEL,
                     "",
-                    "Indicadores de Integridad:",
+                    "Observaciones del análisis:",
                     ...(rep.indicadores.length > 0
-                        ? rep.indicadores.map(i => `  • [${i.severidad}] ${i.tipo_alerta}: ${i.descripcion}`)
-                        : ["  • Sin indicadores destacados."]),
+                        ? rep.indicadores.map(i => `  • ${i.tipo_alerta}: ${i.descripcion}`)
+                        : ["  • Sin observaciones destacadas."]),
                     "",
-                    "Docente Evaluador: Dr. Alan Turing",
+                    "Estas métricas son de apoyo: los modelos pueden equivocarse y el docente decide qué significan.",
+                    "",
+                    "Docente: Dr. Alan Turing",
                     "Plataforma: Graphito In-Memory Demonstration",
                     "========================================================",
                 ].join("\n");

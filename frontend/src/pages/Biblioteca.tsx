@@ -434,9 +434,9 @@ export function Biblioteca({
             {/* Header principal */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
                 <div>
-                    <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white transition-colors">
+                    <h1 className="text-3xl font-display font-black text-slate-900 dark:text-white transition-colors">
                         Mi Biblioteca
-                    </h2>
+                    </h1>
                     <p className="text-slate-600 dark:text-slate-300 font-body mt-2 transition-colors">
                         Gestiona tus soluciones de referencia en C/C++ y supervisa el análisis de similitud entre entregas del curso.
                     </p>
@@ -478,9 +478,9 @@ export function Biblioteca({
                             setBulkUploadProblemId(null);
                             setIsBulkUploadOpen(true);
                         }}
-                        className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-white bg-gradient-to-r from-graphito-blue to-graphito-violet hover:opacity-95 shadow-md shadow-graphito-blue/20 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
+                        className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold border active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue shadow-sm backdrop-blur-md bg-white/25 dark:bg-graphito-card/15 border-slate-200/60 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-graphito-blue/40"
                     >
-                        <UploadCloud size={16} />
+                        <UploadCloud size={16} className="text-graphito-blue" aria-hidden="true" />
                         <span>Carga Masiva</span>
                     </button>
                 </div>
@@ -506,7 +506,8 @@ export function Biblioteca({
                                 setSelectedLanguage("todos");
                                 setCurrentPage(1);
                             }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            aria-pressed={selectedLanguage === "todos"}
+                            className={`px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue ${
                                 selectedLanguage === "todos"
                                     ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-sm"
                                     : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-graphito-dark"
@@ -520,7 +521,8 @@ export function Biblioteca({
                                 setSelectedLanguage("c");
                                 setCurrentPage(1);
                             }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                            aria-pressed={selectedLanguage === "c"}
+                            className={`px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl text-xs font-bold border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue ${
                                 selectedLanguage === "c"
                                     ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/50 shadow-sm"
                                     : "border-transparent text-slate-600 dark:text-slate-300 hover:bg-blue-500/10 hover:text-blue-500"
@@ -534,7 +536,8 @@ export function Biblioteca({
                                 setSelectedLanguage("cpp");
                                 setCurrentPage(1);
                             }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                            aria-pressed={selectedLanguage === "cpp"}
+                            className={`px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl text-xs font-bold border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue ${
                                 selectedLanguage === "cpp"
                                     ? "bg-pink-500/20 text-pink-600 dark:text-pink-400 border-pink-500/50 shadow-sm"
                                     : "border-transparent text-slate-600 dark:text-slate-300 hover:bg-pink-500/10 hover:text-pink-500"

@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useDialogFocus } from "../../lib/focusTrap";
 
 export type ModalMaxWidth = "sm" | "md" | "lg" | "xl" | "2xl" | "4xl" | "full";
 
@@ -120,6 +121,8 @@ export function Modal({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isOpen, closeOnEsc, onClose]);
 
+    useDialogFocus(dialogRef, isOpen && shouldRender);
+
     if (!shouldRender || typeof document === "undefined") {
         return null;
     }
@@ -149,7 +152,7 @@ export function Modal({
                         aria-modal="true"
                         aria-labelledby={titleId}
                         aria-describedby={descId}
-                        className={`relative w-full ${dim.width} ${heightClass} bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl shadow-2xl shadow-black/30 dark:shadow-black/70 overflow-hidden z-10 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform flex flex-col my-auto ${
+                        className={`relative w-full focus:outline-none ${dim.width} ${heightClass} bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-[#2b3346]/60 rounded-3xl shadow-2xl shadow-black/30 dark:shadow-black/70 overflow-hidden z-10 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform flex flex-col my-auto ${
                             isVisible
                                 ? "opacity-100 scale-100 translate-y-0"
                                 : "opacity-0 scale-95 translate-y-3"

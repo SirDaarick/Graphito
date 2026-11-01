@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Upload, Loader2 } from "lucide-react";
+import React, { useId, useState, useEffect, useRef } from "react";
+import { Upload, Loader2, Info } from "lucide-react";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/Button";
 import { api, Problema, IS_DEMO_MODE } from "../lib/api";
@@ -31,6 +31,8 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
     const [error, setError] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const uid = useId();
+    const ids = { problem: `cmp-problem-${uid}`, author: `cmp-author-${uid}`, code: `cmp-code-${uid}` };
 
     useEffect(() => {
         if (isOpen) {
@@ -150,8 +152,9 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
                         variant="gradient"
                         data-tour="cmp-submit"
                         onClick={handleStartAnalysis}
-                        disabled={isLoading || problems.length === 0}
+                        disabled={isLoading || problems.length === 0 || IS_DEMO_MODE}
                         isLoading={isLoading}
+                        title={IS_DEMO_MODE ? "No disponible en el Modo Demostración" : undefined}
                         className="!py-3.5 !px-8 !rounded-2xl"
                     >
                         {isLoading ? loadingMessage : "Iniciar Análisis"}
@@ -170,7 +173,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
 
             {IS_DEMO_MODE && (
                 <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
-                    <span className="text-base leading-none">ℹ️</span>
+                    <Info size={16} className="shrink-0 mt-0.5" aria-hidden="true" />
                     <div>
                         <span className="font-bold">Modo Demostración (Solo Lectura):</span> El análisis de nuevas entregas y subida de archivos está desactivado. Puedes explorar los análisis y reportes detallados ya procesados en la biblioteca.
                     </div>
@@ -204,11 +207,11 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
 
             {/* Código de referencia seleccionado / selector */}
             <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
+                <label htmlFor={ids.problem} className="block text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
                     Código de referencia seleccionado
                 </label>
                 {activeProblem && !isChangingProblem ? (
-                    <div className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-graphito-border bg-slate-50 dark:bg-graphito-surface transition-colors">
+                    <div id={ids.problem} role="group" aria-label="Código de referencia seleccionado" className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-graphito-border bg-slate-50 dark:bg-graphito-surface transition-colors">
                         <div className="flex items-center gap-3 min-w-0">
                             <span className="font-display font-bold text-sm text-slate-900 dark:text-white truncate">
                                 {(activeProblem as PreselectedProblem).title || (activeProblem as Problema).titulo}
@@ -238,6 +241,7 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <select
+                                id={ids.problem}
                                 value={selectedProblemId || ""}
                                 onChange={(e) => {
                                     setSelectedProblemId(Number(e.target.value));
@@ -270,10 +274,12 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
 
             {/* Student Author */}
             <div className="space-y-1.5" data-tour="cmp-author">
-                <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
-                    Alumno / Identificador de la Entrega
+                <label htmlFor={ids.author} className="block text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
+                    Alumno / Identificador de la Entrega <span aria-hidden="true" className="text-rose-500">*</span>
                 </label>
                 <input
+                    id={ids.author}
+                    required
                     type="text"
                     value={author}
                     onChange={(e) => setAuthor(e.target.value)}
@@ -285,8 +291,8 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
 
             {/* Upload Zone */}
             <div className="space-y-1.5" data-tour="cmp-code">
-                <label className="text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
-                    Código de la Entrega {fileName && <span className="text-graphito-blue">({fileName})</span>}
+                <label htmlFor={ids.code} className="block text-[10px] uppercase font-black tracking-widest text-slate-600 dark:text-slate-400">
+                    Código de la Entrega <span aria-hidden="true" className="text-rose-500">*</span> {fileName && <span className="text-graphito-blue">({fileName})</span>}
                 </label>
                 <div
                     onClick={() => fileInputRef.current?.click()}
@@ -315,6 +321,8 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
                     </Button>
                 </div>
                 <textarea
+                    id={ids.code}
+                    required
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     disabled={isLoading}

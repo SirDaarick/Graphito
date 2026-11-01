@@ -9,7 +9,8 @@ import { NewReferenceModal } from "./pages/NewReferenceModal";
 import { NewComparisonModal } from "./pages/NewComparisonModal";
 import { SimilarityReportModal } from "./pages/SimilarityReportModal";
 import { api, Docente, IS_DEMO_MODE, invalidateLibrary } from "./lib/api";
-import { toComparison } from "./lib/dictamen";
+import { toComparison, type ComparisonView } from "./lib/dictamen";
+import { siblingSubmissions } from "./lib/siblings";
 import { navigate, usePath, useRouteMatch, getInitialRoute } from "./lib/router";
 import { useTour } from "./components/tour/TourContext";
 
@@ -88,14 +89,27 @@ function App() {
                 let cancelled = false;
                 api.analysis
                     .getReport(idNum)
-                    .then((report) => {
+                    .then(async (report) => {
                         if (cancelled) return;
-                        const comp = toComparison(report, `Reporte #${report.id}`);
+                        let comp = toComparison(report, `Reporte #${report.id}`);
+                        let list: ComparisonView[] | null = null;
+                        // A direct link has no list yet: look up the other submissions of the same problem.
+                        // State is set once, after the lookup: changing selectedComparison re-runs (and cancels) this effect.
+                        try {
+                            const siblings = siblingSubmissions(await api.problems.list(true, true), report.id);
+                            if (siblings) {
+                                comp = siblings.current;
+                                list = siblings.list;
+                            }
+                        } catch (err) {
+                            console.warn("No se pudieron cargar las demás entregas del problema:", err);
+                        }
+                        if (cancelled) return;
                         setSelectedComparison(comp);
                         setComparisonList((prev) =>
                             prev.length > 0 && prev.some((c) => String(c.id) === String(report.id))
                                 ? prev
-                                : [comp]
+                                : list ?? [comp]
                         );
                     })
                     .catch((err) => {

@@ -161,9 +161,9 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
     return (
         <main id="main-content" className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 flex-1 w-full flex flex-col transition-colors duration-200" tabIndex={-1}>
             <div className="mb-8">
-                <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white transition-colors">
+                <h1 className="text-3xl font-display font-black text-slate-900 dark:text-white transition-colors">
                     Catálogo de Programas
-                </h2>
+                </h1>
                 <p className="text-slate-600 dark:text-slate-300 font-body mt-2 transition-colors">
                     Programas de C/C++ organizados por materia y unidad. Agrega los que necesites a tu biblioteca para usarlos como solución de referencia.
                 </p>
@@ -342,8 +342,8 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
                                                                                         En tu biblioteca
                                                                                     </span>
                                                                                 ) : (
-                                                                                    <span className="shrink-0 text-[10px] font-semibold text-graphito-blue opacity-0 group-hover/card:opacity-100 transition-opacity">
-                                                                                        Ver código →
+                                                                                    <span className="shrink-0 text-xs font-semibold text-graphito-blue group-hover/card:underline">
+                                                                                        Ver y agregar →
                                                                                     </span>
                                                                                 )}
                                                                             </div>

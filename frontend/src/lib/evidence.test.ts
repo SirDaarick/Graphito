@@ -19,13 +19,18 @@ describe("evidenceByLine", () => {
         expect([...map.keys()]).toEqual([7]);
     });
 
-    it("groups several indicators on the same line, most severe first", () => {
+    it("groups several indicators on the same line in the order received, ignoring severity", () => {
         const map = evidenceByLine([
             ind({ numero_linea: 4, severidad: "BAJA", tipo_alerta: "Baja", descripcion: "a" }),
             ind({ numero_linea: 4, severidad: "CRITICA", tipo_alerta: "Crítica", descripcion: "b" }),
             ind({ numero_linea: 4, severidad: "MEDIA", tipo_alerta: "Media", descripcion: "c" }),
         ]);
-        expect(map.get(4)?.map((e) => e.title)).toEqual(["Crítica", "Media", "Baja"]);
+        expect(map.get(4)?.map((e) => e.title)).toEqual(["Baja", "Crítica", "Media"]);
+    });
+
+    it("does not carry the severity into the line evidence", () => {
+        const [entry] = evidenceByLine([ind({ numero_linea: 2, severidad: "CRITICA" })]).get(2)!;
+        expect(Object.keys(entry).sort()).toEqual(["text", "title"]);
     });
 
     it("drops exact duplicates on a line", () => {
@@ -43,14 +48,6 @@ describe("evidenceByLine", () => {
         ]).get(178)!;
         expect(entry.title).toBe("Patrón de Documentación LLM");
         expect(entry.text).toBe("Comentarios paso a paso frecuentes en código generado.");
-    });
-
-    it("treats an unknown severity as the lowest one without throwing", () => {
-        const map = evidenceByLine([
-            ind({ numero_linea: 1, severidad: "constructor", tipo_alerta: "raro" }),
-            ind({ numero_linea: 1, severidad: "ALTA", tipo_alerta: "alta" }),
-        ]);
-        expect(map.get(1)?.map((e) => e.title)).toEqual(["alta", "raro"]);
     });
 
     it("returns an empty map for no indicators", () => {

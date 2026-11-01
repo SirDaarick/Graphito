@@ -4,18 +4,10 @@
  * can explain a line when the teacher points at it. Only rows that name a real line are used.
  */
 import type { IndicadorIntegridad } from "./api";
-import { lookupLabel } from "./dictamen";
 
 export interface LineEvidence {
     title: string;
     text: string;
-    severity: string;
-}
-
-const SEVERITY_RANK: Record<string, number> = { BAJA: 0, MEDIA: 1, ALTA: 2, CRITICA: 3 };
-
-function rank(severity: string): number {
-    return lookupLabel(SEVERITY_RANK, severity.toUpperCase()) ?? -1;
 }
 
 function capitalize(text: string): string {
@@ -35,17 +27,16 @@ function plainText(text: string): string {
     return capitalize(cleaned);
 }
 
-/** Evidence grouped by 1-based line number, most severe first, without exact duplicates. */
+/** Evidence grouped by 1-based line number, in the order received, without exact duplicates. No severity is kept. */
 export function evidenceByLine(indicadores: IndicadorIntegridad[]): Map<number, LineEvidence[]> {
     const byLine = new Map<number, LineEvidence[]>();
     for (const ind of indicadores) {
         const line = ind.numero_linea;
         if (typeof line !== "number" || !Number.isInteger(line) || line < 1) continue;
-        const entry: LineEvidence = { title: plainTitle(ind.tipo_alerta), text: plainText(ind.descripcion), severity: ind.severidad };
+        const entry: LineEvidence = { title: plainTitle(ind.tipo_alerta), text: plainText(ind.descripcion) };
         const list = byLine.get(line) ?? [];
         if (!list.some((e) => e.title === entry.title && e.text === entry.text)) list.push(entry);
         byLine.set(line, list);
     }
-    for (const list of byLine.values()) list.sort((a, b) => rank(b.severity) - rank(a.severity));
     return byLine;
 }

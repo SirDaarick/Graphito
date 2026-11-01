@@ -32,13 +32,11 @@ PDF_LABEL = (
     "estudiante-estudiante. Apoyo a la decision docente, no un dictamen automatico."
 )
 
-# tone -> (background, border, text color)
+# tone -> (background, border, text color). One neutral palette for every tone: the color
+# never signals good or bad, the teacher decides what the metrics mean.
+_NEUTRAL_TONE = ("#f8fafc", "#94a3b8", "#334155")
 TONES = {
-    "dual": ("#faf5ff", "#8b5cf6", "#6d28d9"),
-    "semantic": ("#fef2f2", "#ef4444", "#b91c1c"),
-    "stylometric": ("#fff7ed", "#f97316", "#c2410c"),
-    "clear": ("#f0fdf4", "#22c55e", "#15803d"),
-    "neutral": ("#f8fafc", "#94a3b8", "#475569"),
+    tone: _NEUTRAL_TONE for tone in ("dual", "semantic", "stylometric", "clear", "neutral")
 }
 
 VERDICTS = {
@@ -224,9 +222,9 @@ class PdfReportService:
         elements = []
 
         # 1. Header
-        elements.append(Paragraph("GRAPHITO | Sistema Bimodal de Integridad Academica", subtitle_style))
+        elements.append(Paragraph("GRAPHITO | Apoyo a la evaluacion docente", subtitle_style))
         elements.append(Spacer(1, 4))
-        elements.append(Paragraph("Reporte Oficial de Evaluacion de Codigo", title_style))
+        elements.append(Paragraph("Reporte de metricas de similitud", title_style))
         elements.append(Spacer(1, 10))
         elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#3b82f6"), spaceAfter=14))
 
@@ -246,7 +244,7 @@ class PdfReportService:
                 Paragraph((language or "C/C++").upper(), body_style),
             ],
             [
-                Paragraph("<b>Estudiante Evaluado:</b>", body_style),
+                Paragraph("<b>Estudiante:</b>", body_style),
                 Paragraph(student_author or "Anonimo / Desconocido", body_style),
                 Paragraph("<b>Estado:</b>", body_style),
                 Paragraph(f"<b>{getattr(report.estado, 'value', report.estado) or 'COMPLETADO'}</b>", body_style),
@@ -320,26 +318,22 @@ class PdfReportService:
         elements.append(Spacer(1, 16))
 
         # 5. Indicators Table (rule-based rows are marked as heuristics, spec AR4.1)
-        elements.append(Paragraph("Indicadores y Evidencias de Integridad", h2_style))
+        elements.append(Paragraph("Observaciones del analisis", h2_style))
         if report.indicadores and len(report.indicadores) > 0:
             indicators_data = [
                 [
-                    Paragraph("<b>Alerta / Categoria</b>", body_style),
-                    Paragraph("<b>Severidad</b>", body_style),
-                    Paragraph("<b>Detalle Observado</b>", body_style),
+                    Paragraph("<b>Observacion / Categoria</b>", body_style),
+                    Paragraph("<b>Detalle observado</b>", body_style),
                 ]
             ]
             for ind in report.indicadores:
-                sev = getattr(ind, 'severidad', 'MEDIA')
-                sev_color = "#ef4444" if sev in ("ALTA", "CRITICA") else "#f59e0b" if sev == "MEDIA" else "#10b981"
                 categoria = getattr(ind, "categoria", None) or "GENERAL"
                 origin = "decision" if categoria in ("GENERAL", "SIMILITUD_ARCHIVO") else "heuristica"
                 indicators_data.append([
                     Paragraph(f"<b>{escape(ind.tipo_alerta)}</b><br/>({origin})", body_style),
-                    Paragraph(f"<font color='{sev_color}'><b>{escape(sev)}</b></font>", body_style),
                     Paragraph(escape(ind.descripcion), body_style),
                 ])
-            ind_table = Table(indicators_data, colWidths=[130, 80, 310])
+            ind_table = Table(indicators_data, colWidths=[160, 360])
             ind_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
