@@ -31,6 +31,7 @@ AR11_FIELDS = (
     "etiqueta_validacion", "estado_calibracion", "similitud_semantica", "probabilidad_ia", "discrepancia_score",
 )
 LABEL = "No validado contra plagio derivado de la referencia"
+PDF_LABEL_START = "Apoyo a la decision docente"
 REF_C = """#include <stdio.h>
 int main(void) {
     int n, i, total = 0;
@@ -207,8 +208,8 @@ async def test_pdf_of_abstained_no_evaluable_report_is_honest(client, pdf_text):
     pdf = await client.get(f"/api/v1/analysis/reports/{body['id']}/pdf", headers=headers)
     assert pdf.status_code == 200
     text = pdf_text(pdf.content)
-    assert "ABSTENIDO" in text and "NO EVALUABLE" in text and LABEL in text
-    assert "Jaccard lexico" in text and "stub" in text
+    assert "ABSTENIDO" in text and "NO EVALUABLE" in text and PDF_LABEL_START in text
+    assert "stub" in text and "Jaccard" not in text and "sha256" not in text
     assert "CONFORMIDAD" not in text and "discrepancia" not in text.lower()
 
 
@@ -222,7 +223,7 @@ async def test_pdf_of_sin_referencia_report_says_so(client, pdf_text):
     assert "SIN REFERENCIA" in text and "CONFORMIDAD" not in text and "SIN ALERTAS" not in text
 
 
-def test_content_model_prints_thresholds_calibration_and_no_discrepancy_row():
+def test_content_model_is_short_and_has_no_technical_or_discrepancy_rows():
     from app.presentation.schemas.analysis import ReporteAnalisisResponse
 
     report = ReporteAnalisisResponse(
@@ -234,11 +235,11 @@ def test_content_model_prints_thresholds_calibration_and_no_discrepancy_row():
         gcb_estado="ERROR",
     )
     content = PdfReportService.build_content(report)
-    flat = " ".join(" ".join(map(str, row)) for row in content.metric_rows + content.provenance_rows)
-    assert "0.4321" in flat and "0.1715" in flat and "aaaaaaaaaaaa" in flat and "dddddddddddd" in flat
-    assert "Jaccard lexico" in flat and "exploratorio" in flat.lower()
+    flat = " ".join(" ".join(map(str, row)) for row in content.metric_rows)
+    assert "61.0%" in flat and "10.0%" in flat
+    assert "aaaaaaaaaaaa" not in flat and "0.4321" not in flat
     assert "discrepancia" not in flat.lower() and "0.3" not in flat
-    assert LABEL in content.label and "ALERTA" in content.verdict_text
+    assert PDF_LABEL_START in content.label and "ALERTA" in content.verdict_text
 
 
 @pytest.mark.parametrize("dictamen, estado, expected", [

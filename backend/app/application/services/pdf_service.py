@@ -1,7 +1,8 @@
-"""Institutional PDF report (spec AR3).
+"""Short PDF report for the teacher (spec AR3): who, the result banner, the two scores that matter,
+observations, comments and the code.
 
 `PdfReportService.build_content` turns a report into a plain content model (verdict banner, metric
-rows, provenance rows, validation label); `generate_pdf` only lays it out. The content never
+rows, notes, label); `generate_pdf` only lays it out. The content never
 falls back to a conformity verdict for unknown or missing verdicts, prints NULL scores as not
 evaluated, and has no discrepancy row (design D15). Text is kept ASCII for the standard fonts.
 """
@@ -27,10 +28,7 @@ from reportlab.platypus import (
 from app.infrastructure.database.models import ReporteAnalisis
 from app.presentation.schemas.analysis import ReporteAnalisisResponse
 
-PDF_LABEL = (
-    "No validado contra plagio derivado de la referencia: umbrales calibrados con pares "
-    "estudiante-estudiante. Apoyo a la decision docente, no un dictamen automatico."
-)
+PDF_LABEL = "Apoyo a la decision docente, no un dictamen automatico. Los resultados pueden equivocarse."
 
 # tone -> (background, border, text color). One neutral palette for every tone: the color
 # never signals good or bad, the teacher decides what the metrics mean.
@@ -40,25 +38,17 @@ TONES = {
 }
 
 VERDICTS = {
-    "DISCREPANCIA_DUAL": ("dual", "ALERTA DUAL: AMBOS CANALES SUPERARON SU UMBRAL CALIBRADO"),
-    "REVISION_SEMANTICA": ("semantic", "ALERTA CANAL A: SIMILITUD LEXICA CON LA REFERENCIA SOBRE EL UMBRAL"),
-    "REVISION_ESTILOMETRICA": ("stylometric", "ALERTA CANAL B: ESTILO COMPATIBLE CON CODIGO GENERADO SOBRE EL UMBRAL"),
-    "SIN_ALERTAS": ("clear", "SIN ALERTAS: NINGUN CANAL SUPERO SU UMBRAL CALIBRADO"),
-    "NO_EVALUABLE": ("neutral", "NO EVALUABLE: AL MENOS UN CANAL NO PUDO EVALUARSE; SIN DICTAMEN AUTOMATICO"),
-    "SIN_REFERENCIA": ("neutral", "SIN REFERENCIA: EL PROBLEMA NO TIENE CODIGO DE REFERENCIA (CANAL A NO EVALUADO)"),
+    "DISCREPANCIA_DUAL": ("dual", "ALERTA DUAL: AMBOS ANALISIS SUPERARON SU UMBRAL"),
+    "REVISION_SEMANTICA": ("semantic", "ALERTA: SIMILITUD CON LA REFERENCIA SOBRE EL UMBRAL"),
+    "REVISION_ESTILOMETRICA": ("stylometric", "ALERTA: ESTILO COMPATIBLE CON CODIGO GENERADO SOBRE EL UMBRAL"),
+    "SIN_ALERTAS": ("clear", "SIN ALERTAS: NINGUN ANALISIS SUPERO SU UMBRAL"),
+    "NO_EVALUABLE": ("neutral", "NO EVALUABLE: AL MENOS UN ANALISIS NO PUDO HACERSE; SIN DICTAMEN AUTOMATICO"),
+    "SIN_REFERENCIA": ("neutral", "SIN REFERENCIA: EL PROBLEMA NO TIENE CODIGO DE REFERENCIA"),
 }
 
-METHODS_A = {"jaccard": "Jaccard lexico, shingles de 5 tokens"}
-ENGINES = {
-    "real": "real (artefactos de despliegue verificados)",
-    "stub": "stub (desarrollo; no es resultado de un modelo)",
-    "legacy": "legacy (reporte anterior a la calibracion; no se recalcula)",
-}
-CALIBRATION_STATES = {
-    "calibrado": "calibrado (umbrales de los artefactos)",
-    "no_calibrado": "NO calibrado (solo desarrollo): banderas nulas",
-    "stub": "stub: umbrales fijos de desarrollo",
-    "legacy": "legacy: sin calibracion",
+ENGINE_NOTES = {
+    "stub": "Datos de prueba (stub): no es resultado de un modelo real.",
+    "legacy": "Reporte anterior a la calibracion (legacy): no se recalcula.",
 }
 
 
@@ -72,41 +62,24 @@ def verdict_banner(dictamen: Optional[str], estado: Optional[str]) -> Tuple[str,
     return "neutral", f"NO EVALUABLE: DICTAMEN DESCONOCIDO ({dictamen})"
 
 
-def _num(value: Optional[float]) -> str:
-    return "-" if value is None else f"{value:.4f}"
-
-
 def _pct(value: Optional[float]) -> str:
     return f"{round(value * 100, 1)}%"
-
-
-def _flag(value: Optional[bool]) -> str:
-    return "-" if value is None else ("SI" if value else "NO")
-
-
-def _sha(value: Optional[str]) -> str:
-    return value[:12] if value else "-"
-
-
-def _threshold(umbral: Optional[float], clave: Optional[str], estado: Optional[str], flag: Optional[bool]) -> str:
-    key = f" ({clave})" if clave else ""
-    return f"umbral {_num(umbral)}{key}; estado {estado or '-'}; bandera {_flag(flag)}"
 
 
 @dataclass(frozen=True)
 class PdfContent:
     verdict_tone: str
     verdict_text: str
-    # (canal, metodo, valor, umbral/estado)
-    metric_rows: List[Tuple[str, str, str, str]] = field(default_factory=list)
-    provenance_rows: List[Tuple[str, str]] = field(default_factory=list)
+    # (analisis, resultado)
+    metric_rows: List[Tuple[str, str]] = field(default_factory=list)
+    notes: List[str] = field(default_factory=list)
     label: str = PDF_LABEL
 
 
 class PdfReportService:
     """
-    Servicio generador de reportes academicos oficiales en formato PDF.
-    Diseno formal para catedras universitarias y comisiones de integridad.
+    Servicio generador de reportes en PDF: solo lo esencial para el docente
+    (quien, que se midio, el resultado y sus anotaciones).
     """
 
     @staticmethod
@@ -119,42 +92,19 @@ class PdfReportService:
         if report.similitud_semantica is None:
             a_value = f"No evaluado ({report.estado_canal_a or estado})"
         else:
-            a_value = f"Jaccard {_pct(report.similitud_semantica)}"
-            if report.puntaje_calibrado_a is not None:
-                a_value += f"; calibrado {_num(report.puntaje_calibrado_a)}"
+            a_value = _pct(report.similitud_semantica)
         if report.estado_canal_b == "ABSTENIDO":
-            b_value = "ABSTENIDO (codigo demasiado corto para CharCNN)"
+            b_value = "ABSTENIDO (codigo demasiado corto)"
         elif report.probabilidad_ia is None:
             b_value = f"No evaluado ({report.estado_canal_b or estado})"
         else:
-            b_value = f"calibrado {_num(report.probabilidad_ia)}"
-        gcb_value = (
-            f"coseno {_num(report.gcb_similarity)}" if report.gcb_similarity is not None
-            else f"No disponible ({report.gcb_estado or '-'})"
-        )
-        legacy = report.engine == "legacy"
-        method_a = METHODS_A.get(report.canal_a_metodo or "", report.canal_a_metodo or (
-            "Legado: GraphCodeBERT sin calibrar" if legacy else "-"
-        ))
+            b_value = _pct(report.probabilidad_ia)
         metric_rows = [
-            ("Canal A: similitud con la referencia", method_a, a_value,
-             _threshold(report.umbral_a, report.clave_umbral_a, report.estado_canal_a, report.flag_a)),
-            ("Canal B: estilometria", "Legado: CharCNN sin calibrar" if legacy else "CharCNN v2 (caracteres)", b_value,
-             _threshold(report.umbral_b, report.clave_umbral_b, report.estado_canal_b, report.flag_b)),
-            ("Senal secundaria", "GraphCodeBERT con normalizacion de identificadores (exploratorio, no decide)", gcb_value, "no interviene en el dictamen"),
+            ("Similitud con la referencia", a_value),
+            ("Estilo parecido a codigo generado por IA", b_value),
         ]
-        versions = report.versiones_modelo or {}
-        version_text = ", ".join(f"{k}={v}" for k, v in versions.items() if v is not None) or "-"
-        provenance_rows = [
-            ("Motor", ENGINES.get(report.engine or "", report.engine or "-")),
-            ("Estado de calibracion", CALIBRATION_STATES.get(report.estado_calibracion or "", "sin evaluar")),
-            ("Manifiesto de despliegue (sha256)", _sha(report.manifest_sha)),
-            ("Calibracion A / B (sha256)", f"{_sha(report.calibracion_sha_a)} / {_sha(report.calibracion_sha_b)}"),
-            ("Checkpoint CharCNN (sha256)", _sha(report.checkpoint_sha_b)),
-            ("Versiones de modelo", version_text),
-        ]
-        return PdfContent(tone, text, metric_rows, provenance_rows)
-
+        notes = [ENGINE_NOTES[report.engine]] if report.engine in ENGINE_NOTES else []
+        return PdfContent(tone, text, metric_rows, notes)
     @staticmethod
     def generate_pdf(
         report: ReporteAnalisis,
@@ -229,29 +179,23 @@ class PdfReportService:
         elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#3b82f6"), spaceAfter=14))
 
         # 2. Metadata Box
-        date_str = report.fecha_analisis.strftime("%d/%m/%Y %H:%M:%S UTC") if report.fecha_analisis else datetime.utcnow().strftime("%d/%m/%Y %H:%M:%S UTC")
+        date_str = report.fecha_analisis.strftime("%d/%m/%Y %H:%M") if report.fecha_analisis else datetime.utcnow().strftime("%d/%m/%Y %H:%M")
         meta_data = [
             [
-                Paragraph("<b>ID Reporte:</b>", body_style),
-                Paragraph(f"REP_{report.id}", body_style),
-                Paragraph("<b>Fecha y Hora:</b>", body_style),
+                Paragraph("<b>Problema:</b>", body_style),
+                Paragraph(escape(problem_title or "No especificado"), body_style),
+                Paragraph("<b>Fecha:</b>", body_style),
                 Paragraph(date_str, body_style),
             ],
             [
-                Paragraph("<b>Problema / Ejercicio:</b>", body_style),
-                Paragraph(problem_title or "No especificado", body_style),
+                Paragraph("<b>Estudiante:</b>", body_style),
+                Paragraph(escape(student_author or "Anonimo / Desconocido"), body_style),
                 Paragraph("<b>Lenguaje:</b>", body_style),
                 Paragraph((language or "C/C++").upper(), body_style),
             ],
-            [
-                Paragraph("<b>Estudiante:</b>", body_style),
-                Paragraph(student_author or "Anonimo / Desconocido", body_style),
-                Paragraph("<b>Estado:</b>", body_style),
-                Paragraph(f"<b>{getattr(report.estado, 'value', report.estado) or 'COMPLETADO'}</b>", body_style),
-            ],
         ]
 
-        meta_table = Table(meta_data, colWidths=[120, 140, 110, 150])
+        meta_table = Table(meta_data, colWidths=[85, 195, 70, 170])
         meta_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e1")),
@@ -264,7 +208,7 @@ class PdfReportService:
         elements.append(meta_table)
         elements.append(Spacer(1, 16))
 
-        # 3. Decision Support Diagnostic Banner (never a conformity fallback, spec AR3.1)
+        # 3. Result banner (never a conformity fallback, spec AR3.1)
         content = PdfReportService.build_content(ReporteAnalisisResponse.model_validate(report))
         verdict_bg, verdict_border, verdict_color = TONES[content.verdict_tone]
         verdict_paragraph = Paragraph(
@@ -279,17 +223,14 @@ class PdfReportService:
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
         elements.append(verdict_table)
-        elements.append(Spacer(1, 8))
-        elements.append(Paragraph(f"<b>{escape(content.label)}</b>", body_style))
         elements.append(Spacer(1, 12))
 
-        # 4. Metrics Table: method, value (or not evaluated), threshold + key, state and flag.
-        elements.append(Paragraph("Desglose del Analisis Bimodal", h2_style))
-        header = ["Canal", "Metodo", "Valor", "Umbral y estado"]
-        metrics_data = [[Paragraph(f"<b>{h}</b>", body_style) for h in header]]
+        # 4. The two results that matter
+        elements.append(Paragraph("Resultados", h2_style))
+        metrics_data = [[Paragraph(f"<b>{h}</b>", body_style) for h in ("Analisis", "Resultado")]]
         for row in content.metric_rows:
             metrics_data.append([Paragraph(escape(cell), body_style) for cell in row])
-        metrics_table = Table(metrics_data, colWidths=[115, 135, 120, 150])
+        metrics_table = Table(metrics_data, colWidths=[280, 240])
         metrics_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
@@ -299,38 +240,25 @@ class PdfReportService:
             ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ]))
         elements.append(metrics_table)
+        for note in content.notes:
+            elements.append(Spacer(1, 6))
+            elements.append(Paragraph(f"<i>{escape(note)}</i>", body_style))
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(escape(content.label), body_style))
         elements.append(Spacer(1, 10))
 
-        provenance_data = [
-            [Paragraph(f"<b>{escape(k)}</b>", body_style), Paragraph(escape(v), body_style)]
-            for k, v in content.provenance_rows
-        ]
-        provenance_table = Table(provenance_data, colWidths=[180, 340])
-        provenance_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#f8fafc")),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        elements.append(provenance_table)
-        elements.append(Spacer(1, 16))
-
-        # 5. Indicators Table (rule-based rows are marked as heuristics, spec AR4.1)
-        elements.append(Paragraph("Observaciones del analisis", h2_style))
+        # 5. Observations
         if report.indicadores and len(report.indicadores) > 0:
+            elements.append(Paragraph("Observaciones", h2_style))
             indicators_data = [
                 [
-                    Paragraph("<b>Observacion / Categoria</b>", body_style),
-                    Paragraph("<b>Detalle observado</b>", body_style),
+                    Paragraph("<b>Observacion</b>", body_style),
+                    Paragraph("<b>Detalle</b>", body_style),
                 ]
             ]
             for ind in report.indicadores:
-                categoria = getattr(ind, "categoria", None) or "GENERAL"
-                origin = "decision" if categoria in ("GENERAL", "SIMILITUD_ARCHIVO") else "heuristica"
                 indicators_data.append([
-                    Paragraph(f"<b>{escape(ind.tipo_alerta)}</b><br/>({origin})", body_style),
+                    Paragraph(f"<b>{escape(ind.tipo_alerta)}</b>", body_style),
                     Paragraph(escape(ind.descripcion), body_style),
                 ])
             ind_table = Table(indicators_data, colWidths=[160, 360])
@@ -343,12 +271,6 @@ class PdfReportService:
                 ('RIGHTPADDING', (0, 0), (-1, -1), 6),
             ]))
             elements.append(ind_table)
-        else:
-            elements.append(Paragraph(
-                "<i>Sin indicadores registrados para este reporte.</i>",
-                body_style,
-            ))
-
         # 6. Observaciones y Anotaciones del Docente (si existen)
         if comments and len(comments) > 0:
             elements.append(Spacer(1, 14))
@@ -416,13 +338,10 @@ class PdfReportService:
         elements.append(Spacer(1, 20))
         elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#94a3b8"), spaceAfter=10))
 
-        # 8. Legal / Institutional Footer
+        # 8. Footer
         elements.append(Paragraph(
-            "<b>Aviso Institucional (Sistema de Soporte a la Decision):</b> Este reporte es generado por la plataforma Graphito "
-            "con dos canales calibrados (Canal A: similitud lexica Jaccard con la referencia; Canal B: estilometria CharCNN v2); "
-            "GraphCodeBERT solo aporta una senal exploratoria que no decide. Las indicaciones heuristicas no son salida de un modelo. "
-            "Los resultados orientan la revision; no constituyen una sancion disciplinaria automatica ni sustituyen el juicio "
-            "academico y pedagogico del docente evaluador.",
+            "Generado por Graphito. Los resultados orientan la revision; no son una sancion automatica "
+            "ni sustituyen el juicio del docente.",
             ParagraphStyle(
                 "FooterNote",
                 parent=styles["Normal"],
@@ -432,7 +351,6 @@ class PdfReportService:
                 textColor=colors.HexColor("#64748b"),
             ),
         ))
-
         doc.build(elements)
         buffer.seek(0)
         return buffer
