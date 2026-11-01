@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from app.infrastructure.database.models import (
     CodigoFuente,
     ComentarioRevision,
+    Grupo,
     GrupoProblema,
     IndicadorIntegridad,
     LoteAnalisis,
@@ -234,6 +235,17 @@ class ProblemService:
     ) -> CodigoFuenteResponse:
         # Validar problema
         await self.get_problem(docente_id, data.problema_id)
+
+        # Same rule as BatchAnalysisService.create_batch: the group must be the caller's.
+        if data.grupo_id:
+            owned = await self.db.execute(
+                select(Grupo.id).where(Grupo.id == data.grupo_id, Grupo.docente_id == docente_id)
+            )
+            if owned.scalar_one_or_none() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Grupo {data.grupo_id} no encontrado en tu cuenta.",
+                )
 
         codigo = CodigoFuente(
             problema_id=data.problema_id,
