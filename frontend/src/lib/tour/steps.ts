@@ -4,6 +4,7 @@ import type { TourContext, TourFlow, TourStep } from "./types";
 const OWN_EXERCISE_STEPS: TourStep[] = [
     {
         id: "own-new-code",
+        skipWhen: { present: ["ref-title"], problemChosen: true },
         target: "header-new-code",
         title: "Crea tu ejercicio",
         text: "Pulsa «Nuevo código» para registrar tu solución de referencia.",
@@ -12,6 +13,7 @@ const OWN_EXERCISE_STEPS: TourStep[] = [
     },
     {
         id: "own-title",
+        skipWhen: { problemChosen: true, filled: true },
         target: "ref-title",
         title: "Ponle un nombre",
         text: "Por ejemplo: «Búsqueda binaria».",
@@ -21,6 +23,7 @@ const OWN_EXERCISE_STEPS: TourStep[] = [
     },
     {
         id: "own-code",
+        skipWhen: { problemChosen: true, filled: true },
         target: "ref-code",
         title: "Agrega el código",
         text: "Sube un archivo .c o .cpp, o pega el código.",
@@ -30,6 +33,7 @@ const OWN_EXERCISE_STEPS: TourStep[] = [
     },
     {
         id: "own-submit",
+        skipWhen: { problemChosen: true },
         target: "ref-submit",
         title: "Guárdalo",
         text: "Pulsa «Agregar código de referencia».",
@@ -42,6 +46,7 @@ const OWN_EXERCISE_STEPS: TourStep[] = [
 const LIBRARY_STEPS: TourStep[] = [
     {
         id: "lib-catalog",
+        skipWhen: { route: "/catalogo", problemChosen: true },
         target: "nav-catalog",
         title: "Abre el catálogo",
         text: "Aquí están los ejercicios precargados.",
@@ -51,6 +56,7 @@ const LIBRARY_STEPS: TourStep[] = [
     },
     {
         id: "lib-expand",
+        skipWhen: { present: ["catalog-add"], problemChosen: true },
         target: "catalog-expand-all",
         title: "Despliega los programas",
         text: "Muestra todas las materias y unidades.",
@@ -60,6 +66,7 @@ const LIBRARY_STEPS: TourStep[] = [
     },
     {
         id: "lib-program",
+        skipWhen: { present: ["catalog-add"], problemChosen: true },
         target: "catalog-program",
         title: "Elige un programa",
         text: "Haz clic en cualquiera para ver su código.",
@@ -69,6 +76,7 @@ const LIBRARY_STEPS: TourStep[] = [
     },
     {
         id: "lib-add",
+        skipWhen: { problemChosen: true },
         target: "catalog-add",
         title: "Agrégalo a tu biblioteca",
         text: "Se usará como solución de referencia.",
@@ -78,6 +86,7 @@ const LIBRARY_STEPS: TourStep[] = [
     },
     {
         id: "lib-go",
+        skipWhen: { route: "/biblioteca" },
         target: "catalog-go-library",
         title: "Vuelve a tu biblioteca",
         text: "Pulsa «Ir a la biblioteca».",
@@ -92,6 +101,7 @@ const LIBRARY_STEPS: TourStep[] = [
 const SHARED_TAIL: TourStep[] = [
     {
         id: "cmp-open",
+        skipWhen: { present: ["cmp-author"], route: "/reporte/:id" },
         target: "compare",
         title: "Compara una entrega",
         text: "Pulsa «Comparar» en tu ejercicio.",
@@ -102,6 +112,7 @@ const SHARED_TAIL: TourStep[] = [
     },
     {
         id: "cmp-author",
+        skipWhen: { route: "/reporte/:id", filled: true },
         target: "cmp-author",
         title: "Identifica al alumno",
         text: "Escribe su nombre o boleta.",
@@ -111,6 +122,7 @@ const SHARED_TAIL: TourStep[] = [
     },
     {
         id: "cmp-code",
+        skipWhen: { route: "/reporte/:id", filled: true },
         target: "cmp-code",
         title: "Sube su código",
         text: "Un archivo .c o .cpp, o pégalo aquí.",
@@ -120,6 +132,7 @@ const SHARED_TAIL: TourStep[] = [
     },
     {
         id: "cmp-submit",
+        skipWhen: { route: "/reporte/:id" },
         target: "cmp-submit",
         title: "Inicia el análisis",
         text: "Se comparará contra tu referencia.",

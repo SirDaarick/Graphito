@@ -739,16 +739,24 @@ export function Biblioteca({
                                     </div>
                                 </button>
 
-                                {isExpanded && (
-                                    <div className="p-4 sm:p-6 pt-0 border-t border-slate-200/50 dark:border-white/5">
-                                        <div
-                                            className="flex flex-col pt-4"
-                                            data-tour={group.id === tourGroup ? "example-problems" : undefined}
-                                        >
-                                            {problems.map((ref) => renderCard(ref))}
+                                <div
+                                    className={`grid transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                                        isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                                    }`}
+                                    aria-hidden={!isExpanded}
+                                    inert={!isExpanded}
+                                >
+                                    <div className="overflow-hidden">
+                                        <div className="p-4 sm:p-6 pt-0 border-t border-slate-200/50 dark:border-white/5">
+                                            <div
+                                                className="flex flex-col pt-4"
+                                                data-tour={group.id === tourGroup ? "example-problems" : undefined}
+                                            >
+                                                {problems.map((ref) => renderCard(ref))}
+                                            </div>
                                         </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
                         );
                     })}
@@ -796,13 +804,21 @@ export function Biblioteca({
                                     </div>
                                 </button>
 
-                                {isExpanded && (
-                                    <div className="p-4 sm:p-6 pt-0 border-t border-slate-200/50 dark:border-white/5">
-                                        <div className="flex flex-col pt-4">
-                                            {unassignedProblems.map((ref) => renderCard(ref))}
+                                <div
+                                    className={`grid transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                                        isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                                    }`}
+                                    aria-hidden={!isExpanded}
+                                    inert={!isExpanded}
+                                >
+                                    <div className="overflow-hidden">
+                                        <div className="p-4 sm:p-6 pt-0 border-t border-slate-200/50 dark:border-white/5">
+                                            <div className="flex flex-col pt-4">
+                                                {unassignedProblems.map((ref) => renderCard(ref))}
+                                            </div>
                                         </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
                         );
                     })()}

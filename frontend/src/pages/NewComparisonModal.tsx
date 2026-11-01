@@ -1,5 +1,5 @@
 import React, { useId, useState, useEffect, useRef } from "react";
-import { Upload, Loader2, Info } from "lucide-react";
+import { Upload, UploadCloud, FileCode2, Loader2, Info } from "lucide-react";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/Button";
 import { api, Problema, IS_DEMO_MODE } from "../lib/api";
@@ -17,9 +17,17 @@ interface NewComparisonModalProps {
     onClose: () => void;
     onAnalysisComplete?: (report: any) => void;
     preselectedProblem?: PreselectedProblem | null;
+    /** Switches to the bulk-upload flow for the chosen problem (the parent closes this modal). */
+    onSwitchToBulk?: (problemId: number | null) => void;
 }
 
-export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, preselectedProblem }: NewComparisonModalProps) {
+export function NewComparisonModal({
+    isOpen,
+    onClose,
+    onAnalysisComplete,
+    preselectedProblem,
+    onSwitchToBulk,
+}: NewComparisonModalProps) {
     const [problems, setProblems] = useState<Problema[]>([]);
     const [selectedProblemId, setSelectedProblemId] = useState<number | null>(preselectedProblem?.id ?? null);
     const [isChangingProblem, setIsChangingProblem] = useState(false);
@@ -202,6 +210,33 @@ export function NewComparisonModal({ isOpen, onClose, onAnalysisComplete, presel
                     <div className="h-1.5 w-full bg-slate-200/60 dark:bg-white/10 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-graphito-blue to-graphito-violet rounded-full w-3/4 animate-pulse" />
                     </div>
+                </div>
+            )}
+
+            {onSwitchToBulk && (
+                <div
+                    role="group"
+                    aria-label="Modo de carga"
+                    className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-[#121827] border border-slate-200 dark:border-[#2b3346]"
+                >
+                    <button
+                        type="button"
+                        aria-pressed="true"
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-white dark:bg-graphito-card text-graphito-blue shadow-sm"
+                    >
+                        <FileCode2 size={15} aria-hidden="true" />
+                        Una entrega
+                    </button>
+                    <button
+                        type="button"
+                        aria-pressed="false"
+                        disabled={isLoading}
+                        onClick={() => onSwitchToBulk(selectedProblemId)}
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50"
+                    >
+                        <UploadCloud size={15} aria-hidden="true" />
+                        Carga masiva
+                    </button>
                 </div>
             )}
 

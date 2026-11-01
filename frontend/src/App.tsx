@@ -7,6 +7,7 @@ import { Register } from "./pages/Register";
 import { MouseGlowBackground } from "./components/layout/MouseGlowBackground";
 import { NewReferenceModal } from "./pages/NewReferenceModal";
 import { NewComparisonModal } from "./pages/NewComparisonModal";
+import { BulkUploadModal } from "./components/batch/BulkUploadModal";
 import { SimilarityReportModal } from "./pages/SimilarityReportModal";
 import { api, Docente, IS_DEMO_MODE, invalidateLibrary } from "./lib/api";
 import { toComparison, type ComparisonView } from "./lib/dictamen";
@@ -25,6 +26,8 @@ function App() {
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const [isNewCodeModalOpen, setIsNewCodeModalOpen] = useState(false);
     const [isNewComparisonModalOpen, setIsNewComparisonModalOpen] = useState(false);
+    const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+    const [bulkProblemId, setBulkProblemId] = useState<number | null>(null);
     const [comparisonTargetProblem, setComparisonTargetProblem] = useState<{ id: number; title: string; lenguaje?: string } | null>(null);
     const [selectedComparison, setSelectedComparison] = useState<any>(null);
     const [comparisonList, setComparisonList] = useState<any[]>([]);
@@ -254,11 +257,23 @@ function App() {
                             setComparisonTargetProblem(null);
                         }}
                         preselectedProblem={comparisonTargetProblem}
+                        onSwitchToBulk={(problemId) => {
+                            setBulkProblemId(problemId);
+                            setIsNewComparisonModalOpen(false);
+                            setComparisonTargetProblem(null);
+                            setIsBulkUploadOpen(true);
+                        }}
                         onAnalysisComplete={(report) => {
                             const comp = toComparison(report, `Reporte #${report.id}`);
                             handleOpenComparison(comp, [comp]);
                             invalidateLibrary();
                         }}
+                    />
+                    <BulkUploadModal
+                        isOpen={isBulkUploadOpen}
+                        onClose={() => setIsBulkUploadOpen(false)}
+                        onBatchComplete={invalidateLibrary}
+                        preselectedProblemId={bulkProblemId}
                     />
                     <SimilarityReportModal
                         isOpen={reportMatch.isMatch}

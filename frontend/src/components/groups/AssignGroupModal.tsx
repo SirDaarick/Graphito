@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Users, Loader2 } from "lucide-react";
+import { Users, Loader2, Plus } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { GradientButton } from "../ui/GradientButton";
 import { api, Grupo } from "../../lib/api";
@@ -41,25 +41,51 @@ export function AssignGroupModal({
     }
     const activeProblemId = problemId ?? lastProblemIdRef.current;
 
+    const [creatingNew, setCreatingNew] = useState(false);
+    const [newNombre, setNewNombre] = useState("");
+    const [newCodigo, setNewCodigo] = useState("");
+    const [newPeriodo, setNewPeriodo] = useState("2026-B");
+
     useEffect(() => {
         if (isOpen) {
             setGroupId(available[0]?.id ?? null);
             setError(null);
             setDone(null);
+            setCreatingNew(false);
+            setNewNombre("");
+            setNewCodigo("");
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
 
+    // With no groups yet, creating one is the only way forward.
+    const showNewForm = creatingNew || available.length === 0;
+
     const handleAssign = async () => {
-        if (groupId === null || activeProblemId === null) {
+        if (activeProblemId === null) return;
+        if (!showNewForm && groupId === null) {
             setError("Selecciona un grupo para continuar.");
+            return;
+        }
+        if (showNewForm && (!newNombre.trim() || !newCodigo.trim() || !newPeriodo.trim())) {
+            setError("Nombre, código de grupo y periodo son obligatorios.");
             return;
         }
         setIsLoading(true);
         setError(null);
         try {
-            await api.groups.assignProblem(groupId, activeProblemId);
-            const group = available.find((g) => g.id === groupId);
+            let group: Grupo | undefined;
+            if (showNewForm) {
+                group = await api.groups.create({
+                    nombre: newNombre.trim(),
+                    codigo_grupo: newCodigo.trim().toUpperCase(),
+                    periodo: newPeriodo.trim(),
+                });
+                await api.groups.assignProblem(group.id, activeProblemId);
+            } else {
+                await api.groups.assignProblem(groupId as number, activeProblemId);
+                group = available.find((g) => g.id === groupId);
+            }
             setDone(group ? `Asignado a [${group.codigo_grupo}] ${group.nombre}.` : "Problema asignado.");
             onAssigned();
         } catch (err: unknown) {
@@ -76,7 +102,7 @@ export function AssignGroupModal({
             title="Asignar a un grupo"
             description={displayTitle}
             maxWidth="md"
-            fixedHeight="h-[380px] max-h-[85vh]"
+            fixedHeight={showNewForm ? "h-[500px] max-h-[85vh]" : "h-[400px] max-h-[85vh]"}
             bodyClassName="space-y-4"
             footer={
                 <div className="flex items-center justify-end gap-6">
@@ -90,7 +116,7 @@ export function AssignGroupModal({
                     {!done && (
                         <GradientButton
                             onClick={handleAssign}
-                            disabled={isLoading || available.length === 0}
+                            disabled={isLoading}
                             className="!py-3 !px-6 !rounded-2xl"
                         >
                             <div className="flex items-center gap-2">
@@ -100,7 +126,7 @@ export function AssignGroupModal({
                                         <span>Asignando...</span>
                                     </>
                                 ) : (
-                                    <span>Asignar</span>
+                                    <span>{showNewForm ? "Crear y asignar" : "Asignar"}</span>
                                 )}
                             </div>
                         </GradientButton>
@@ -119,12 +145,77 @@ export function AssignGroupModal({
                 </div>
             )}
 
-            {available.length === 0 ? (
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                    No tienes grupos disponibles. Crea uno desde el filtro de cursos de la biblioteca.
-                </p>
+            {showNewForm ? (
+                <div className="space-y-4">
+                    {available.length === 0 ? (
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                            Aún no tienes grupos. Crea uno y se asignará este problema.
+                        </p>
+                    ) : (
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                            <Plus size={14} className="text-graphito-blue" aria-hidden="true" />
+                            Nuevo grupo
+                        </p>
+                    )}
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-2 space-y-1.5">
+                            <label htmlFor="assign-new-nombre" className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
+                                Materia
+                            </label>
+                            <input
+                                id="assign-new-nombre"
+                                type="text"
+                                value={newNombre}
+                                onChange={(e) => setNewNombre(e.target.value)}
+                                disabled={isLoading || done !== null}
+                                placeholder="Ej. Estructuras de Datos"
+                                className="w-full bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-graphito-blue transition-colors"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="assign-new-codigo" className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
+                                Código
+                            </label>
+                            <input
+                                id="assign-new-codigo"
+                                type="text"
+                                value={newCodigo}
+                                onChange={(e) => setNewCodigo(e.target.value)}
+                                disabled={isLoading || done !== null}
+                                placeholder="2CM1"
+                                className="w-full bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-xl py-3 px-4 text-sm font-mono uppercase focus:outline-none focus:border-graphito-blue transition-colors"
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label htmlFor="assign-new-periodo" className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
+                            Periodo escolar
+                        </label>
+                        <input
+                            id="assign-new-periodo"
+                            type="text"
+                            value={newPeriodo}
+                            onChange={(e) => setNewPeriodo(e.target.value)}
+                            disabled={isLoading || done !== null}
+                            placeholder="Ej. 2026-B"
+                            className="w-full bg-slate-50 dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-xl py-3 px-4 text-sm font-mono focus:outline-none focus:border-graphito-blue transition-colors"
+                        />
+                    </div>
+                    {available.length > 0 && !done && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setCreatingNew(false);
+                                setError(null);
+                            }}
+                            className="text-xs font-bold text-graphito-blue hover:underline"
+                        >
+                            Elegir un grupo existente
+                        </button>
+                    )}
+                </div>
             ) : (
-                <div className="space-y-1.5">
+                <div className="space-y-3">
                     <label
                         htmlFor="assign-group-select"
                         className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5"
@@ -149,6 +240,20 @@ export function AssignGroupModal({
                             </option>
                         ))}
                     </select>
+                    {!done && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setCreatingNew(true);
+                                setError(null);
+                            }}
+                            disabled={isLoading}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-graphito-blue hover:underline disabled:opacity-50"
+                        >
+                            <Plus size={13} aria-hidden="true" />
+                            Crear grupo nuevo
+                        </button>
+                    )}
                 </div>
             )}
         </Modal>

@@ -26,8 +26,22 @@ export type TourAdvance =
      */
     | { kind: "pick" };
 
+/** Conditions that mean the user already did what a step asks, so the tour moves past it. Any one is enough. */
+export interface TourSkip {
+    /** Some of these `data-tour` targets is already on screen (e.g. the modal the step opens is open). */
+    present?: string[];
+    /** The current path matches this pattern (same syntax as `matchRoute`). */
+    route?: string;
+    /** The tour already has a problem (created or added by the user). */
+    problemChosen?: boolean;
+    /** On arrival, the highlighted field already has content. */
+    filled?: boolean;
+}
+
 export interface TourStep {
     id: string;
+    /** Skip the step when the user got ahead of the guide. */
+    skipWhen?: TourSkip;
     /** `data-tour` value of the element to highlight. Omitted for a centered card. */
     target?: string;
     title: string;

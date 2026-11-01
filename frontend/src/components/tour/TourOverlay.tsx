@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { computeTooltipPosition } from "../../lib/tour/geometry";
 import { currentStep, resolveTargetSelectors, routeAdvancesStep, stepEntryPath, stepProgress } from "../../lib/tour/machine";
+import { shouldSkipStep } from "../../lib/tour/skip";
 import { requestReportView } from "../../lib/tour/reportView";
 import { otherFlow } from "../../lib/tour/steps";
 import type { Size } from "../../lib/tour/types";
@@ -57,6 +58,38 @@ export function TourOverlay() {
         const timer = window.setTimeout(() => setMoving(false), MOVE_TRANSITION_MS);
         return () => window.clearTimeout(timer);
     }, [stepId]);
+
+    // Steps the user already did on their own (opened a modal, filled a field, changed page) are skipped.
+    // Pressing "Atrás" lands on a step on purpose, so that one is not skipped again.
+    const suppressNextRef = useRef(false);
+    const suppressedStepRef = useRef<string | null>(null);
+    const filledChecked = useRef<string | null>(null);
+    useEffect(() => {
+        if (suppressNextRef.current) {
+            suppressNextRef.current = false;
+            suppressedStepRef.current = stepId;
+        }
+        filledChecked.current = null;
+    }, [stepId]);
+
+    const targetElement = target.element;
+    useEffect(() => {
+        if (!step || suppressedStepRef.current === step.id) return;
+        const check = () => {
+            // "Filled" only counts when the step is first seen: typing later is handled by the step itself.
+            const arrival = filledChecked.current !== step.id && targetElement !== null;
+            if (arrival) filledChecked.current = step.id;
+            const skip = shouldSkipStep(step, { problemId }, {
+                path: window.location.pathname,
+                hasTarget: (name) => document.querySelector(`[data-tour="${name}"]`) !== null,
+                filledOnArrival: arrival && isFilled(targetElement),
+            });
+            if (skip) next(step.id);
+        };
+        check();
+        const timer = window.setInterval(check, 250);
+        return () => window.clearInterval(timer);
+    }, [step, problemId, targetElement, next]);
 
     // A step may open its own route (a report) and the view of it that its target lives in.
     useEffect(() => {
@@ -227,7 +260,10 @@ export function TourOverlay() {
                     recoverLabel={recoverLabel}
                     otherFlowLabel={state.flow === "examples" ? "Elegir otro recorrido" : "Probar el otro flujo"}
                     onNext={() => next(step.id)}
-                    onBack={back}
+                    onBack={() => {
+                        suppressNextRef.current = true;
+                        back();
+                    }}
                     onExit={exit}
                     onRecover={recover}
                     onOtherFlow={() => {

@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { HelpCircle, X } from "lucide-react";
 
 interface InfoPopoverProps {
@@ -24,6 +25,52 @@ export function InfoPopover({ label, title, children, className = "relative" }: 
     const panelId = useId();
     const titleId = useId();
 
+    // The panel is portaled into the surrounding dialog (or body) so no ancestor overflow can clip it,
+    // and placed next to the button, clamped to the container's bounds.
+    const [container, setContainer] = useState<HTMLElement | null>(null);
+    const [pos, setPos] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
+
+    useLayoutEffect(() => {
+        if (!open) {
+            setPos(null);
+            return;
+        }
+        const host = (buttonRef.current?.closest('[role="dialog"]') as HTMLElement | null) ?? document.body;
+        setContainer(host);
+
+        const place = () => {
+            const btn = buttonRef.current;
+            const panel = panelRef.current;
+            if (!btn || !panel) return;
+            const margin = 12;
+            const isBody = host === document.body;
+            const box = isBody
+                ? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+                : host.getBoundingClientRect();
+            const b = btn.getBoundingClientRect();
+            const width = panel.offsetWidth;
+            const maxHeight = Math.max(120, box.height - margin * 2);
+            const height = Math.min(panel.scrollHeight, maxHeight);
+
+            let left = b.right - box.left - width;
+            left = Math.min(Math.max(margin, left), box.width - width - margin);
+
+            let top = b.bottom - box.top + 4;
+            if (top + height > box.height - margin) top = b.top - box.top - height - 4;
+            top = Math.min(Math.max(margin, top), box.height - height - margin);
+
+            setPos({ top, left, maxHeight });
+        };
+
+        place();
+        window.addEventListener("resize", place);
+        window.addEventListener("scroll", place, true);
+        return () => {
+            window.removeEventListener("resize", place);
+            window.removeEventListener("scroll", place, true);
+        };
+    }, [open, container]);
+
     useEffect(() => {
         if (!open) return;
         panelRef.current?.focus({ preventScroll: true });
@@ -36,7 +83,9 @@ export function InfoPopover({ label, title, children, className = "relative" }: 
             buttonRef.current?.focus();
         };
         const onPointerDown = (e: PointerEvent) => {
-            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+            const target = e.target as Node;
+            if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+            setOpen(false);
         };
 
         // Capture phase so Escape closes only this panel, not the modal behind it.
@@ -62,14 +111,21 @@ export function InfoPopover({ label, title, children, className = "relative" }: 
                 <HelpCircle size={18} aria-hidden="true" />
             </button>
 
-            {open && (
+            {open && container && createPortal(
                 <div
                     ref={panelRef}
                     id={panelId}
                     role="dialog"
                     aria-labelledby={titleId}
                     tabIndex={-1}
-                    className="absolute right-0 top-full z-40 mt-1 w-[min(22rem,calc(100vw-2.5rem))] max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs leading-relaxed text-slate-700 shadow-2xl focus:outline-none dark:border-[#2b3346] dark:bg-[#141b2c] dark:text-slate-300"
+                    style={{
+                        position: container === document.body ? "fixed" : "absolute",
+                        top: pos?.top ?? 0,
+                        left: pos?.left ?? 0,
+                        maxHeight: pos?.maxHeight,
+                        visibility: pos ? "visible" : "hidden",
+                    }}
+                    className="z-[300] w-[min(22rem,calc(100vw-4rem))] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs leading-relaxed text-slate-700 shadow-2xl focus:outline-none dark:border-[#2b3346] dark:bg-[#141b2c] dark:text-slate-300"
                 >
                     <div className="mb-2 flex items-start justify-between gap-2">
                         <h5 id={titleId} className="text-sm font-bold text-slate-900 dark:text-white">
@@ -88,7 +144,8 @@ export function InfoPopover({ label, title, children, className = "relative" }: 
                         </button>
                     </div>
                     <div className="space-y-3">{children}</div>
-                </div>
+                </div>,
+                container
             )}
         </span>
     );

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
 import {
     Calendar,
     GitCompare,
@@ -72,7 +73,9 @@ export function ReferenceCard({
     const [isExpanded, setIsExpanded] = useState(forceExpanded);
     const wasForcedRef = useRef(forceExpanded);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    const menuButtonRef = useRef<HTMLButtonElement>(null);
     const hasActions = Boolean(onAssignToGroup || onToggleArchive || onDelete);
 
     // The guided tour opens the list while its step is current and closes it when the step ends.
@@ -85,20 +88,41 @@ export function ReferenceCard({
     useEffect(() => {
         if (!isMenuOpen) return;
         const onDown = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setIsMenuOpen(false);
-            }
+            const target = event.target as Node;
+            if (menuRef.current?.contains(target) || menuButtonRef.current?.contains(target)) return;
+            setIsMenuOpen(false);
         };
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape") setIsMenuOpen(false);
         };
+        const close = () => setIsMenuOpen(false);
         document.addEventListener("mousedown", onDown);
         document.addEventListener("keydown", onKey);
+        window.addEventListener("resize", close);
+        window.addEventListener("scroll", close, true);
         return () => {
             document.removeEventListener("mousedown", onDown);
             document.removeEventListener("keydown", onKey);
+            window.removeEventListener("resize", close);
+            window.removeEventListener("scroll", close, true);
         };
     }, [isMenuOpen]);
+
+    const toggleMenu = () => {
+        if (!isMenuOpen) {
+            const rect = menuButtonRef.current?.getBoundingClientRect();
+            if (rect) setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+        }
+        setIsMenuOpen((open) => !open);
+    };
+
+    // The whole card toggles the submissions list; interactive children keep their own behavior.
+    const handleCardClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+        if ((event.target as HTMLElement).closest("button, a, input, select, textarea, [role='button'], [role='menu']")) {
+            return;
+        }
+        setIsExpanded((v) => !v);
+    };
 
     const runAction = (action?: () => void) => {
         setIsMenuOpen(false);
@@ -124,15 +148,19 @@ export function ReferenceCard({
                 archived && "opacity-70"
             )}
         >
-            <div className="p-6">
+            <div className="p-6 cursor-pointer" onClick={handleCardClick}>
                 {/* Distributed Horizontal Layout across the wide card */}
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     {/* Left Section: Title, Badges (Language & Groups) and Description */}
                     <div className="space-y-2 flex-1 min-w-0">
+                        <h3
+                            className="text-lg sm:text-xl font-display font-bold text-slate-900 dark:text-white tracking-tight truncate max-w-md"
+                            title={title}
+                        >
+                            {title}
+                        </h3>
+                        {/* Badges live on their own row so their position never depends on the title length */}
                         <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg sm:text-xl font-display font-bold text-slate-900 dark:text-white tracking-tight truncate max-w-md">
-                                {title}
-                            </h3>
                             <span
                                 className={cn(
                                     "px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border shrink-0",
@@ -223,10 +251,11 @@ export function ReferenceCard({
                         </Button>
 
                         {hasActions && (
-                            <div className="relative" ref={menuRef}>
+                            <div className="relative">
                                 <button
+                                    ref={menuButtonRef}
                                     type="button"
-                                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                    onClick={toggleMenu}
                                     className="p-2.5 min-w-[42px] min-h-[42px] flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-graphito-dark dark:hover:bg-graphito-subtle text-slate-600 dark:text-slate-300 rounded-xl transition-all duration-200 focus-visible:ring-2 focus-visible:ring-graphito-blue focus-visible:outline-none active:scale-95"
                                     aria-label="Más opciones"
                                     aria-haspopup="menu"
@@ -234,10 +263,12 @@ export function ReferenceCard({
                                 >
                                     <MoreVertical className="h-4 w-4" />
                                 </button>
-                                {isMenuOpen && (
+                                {isMenuOpen && menuPos && createPortal(
                                     <div
+                                        ref={menuRef}
                                         role="menu"
-                                        className="absolute right-0 z-30 mt-2 w-56 rounded-xl bg-white/95 dark:bg-graphito-card/95 backdrop-blur-xl border border-slate-200/80 dark:border-white/[0.08] shadow-2xl p-1.5"
+                                        style={{ position: "fixed", top: menuPos.top, right: menuPos.right }}
+                                        className="z-[200] w-56 rounded-xl bg-white dark:bg-graphito-card backdrop-blur-xl border border-slate-200/80 dark:border-white/[0.08] shadow-2xl p-1.5"
                                     >
                                         {onAssignToGroup && !archived && (
                                             <button
@@ -276,7 +307,8 @@ export function ReferenceCard({
                                                 Eliminar
                                             </button>
                                         )}
-                                    </div>
+                                    </div>,
+                                    document.body
                                 )}
                             </div>
                         )}

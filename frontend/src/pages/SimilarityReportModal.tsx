@@ -4,7 +4,6 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
 import { clearVerdict, getVerdict, saveVerdict } from "../lib/verdicts";
-import { calibrationLabel } from "../lib/dictamen";
 import { evidenceByLine } from "../lib/evidence";
 import type { StyleAttribution } from "../lib/styleAttribution";
 import { useDialogFocus } from "../lib/focusTrap";
@@ -527,11 +526,6 @@ export function SimilarityReportModal({
                                         className="px-2.5 py-1 rounded-full text-xs font-semibold border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-300 dark:border-graphito-subtle"
                                     >
                                         Ejemplo
-                                    </span>
-                                )}
-                                {comparison.estado_calibracion && !isSample && (
-                                    <span className="hidden md:inline px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-graphito-subtle">
-                                        {calibrationLabel(comparison.estado_calibracion)}
                                     </span>
                                 )}
                                 {comparison.engine === "demo" && (

@@ -62,13 +62,15 @@ export function BulkUploadModal({
             setIsCompleted(false);
             setBatchId(null);
             setProgressPercent(0);
+            if (preselectedProblemId) setSelectedProblemId(preselectedProblemId);
+            if (preselectedGroupId) setSelectedGroupId(preselectedGroupId);
 
             // Cargar problemas y grupos
             Promise.all([api.problems.list(), api.groups.list()])
                 .then(([probList, grpList]) => {
                     setProblems(probList);
                     setGroups(grpList);
-                    if (!selectedProblemId && probList.length > 0) {
+                    if (!preselectedProblemId && !selectedProblemId && probList.length > 0) {
                         setSelectedProblemId(probList[0].id);
                     }
                 })
