@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { Upload, Database, Check, Minus, Plus, Loader2 } from "lucide-react";
+﻿import React, { useId, useState, useRef } from "react";
+import { Upload, Database, Check, Minus, Plus, Loader2, Info } from "lucide-react";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/Button";
 import { api, IS_DEMO_MODE } from "../lib/api";
@@ -24,6 +24,16 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
     const [variations, setVariations] = useState(3);
     const [generateAI, setGenerateAI] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const uid = useId();
+    const ids = {
+        title: `ref-title-${uid}`,
+        language: `ref-lang-${uid}`,
+        code: `ref-code-${uid}`,
+        description: `ref-desc-${uid}`,
+        aiToggle: `ref-ai-${uid}`,
+        aiInstructions: `ref-ai-text-${uid}`,
+        variations: `ref-var-${uid}`,
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -94,8 +104,9 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                         variant="gradient"
                         data-tour="ref-submit"
                         onClick={handleSubmit}
-                        disabled={isLoading}
+                        disabled={isLoading || IS_DEMO_MODE}
                         isLoading={isLoading}
+                        title={IS_DEMO_MODE ? "No disponible en el Modo Demostración" : undefined}
                         leftIcon={!isLoading ? <Database size={16} /> : undefined}
                         className="!py-3 !px-8"
                     >
@@ -137,7 +148,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
 
             {IS_DEMO_MODE && (
                 <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
-                    <span className="text-base leading-none">ℹ️</span>
+                    <Info size={16} className="shrink-0 mt-0.5" aria-hidden="true" />
                     <div>
                         <span className="font-bold">Modo Demostración (Solo Lectura):</span> La creación de nuevos problemas y subida de archivos está desactivada en esta versión de muestra. Puedes explorar los ejercicios precargados en la biblioteca.
                     </div>
@@ -153,11 +164,13 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
             {/* Row: Title & Language */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2 space-y-1.5" data-tour="ref-title">
-                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
-                        Título del Problema / Ejercicio
+                    <label htmlFor={ids.title} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
+                        Título del Problema / Ejercicio <span aria-hidden="true" className="text-rose-500">*</span>
                     </label>
                     <input
+                        id={ids.title}
                         type="text"
+                        required
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         disabled={isLoading}
@@ -166,10 +179,11 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
+                    <label htmlFor={ids.language} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
                         Lenguaje
                     </label>
                     <select
+                        id={ids.language}
                         value={language}
                         onChange={(e) => setLanguage(e.target.value as "c" | "cpp")}
                         disabled={isLoading}
@@ -184,8 +198,8 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Left Column: Source Code */}
                 <div className="space-y-4" data-tour="ref-code">
-                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-500">
-                        Código Fuente {fileName && <span className="text-graphito-blue">({fileName})</span>}
+                    <label htmlFor={ids.code} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
+                        Código Fuente <span aria-hidden="true" className="text-rose-500">*</span> {fileName && <span className="text-graphito-blue">({fileName})</span>}
                     </label>
                     <div
                         onClick={() => fileInputRef.current?.click()}
@@ -216,6 +230,8 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                         </Button>
                     </div>
                     <textarea
+                        id={ids.code}
+                        required
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
                         disabled={isLoading}
@@ -227,11 +243,12 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                 {/* Right Column: Description */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <label className="text-[10px] uppercase font-black tracking-widest text-slate-500">
+                        <label htmlFor={ids.description} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
                             Enunciado / Descripción
                         </label>
                     </div>
                     <textarea
+                        id={ids.description}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         disabled={isLoading}
@@ -245,8 +262,10 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
             <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/40 rounded-2xl p-6 space-y-6 transition-colors">
                 <div className="flex items-center gap-3">
                     <div
+                        id={ids.aiToggle}
                         role="checkbox"
                         aria-checked={generateAI}
+                        aria-labelledby={`${ids.aiToggle}-label`}
                         tabIndex={0}
                         onKeyDown={(e) => {
                             if (e.key === " " || e.key === "Enter") {
@@ -259,26 +278,27 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                     >
                         {generateAI && <Check size={14} className="text-white" />}
                     </div>
-                    <span className="text-xs font-bold text-slate-800 dark:text-white">
+                    <span id={`${ids.aiToggle}-label`} className="text-xs font-bold text-slate-800 dark:text-white">
                         Generar variaciones mediante inteligencia artificial
                     </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                     <div className="md:col-span-2 space-y-2">
-                        <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 ml-1">
+                        <label htmlFor={ids.aiInstructions} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 ml-1">
                             Instrucciones para la IA
                         </label>
                         <textarea
+                            id={ids.aiInstructions}
                             className="w-full h-24 bg-white dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-graphito-blue/50 transition-all resize-none font-medium"
                             placeholder="Ej: Generar una versión más optimizada y otra con comentarios detallados..."
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-[10px] uppercase font-black tracking-widest text-slate-500 ml-1">
+                        <span id={ids.variations} className="block text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 ml-1">
                             Número de variaciones
-                        </label>
-                        <div className="flex items-center bg-white dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346] rounded-xl overflow-hidden h-24 transition-colors">
+                        </span>
+                        <div role="group" aria-labelledby={ids.variations} className="flex items-center bg-white dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346] rounded-xl overflow-hidden h-24 transition-colors">
                             <button
                                 type="button"
                                 aria-label="Disminuir número de variaciones"

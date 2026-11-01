@@ -150,6 +150,24 @@ export function SideBySideDiffViewer({
             {/* Top Accent Strip */}
             <div className="h-[2px] bg-gradient-to-r from-fuchsia-500/60 via-cyan-400/60 to-amber-300/60 shrink-0" />
 
+            {/* Legend: what the highlighting means, and what it does not */}
+            <ul
+                aria-label="Leyenda del resaltado"
+                className="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2 bg-[#1a1328] border-b border-[#2d2244] font-sans text-[11px] text-slate-300 shrink-0"
+            >
+                <li className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-amber-400/20 shadow-[inset_3px_0_0_rgba(251,191,36,0.9)]" aria-hidden="true" />
+                    Línea con una observación (pasa el cursor o enfócala para leerla)
+                </li>
+                <li className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-fuchsia-950/60 border border-fuchsia-500/30" aria-hidden="true" />
+                    Línea distinta a la de la referencia
+                </li>
+                <li className="text-slate-400">
+                    Los nombres renombrados no se enlazan: la comparación se hace por posición de línea.
+                </li>
+            </ul>
+
             {/* General Comment Composer Dropdown */}
             {showGeneralComposer && (
                 <div className="p-4 bg-[#231a38] border-b border-fuchsia-500/30 text-sans shrink-0">

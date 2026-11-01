@@ -667,10 +667,10 @@ int main(void) {
     return 0;
 }
 `),
-    demoCatalogEntry("demo-ed-u2-busqueda", "Busqueda binaria", "c", "busqueda_binaria.c",
+    demoCatalogEntry("demo-ed-u3-busqueda", "Búsqueda binaria", "c", "busqueda_binaria.c",
         "Búsqueda sobre estructuras ordenadas",
         "Busca un elemento en un arreglo ordenado dividiendo el intervalo a la mitad en cada paso.",
-        "estructuras_de_datos", "Estructuras de Datos", "unidad_2", "Unidad 2: Listas",
+        "estructuras_de_datos", "Estructuras de Datos", "unidad_3", "Unidad 3: Búsqueda",
         `#include <stdio.h>
 
 int busqueda_binaria(int a[], int n, int x) {
@@ -690,7 +690,7 @@ int main(void) {
     return 0;
 }
 `),
-    demoCatalogEntry("demo-pa-u1-fib", "Fibonacci con memoizacion", "cpp", "fibonacci_memo.cpp",
+    demoCatalogEntry("demo-pa-u1-fib", "Fibonacci con memoización", "cpp", "fibonacci_memo.cpp",
         "Memoización y programación dinámica",
         "Calcula números de Fibonacci evitando recálculos mediante una tabla de memoización con std::vector.",
         "programacion_avanzada", "Programación Avanzada", "unidad_1", "Unidad 1: Programación dinámica",

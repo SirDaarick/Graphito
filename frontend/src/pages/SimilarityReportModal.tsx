@@ -3,7 +3,8 @@ import { ArrowLeft, Code2, Download, ShieldCheck, UserCheck, ChevronLeft, Chevro
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
-import { saveVerdict } from "../lib/verdicts";
+import { clearVerdict, getVerdict, saveVerdict } from "../lib/verdicts";
+import { calibrationLabel } from "../lib/dictamen";
 import { evidenceByLine } from "../lib/evidence";
 import { useDialogFocus } from "../lib/focusTrap";
 import { SideBySideDiffViewer, ComentarioRevisionItem } from "../components/code/SideBySideDiffViewer";
@@ -48,7 +49,10 @@ interface CodeData {
 type ViewMode = "report" | "code_diff";
 type CodeStatus = "idle" | "loading" | "error" | "ready";
 
-const KBD = "px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono text-[10px]";
+/** How long the teacher can undo a decision before the toast goes away (and the last submission closes). */
+const UNDO_WINDOW_MS = 5000;
+
+const KBD ="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono text-[10px]";
 
 const FOOTER_TOOLTIP =
     "absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-graphito-surface/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]";
@@ -89,7 +93,9 @@ export function SimilarityReportModal({
     const [comments, setComments] = useState<ComentarioRevisionItem[]>([]);
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
-    const [triageToast, setTriageToast] = useState<{ message: string; type: "success" | "warning" } | null>(null);
+    const [triageToast, setTriageToast] = useState<{ message: string; type: "success" | "warning"; undo: () => void } | null>(null);
+    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const bodyContainerRef = useRef<HTMLDivElement>(null);
@@ -144,38 +150,67 @@ export function SimilarityReportModal({
         }
     };
 
+    const clearToastTimers = () => {
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        toastTimer.current = null;
+        closeTimer.current = null;
+    };
+
     const handleVerdictAndAdvance = (type: "conforme" | "aclaracion") => {
         const isConforme = type === "conforme";
         const msg = isConforme
             ? "Entrega marcada por el docente como revisada, sin observaciones."
             : "Entrega marcada por el docente para aclarar con el estudiante.";
 
-        if (comparison?.id) {
-            saveVerdict(comparison.id, isConforme ? "CONFORME" : "DUDA");
-            if (reportId !== null) {
-                api.analysis.updateVerdict(reportId, isConforme ? "APROBADO" : "EN_DUDA").catch((err) => {
+        clearToastTimers();
+        const decidedId = comparison?.id;
+        const decidedReportId = reportId;
+        const previous = decidedId ? getVerdict(decidedId) : null;
+        const fromIndex = currentIndex;
+        const willAdvance = hasNext && currentIndex >= 0;
+
+        if (decidedId) {
+            saveVerdict(decidedId, isConforme ? "CONFORME" : "DUDA");
+            if (decidedReportId !== null) {
+                api.analysis.updateVerdict(decidedReportId, isConforme ? "APROBADO" : "EN_DUDA").catch((err) => {
                     console.warn("No se pudo persistir el veredicto en backend:", err);
                 });
             }
         }
 
-        setTriageToast({
-            message: msg,
-            type: isConforme ? "success" : "warning",
-        });
-
-        setTimeout(() => {
+        // Undo restores what the teacher had before and, if the view moved on, goes back to that submission.
+        const undo = () => {
+            clearToastTimers();
             setTriageToast(null);
-        }, 2600);
+            if (!decidedId) return;
+            if (previous) saveVerdict(decidedId, previous);
+            else clearVerdict(decidedId);
+            if (decidedReportId !== null) {
+                const restored = previous === "CONFORME" ? "APROBADO" : previous === "DUDA" ? "EN_DUDA" : "PENDIENTE";
+                api.analysis.updateVerdict(decidedReportId, restored).catch((err) => {
+                    console.warn("No se pudo deshacer el veredicto en backend:", err);
+                });
+            }
+            if (willAdvance && submissions && fromIndex >= 0) onSelectComparison?.(submissions[fromIndex]);
+        };
 
-        if (hasNext && currentIndex >= 0) {
+        setTriageToast({ message: msg, type: isConforme ? "success" : "warning", undo });
+        toastTimer.current = setTimeout(() => setTriageToast(null), UNDO_WINDOW_MS);
+
+        if (willAdvance) {
             navigateTo(currentIndex + 1);
         } else {
-            setTimeout(() => {
-                onClose();
-            }, 1000);
+            closeTimer.current = setTimeout(onClose, UNDO_WINDOW_MS);
         }
     };
+
+    // A pending toast or auto-close must not outlive the modal.
+    useEffect(() => {
+        if (isOpen) return;
+        clearToastTimers();
+        setTriageToast(null);
+    }, [isOpen]);
 
     const loadCode = (repId: number) => {
         requestedCodeFor.current = repId;
@@ -413,7 +448,13 @@ export function SimilarityReportModal({
                             >
                                 {triageToast.type === "success" ? <ShieldCheck size={18} className="text-emerald-400" /> : <UserCheck size={18} className="text-amber-400" />}
                                 <span>{triageToast.message}</span>
-                                {hasNext && <span className="opacity-80 text-[10px] ml-1 bg-white/10 px-1.5 py-0.5 rounded">Pasando a la siguiente entrega</span>}
+                                <button
+                                    type="button"
+                                    onClick={triageToast.undo}
+                                    className="ml-1 px-3 py-1.5 min-h-[32px] rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                >
+                                    Deshacer
+                                </button>
                             </div>
                         )}
 
@@ -454,12 +495,12 @@ export function SimilarityReportModal({
                                         STUB
                                     </span>
                                 )}
-                                {comparison.estado_calibracion && (
+                                {comparison.estado_calibracion && !isSample && (
                                     <span className="hidden md:inline px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-graphito-subtle">
-                                        {comparison.estado_calibracion}
+                                        {calibrationLabel(comparison.estado_calibracion)}
                                     </span>
                                 )}
-                                {isSample && (
+                                {comparison.engine === "demo" && (
                                     <span className="hidden sm:inline px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/40">
                                         Datos de ejemplo
                                     </span>
@@ -536,7 +577,7 @@ export function SimilarityReportModal({
 
                         {/* Footer */}
                         <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-slate-50 dark:bg-graphito-dark border-t border-slate-200 dark:border-graphito-subtle/40 shrink-0">
-                            <div className="hidden md:flex items-center gap-2.5 text-[11px] text-slate-600 dark:text-slate-400">
+                            <div className="hidden lg:flex items-center gap-2.5 text-[11px] text-slate-600 dark:text-slate-400">
                                 <span><kbd className={KBD}>←</kbd> <kbd className={KBD}>→</kbd> navegar</span>
                                 <span aria-hidden="true">•</span>
                                 <span><kbd className={KBD}>A</kbd> sin observaciones</span>
@@ -551,24 +592,20 @@ export function SimilarityReportModal({
                                 <button
                                     onClick={() => handleVerdictAndAdvance("conforme")}
                                     aria-label="Marcar sin observaciones (tecla A)"
-                                    className="group relative p-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                                    className="group relative px-3 py-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
                                 >
-                                    <ShieldCheck size={19} />
-                                    <div role="tooltip" className={FOOTER_TOOLTIP}>
-                                        <span>Marcar sin observaciones</span>
-                                    </div>
+                                    <ShieldCheck size={19} aria-hidden="true" />
+                                    <span className="hidden sm:inline">Sin observaciones</span>
                                 </button>
 
                                 {/* Citar a Aclaración */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("aclaracion")}
                                     aria-label="Marcar para aclarar con el estudiante (tecla R)"
-                                    className="group relative p-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                                    className="group relative px-3 py-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                                 >
-                                    <UserCheck size={19} />
-                                    <div role="tooltip" className={FOOTER_TOOLTIP}>
-                                        <span>Marcar para aclarar con el estudiante</span>
-                                    </div>
+                                    <UserCheck size={19} aria-hidden="true" />
+                                    <span className="hidden sm:inline">Aclarar con el estudiante</span>
                                 </button>
 
                                 </div>

@@ -10,7 +10,7 @@ import {
     ArchiveRestore,
     Trash2,
 } from "lucide-react";
-import { GradientButton } from "../ui/GradientButton";
+import { Button } from "../ui/Button";
 import { cn } from "../../lib/utils";
 import { getSavedVerdicts, VerdictType } from "../../lib/verdicts";
 import { ComparisonView } from "../../lib/dictamen";
@@ -150,7 +150,7 @@ export function ReferenceCard({
                                             e.stopPropagation();
                                             onAssignToGroup();
                                         }}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-slate-500 dark:text-slate-400 hover:text-graphito-blue hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-dashed border-slate-300 dark:border-slate-700 shrink-0"
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 min-h-[32px] rounded-md text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-graphito-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-dashed border-slate-300 dark:border-slate-700 shrink-0"
                                         title="Asignar este problema a un grupo académico"
                                     >
                                         <Plus size={10} />
@@ -198,15 +198,16 @@ export function ReferenceCard({
 
                     {/* Right Section: Action Controls */}
                     <div className="flex items-center gap-2.5 shrink-0 self-end lg:self-center">
-                        <GradientButton
-                            className="text-xs sm:text-sm !py-2.5 !px-5 min-h-[42px] !rounded-xl shadow-sm"
+                        <Button
+                            variant="outline"
+                            className="text-xs sm:text-sm !py-2.5 !px-5 min-h-[44px] !rounded-xl whitespace-nowrap !text-graphito-blue !border-graphito-blue/50 hover:!bg-graphito-blue/10"
                             onClick={onCompare}
                             data-tour="compare"
                             data-problem-id={problemId}
+                            leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
                         >
-                            <Plus className="h-4 w-4" />
-                            <span>Comparar</span>
-                        </GradientButton>
+                            Comparar
+                        </Button>
 
                         {hasActions && (
                             <div className="relative" ref={menuRef}>

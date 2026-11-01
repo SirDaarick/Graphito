@@ -45,6 +45,25 @@ export function saveVerdict(comparisonId: string | number, verdict: VerdictType)
 }
 
 /**
+ * Quita el veredicto del docente de una entrega (deshacer) y avisa a la lista con el mismo evento.
+ * @param comparisonId Identificador de la comparación o reporte.
+ */
+export function clearVerdict(comparisonId: string | number): void {
+    try {
+        const verdicts = getSavedVerdicts();
+        delete verdicts[String(comparisonId)];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(verdicts));
+        window.dispatchEvent(
+            new CustomEvent("graphito_verdict_updated", {
+                detail: { comparisonId: String(comparisonId), verdict: null },
+            })
+        );
+    } catch (e) {
+        console.error("Error al quitar veredicto docente:", e);
+    }
+}
+
+/**
  * Consulta el veredicto previamente emitido para una comparación dada.
  * @param comparisonId Identificador de la comparación.
  * @returns {VerdictType | null} El veredicto almacenado o null si no se ha emitido uno.
