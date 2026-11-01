@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.infrastructure.database.session import get_db
 from app.infrastructure.database.models import Docente, ReporteAnalisis, ComentarioRevision
-from app.presentation.api.v1.deps import get_current_docente
+from app.presentation.api.v1.deps import get_current_docente, load_owned_report
 from app.presentation.schemas.comment import ComentarioCreate, ComentarioResponse
 
 router = APIRouter()
@@ -29,16 +29,7 @@ async def list_comments(
     Returns:
         List[ComentarioResponse]: Lista de anotaciones con autor y línea asociada.
     """
-    # Verificar que el reporte exista
-    res = await db.execute(
-        select(ReporteAnalisis).where(ReporteAnalisis.id == reporte_id)
-    )
-    reporte = res.scalar_one_or_none()
-    if not reporte:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Reporte no encontrado.",
-        )
+    await load_owned_report(db, reporte_id, current_user.id)
 
     stmt = (
         select(ComentarioRevision)
@@ -86,16 +77,7 @@ async def create_comment(
     Returns:
         ComentarioResponse: Registro persistido del comentario con metadatos de autoría.
     """
-    # Verificar existencia de reporte
-    res = await db.execute(
-        select(ReporteAnalisis).where(ReporteAnalisis.id == reporte_id)
-    )
-    reporte = res.scalar_one_or_none()
-    if not reporte:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Reporte no encontrado.",
-        )
+    await load_owned_report(db, reporte_id, current_user.id)
 
     comentario = ComentarioRevision(
         reporte_id=reporte_id,
@@ -137,6 +119,7 @@ async def delete_comment(
         current_user (Docente): Docente evaluador autenticado.
         db (AsyncSession): Sesión asíncrona de base de datos.
     """
+    await load_owned_report(db, reporte_id, current_user.id)
     stmt = select(ComentarioRevision).where(
         ComentarioRevision.id == comment_id,
         ComentarioRevision.reporte_id == reporte_id,

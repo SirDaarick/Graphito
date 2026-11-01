@@ -15,7 +15,12 @@ from app.application.services.batch_analysis_service import BatchAnalysisService
 from app.application.services.xai_service import XAIService
 from app.application.services.scoring_service import ScoringService
 from app.application.services.usage_events import record_event
-from app.presentation.api.v1.deps import get_current_docente, get_scoring_service
+from app.presentation.api.v1.deps import (
+    ensure_owned_entrega,
+    get_current_docente,
+    get_scoring_service,
+    load_owned_report,
+)
 from app.presentation.schemas.analysis import (
     AnalysisRunRequest,
     ReporteAnalisisResponse,
@@ -40,6 +45,7 @@ async def run_analysis(
     db: AsyncSession = Depends(get_db),
     scoring: ScoringService = Depends(get_scoring_service),
 ):
+    await ensure_owned_entrega(db, request.entrega_id, current_user.id)
     orchestrator = AnalysisOrchestrator(db, scoring=scoring)
     if async_mode:
         return await orchestrator.start_async_analysis(current_user.id, request)
@@ -52,6 +58,7 @@ async def get_report(
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
+    await load_owned_report(db, report_id, current_user.id)
     orchestrator = AnalysisOrchestrator(db)
     report = await orchestrator.get_report(report_id)
     in_example_group = await db.execute(
@@ -76,8 +83,7 @@ async def download_report_pdf(
     incluyendo métricas bimodales, señales forenses, código fuente con numeración de líneas
     y anotaciones pedagógicas registradas por el docente.
     """
-    orchestrator = AnalysisOrchestrator(db)
-    report = await orchestrator.get_report_model(report_id)
+    report = await load_owned_report(db, report_id, current_user.id)
 
     student_author = report.entrega.autor if report.entrega else None
     student_code = report.entrega.contenido if report.entrega else None
@@ -115,8 +121,7 @@ async def get_report_code(
     Obtiene los códigos fuente necesarios para el cotejo visual lado a lado (Side-by-Side Diff):
     código evaluado del estudiante frente al código canónico de referencia del problema o entrega contrastada.
     """
-    orchestrator = AnalysisOrchestrator(db)
-    report = await orchestrator.get_report_model(report_id)
+    report = await load_owned_report(db, report_id, current_user.id)
 
     student_author = report.entrega.autor if report.entrega else "Estudiante"
     student_code = report.entrega.contenido if report.entrega else ""
@@ -183,17 +188,7 @@ async def get_report_style_attribution(
     Aproximación por oclusión: líneas que más influyen en el puntaje de estilo (CharCNN). Se quita cada
     línea y se mide el cambio del puntaje; no es un dictamen ni una detección por línea.
     """
-    orchestrator = AnalysisOrchestrator(db)
-    report = await orchestrator.get_report_model(report_id)
-    if (
-        report.entrega
-        and report.entrega.problema
-        and report.entrega.problema.docente_id != current_user.id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permiso para ver esta entrega.",
-        )
+    report = await load_owned_report(db, report_id, current_user.id)
     runtime = inference_runtime.get_runtime()
     manifest_sha = getattr(getattr(runtime, "calibration", None), "manifest_sha256", "") or ""
     service = StyleAttributionService(engine, model_id=str(manifest_sha))
@@ -290,6 +285,7 @@ async def update_report_verdict(
     Persiste en base de datos la decisión humana final del docente (Human-in-the-Loop)
     para active learning y seguimiento de integridad académica institucional.
     """
+    await load_owned_report(db, report_id, current_user.id)
     orchestrator = AnalysisOrchestrator(db)
     return await orchestrator.update_verdict(
         docente_id=current_user.id,

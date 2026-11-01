@@ -31,6 +31,42 @@ def get_scoring_service(
     return ScoringService(inference, runtime.calibration, vector_store, runtime.lexical)
 
 
+async def load_owned_report(db: AsyncSession, report_id: int, docente_id: int):
+    """Load a report (with its relations) only if its problem belongs to `docente_id`.
+
+    Chain: ReporteAnalisis.entrega_id -> CodigoFuente.problema_id -> Problema.docente_id.
+    404 when the report does not exist, 403 when it belongs to another teacher.
+    """
+    from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
+
+    report = await AnalysisOrchestrator(db).get_report_model(report_id)
+    problema = report.entrega.problema if report.entrega else None
+    if problema is None or problema.docente_id != docente_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para ver esta entrega.",
+        )
+    return report
+
+
+async def ensure_owned_entrega(db: AsyncSession, entrega_id, docente_id: int) -> None:
+    """403 when the submission's problem belongs to another teacher; unknown ids fall through
+    so the caller keeps its own 404."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.infrastructure.database.models import CodigoFuente
+
+    res = await db.execute(
+        select(CodigoFuente).options(selectinload(CodigoFuente.problema)).where(CodigoFuente.id == entrega_id)
+    )
+    entrega = res.scalar_one_or_none()
+    if entrega is not None and (entrega.problema is None or entrega.problema.docente_id != docente_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para analizar esta entrega.",
+        )
+
+
 async def get_current_docente(
     request: Request,
     token: str = Depends(oauth2_scheme),
