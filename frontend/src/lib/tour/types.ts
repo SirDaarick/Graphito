@@ -50,6 +50,8 @@ export interface TourStep {
     reportView?: TourReportView;
     /** The library page selects the example group while this step is current. */
     showGroup?: boolean;
+    /** The library page expands the submissions list of the problem the teacher picked while this step is current. */
+    expandProblem?: boolean;
     /** Examples flow: the step is skipped when the chosen problem has no report of this case. */
     requiresCase?: ExampleCase;
 }

@@ -42,6 +42,22 @@ class StylometryResult:
             raise ValueError("a non-abstained result needs a score")
 
 
+@dataclass(frozen=True)
+class LineAttributionResult:
+    """Occlusion attribution of the CharCNN score over source lines (an approximation).
+
+    `deltas` maps a 1-based source line number to the drop in the RAW (uncalibrated) score when the line is
+    removed; positive means the line pushes the style score up. Real engines measure it in log-odds (the
+    probability saturates near 1.0), stubs in arbitrary fake units: only the ordering and the relative
+    size are meaningful. Only evaluated lines appear.
+    `base_score` is None when the file is too short to score (`abstained`), and `deltas` is then empty.
+    """
+
+    base_score: Optional[float]
+    abstained: bool
+    deltas: Mapping[int, float] = field(default_factory=dict)
+
+
 class InferencePort(ABC):
     """Bimodal inference engine: GraphCodeBERT v2 embeddings (secondary) and CharCNN v2 (Channel B)."""
 
@@ -61,3 +77,11 @@ class InferencePort(ABC):
     @abstractmethod
     async def predict_stylometry(self, code: str) -> StylometryResult:
         """CharCNN v2 raw score or abstention. Raises `InferenceError` on failure."""
+
+    @abstractmethod
+    async def attribute_stylometry_by_line(self, code: str, max_lines: int = 300) -> LineAttributionResult:
+        """Leave-one-line-out attribution of the Channel B raw score (an approximation).
+
+        Each non-empty line (the first `max_lines`) is removed, the file is re-scored through the same
+        path as `predict_stylometry`, and `delta = p(original) - p(without the line)` is reported.
+        Raises `InferenceError` on failure."""

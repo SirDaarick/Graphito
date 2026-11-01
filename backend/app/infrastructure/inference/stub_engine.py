@@ -1,7 +1,7 @@
 import hashlib
 import math
 from typing import Dict, List, Any
-from app.domain.ports.inference_port import InferencePort, Readiness, StylometryResult
+from app.domain.ports.inference_port import InferencePort, LineAttributionResult, Readiness, StylometryResult
 
 # Same minimum as `models.char_cnn.preprocess.MIN_NON_WS_CHARS` (asserted in tests); duplicated so
 # the stub never imports the models package.
@@ -42,6 +42,21 @@ class StubInferenceEngine(InferencePort):
         if len("".join(code.split())) < STUB_MIN_NON_WS_CHARS:
             return StylometryResult(raw_score=None, abstained=True, reason="insufficient_length")
         return StylometryResult(raw_score=await self.predict_synthetic_prob(code), abstained=False)
+
+    async def attribute_stylometry_by_line(self, code: str, max_lines: int = 300) -> LineAttributionResult:
+        """Deterministic fake deltas in [-0.1, 0.1] derived from each line's text (mixed signs)."""
+        base = await self.predict_stylometry(code)
+        if base.abstained:
+            return LineAttributionResult(base_score=None, abstained=True)
+        deltas: Dict[int, float] = {}
+        for number, line in enumerate(code.split("\n"), start=1):
+            if not line.strip():
+                continue
+            if len(deltas) >= max_lines:
+                break
+            bucket = int(hashlib.sha256(line.strip().encode("utf-8")).hexdigest()[:6], 16) % 2001
+            deltas[number] = round((bucket - 1000) / 10000, 6)
+        return LineAttributionResult(base_score=base.raw_score, abstained=False, deltas=deltas)
 
     # --- legacy, outside the port -----------------------------------------------------------------
     # `predict_synthetic_prob` is the deterministic heuristic behind `predict_stylometry`.

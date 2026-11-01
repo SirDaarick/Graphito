@@ -24,12 +24,13 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from app.domain.errors import InferenceError
-from app.domain.ports.inference_port import CANONICALIZATION_FALLBACK, InferencePort, Readiness, StylometryResult
+from app.domain.ports.inference_port import CANONICALIZATION_FALLBACK, InferencePort, LineAttributionResult, Readiness, StylometryResult
 from app.infrastructure.artifacts.models_path import ensure_on_path
 
 logger = logging.getLogger(__name__)
@@ -248,6 +249,49 @@ class RealBimodalInferenceEngine(InferencePort):
         if isinstance(score, bool) or not isinstance(score, (int, float)):
             raise InferenceError("charcnn_result_invalid", "CharCNN result lacks a numeric `score`")
         return StylometryResult(raw_score=float(score), abstained=False)
+
+    def _occlude(self, code: str, max_lines: int) -> LineAttributionResult:
+        """Leave-one-line-out scoring on an inference thread.
+
+        Every variant goes through the same path as `predict_one` (`preprocess_v2` -> `encode` ->
+        windowed mean logits -> softmax), batched by `score_arrays`. Variants whose normalized text equals
+        the original's (blank or comment-only lines) are not scored: their delta is 0.
+        """
+        ensure_on_path()
+        from models.char_cnn.v2.preprocess import effective_length_v2, encode, preprocess_v2
+        from models.char_cnn.v2.scoring import score_arrays
+
+        model, cfg, device = self.charcnn.model, self.charcnn.config, self.charcnn.device
+        base_text = preprocess_v2(code)
+        if effective_length_v2(base_text) < cfg.min_non_ws_chars:
+            return LineAttributionResult(base_score=None, abstained=True)
+
+        lines = code.split("\n")
+        candidates = [i for i, line in enumerate(lines) if line.strip()][:max_lines]
+        variants: Dict[int, str] = {}
+        unique: Dict[str, int] = {}
+        for i in candidates:
+            text = preprocess_v2("\n".join(lines[:i] + lines[i + 1:]))
+            variants[i] = text
+            if text != base_text and text not in unique:
+                unique[text] = len(unique) + 1  # slot 0 is the original
+        arrays = [encode(base_text)] + [encode(text) for text in unique]
+        scores, _, _ = score_arrays(model, arrays, device, batch_size=32, cfg=cfg)
+        base = float(scores[0])
+        # Measured in log-odds: the raw probability saturates near 1.0 for most synthetic-looking files
+        # (every probability delta would round to 0), while log-odds keeps the ordering of the lines.
+        odds = [math.log(max(min(float(s), 1 - 1e-12), 1e-12) / (1 - max(min(float(s), 1 - 1e-12), 1e-12))) for s in scores]
+        deltas = {
+            i + 1: (0.0 if text == base_text else odds[0] - odds[unique[text]])
+            for i, text in variants.items()
+        }
+        return LineAttributionResult(base_score=round(base, 6), abstained=False, deltas=deltas)
+
+    async def attribute_stylometry_by_line(self, code: str, max_lines: int = 300) -> LineAttributionResult:
+        try:
+            return await self._run(self._occlude, code, max_lines)
+        except Exception as exc:
+            raise InferenceError("charcnn_failed", f"{type(exc).__name__}: {exc}") from exc
 
     def close(self) -> None:
         self._executor.shutdown(wait=False)

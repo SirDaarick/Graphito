@@ -7,6 +7,7 @@ import {
     routeAdvancesStep,
     stepEntryPath,
     stepProgress,
+    tourExpandedProblemId,
     tourGroupId,
     tourReducer,
 } from "./machine";
@@ -101,8 +102,11 @@ describe("tourReducer", () => {
         it("stores the problem and advances in one action", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
             expect(picked.context.problemId).toBe(32);
-            expect(currentStep(picked)?.id).toBe("ex-identical-semantic");
-            expect(stepEntryPath(currentStep(picked)!, picked.context)).toBe("/reporte/201");
+            expect(currentStep(picked)?.id).toBe("ex-problem-submissions");
+            expect(stepEntryPath(currentStep(picked)!, picked.context)).toBeNull();
+            const reports = run([{ type: "next" }], picked);
+            expect(currentStep(reports)?.id).toBe("ex-identical-semantic");
+            expect(stepEntryPath(currentStep(reports)!, reports.context)).toBe("/reporte/201");
         });
 
         it("is idempotent for the step it came from and ignored on other steps", () => {
@@ -112,20 +116,20 @@ describe("tourReducer", () => {
             expect(run([{ type: "pick", problemId: 31 }], INITIAL_TOUR_STATE)).toBe(INITIAL_TOUR_STATE);
         });
 
-        it("a problem with four cases walks all twelve steps", () => {
+        it("a problem with four cases walks all thirteen steps", () => {
             const picked = run([{ type: "pick", problemId: 31, from: "ex-library" }], started);
             expect(ids(picked)).toHaveLength(getSteps("examples").length);
-            expect(stepProgress(picked)).toEqual({ current: 2, total: 12 });
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 13 });
         });
 
         it("a problem without an AI case skips that step in next, back, goTo and progress", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
-            expect(stepProgress(picked)).toEqual({ current: 2, total: 11 });
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 12 });
             const atDifferentCode = run([{ type: "goTo", stepId: "ex-different-code" }], picked);
             expect(currentStep(atDifferentCode)?.id).toBe("ex-different-code");
             const afterIt = run([{ type: "next" }], atDifferentCode);
             expect(currentStep(afterIt)?.id).toBe("ex-done");
-            expect(stepProgress(afterIt)).toEqual({ current: 11, total: 11 });
+            expect(stepProgress(afterIt)).toEqual({ current: 12, total: 12 });
             expect(currentStep(run([{ type: "back" }], afterIt))?.id).toBe("ex-different-code");
             expect(run([{ type: "goTo", stepId: "ex-ai-style" }], picked)).toBe(picked);
             expect(run([{ type: "next" }], afterIt)).toEqual(INITIAL_TOUR_STATE);
@@ -135,7 +139,7 @@ describe("tourReducer", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
             const again = run([{ type: "goTo", stepId: "ex-library" }, { type: "pick", problemId: 31 }], picked);
             expect(again.context.problemId).toBe(31);
-            expect(stepProgress(again).total).toBe(12);
+            expect(stepProgress(again).total).toBe(13);
         });
     });
 
@@ -204,9 +208,30 @@ describe("tourGroupId", () => {
     });
 });
 
+describe("tourExpandedProblemId", () => {
+    const picked = (problemId: number) =>
+        run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }, { type: "pick", problemId }]);
+
+    it("is the picked problem only while the submissions step is current", () => {
+        const state = picked(32);
+        expect(currentStep(state)?.id).toBe("ex-problem-submissions");
+        expect(tourExpandedProblemId(state)).toBe(32);
+        expect(tourExpandedProblemId(run([{ type: "next" }], state))).toBeNull();
+        expect(tourExpandedProblemId(run([{ type: "back" }], state))).toBeNull();
+    });
+
+    it("is null when idle, outside the examples flow and before a pick", () => {
+        expect(tourExpandedProblemId(INITIAL_TOUR_STATE)).toBeNull();
+        expect(tourExpandedProblemId(run([{ type: "open" }, { type: "choose", flow: "own" }]))).toBeNull();
+        expect(
+            tourExpandedProblemId(run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }])),
+        ).toBeNull();
+    });
+});
+
 describe("stepEntryPath", () => {
     it("resolves the report a step opens from the tour context", () => {
-        const state = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }, { type: "next" }]);
+        const state = run([{ type: "open" }, { type: "choose", flow: "examples", examples: EXAMPLES }, { type: "next" }, { type: "next" }]);
         expect(stepEntryPath(currentStep(state)!, state.context)).toBe("/reporte/101");
     });
 
