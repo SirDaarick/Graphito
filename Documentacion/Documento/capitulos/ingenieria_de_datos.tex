@@ -3,32 +3,62 @@
 
 Un modelo de aprendizaje automático se parece a un estudiante que prepara un examen: aprende de los ejemplos que se le muestran. Si esos ejemplos son pocos, están sesgados o repiten las preguntas del examen, el resultado final puede parecer bueno sin serlo. Por eso, antes de describir los modelos, este capítulo explica de dónde salen los datos de Graphito y cómo se prepararon para que la evaluación sea justa.
 
-Siguiendo la metodología \textbf{Komorebi} para proyectos de Inteligencia Artificial \cite{verges_como_2023}, el capítulo cubre dos fases. La \textbf{Adquisición de Datos} (Sección~\ref{sec:adquisicion_datos}) responde a tres preguntas: qué código se necesitaba y de dónde salió (el conjunto de estudiantes de Sarajevo y el conjunto externo \textit{Project CodeNet}, que sirve para ajustar el Canal A), cómo se obtuvo la contraparte generada por inteligencia artificial (IA) sobre los mismos problemas y cuántos ejemplos de IA bastan. La \textbf{Preparación de Datos} (Sección~\ref{sec:preparacion_datos}) explica cómo se limpiaron los archivos, cómo se retiraron los duplicados, cómo se dividió cada conjunto sin fuga de información y cómo se adaptó el texto para cada uno de los dos canales de análisis. La Figura~\ref{fig:pipeline_adquisicion} resume el recorrido completo.
+Siguiendo la metodología \textbf{Komorebi} para proyectos de Inteligencia Artificial \cite{verges_como_2023}, el capítulo cubre dos fases y, en cada una, describe por separado el conjunto de datos de cada canal de análisis. El \textbf{Canal A (semántica)} se ajusta con el conjunto externo \textit{Project CodeNet}; el \textbf{Canal B (estilo)} se entrena con el conjunto de estudiantes de Sarajevo y su contraparte generada por inteligencia artificial (IA). La \textbf{Adquisición de Datos} (Sección~\ref{sec:adquisicion_datos}) responde a qué código se necesitaba, de dónde salió y cómo se obtuvo; en el Canal B, además, cómo se generó la contraparte de IA y cuántos ejemplos bastan. La \textbf{Preparación de Datos} (Sección~\ref{sec:preparacion_datos}) explica cómo se limpiaron los archivos, cómo se dividió cada conjunto sin fuga de información y cómo se adaptó el código para cada canal. Ambos recorridos tienen la misma importancia y se resumen lado a lado en la Figura~\ref{fig:pipeline_adquisicion}.
 
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}[
-        node distance=0.6cm and 0cm,
-        box/.style={rectangle, draw=black!60, fill=blue!6, rounded corners=3pt, text width=10.5cm, align=center, inner sep=6pt, font=\small},
-        proc/.style={rectangle, draw=black!60, fill=cyan!8, rounded corners=3pt, text width=10.5cm, align=center, inner sep=6pt, font=\small},
-        data/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, text width=10.5cm, align=center, inner sep=6pt, font=\small},
+        acq/.style={rectangle, draw=black!60, fill=blue!8, rounded corners=3pt, align=center, inner sep=4pt, font=\footnotesize},
+        prep/.style={rectangle, draw=black!60, fill=orange!15, rounded corners=3pt, align=center, inner sep=4pt, font=\footnotesize},
+        res/.style={rectangle, draw=black!60, fill=green!12, rounded corners=3pt, align=center, inner sep=4pt, font=\footnotesize},
+        narrow/.style={text width=3.3cm, minimum height=1.6cm},
+        wide/.style={text width=7.2cm, minimum height=1.3cm},
+        head/.style={rectangle, draw=black!60, fill=gray!20, rounded corners=3pt, text width=7.2cm, minimum height=0.8cm, align=center, inner sep=4pt, font=\small\bfseries},
+        phase/.style={font=\footnotesize\bfseries, text=black!60},
+        key/.style={rectangle, draw=black!60, rounded corners=3pt, text width=2.4cm, minimum height=0.5cm, align=center, inner sep=3pt, font=\footnotesize},
         arrow/.style={->, >=stealth, thick, draw=black!75}
     ]
-        \node[box, fill=gray!12] (ieee) {\textbf{Código real de estudiantes}\\Conjunto público de la Universidad de Sarajevo (2016--2017), 43,771 entregas en C y C++};
-        \node[proc, below=of ieee] (enun) {\textbf{Reconstrucción de enunciados}\\Un modelo de lenguaje deduce, a partir de varias soluciones, qué pedía cada tarea};
-        \node[proc, below=of enun] (gen) {\textbf{Generación de la contraparte de IA}\\Mismo problema, mismo idioma, perfiles de estudiante: 1,520 archivos};
-        \node[data, below=of gen] (limp) {\textbf{Limpieza y eliminación de duplicados}\\Mismo criterio para código humano y de IA};
-        \node[data, below=of limp] (split) {\textbf{Partición \texttt{split\_v1}}\\Entrenamiento, validación y prueba, separadas por tarea};
-        \node[box, fill=green!12, below=of split] (conj) {\textbf{Conjunto de datos de Graphito}\\42,389 archivos: 40,936 humanos y 1,453 de IA};
-        \node[box, dashed, fill=violet!8, below=1.0cm of conj] (cn) {\textbf{Conjunto externo \textit{Project CodeNet}}\\Se prepara y se particiona aparte, por problema: 27,463 programas para ajustar el Canal A};
+        % ================= Canal A =================
+        \node[head] (ha) at (0,0) {Canal A (semántica): Project CodeNet};
+        \node[phase] (pa1) at ([yshift=-0.4cm]ha.south) {ADQUISICIÓN};
+        \node[acq, narrow, anchor=north] (a1) at ([xshift=-1.85cm,yshift=-0.15cm]pa1.south) {\textbf{Correctas}\\C++1000 (IBM)};
+        \node[acq, narrow, anchor=north] (a2) at ([xshift=1.85cm,yshift=-0.15cm]pa1.south) {\textbf{Incorrectas}\\\textit{Wrong Answer}};
+        \node[phase] (pa2) at ([yshift=-0.7cm]a1.south -| pa1.south) {PREPARACIÓN};
+        \node[prep, wide, anchor=north] (a3) at ([yshift=-0.15cm]pa2.south) {\textbf{Muestreo y filtros}\\Hasta 20 correctas y 10 incorrectas por problema};
+        \node[prep, wide, anchor=north] (a4) at ([yshift=-0.45cm]a3.south) {\textbf{Partición por problema}\\Entrenamiento, validación y prueba};
+        \node[prep, wide, anchor=north] (a5) at ([yshift=-0.45cm]a4.south) {\textbf{Entrada del Canal A}\\Sin comentarios, nombres canónicos y grafo de flujo de datos};
+        \node[res, wide, anchor=north] (a6) at ([yshift=-0.45cm]a5.south) {\textbf{Conjunto CodeNet}\\27,463 programas en 988 problemas};
 
-        \draw[arrow] (ieee.south) -- (enun.north);
-        \draw[arrow] (enun.south) -- (gen.north);
-        \draw[arrow] (gen.south) -- (limp.north);
-        \draw[arrow] (limp.south) -- (split.north);
-        \draw[arrow] (split.south) -- (conj.north);
+        \draw[arrow] (a1.south) -- (a1.south |- pa2.north);
+        \draw[arrow] (a2.south) -- (a2.south |- pa2.north);
+        \draw[arrow] (pa2.south) -- (a3.north);
+        \foreach \i/\j in {a3/a4,a4/a5,a5/a6}
+            \draw[arrow] (\i.south) -- (\j.north);
+
+        % ================= Canal B =================
+        \node[head] (hb) at (8.0,0) {Canal B (estilo): Sarajevo e IA};
+        \node[phase] (pb1) at ([yshift=-0.4cm]hb.south) {ADQUISICIÓN};
+        \node[acq, narrow, anchor=north] (b1) at ([xshift=-1.85cm,yshift=-0.15cm]pb1.south) {\textbf{Código humano}\\Estudiantes de Sarajevo};
+        \node[acq, narrow, anchor=north] (b2) at ([xshift=1.85cm,yshift=-0.15cm]pb1.south) {\textbf{Código de IA}\\Enunciados y generación};
+        \node[phase] (pb2) at ([yshift=-0.7cm]b1.south -| pb1.south) {PREPARACIÓN};
+        \node[prep, wide, anchor=north] (b3) at ([yshift=-0.15cm]pb2.south) {\textbf{Limpieza y duplicados}\\Mismo criterio para ambas clases};
+        \node[prep, wide, anchor=north] (b4) at ([yshift=-0.45cm]b3.south) {\textbf{Partición por tarea}\\Entrenamiento, validación y prueba};
+        \node[prep, wide, anchor=north] (b5) at ([yshift=-0.45cm]b4.south) {\textbf{Entrada del Canal B}\\Texto sin comentarios ni cabeceras};
+        \node[res, wide, anchor=north] (b6) at ([yshift=-0.45cm]b5.south) {\textbf{Conjunto de Graphito}\\42,389 archivos: 40,936 humanos y 1,453 de IA};
+
+        \draw[arrow] (b1.south) -- (b1.south |- pb2.north);
+        \draw[arrow] (b2.south) -- (b2.south |- pb2.north);
+        \draw[arrow] (pb2.south) -- (b3.north);
+        \foreach \i/\j in {b3/b4,b4/b5,b5/b6}
+            \draw[arrow] (\i.south) -- (\j.north);
+
+        % ================= Leyenda =================
+        \coordinate (leg) at ([xshift=4cm,yshift=-0.7cm]a6.south);
+        \node[key, fill=blue!8]    at ([xshift=-2.9cm]leg) {Adquisición};
+        \node[key, fill=orange!15] at (leg) {Preparación};
+        \node[key, fill=green!12]  at ([xshift=2.9cm]leg) {Resultado};
     \end{tikzpicture}
-    \caption{Flujo general de adquisición y preparación de los datos de Graphito, desde el código real de estudiantes hasta el conjunto particionado. El conjunto externo de CodeNet (abajo) sigue su propio recorrido, descrito en las Secciones~\ref{subsec:origen_codenet} y~\ref{subsec:seleccion_codenet}.}
+    \caption[Adquisición y preparación de los datos de cada canal.]{Adquisición y preparación de los datos: Canal A (CodeNet) a la izquierda y Canal B (Sarajevo e IA) a la derecha. Detalle en las Secciones~\ref{subsec:adquisicion_canal_a} a~\ref{subsec:preparacion_canal_b}.}
     \label{fig:pipeline_adquisicion}
 \end{figure}
 
@@ -37,13 +67,87 @@ Siguiendo la metodología \textbf{Komorebi} para proyectos de Inteligencia Artif
 \label{sec:adquisicion_datos}
 % ======================================================================
 
-El objetivo fue reunir dos grupos de programas: los escritos por estudiantes y los generados por IA. La condición clave es que ambos grupos resuelvan los mismos problemas. Así, las dos clases difieren en su \textbf{origen} y no en el tema, de modo que un modelo no puede distinguirlas solo por el problema que resuelven. Para el Canal A hizo falta además un insumo de otra naturaleza: muchos problemas distintos con soluciones correctas e incorrectas, que sirven para enseñarle qué significa que dos programas se parezcan. Ese insumo proviene de un conjunto público externo, \textit{Project CodeNet}, que se presenta junto al de los estudiantes.
+El objetivo fue reunir dos conjuntos de datos, uno para cada canal de análisis, y cada uno tiene su propio recorrido de adquisición. El \textbf{Canal B} (estilo) necesita dos grupos de programas: los escritos por estudiantes y los generados por IA. La condición clave es que ambos grupos resuelvan los mismos problemas. Así, las dos clases difieren en su \textbf{origen} y no en el tema, de modo que un modelo no puede distinguirlas solo por el problema que resuelven. El \textbf{Canal A} (semántica) necesita un insumo de otra naturaleza: muchos problemas distintos con soluciones correctas e incorrectas, que sirven para enseñarle qué significa que dos programas se parezcan. Ese insumo proviene de un conjunto público externo, \textit{Project CodeNet}. Cada canal define sus propios requerimientos y sigue su propio recorrido.
 
 % ----------------------------------------------------------------------
-\subsection{Requerimientos del Conjunto de Datos}
+\subsection{Canal A: Project CodeNet}
+\label{subsec:adquisicion_canal_a}
+
+El Canal A aprende por comparación (Capítulo~\ref{cap:modelado}), por lo que su conjunto de datos se adquirió en tres pasos: elegir la fuente y el lenguaje, descargar las soluciones correctas y reunir las incorrectas.
+
+\subsubsection{Requerimientos del Conjunto de Datos}
+\label{subsec:requerimientos_canal_a}
+
+El ajuste que se describe en el Capítulo~\ref{cap:modelado} aprende por comparación, por lo que el conjunto del Canal A debe cumplir cuatro condiciones:
+
+\begin{enumerate}
+    \item \textbf{Muchos problemas distintos,} para que el modelo aprenda a comparar programas y no a reconocer un problema concreto.
+    \item \textbf{Varias soluciones por problema,} para enseñarle que programas muy diferentes pueden resolver lo mismo.
+    \item \textbf{Un veredicto de correcto o incorrecto} que no dependa de la opinión de una persona.
+    \item \textbf{Autoría humana anterior a los modelos de lenguaje actuales,} por las razones que se detallan en la Sección~\ref{subsec:requerimientos_dataset}.
+\end{enumerate}
+
+El conjunto de Sarajevo no cumple las tres primeras (tiene 48 tareas una vez agrupadas, y se reserva para evaluar), por lo que se buscó un segundo conjunto.
+
+\subsubsection{Selección del Dataset: Project CodeNet}
+\label{subsec:origen_codenet}
+
+Para ajustar el Canal A se eligió \textit{Project CodeNet} \cite{Puri2021CodeNet}, un conjunto público creado por IBM Research y presentado en 2021 como \textit{benchmark} para tareas de aprendizaje automático sobre código, entre ellas la detección de similitud y la clasificación de programas. Sus datos provienen de las plataformas de concursos de programación en línea \textit{AIZU Online Judge} y \textit{AtCoder}, donde cada participante envía una solución y un juez automático la ejecuta contra pruebas y emite un veredicto. Se obtuvo por descarga pública: el conjunto completo pesa unos 7.8 GB y, además, ofrece subconjuntos ya depurados por lenguaje. La Tabla~\ref{tab:dimensiones_codenet} resume su estructura.
+
+\begin{table}[H]
+    \centering
+    \caption{Estructura del conjunto Project CodeNet y del subconjunto utilizado.}
+    \label{tab:dimensiones_codenet}
+    \begin{tabularx}{\textwidth}{|l|X|}
+        \hline
+        \textbf{Aspecto} & \textbf{Detalle} \\ \hline
+        Origen & Envíos a las plataformas AIZU Online Judge y AtCoder \\ \hline
+        Tamaño total & Unos 14 millones de envíos, más de 4,000 problemas y 55 lenguajes \\ \hline
+        Contenido por problema & Enunciado, carpetas de código fuente por lenguaje y una tabla de metadatos (autor anónimo, fecha, lenguaje, veredicto, tiempo y memoria) \\ \hline
+        Veredictos & \textit{Accepted} (pasó todas las pruebas), \textit{Wrong Answer} (respuesta incorrecta) y otros, como exceder el tiempo \\ \hline
+        Subconjunto utilizado & Lenguaje C++: 1,000 problemas con soluciones aceptadas (subconjunto depurado \textit{C++1000}) y envíos \textit{Wrong Answer} tomados de los metadatos del conjunto completo \\ \hline
+    \end{tabularx}
+\end{table}
+
+Se escogió este conjunto por cuatro razones:
+
+\begin{itemize}
+    \item \textbf{Veredicto verificado sin etiquetar a mano.} Que un programa sea correcto o incorrecto lo decide un juez que ejecuta pruebas, no una persona.
+    \item \textbf{Muchas soluciones por problema.} Cada problema tiene cientos de soluciones distintas, lo que permite enseñar que programas muy diferentes pueden resolver lo mismo.
+    \item \textbf{Autoría humana anterior a los modelos de lenguaje actuales,} como pide el requisito de la Sección~\ref{subsec:requerimientos_canal_a}.
+    \item \textbf{Independencia del corpus de evaluación.} Como el ajuste no ve ningún dato de los estudiantes de Sarajevo, la evaluación final sigue siendo justa.
+\end{itemize}
+
+Se tomó C++ porque es uno de los dos lenguajes de las unidades de aprendizaje de ESCOM y porque ya cuenta con un subconjunto depurado de casi-copias.
+
+\subsubsection{Obtención de los Datos}
+\label{subsec:obtencion_codenet}
+
+El recorrido de adquisición del Canal A tiene tres pasos (Figura~\ref{fig:pipeline_adquisicion}, columna izquierda):
+
+\begin{enumerate}
+    \item \textbf{Selección de la fuente y del lenguaje.} Se eligió \textit{Project CodeNet} por las razones anteriores y, dentro de él, el lenguaje C++.
+    \item \textbf{Soluciones correctas.} Se descargó el subconjunto depurado \textit{Project\_CodeNet\_C++1000}, que reúne 1,000 problemas con envíos aceptados (\textit{Accepted}), organizados en una carpeta por problema.
+    \item \textbf{Soluciones incorrectas.} El subconjunto depurado no incluye envíos incorrectos. Se identificaron los \textit{Wrong Answer} de C++ con los metadatos del conjunto completo (unos 7.8 GB) y se extrajeron solo esos programas, conservando la organización por problema y lenguaje del original.
+\end{enumerate}
+
+Ambas fuentes comparten el identificador de cada problema, por lo que las soluciones correctas e incorrectas de un mismo problema se pueden emparejar. Esa correspondencia es la que permite formar las tripletas del ajuste (Sección~\ref{subsec:ajuste_contrastivo}). Los programas se conservaron sin modificar; el muestreo, los filtros y la partición se describen en la Sección~\ref{subsec:seleccion_codenet}.
+
+\subsubsection{Limitaciones de CodeNet}
+\label{subsec:limitaciones_codenet}
+
+CodeNet tiene sus propias limitaciones: son problemas de concursos y no tareas escolares. Los programas suelen leer de la entrada estándar y rara vez incluyen menús o estructuras como las de las tareas de los cursos introductorios. Por eso su efecto solo se da por bueno al evaluarlo con tareas de estudiantes, las del corpus de Sarajevo (Capítulo~\ref{cap:modelado}); la validación con entregas reales de la ESCOM queda como trabajo futuro.
+
+% ----------------------------------------------------------------------
+\subsection{Canal B: IEEE Programming Homework Dataset}
+\label{subsec:adquisicion_canal_b}
+
+El Canal B detecta el estilo de escritura, por lo que necesita código humano auténtico y una contraparte de IA sobre los mismos problemas. Su recorrido de adquisición tiene cuatro etapas (Figura~\ref{fig:pipeline_adquisicion}, columna derecha): seleccionar el conjunto de estudiantes, reconstruir los enunciados que faltan, generar el código de IA y decidir cuándo dejar de generar.
+
+\subsubsection{Requerimientos del Conjunto de Datos}
 \label{subsec:requerimientos_dataset}
 
-Para que los datos fueran útiles en las unidades de aprendizaje de programación introductorias de la Escuela Superior de Cómputo (ESCOM-IPN), se definieron dos condiciones:
+Para que los datos fueran útiles en las unidades de aprendizaje de programación introductorias de la Escuela Superior de Cómputo (ESCOM-IPN), el conjunto del Canal B debía cumplir dos condiciones, además de ofrecer los mismos problemas en código humano y de IA:
 
 \begin{enumerate}
     \item \textbf{Autoría humana verificable.}
@@ -53,10 +157,8 @@ Para que los datos fueran útiles en las unidades de aprendizaje de programació
     El proposito de Graphito es apoyar la revisión de código en unidades de aprendizaje como Fundamentos de Programación y Estructuras de Datos. Se buscó código típico de principiantes: variables sencillas, estructuras de control básicas (\texttt{if}, \texttt{for}, \texttt{while}), funciones, arreglos y punteros elementales, con los errores de formato habituales.
 \end{enumerate}
 
-El Canal A plantea además condiciones propias, porque el ajuste que se describe en el Capítulo~\ref{cap:modelado} aprende por comparación: necesita \textbf{muchos problemas distintos}, \textbf{varias soluciones por problema} y un \textbf{veredicto de correcto o incorrecto} que no dependa de la opinión de una persona. El conjunto de Sarajevo no las cumple (tiene 48 tareas una vez agrupadas, y se reserva para evaluar), por lo que se buscó un segundo conjunto.
-
 % ----------------------------------------------------------------------
-\subsection{Selección del Dataset Base: IEEE Programming Homework Dataset}
+\subsubsection{Selección del Dataset Base: IEEE Programming Homework Dataset}
 \label{subsec:seleccion_dataset_ieee}
 
 Se seleccionó el conjunto \textit{Programming Homework Dataset for Plagiarism Detection}, publicado por Ljubovic y Pajic en IEEE Dataport \cite{Ljubovic2020}. Fue recolectado en la Facultad de Ingeniería Eléctrica de la \textbf{Universidad de Sarajevo} (Bosnia y Herzegovina) y ofrece tres ventajas:
@@ -88,40 +190,9 @@ El conjunto abarca cuatro cursos, resumidas en la Tabla~\ref{tab:dimensiones_dat
     \end{tabularx}
 \end{table}
 
-% ----------------------------------------------------------------------
-\subsection{Selección del Dataset Complementario: Project CodeNet}
-\label{subsec:origen_codenet}
-
-Para ajustar el Canal A se eligió \textit{Project CodeNet} \cite{Puri2021CodeNet}, un conjunto público creado por IBM Research y presentado en 2021 como \textit{benchmark} para tareas de aprendizaje automático sobre código, entre ellas la detección de similitud y la clasificación de programas. Sus datos provienen de las plataformas de concursos de programación en línea \textit{AIZU Online Judge} y \textit{AtCoder}, donde cada participante envía una solución y un juez automático la ejecuta contra pruebas y emite un veredicto. Se obtuvo por descarga pública: el conjunto completo pesa unos 7.8 GB y, además, ofrece subconjuntos ya depurados por lenguaje. La Tabla~\ref{tab:dimensiones_codenet} resume su estructura.
-
-\begin{table}[H]
-    \centering
-    \caption{Estructura del conjunto Project CodeNet y del subconjunto utilizado.}
-    \label{tab:dimensiones_codenet}
-    \begin{tabularx}{\textwidth}{|l|X|}
-        \hline
-        \textbf{Aspecto} & \textbf{Detalle} \\ \hline
-        Origen & Envíos a las plataformas AIZU Online Judge y AtCoder \\ \hline
-        Tamaño total & Unos 14 millones de envíos, más de 4,000 problemas y 55 lenguajes \\ \hline
-        Contenido por problema & Enunciado, carpetas de código fuente por lenguaje y una tabla de metadatos (autor anónimo, fecha, lenguaje, veredicto, tiempo y memoria) \\ \hline
-        Veredictos & \textit{Accepted} (pasó todas las pruebas), \textit{Wrong Answer} (respuesta incorrecta) y otros, como exceder el tiempo \\ \hline
-        Subconjunto utilizado & Lenguaje C++: 1,000 problemas con soluciones aceptadas (subconjunto depurado \textit{C++1000}) y envíos \textit{Wrong Answer} tomados de los metadatos del conjunto completo \\ \hline
-    \end{tabularx}
-\end{table}
-
-Se escogió este conjunto por cuatro razones:
-
-\begin{itemize}
-    \item \textbf{Veredicto verificado sin etiquetar a mano.} Que un programa sea correcto o incorrecto lo decide un juez que ejecuta pruebas, no una persona.
-    \item \textbf{Muchas soluciones por problema.} Cada problema tiene cientos de soluciones distintas, lo que permite enseñar que programas muy diferentes pueden resolver lo mismo.
-    \item \textbf{Autoría humana anterior a los modelos de lenguaje actuales,} el mismo requisito que se pidió a los datos de estudiantes (Sección~\ref{subsec:requerimientos_dataset}).
-    \item \textbf{Independencia de ESCOM.} Como el ajuste no ve ningún dato de los estudiantes, la evaluación final sigue siendo justa.
-\end{itemize}
-
-Se tomó C++ porque es uno de los dos lenguajes de las unidades de aprendizaje de ESCOM y porque ya cuenta con un subconjunto depurado de casi-copias.
 
 % ----------------------------------------------------------------------
-\subsection{Limitaciones de los Datasets}
+\subsubsection{Limitaciones de los Datasets}
 \label{subsec:limitaciones_dataset}
 
 Al explorar los archivos del conjunto de Sarajevo se identificaron tres limitaciones:
@@ -134,13 +205,12 @@ Al explorar los archivos del conjunto de Sarajevo se identificaron tres limitaci
     Las carpetas contienen las soluciones, organizadas por tarea (por ejemplo, \texttt{A2016/Z1/Z1}), pero no la descripción de los problemas. Sin el enunciado no era posible pedir a una IA que resolviera el mismo ejercicio.
 
     \item \textbf{Ausencia de soluciones oficiales del docente.}
-    Tampoco se incluye una solución de referencia por tarea. Esta carencia se retoma en el Capítulo~\ref{cap:modelado}, donde se explica cómo se compensa en la evaluación sin referencias oficiales.
+    Tampoco se incluye una solución de referencia por tarea. Esta carencia se retoma en el Capítulo~\ref{cap:modelado} como limitación: la evaluación compara las entregas entre sí y no contra una solución oficial.
 \end{enumerate}
 
-CodeNet tiene su propia limitación: son problemas de concursos y no tareas escolares. Los programas suelen leer de la entrada estándar y rara vez incluyen menús o estructuras como las de las tareas de ESCOM. Por eso su efecto solo se da por bueno al evaluarlo con datos de ESCOM (Capítulo~\ref{cap:modelado}).
 
 % ----------------------------------------------------------------------
-\subsection{Reconstrucción de Enunciados}
+\subsubsection{Reconstrucción de Enunciados}
 \label{subsec:ingenieria_inversa}
 
 Para recuperar los enunciados se aplicó una especie de ingeniería inversa: a partir de varias soluciones correctas de una misma tarea, un modelo de lenguaje deducen las indicaciones que siguieron los alumnos para generar los códigos. La Figura~\ref{fig:reconstruccion_enunciado} ilustra la idea. 
@@ -199,17 +269,17 @@ La Tabla~\ref{tab:ejemplos_enunciados_inferidos} muestra ejemplos de los enuncia
 \end{table}
 
 % ----------------------------------------------------------------------
-\subsection{Generación de la Contraparte de IA}
+\subsubsection{Generación de la Contraparte de IA}
 \label{subsec:generacion_ia}
 
 Con los enunciados disponibles, se pidió a modelos de lenguaje que resolvieran cada tarea como lo haría un estudiante. La cantidad de código a generar no se tomó como una meta fija, sino que se justificó con un criterio de paro basado en una curva de aprendizaje (Sección~\ref{subsec:justificacion_tamano_sintetico}). Se tomaron tres decisiones para evitar atajos.
 
-\subsubsection{Control del Sesgo de Idioma}
+\paragraph{Control del Sesgo de Idioma}
 Las instrucciones se redactaron en serbocroata y se le pidió al modelo que las variables, funciones y mensajes también lo estuvieran (nombres como \texttt{broj}, \texttt{zbir} o \texttt{unos}). Así, el idioma deja de ser una pista para distinguir las clases.
 
-\subsubsection{Perfiles de Estudiante y Cuota de Comentarios}
+\paragraph{Perfiles de Estudiante y Cuota de Comentarios}
 Los modelos generadores de código suelen escribir comentarios extensos y bien redactados por defecto, mientras que muchos estudiantes no comentan. Se observó que alrededor del 38\,\% de los códigos humanos del conjunto base incluía comentarios. % TODO verificar: cifra heredada del texto anterior y del comentario en generar_referencias.py; no reproducida con una medición propia.
-Para no dejar la presencia de comentarios como pista fácil, se definieron seis perfiles de generación que se turnan, resumidos en la Tabla~\ref{tab:perfiles_generacion}. 
+Para no dejar la presencia de comentarios como pista fácil, se definieron seis perfiles de generación que se turnan, resumidos en la Tabla~\ref{tab:perfiles_generacion}. Los comentarios se eliminan después, en la preparación (Sección~\ref{subsec:limpieza_simetrica}), para ambas clases; los perfiles con comentarios sirven para variar la forma de generar y no para que el detector aprenda a buscarlos.
 
 \begin{table}[H]
     \centering
@@ -229,11 +299,11 @@ Para no dejar la presencia de comentarios como pista fácil, se definieron seis 
 
 La temperatura ($T$) es un parámetro del modelo de lenguaje: valores altos producen respuestas más variadas y valores bajos, más conservadoras.
 
-\subsubsection{Variedad de Generadores}
+\paragraph{Variedad de Generadores}
 El código de IA no proviene de un solo modelo. Los archivos finales provienen de \textit{DeepSeek-Chat} y de \textit{Qwen3}. Esto es una limitación importante: aún no se sabe qué tan bien se reconocerá código de IA producido por otros modelos. Se retoma en los Capítulos~\ref{cap:modelado} y~\ref{cap:conclusiones}.
 
 % ----------------------------------------------------------------------
-\subsection{Criterio de Paro de la Generación: Curva de Aprendizaje}
+\subsubsection{Criterio de Paro de la Generación: Curva de Aprendizaje}
 \label{subsec:justificacion_tamano_sintetico}
 
 Generar código con modelos de lenguaje cuesta tiempo y dinero. Para optimizar estos recursos nos hicimos la siguiente pregunta: ¿conviene seguir generando códigos con IA? Ya que al entrenar un modelo los primeros ejemplos le enseñan mucho, pero cada ejemplo parecido adicional va aportando cada vez menos. Puesto que la planeación inicial contemplaba un corpus de 20,000 códigos (10,000 por clase), decidimos realizar un experimento que funcionara como criterio de paro: ir evaluando el rendimiento del modelo a medida que aumentaba progresivamente la cantidad de códigos de IA generados, y detener el proceso cuando la mejora marginal se volviera pequeña. Se fue entrenando el modelo a la par que los códigos de IA fueron generados, analizando la mejora en la curva de aprendizaje para evaluar si aún valía la pena continuar con la generación.
@@ -294,7 +364,7 @@ La Figura~\ref{fig:curva_aprendizaje_charcnn} muestra cómo cambia PR-AUC confor
     \label{fig:curva_aprendizaje_charcnn}
 \end{figure}
 
-Antes de empezar se fijó una regla para decidir cuándo dejar de generar código. Se dice que la curva está \textbf{saturada} (es decir, que más datos ya no ayudan) si, al pasar de la mitad de los ejemplos de IA (439) a todos (874), PR-AUC mejora menos de $0.01$ y menos que la variación normal entre repeticiones. Los resultados fueron (el valor después de $\pm$ indica cuánto varía el resultado entre las 5 repeticiones):
+Antes de empezar se fijó una regla para decidir cuándo dejar de generar código. Se dice que la curva está \textbf{saturada} (es decir, que más datos ya no ayudan) si, al pasar de la mitad de los ejemplos de IA (439) a todos (874), PR-AUC mejora menos de $0.01$ y menos que la variación normal entre repeticiones. Como las fracciones se aplican por tarea y por familia de casi-copias, los tamaños reales difieren un poco del porcentaje exacto (por eso el 5\,\% son 55 ejemplos y no 44). Los resultados fueron (el valor después de $\pm$ indica cuánto varía el resultado entre las 5 repeticiones):
 
 \begin{itemize}
     \item \textbf{Con muy pocos datos} (5\,\%, 55 ejemplos), el modelo es inestable: PR-AUC $= 0.5546 \pm 0.2988$. El resultado depende mucho de la suerte del sorteo.
@@ -311,7 +381,7 @@ La ganancia ($0.0148$) supera por poco el umbral ($0.01$), así que, en sentido 
     \label{fig:mejora_marginal_charcnn}
 \end{figure}
 
-En los últimos pasos, cada mejora fue menor que la variación normal entre repeticiones; es decir, ya no se distingue de un simple efecto del azar. Con esto se decidió dejar de generar código.
+En los últimos pasos, cada mejora fue menor que la variación normal entre repeticiones; es decir, ya no se distingue de un simple efecto del azar. Sin embargo, la regla fijada de antemano no se cumplió estrictamente (la ganancia de $0.0148$ supera el umbral de $0.01$). La decisión de dejar de generar código fue entonces una decisión de costo y beneficio: las mejoras son pequeñas y no distinguibles del azar, y el límite parece estar en la diversidad de generadores y no en el volumen.
 
 Al detenerse, se habían generado 1,520 archivos de IA, pero la curva llega solo hasta 874 ejemplos (su 100\,\%). La diferencia no se debe a que se descartara código, sino a tres pasos que se explican en la Sección~\ref{sec:preparacion_datos} y se resumen en la Tabla~\ref{tab:conteo_ia}:
 
@@ -338,9 +408,9 @@ Al detenerse, se habían generado 1,520 archivos de IA, pero la curva llega solo
 
 De este modo, cuando la curva habla del 100\,\% se refiere al 100\,\% de los ejemplos de IA disponibles para entrenar (874 grupos únicos tomados de los 897 archivos de entrenamiento), no al total bruto generado.
 
-Existen dos cosas a tener en cuenta con estos resultados. Primero, el conjunto de validación también se usó para decidir cuándo detener cada entrenamiento, así que los valores absolutos pueden ser algo optimistas por lo que el sesgo afecta por igual a todos los puntos de la curva. Segundo, el experimento solo cambia la cantidad de código de un mismo generador. En este conjunto, el límite parece ser la diversidad de modelos generadores y no el volumen. Con esta evidencia se decidió no seguir generando código de IA y conservar los 1,520 archivos (874 ejemplos únicos de entrenamiento, Tabla~\ref{tab:conteo_ia}) en lugar de alcanzar la meta planificada de 10,000; esa es la razón de que el corpus tenga el tamaño que tiene.
+Existen dos cosas a tener en cuenta con estos resultados. Primero, el conjunto de validación también se usó para decidir cuándo detener cada entrenamiento, así que los valores absolutos pueden ser algo optimistas por lo que el sesgo afecta por igual a todos los puntos de la curva. Segundo, el experimento solo cambia la cantidad de código de un mismo generador. En este conjunto, el límite parece ser la diversidad de modelos generadores y no el volumen. Con esta evidencia se decidió no seguir generando código de IA y conservar el corpus generado (1,520 archivos, de los que se usan 1,453 tras la limpieza y 874 ejemplos únicos de entrenamiento, Tabla~\ref{tab:conteo_ia}) en lugar de alcanzar la meta planificada de 10,000; esa es la razón de que el corpus tenga el tamaño que tiene.
 % ----------------------------------------------------------------------
-\subsection{Ejemplo Comparativo: Código Humano frente a Código de IA}
+\subsubsection{Ejemplo Comparativo: Código Humano frente a Código de IA}
 \label{subsec:caso_estudio_comparativo}
 
 Los Listados~\ref{lst:codigo_humano_srb} y~\ref{lst:codigo_ia_srb} muestran dos soluciones en C del problema A2016/Z1/Z1 (cálculo de notas de estudiantes). Ambas resuelven el mismo problema y están en serbocroata.
@@ -417,7 +487,7 @@ Con el mismo enunciado y las mismas condiciones, aparecen diferencias de estruct
         \hline
         \textbf{Dimensión} & \textbf{Implementación Humana} & \textbf{Implementación de IA} & \textbf{Qué sugiere para el análisis} \\ \hline
         Modularidad & Todo dentro de \texttt{main}, con la lógica mezclada. & Función auxiliar (\texttt{validirajUnos}) que separa responsabilidades. & La lógica puede reorganizarse sin cambiar lo que el programa hace. \\ \hline
-        Identificadores & Nombres abreviados (\texttt{p1}, \texttt{p2}, \texttt{pris}). & Nombres descriptivos (\texttt{parcijalni1}, \texttt{prisustvoBodovi}). & Los nombres son una pista de estilo, pero también pueden cambiarse sin alterar la lógica. \\ \hline
+        Identificadores & Nombres abreviados en las variables (\texttt{p1}, \texttt{p2}, \texttt{prisustvo}). & Nombres descriptivos en las variables de \texttt{main} (\texttt{parcijalni1}, \texttt{prisustvoBodovi}), aunque la función auxiliar usa abreviaturas. & Los nombres son una pista de estilo, pero también pueden cambiarse sin alterar la lógica. \\ \hline
         Tipado y literales & Constantes enteras (\texttt{0}, \texttt{10}, \texttt{20}). & Constantes de punto flotante explícitas (\texttt{0.0f}, \texttt{20.0f}). & Es un rasgo visible a nivel de caracteres, que el canal de estilo puede captar. \\ \hline
         Estilo y formato & Espaciado compacto y sangría irregular. & Formato regular y saltos de línea ordenados. & Si no se neutraliza, el formato puede ser un atajo (Sección~\ref{subsec:limpieza_simetrica}). \\ \hline
         Equivalencia lógica & Valida los rangos uno por uno. & Cubre los mismos requisitos y rangos. & Dos programas con lógica equivalente pueden verse muy distintos por fuera. \\ \hline
@@ -431,7 +501,82 @@ Como indica la Tabla~\ref{tab:caso_estudio_humano_ia}, un solo rasgo no basta pa
 \label{sec:preparacion_datos}
 % ======================================================================
 
-Antes de entrenar los modelos, hay que buscar tener calidad en los datos. Esta sección describe cuatro pasos para el conjunto de Sarajevo y su contraparte de IA: limpiar los archivos, retirar duplicados, dividir el conjunto sin fuga de información y adaptar el texto a cada canal. La Figura~\ref{fig:embudo_datos} muestra el resultado de los dos primeros pasos sobre la cantidad de archivos. Después se explica cómo se preparó el conjunto externo de CodeNet y cómo se usa en el modelo (Sección~\ref{subsec:seleccion_codenet}).
+Antes de entrenar los modelos, hay que buscar tener calidad en los datos. Cada canal tiene su propio recorrido de preparación. En el Canal A (Sección~\ref{subsec:seleccion_codenet}) se prepara el conjunto de CodeNet: se convierte el código en la entrada del modelo semántico, se filtra y se parte por problema. En el Canal B (Sección~\ref{subsec:preparacion_canal_b}) se prepara el conjunto de Sarajevo y su contraparte de IA en cuatro pasos: limpiar los archivos, retirar duplicados, dividir el conjunto sin fuga de información y normalizar el texto para la red de caracteres. Al final se comparan ambos tratamientos (Sección~\ref{subsec:bifurcacion_pipeline}).
+
+% ----------------------------------------------------------------------
+\subsection{Canal A: Preparación del Conjunto de CodeNet}
+\label{subsec:seleccion_codenet}
+
+La preparación del Canal A tiene cuatro etapas: convertir cada programa en la entrada del modelo semántico, muestrear y filtrar por problema, partir por problema y guardar un registro reproducible. La conversión se describe primero porque uno de los filtros depende de ella. La entrada es la misma que reciben las entregas de los estudiantes cuando el sistema está en uso, de modo que el modelo se ajusta con exactamente lo que verá después.
+
+\subsubsection{Representación para GraphCodeBERT: Estructura y Flujo de Datos}
+\label{subsec:prep_semantica}
+
+El Canal A busca qué hace el programa, no cómo está escrito. Los pasos son:
+
+\begin{enumerate}
+    \item \textbf{Eliminación de comentarios,} respetando el contenido de las cadenas de texto.
+    \item \textbf{Renombrado canónico.} Los identificadores definidos por el usuario se sustituyen por nombres genéricos: las variables por \texttt{v1}, \texttt{v2}, \ldots, las funciones por \texttt{f1}, \texttt{f2}, \ldots y los tipos propios por \texttt{t1}, \texttt{t2}, \ldots, en orden de primera aparición y de forma determinista. Así, dos programas que solo cambian los nombres producen el mismo texto.
+    \item \textbf{Árbol sintáctico.} El analizador Tree-sitter \cite{Brunsfeld2021Treesitter} reconoce la estructura del programa (funciones, ciclos, condiciones). Tolera código incompleto o con errores locales, algo común en trabajos de estudiantes.
+    \item \textbf{Grafo de flujo de datos (DFG).} Es un esquema que indica ``qué variable le pasa su valor a cuál''. Se construye una sola vez sobre el archivo completo.
+    \item \textbf{Subtokens y ventanas.} El código se divide en subtokens, es decir, trozos de palabra. Si no cabe en una sola entrada, se corta en ventanas de 382 subtokens que se traslapan a la mitad, hasta 16 ventanas. Cada ventana conserva los nodos del grafo que quedan dentro de ella.
+\end{enumerate}
+
+En CodeNet solo se conservan programas que caben en una sola ventana (filtro 1 de la siguiente subsección), por lo que para ellos el último paso no necesita partir el código; las ventanas se usan sobre todo con las entregas largas de los estudiantes.
+
+En la versión original (v2) los identificadores no se renombraban (no se sustituían por nombres genéricos). Por eso el Canal A era sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}. El renombrado canónico (versión \texttt{v2\_norm}, que también usa el modelo ajustado con CodeNet) elimina esa sensibilidad (ROC-AUC de 0.856 a 0.902; Sección~\ref{subsec:robustez_canal_a}).\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
+
+El renombrado no modifica \texttt{main}, las palabras clave ni las funciones y tipos de la biblioteca estándar (como \texttt{printf}, \texttt{scanf} o \texttt{std::vector}), y tampoco el código dentro de nodos con error de sintaxis. Se aplica solo al Canal A: CharCNN conserva los nombres tal como están, y Jaccard no lo necesita porque ya abstrae los identificadores en su propia tokenización (Sección~\ref{subsec:linea_base_lexica}). En el motor desplegado se aplica antes de cada embedding, tanto a las referencias como a las entregas.\footnote{Implementado en \texttt{models/logic\_eval/canonical.py}.} Si el renombrado falla, se usa el código original y el reporte registra \texttt{gcb\_estado = OK\_SIN\_NORM}.
+
+\subsubsection{Selección y Limpieza}
+De los 1,000 problemas del subconjunto depurado de C++ se quiso conservar, por problema, un máximo de 20 soluciones correctas y 10 incorrectas. Para ello se fueron revisando soluciones elegidas al azar con semilla fija (hasta 150 correctas por problema) y se guardaron las primeras que pasaban los tres filtros que siguen. Ese tope evita que unos pocos problemas con miles de envíos dominen el aprendizaje y permite entrenar en una sola tarjeta gráfica de 8 GB. Los filtros fueron:
+
+\begin{enumerate}
+    \item \textbf{Que quepa en una ventana.} GraphCodeBERT lee 512 elementos a la vez. Se conservaron solo los programas que caben completos, para que el vector resuma todo el programa y no una parte. Este filtro descartó 25,933 de los programas revisados, casi todos los que se retiraron.
+    \item \textbf{Sin casi-copias de una solución correcta.} Una respuesta incorrecta que comparte más del 90\,\% de sus fragmentos con una correcta del mismo problema suele diferir en un solo símbolo (un \texttt{<} en lugar de un \texttt{>}). De ella no se puede aprender nada y solo añade ruido. La comparación usa fragmentos de código superpuestos, como en la detección de documentos casi idénticos \cite{Broder1997Resemblance}. Se retiraron 41.
+    \item \textbf{Sin coincidencias con el corpus de estudiantes.} Se compararon con todos los archivos del corpus de Sarajevo con el que se evalúa; solo uno compartía 80\,\% o más de sus fragmentos con alguno y se retiró, para que la evaluación final no incluya algo que el modelo ya vio. Los duplicados entre entrenamiento y evaluación inflan los resultados \cite{Allamanis2019Adverse,Lee2022Dedup}.
+\end{enumerate}
+
+Doce problemas quedaron con menos de dos soluciones correctas y se omitieron. El resultado son 988 problemas y 27,463 programas: 19,235 correctos y 8,228 incorrectos.
+
+El primer filtro tiene un costo: los programas que se conservaron son más cortos que los del corpus de Sarajevo (Figura~\ref{fig:longitud_codenet}). La mediana es de 26 líneas frente a 104. Es una limitación que se tiene presente al interpretar los resultados del Capítulo~\ref{cap:modelado}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figuras/codenet_longitud_comparada.png}
+    \caption{Líneas no vacías por programa en los datos de CodeNet conservados y en la muestra del corpus de Sarajevo usada para evaluar. Las líneas punteadas marcan la mediana de cada conjunto.}
+    \label{fig:longitud_codenet}
+\end{figure}
+
+\subsubsection{Partición}
+\label{subsec:particion_codenet}
+La partición sigue la misma idea que en los datos de Sarajevo (Sección~\ref{subsec:particion_datos}): se hace por problema y no por programa. Las soluciones de un mismo problema se parecen entre sí; si unas quedaran en entrenamiento y otras en validación, el modelo parecería acertar solo porque reconoce el problema, una fuga de información \cite{Kapoor2023Leakage}. Los 988 problemas se repartieron al azar, con semilla fija, en 80\,\% para entrenamiento, 10\,\% para validación y 10\,\% para prueba, proporciones habituales que dejan 99 problemas para validar (Tabla~\ref{tab:particion_codenet}).
+
+\begin{table}[H]
+    \centering
+    \caption{Composición de los datos de CodeNet, particionados por problema.}
+    \label{tab:particion_codenet}
+    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
+        \hline
+        \textbf{Subconjunto} & \textbf{Problemas} & \textbf{Correctos} & \textbf{Incorrectos} & \textbf{Uso en el Proyecto} \\ \hline
+        Entrenamiento & 790 & 15,412 & 6,588 & Ajuste de los pesos del modelo. \\ \hline
+        Validación & 99 & 1,920 & 846 & Elegir qué copia del modelo conservar. \\ \hline
+        Prueba & 99 & 1,903 & 794 & Reservada; no se utilizó. \\ \hline
+        \textbf{Total} & \textbf{988} & \textbf{19,235} & \textbf{8,228} & \textbf{27,463 programas.} \\ \hline
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Registro y Caché}
+Los programas que superan los filtros se registran en un manifiesto con una fila por programa: problema, partición, rol (correcto o incorrecto), identificador del envío, ruta y huella sha256 del archivo. Además, la entrada del Canal A de cada programa se calcula una sola vez y se guarda por partición. Así el ajuste no repite el análisis sintáctico y cualquiera puede reproducir la misma partición con la misma semilla.\footnote{Implementado en \texttt{scripts/prepare\_codenet\_contrastive.py}.}
+
+\subsubsection{Uso en el Modelo}
+El modelo no aprende de cada programa por separado, sino de \textbf{tripletas} formadas dentro de un mismo problema: una solución correcta como ancla, otra correcta como positivo y una incorrecta como negativo difícil (Sección~\ref{subsec:ajuste_contrastivo}). Por eso se conservan las soluciones incorrectas, que sirven como contraste. Los 790 problemas de entrenamiento alimentan el ajuste; los 99 de validación permiten elegir qué copia del modelo conservar; la partición de prueba de CodeNet se reservó y no se usó, porque la evaluación final se hizo con los datos de Sarajevo, que el ajuste nunca vio.
+
+% ----------------------------------------------------------------------
+\subsection{Canal B: Preparación del Conjunto de Estudiantes e IA}
+\label{subsec:preparacion_canal_b}
+
+El Canal B parte de las 43,771 entregas humanas y los 1,520 archivos de IA, y los prepara con el mismo criterio para ambas clases. La Figura~\ref{fig:embudo_datos} muestra el efecto de los dos primeros pasos sobre la cantidad de archivos.
 
 \begin{figure}[H]
     \centering
@@ -450,7 +595,7 @@ Antes de entrenar los modelos, hay que buscar tener calidad en los datos. Esta s
 \end{figure}
 
 % ----------------------------------------------------------------------
-\subsection{Limpieza Simétrica y Aprendizaje de Atajos}
+\subsubsection{Limpieza Simétrica y Aprendizaje de Atajos}
 \label{subsec:limpieza_simetrica}
 
 La limpieza se aplica con el mismo criterio al código humano y al de IA. Se descartan los archivos vacíos, los demasiado cortos (menos de 50 caracteres), los que tienen el mismo nombre de archivo y las generaciones fallidas. En total se excluyeron 2,835 archivos humanos y 67 de IA, incluidos los duplicados que se describen en la Sección~\ref{subsec:deduplicacion}.
@@ -458,7 +603,7 @@ La limpieza se aplica con el mismo criterio al código humano y al de IA. Se des
 Además se eliminan las pistas que no tienen que ver con el estilo de programación. El ejemplo principal es la cabecera del curso: líneas como ``Zadaca 6'' o ``Tutorijal 13'' aparecían en cerca de la mitad de los archivos humanos de una muestra revisada y en casi ninguno de los de IA. Si se dejaran, un modelo podría clasificar mirando únicamente esa línea, ignorando el resto del código. Este fenómeno se conoce como aprendizaje de atajos (\textit{shortcut learning}) \cite{Geirhos2020Shortcut}. Lo mismo ocurre con los comentarios y con la sangría, que dependen del editor que se use y no del autor. Por eso estos elementos se neutralizan para ambas clases, como se detalla en la Sección~\ref{subsec:prep_estilometria}.
 
 % ----------------------------------------------------------------------
-\subsection{Eliminación de Duplicados}
+\subsubsection{Eliminación de Duplicados}
 \label{subsec:deduplicacion}
 
 En cursos introductorios muchas entregas son idénticas o casi idénticas. Si una misma solución aparece en entrenamiento y en prueba, el modelo parece acertar cuando en realidad solo la recuerda. Se aplican dos detecciones:
@@ -473,7 +618,7 @@ Cada conjunto de archivos equivalentes forma un \textbf{grupo de duplicados} (\t
 Esto puede pasar porque el conjunto se divide por tarea (Sección~\ref{subsec:particion_datos}) y una misma solución puede aparecer en tareas distintas. Por ejemplo, si una familia tiene un archivo en una tarea de entrenamiento y otro en una de prueba, la familia se queda en la partición que debe estar más aislada del aprendizaje (prueba, luego validación, luego entrenamiento) y se \textbf{excluyen} los miembros que estaban en las otras particiones. Así, el modelo no entrena con una copia de lo que luego se le pide evaluar. Por esta causa se excluyeron 236 archivos (224 humanos y 12 de IA).
 
 % ----------------------------------------------------------------------
-\subsection{Partición para Evitar Fuga de Información}
+\subsubsection{Partición para Evitar Fuga de Información}
 \label{subsec:particion_datos}
 
 Dividir los archivos al azar es un error que cometimos en primeras versiones del modelo. Allamanis \cite{Allamanis2019Adverse} mostró que la duplicación entre entrenamiento y prueba puede inflar de forma artificial las métricas de modelos de código, porque el modelo ya vio versiones casi idénticas de lo que se le pide evaluar. Esa situación se llama fuga de información \cite{Kapoor2023Leakage}.
@@ -511,11 +656,56 @@ Para evitar este problema, la partición se hace por tarea y no por archivo (Fig
 
 La partición por tarea evita que el mismo problema aparezca en dos particiones, pero no impide que un mismo estudiante tenga entregas en varias. Esta limitación se tiene en cuenta al interpretar los resultados del Capítulo~\ref{cap:modelado}. El conjunto externo de CodeNet se divide con el mismo principio, también por problema (Sección~\ref{subsec:particion_codenet}).
 
+\subsubsection{Canal B: Normalización Simétrica para CharCNN}
+\label{subsec:prep_estilometria}
+
+El Canal B trata el código como una secuencia de caracteres. Antes de leerlo se aplican cinco pasos, iguales para código humano y de IA (de ahí el nombre ``simétrica''):
+
+\begin{enumerate}
+    \item Se unifican los saltos de línea y se retiran caracteres de control invisibles.
+    \item Se convierten a ASCII las comillas, guiones y espacios especiales, y las letras con diacríticos del serbocroata (por ejemplo, \texttt{č} pasa a \texttt{c}).
+    \item Se eliminan los comentarios.
+    \item Se eliminan las cabeceras y marcas del curso (Sección~\ref{subsec:limpieza_simetrica}).
+    \item Se normaliza el espacio en blanco, como se indica en la Tabla~\ref{tab:pipeline_dual_preprocesamiento}.
+\end{enumerate}
+
+El texto resultante se convierte en números. El alfabeto contiene el salto de línea y los 95 caracteres ASCII imprimibles, el valor 0 se reserva para el relleno (\textit{padding}) y el 1 para cualquier carácter desconocido, de modo que no se confunden. Como la red necesita entradas de tamaño fijo, los archivos largos se leen por ventanas de 4,096 caracteres que se traslapan a la mitad (hasta 8). Es como leer un documento largo por páginas que repiten la mitad de la anterior. Los archivos cortos se completan con relleno.\footnote{Implementado en \texttt{models/char\_cnn/v2/preprocess.py} y \texttt{config.py}. Una comprobación adicional verifica que no sobreviva ninguna marca del curso ni caracteres fuera del alfabeto.}
+
 % ----------------------------------------------------------------------
-\subsection{Preparación para Cada Canal}
+\subsubsection{Composición Final del Conjunto}
+\label{subsec:composicion_final}
+
+Tras la limpieza, la eliminación de duplicados y la partición, el conjunto de Graphito contiene 42,389 archivos: 40,936 humanos y 1,453 de IA. La Tabla~\ref{tab:particion_corpus} muestra su reparto. El conjunto externo de CodeNet (27,463 programas, Tabla~\ref{tab:particion_codenet}) no forma parte de esta cuenta: se usa solo para ajustar el Canal A.
+
+\begin{table}[H]
+    \centering
+    \caption{Composición del conjunto de datos particionado por tarea.}
+    \label{tab:particion_corpus}
+    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
+        \hline
+        \textbf{Subconjunto} & \textbf{Humanos} & \textbf{IA} & \textbf{Total} & \textbf{Uso en el Proyecto} \\ \hline
+        Entrenamiento (\textit{Train}) & 24,810 & 897 & 25,707 & Ajuste de pesos del modelo. \\ \hline
+        Validación (\textit{Val}) & 6,808 & 225 & 7,033 & Ajuste de hiperparámetros, umbrales y paro anticipado. \\ \hline
+        Prueba (\textit{Test}) & 9,318 & 331 & 9,649 & Evaluación final con tareas no vistas. \\ \hline
+        \hline
+        \textbf{Total} & \textbf{40,936} & \textbf{1,453} & \textbf{42,389} & \textbf{Conjunto consolidado.} \\ \hline
+    \end{tabularx}
+\end{table}
+
+Las cifras de esta tabla cuentan todos los archivos. En el Capítulo~\ref{cap:modelado}, la validación y la prueba del Canal B se miden con un solo representante por familia de casi-copias, para que una misma solución repetida no pese varias veces: la validación pasa de 6,808 a 2,868 archivos humanos (y de 225 a 209 de IA), y la prueba de 9,318 a 4,201 (y de 331 a 330 de IA). Los archivos de entrenamiento se cuentan igual (24,810 archivos, 10,688 familias de humanos). Los mismos archivos de prueba, completos, se reportan aparte como vista secundaria.
+
+En el conjunto, solo cerca del 3\,\% de los archivos son de IA. Este desbalance no se corrigió eliminando código humano, sino que se maneja de forma distinta según el momento:
+
+\begin{itemize}
+    \item \textbf{Durante el entrenamiento, los datos se balancean.} Si el modelo aprendiera con 97 ejemplos humanos por cada 3 de IA, le bastaría con responder casi siempre ``humano'' para acertar la mayoría de las veces, sin aprender a reconocer el código de IA. Para evitarlo, en cada época (cada pasada completa de entrenamiento) el modelo ve todos los ejemplos de IA de entrenamiento y la misma cantidad de códigos humanos, elegidos al azar. En la siguiente época se eligen otros códigos humanos. Así, cada época está balanceada (mitad y mitad) y, a lo largo del entrenamiento, el modelo recorre la variedad de los 10,688 ejemplos humanos únicos de entrenamiento (uno por familia de casi-copias) en lugar de descartarlos.
+    \item \textbf{Durante la validación y la prueba, se conserva el desbalance.} Estos conjuntos no se modifican, porque deben parecerse a un aula real, donde la gran mayoría del código es de autoría humana. Medir con datos balanceados haría que el modelo pareciera mejor de lo que sería en la práctica: con la misma tasa de errores, habría muchos menos humanos que acusar por error, y las falsas alarmas se verían menos graves de lo que serían en un aula real. La métrica debe elegirse según el uso previsto del modelo y no solo por la proporción de clases \cite{McDermott2024AUROC}. Por eso, en los capítulos siguientes, además de ROC-AUC, se reporta PR-AUC, que se enfoca en qué tan bien se encuentran los pocos casos de IA sin generar muchas falsas alarmas.
+\end{itemize}
+
+% ----------------------------------------------------------------------
+\subsection{Comparación de la Preparación de Ambos Canales}
 \label{subsec:bifurcacion_pipeline}
 
-Graphito analiza cada archivo con dos canales que miran cosas distintas. El Canal A compara la similitud semántica (qué hace el programa) y el Canal B produce un indicador estilométrico (cómo está escrito). La Figura~\ref{fig:bifurcacion_preprocesamiento} muestra cómo se divide la preparación y la Tabla~\ref{tab:pipeline_dual_preprocesamiento} compara ambos tratamientos.
+En el sistema en uso, un mismo archivo entregado por un estudiante pasa por las dos preparaciones, cada una hacia su canal. La Figura~\ref{fig:bifurcacion_preprocesamiento} muestra cómo se divide y la Tabla~\ref{tab:pipeline_dual_preprocesamiento} compara ambos tratamientos.
 
 \begin{figure}[H]
     \centering
@@ -567,113 +757,6 @@ Graphito analiza cada archivo con dos canales que miran cosas distintas. El Cana
         Objetivo & Capturar qué hace el programa y qué relaciones de datos contiene. & Capturar rasgos de escritura que no dependen de la lógica. \\ \hline
     \end{tabularx}
 \end{table}
-
-\subsubsection{Canal B: Normalización Simétrica para CharCNN}
-\label{subsec:prep_estilometria}
-
-El Canal B trata el código como una secuencia de caracteres. Antes de leerlo se aplican cinco pasos, iguales para código humano y de IA (de ahí el nombre ``simétrica''):
-
-\begin{enumerate}
-    \item Se unifican los saltos de línea y se retiran caracteres de control invisibles.
-    \item Se convierten a ASCII las comillas, guiones y espacios especiales, y las letras con diacríticos del serbocroata (por ejemplo, \texttt{č} pasa a \texttt{c}).
-    \item Se eliminan los comentarios.
-    \item Se eliminan las cabeceras y marcas del curso (Sección~\ref{subsec:limpieza_simetrica}).
-    \item Se normaliza el espacio en blanco, como se indica en la Tabla~\ref{tab:pipeline_dual_preprocesamiento}.
-\end{enumerate}
-
-El texto resultante se convierte en números. El alfabeto contiene el salto de línea y los 95 caracteres ASCII imprimibles, el valor 0 se reserva para el relleno (\textit{padding}) y el 1 para cualquier carácter desconocido, de modo que no se confunden. Como la red necesita entradas de tamaño fijo, los archivos largos se leen por ventanas de 4,096 caracteres que se traslapan a la mitad (hasta 8). Es como leer un documento largo por páginas que repiten la mitad de la anterior. Los archivos cortos se completan con relleno.\footnote{Implementado en \texttt{models/char\_cnn/v2/preprocess.py} y \texttt{config.py}. Una comprobación adicional verifica que no sobreviva ninguna marca del curso ni caracteres fuera del alfabeto.}
-
-\subsubsection{Canal A: Estructura y Flujo de Datos para GraphCodeBERT}
-\label{subsec:prep_semantica}
-
-El Canal A busca qué hace el programa, no cómo está escrito. Los pasos son:
-
-\begin{enumerate}
-    \item \textbf{Eliminación de comentarios,} respetando el contenido de las cadenas de texto.
-    \item \textbf{Renombrado canónico.} Los identificadores definidos por el usuario se sustituyen por nombres genéricos: las variables por \texttt{v1}, \texttt{v2}, \ldots, las funciones por \texttt{f1}, \texttt{f2}, \ldots y los tipos propios por \texttt{t1}, \texttt{t2}, \ldots, en orden de primera aparición y de forma determinista. Así, dos programas que solo cambian los nombres producen el mismo texto.
-    \item \textbf{Árbol sintáctico.} El analizador Tree-sitter \cite{Brunsfeld2021Treesitter} reconoce la estructura del programa (funciones, ciclos, condiciones). Tolera código incompleto o con errores locales, algo común en trabajos de estudiantes.
-    \item \textbf{Grafo de flujo de datos (DFG).} Es un esquema que indica ``qué variable le pasa su valor a cuál''. Se construye una sola vez sobre el archivo completo.
-    \item \textbf{Subtokens y ventanas.} El código se divide en subtokens, es decir, trozos de palabra. Si no cabe en una sola entrada, se corta en ventanas de 382 subtokens que se traslapan a la mitad, hasta 16 ventanas. Cada ventana conserva los nodos del grafo que quedan dentro de ella.
-\end{enumerate}
-
-En la versión original (v2) los identificadores no se renombraban (no se sustituían por nombres genéricos). Por eso el Canal A era sensible a cambios de nombres de variables, un efecto que se mide en el Capítulo~\ref{cap:modelado}. El renombrado canónico (versión \texttt{v2\_norm}, que también usa el modelo ajustado con CodeNet) elimina esa sensibilidad (ROC-AUC de 0.856 a 0.902; Sección~\ref{subsec:robustez_canal_a}).\footnote{Implementado en \texttt{models/graphcodebert/v2/}.}
-
-El renombrado no modifica \texttt{main}, las palabras clave ni las funciones y tipos de la biblioteca estándar (como \texttt{printf}, \texttt{scanf} o \texttt{std::vector}), y tampoco el código dentro de nodos con error de sintaxis. Se aplica solo al Canal A: CharCNN conserva los nombres tal como están, y Jaccard no lo necesita porque ya abstrae los identificadores en su propia tokenización (Sección~\ref{subsec:linea_base_lexica}). En el motor desplegado se aplica antes de cada embedding, tanto a las referencias como a las entregas.\footnote{Implementado en \texttt{models/logic\_eval/canonical.py}.} Si el renombrado falla, se usa el código original y el reporte registra \texttt{gcb\_estado = OK\_SIN\_NORM}.
-
-% ----------------------------------------------------------------------
-\subsection{Preparación del Conjunto de CodeNet}
-\label{subsec:seleccion_codenet}
-
-Los programas de CodeNet reciben la misma preparación del Canal A que el código de los estudiantes (Sección~\ref{subsec:prep_semantica}), incluido el renombrado canónico de identificadores. Así, el modelo se ajusta con exactamente la misma entrada que verá cuando el sistema esté en uso.
-
-\subsubsection{Selección y Limpieza}
-De los 1,000 problemas del subconjunto depurado de C++ se quiso conservar, por problema, un máximo de 20 soluciones correctas y 10 incorrectas. Para ello se fueron revisando soluciones elegidas al azar con semilla fija (hasta 150 correctas por problema) y se guardaron las primeras que pasaban los tres filtros que siguen. Ese tope evita que unos pocos problemas con miles de envíos dominen el aprendizaje y permite entrenar en una sola tarjeta gráfica de 8 GB. Los filtros fueron:
-
-\begin{enumerate}
-    \item \textbf{Que quepa en una ventana.} GraphCodeBERT lee 512 elementos a la vez. Se conservaron solo los programas que caben completos, para que el vector resuma todo el programa y no una parte. Este filtro descartó 25,933 de los programas revisados, casi todos los que se retiraron.
-    \item \textbf{Sin casi-copias de una solución correcta.} Una respuesta incorrecta que comparte más del 90\,\% de sus fragmentos con una correcta del mismo problema suele diferir en un solo símbolo (un \texttt{<} en lugar de un \texttt{>}). De ella no se puede aprender nada y solo añade ruido. La comparación usa fragmentos de código superpuestos, como en la detección de documentos casi idénticos \cite{Broder1997Resemblance}. Se retiraron 41.
-    \item \textbf{Sin coincidencias con ESCOM.} Se compararon con los 43,895 archivos del corpus de estudiantes con el que se evalúa; solo uno compartía 80\,\% o más de sus fragmentos con alguno y se retiró, para que la evaluación final no incluya algo que el modelo ya vio. Los duplicados entre entrenamiento y evaluación inflan los resultados \cite{Allamanis2019Adverse,Lee2022Dedup}.
-\end{enumerate}
-
-Doce problemas quedaron con menos de dos soluciones correctas y se omitieron. El resultado son 988 problemas y 27,463 programas: 19,235 correctos y 8,228 incorrectos.
-
-El primer filtro tiene un costo: los programas que se conservaron son más cortos que los de ESCOM (Figura~\ref{fig:longitud_codenet}). La mediana es de 26 líneas frente a 104. Es una limitación que se tiene presente al interpretar los resultados del Capítulo~\ref{cap:modelado}.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{figuras/codenet_longitud_comparada.png}
-    \caption{Líneas no vacías por programa en los datos de CodeNet conservados y en la muestra de ESCOM usada para evaluar. Las líneas punteadas marcan la mediana de cada conjunto.}
-    \label{fig:longitud_codenet}
-\end{figure}
-
-\subsubsection{Partición}
-\label{subsec:particion_codenet}
-La partición sigue la misma idea que en los datos de ESCOM (Sección~\ref{subsec:particion_datos}): se hace por problema y no por programa. Las soluciones de un mismo problema se parecen entre sí; si unas quedaran en entrenamiento y otras en validación, el modelo parecería acertar solo porque reconoce el problema, una fuga de información \cite{Kapoor2023Leakage}. Los 988 problemas se repartieron al azar, con semilla fija, en 80\,\% para entrenamiento, 10\,\% para validación y 10\,\% para prueba, proporciones habituales que dejan 99 problemas para validar (Tabla~\ref{tab:particion_codenet}).
-
-\begin{table}[H]
-    \centering
-    \caption{Composición de los datos de CodeNet, particionados por problema.}
-    \label{tab:particion_codenet}
-    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
-        \hline
-        \textbf{Subconjunto} & \textbf{Problemas} & \textbf{Correctos} & \textbf{Incorrectos} & \textbf{Uso en el Proyecto} \\ \hline
-        Entrenamiento & 790 & 15,412 & 6,588 & Ajuste de los pesos del modelo. \\ \hline
-        Validación & 99 & 1,920 & 846 & Elegir qué copia del modelo conservar. \\ \hline
-        Prueba & 99 & 1,903 & 794 & Reservada; no se utilizó. \\ \hline
-        \textbf{Total} & \textbf{988} & \textbf{19,235} & \textbf{8,228} & \textbf{27,463 programas.} \\ \hline
-    \end{tabularx}
-\end{table}
-
-\subsubsection{Uso en el Modelo}
-El modelo no aprende de cada programa por separado, sino de \textbf{tripletas} formadas dentro de un mismo problema: una solución correcta como ancla, otra correcta como positivo y una incorrecta como negativo difícil (Sección~\ref{subsec:ajuste_contrastivo}). Por eso se conservan las soluciones incorrectas, que sirven como contraste. Los 790 problemas de entrenamiento alimentan el ajuste; los 99 de validación permiten elegir qué copia del modelo conservar; la partición de prueba de CodeNet se reservó y no se usó, porque la evaluación final se hizo con los datos de ESCOM, que el ajuste nunca vio.
-
-% ----------------------------------------------------------------------
-\subsection{Composición Final del Conjunto}
-\label{subsec:composicion_final}
-
-Tras la limpieza, la eliminación de duplicados y la partición, el conjunto de Graphito contiene 42,389 archivos: 40,936 humanos y 1,453 de IA. La Tabla~\ref{tab:particion_corpus} muestra su reparto. El conjunto externo de CodeNet (27,463 programas, Tabla~\ref{tab:particion_codenet}) no forma parte de esta cuenta: se usa solo para ajustar el Canal A.
-
-\begin{table}[H]
-    \centering
-    \caption{Composición del conjunto de datos particionado por tarea.}
-    \label{tab:particion_corpus}
-    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
-        \hline
-        \textbf{Subconjunto} & \textbf{Humanos} & \textbf{IA} & \textbf{Total} & \textbf{Uso en el Proyecto} \\ \hline
-        Entrenamiento (\textit{Train}) & 24,810 & 897 & 25,707 & Ajuste de pesos del modelo. \\ \hline
-        Validación (\textit{Val}) & 6,808 & 225 & 7,033 & Ajuste de hiperparámetros, umbrales y paro anticipado. \\ \hline
-        Prueba (\textit{Test}) & 9,318 & 331 & 9,649 & Evaluación final con tareas no vistas. \\ \hline
-        \hline
-        \textbf{Total} & \textbf{40,936} & \textbf{1,453} & \textbf{42,389} & \textbf{Conjunto consolidado.} \\ \hline
-    \end{tabularx}
-\end{table}
-
-En el conjunto, solo cerca del 3\,\% de los archivos son de IA. Este desbalance no se corrigió eliminando código humano, sino que se maneja de forma distinta según el momento:
-
-\begin{itemize}
-    \item \textbf{Durante el entrenamiento, los datos se balancean.} Si el modelo aprendiera con 97 ejemplos humanos por cada 3 de IA, le bastaría con responder casi siempre ``humano'' para acertar la mayoría de las veces, sin aprender a reconocer el código de IA. Para evitarlo, en cada época (cada pasada completa de entrenamiento) el modelo ve todos los ejemplos de IA de entrenamiento y la misma cantidad de códigos humanos, elegidos al azar. En la siguiente época se eligen otros códigos humanos. Así, cada época está balanceada (mitad y mitad) y, a lo largo del entrenamiento, el modelo recorre la variedad de los 10,688 ejemplos humanos únicos de entrenamiento (uno por familia de casi-copias) en lugar de descartarlos.
-    \item \textbf{Durante la validación y la prueba, se conserva el desbalance.} Estos conjuntos no se modifican, porque deben parecerse a un aula real, donde la gran mayoría del código es de autoría humana. Medir con datos balanceados haría que el modelo pareciera mejor de lo que sería en la práctica: con la misma tasa de errores, habría muchos menos humanos que acusar por error, y las falsas alarmas se verían menos graves de lo que serían en un aula real. La métrica debe elegirse según el uso previsto del modelo y no solo por la proporción de clases \cite{McDermott2024AUROC}. Por eso, en los capítulos siguientes, además de ROC-AUC, se reporta PR-AUC, que se enfoca en qué tan bien se encuentran los pocos casos de IA sin generar muchas falsas alarmas.
-\end{itemize}
 
 % ======================================================================
 \section{Conclusión del capítulo}
