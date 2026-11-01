@@ -179,9 +179,21 @@ def test_sql_rewrites_legacy_verdict_labels_to_their_canonical_names():
     flat = [" ".join(s.split()) for s in STATEMENTS]
     last_enum_add = max(i for i, s in enumerate(flat) if "ADD VALUE" in s.upper())
     for legacy, canonical in aliases.items():
-        stmt = f"UPDATE reportes_analisis SET dictamen = '{canonical}' WHERE dictamen = '{legacy}';"
+        # Compared as text: a database whose enum never had the legacy labels (one built by
+        # `create_all`, such as a new Supabase project) rejects the literal 'INTEGRO' as an enum value.
+        stmt = f"UPDATE reportes_analisis SET dictamen = '{canonical}' WHERE dictamen::text = '{legacy}';"
         assert stmt in flat, legacy
         assert flat.index(stmt) > last_enum_add, f"{legacy} rewrite must run after the enum additions"
+
+
+def test_sql_never_compares_the_verdict_enum_with_a_legacy_literal():
+    # `dictamen = 'INTEGRO'` raises InvalidTextRepresentation on an enum without that label, which
+    # stops the whole migration (and the production container's entrypoint) on a fresh database.
+    aliases = [name for name, member in DictamenEnum.__members__.items() if name != member.name]
+    flat = [" ".join(s.split()) for s in STATEMENTS]
+    for stmt in flat:
+        for legacy in aliases:
+            assert f"dictamen = '{legacy}'" not in stmt, stmt
 
 
 def test_sql_enum_additions_and_columns_are_idempotent():

@@ -113,9 +113,11 @@ ALTER TYPE dictamenenum ADD VALUE IF NOT EXISTS 'SIN_REFERENCIA';
 -- Los reportes viejos guardan etiquetas que hoy son alias en Python (DictamenEnum) y el ORM no puede
 -- leerlas: cualquier endpoint que cargue esos reportes responde 500. Se reescriben a su nombre
 -- canónico, con la misma equivalencia que define DictamenEnum ("compatibilidad retroactiva").
-UPDATE reportes_analisis SET dictamen = 'SIN_ALERTAS' WHERE dictamen = 'INTEGRO';
-UPDATE reportes_analisis SET dictamen = 'REVISION_ESTILOMETRICA' WHERE dictamen = 'SOSPECHA_IA';
-UPDATE reportes_analisis SET dictamen = 'REVISION_SEMANTICA' WHERE dictamen = 'PLAGIO_PROBABLE';
+-- Se compara como texto: una BD creada por create_all (p. ej. un proyecto Supabase nuevo) tiene un enum
+-- sin las etiquetas viejas y rechazaría el literal 'INTEGRO' como valor de enum, deteniendo la migración.
+UPDATE reportes_analisis SET dictamen = 'SIN_ALERTAS' WHERE dictamen::text = 'INTEGRO';
+UPDATE reportes_analisis SET dictamen = 'REVISION_ESTILOMETRICA' WHERE dictamen::text = 'SOSPECHA_IA';
+UPDATE reportes_analisis SET dictamen = 'REVISION_SEMANTICA' WHERE dictamen::text = 'PLAGIO_PROBABLE';
 -- NULL significa "no evaluado", nunca 0 (dictamen NULL mientras PENDIENTE/PROCESANDO/ERROR).
 ALTER TABLE reportes_analisis ALTER COLUMN similitud_semantica DROP NOT NULL;
 ALTER TABLE reportes_analisis ALTER COLUMN probabilidad_ia DROP NOT NULL;
