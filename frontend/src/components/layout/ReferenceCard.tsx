@@ -117,10 +117,13 @@ export function ReferenceCard({
     };
 
     // The whole card toggles the submissions list; interactive children keep their own behavior.
+    const isOpen = forceExpanded || isExpanded;
+
     const handleCardClick = (event: ReactMouseEvent<HTMLDivElement>) => {
         if ((event.target as HTMLElement).closest("button, a, input, select, textarea, [role='button'], [role='menu']")) {
             return;
         }
+        if (forceExpanded) return;
         setIsExpanded((v) => !v);
     };
 
@@ -323,15 +326,18 @@ export function ReferenceCard({
                         )}
 
                         <button
-                            onClick={() => setIsExpanded(!isExpanded)}
+                            onClick={() => {
+                                if (forceExpanded) return;
+                                setIsExpanded(!isExpanded);
+                            }}
                             className="p-2.5 min-w-[42px] min-h-[42px] flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-graphito-dark dark:hover:bg-graphito-subtle text-slate-600 dark:text-slate-300 rounded-xl transition-all duration-200 focus-visible:ring-2 focus-visible:ring-graphito-blue focus-visible:outline-none active:scale-95"
-                            aria-label={isExpanded ? "Colapsar entregas" : "Expandir entregas"}
-                            aria-expanded={isExpanded}
+                            aria-label={isOpen ? "Colapsar entregas" : "Expandir entregas"}
+                            aria-expanded={isOpen}
                         >
                             <ChevronDown
                                 className={cn(
                                     "h-4 w-4 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-                                    isExpanded && "rotate-180"
+                                    isOpen && "rotate-180"
                                 )}
                             />
                         </button>
@@ -342,7 +348,7 @@ export function ReferenceCard({
                 <div
                     className={cn(
                         "grid transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-                        isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                        isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                     )}
                 >
                     <div className="overflow-hidden">
@@ -352,7 +358,7 @@ export function ReferenceCard({
                                 data-problem-id={problemId}
                                 className={cn(
                                     "border-t border-slate-200 dark:border-graphito-border transition-all duration-300",
-                                    isExpanded ? "mt-5 pt-5" : "mt-0 pt-0 pb-0 border-transparent"
+                                    isOpen ? "mt-5 pt-5" : "mt-0 pt-0 pb-0 border-transparent"
                                 )}
                             >
                                 <div className="flex items-center justify-between mb-3">

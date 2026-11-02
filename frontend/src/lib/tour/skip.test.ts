@@ -52,4 +52,12 @@ describe("shouldSkipStep", () => {
             expect(shouldSkipStep(step(id), { problemId: 5 }, report)).toBe(true);
         }
     });
+
+    it("skips the submissions overview in examples flow if a report is already open", () => {
+        const report = env({ path: "/reporte/12" });
+        const exStep = getSteps("examples").find((s) => s.id === "ex-problem-submissions");
+        if (!exStep) throw new Error("ex-problem-submissions step not found");
+        expect(shouldSkipStep(exStep, { problemId: 5 }, report)).toBe(true);
+        expect(shouldSkipStep(exStep, { problemId: 5 }, env())).toBe(false);
+    });
 });

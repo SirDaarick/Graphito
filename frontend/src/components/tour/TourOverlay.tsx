@@ -87,8 +87,12 @@ export function TourOverlay() {
             if (skip) next(step.id);
         };
         check();
+        const unsubscribe = subscribeToRoute(check);
         const timer = window.setInterval(check, 250);
-        return () => window.clearInterval(timer);
+        return () => {
+            unsubscribe();
+            window.clearInterval(timer);
+        };
     }, [step, problemId, targetElement, next]);
 
     // A step may open its own route (a report) and the view of it that its target lives in.

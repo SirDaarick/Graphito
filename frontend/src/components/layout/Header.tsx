@@ -337,6 +337,30 @@ export function Header({
                                             <span>{item.label}</span>
                                         </button>
                                     ))}
+                                    {!IS_DEMO_MODE && (
+                                        <button
+                                            type="button"
+                                            data-tour="mobile-tour-button"
+                                            aria-label="Cómo usar Graphito"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowUserMenu(false);
+                                                tour.open();
+                                            }}
+                                            className="w-full sm:hidden flex items-center justify-between px-4 py-2.5 min-h-[44px] text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-graphito-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <CircleQuestionMark size={18} className="text-graphito-blue shrink-0" aria-hidden="true" />
+                                                <span>Cómo usar</span>
+                                            </div>
+                                            {!tour.hasSeen && (
+                                                <span className="flex h-2 w-2 relative">
+                                                    <span className="absolute inline-flex h-full w-full rounded-full bg-graphito-violet opacity-75 animate-ping" />
+                                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-graphito-violet" />
+                                                </span>
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="py-1">
                                     <button
