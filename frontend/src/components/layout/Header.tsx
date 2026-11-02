@@ -90,7 +90,7 @@ export function Header({
             <div className="max-w-7xl mx-auto flex items-center justify-between">
 
                 {/* Lado Izquierdo: Logo y Nav */}
-                <div className="flex items-center gap-4 md:gap-10">
+                <div className="flex items-center gap-4 md:gap-6 lg:gap-10 min-w-0">
                     <button
                         type="button"
                         onClick={handleLogoClick}
@@ -102,7 +102,7 @@ export function Header({
                             alt="Graphito Logo"
                             className="w-9 h-9 object-contain transform group-hover:rotate-6 transition-transform duration-300"
                         />
-                        <span className="hidden sm:inline text-2xl font-display font-extrabold tracking-tighter bg-gradient-to-r from-graphito-blue to-graphito-violet bg-clip-text text-transparent">
+                        <span className="hidden sm:inline md:hidden lg:inline text-2xl font-display font-extrabold tracking-tighter bg-gradient-to-r from-graphito-blue to-graphito-violet bg-clip-text text-transparent">
                             Graphito
                         </span>
                         {IS_DEMO_MODE && (
@@ -140,7 +140,7 @@ export function Header({
                 </div>
 
                 {/* Lado Derecho: Acciones y Perfil */}
-                <div className="flex items-center gap-1 sm:gap-4 lg:gap-6">
+                <div className="flex items-center gap-1 sm:gap-3 lg:gap-6 shrink-0 md:ml-4">
 
                     <GradientButton
                         onClick={onNewCode}
@@ -162,7 +162,7 @@ export function Header({
                             title="Cómo usar"
                         >
                             <CircleQuestionMark size={20} className="text-graphito-blue" aria-hidden="true" />
-                            <span className="hidden lg:inline">Cómo usar</span>
+                            <span className="hidden lg:inline whitespace-nowrap">Cómo usar</span>
                             {!tour.hasSeen && (
                                 <span className="absolute top-1.5 right-1.5 lg:top-2 lg:right-2 flex h-2.5 w-2.5" aria-hidden="true">
                                     <span className="absolute inline-flex h-full w-full rounded-full bg-graphito-violet opacity-75 animate-ping" />

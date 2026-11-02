@@ -130,8 +130,8 @@ class PdfReportService:
             "DocTitle",
             parent=styles["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=22,
-            leading=26,
+            fontSize=16,
+            leading=21,
             textColor=colors.HexColor("#0f172a"),
         )
         subtitle_style = ParagraphStyle(
@@ -160,24 +160,18 @@ class PdfReportService:
             leading=14,
             textColor=colors.HexColor("#334155"),
         )
-        verdict_style = ParagraphStyle(
-            "Verdict",
-            parent=styles["Normal"],
-            fontName="Helvetica-Bold",
-            fontSize=13,
-            leading=17,
-            alignment=1,
-        )
-
         elements = []
 
-        # 1. Header
-        elements.append(Paragraph("GRAPHITO | Apoyo a la evaluacion docente", subtitle_style))
+        # 1. Header: the thesis (TT) title
+        elements.append(Paragraph("GRAPHITO", subtitle_style))
         elements.append(Spacer(1, 4))
-        elements.append(Paragraph("Reporte de metricas de similitud", title_style))
+        elements.append(Paragraph(
+            "Graphito: Sistema de comparación de código en C/C++ mediante similitud "
+            "semántica para cursos introductorios de programación",
+            title_style,
+        ))
         elements.append(Spacer(1, 10))
         elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#3b82f6"), spaceAfter=14))
-
         # 2. Metadata Box
         date_str = report.fecha_analisis.strftime("%d/%m/%Y %H:%M") if report.fecha_analisis else datetime.utcnow().strftime("%d/%m/%Y %H:%M")
         meta_data = [
@@ -208,23 +202,7 @@ class PdfReportService:
         elements.append(meta_table)
         elements.append(Spacer(1, 16))
 
-        # 3. Result banner (never a conformity fallback, spec AR3.1)
         content = PdfReportService.build_content(ReporteAnalisisResponse.model_validate(report))
-        verdict_bg, verdict_border, verdict_color = TONES[content.verdict_tone]
-        verdict_paragraph = Paragraph(
-            f"<font color='{verdict_color}'><b>{escape(content.verdict_text)}</b></font>",
-            verdict_style,
-        )
-        verdict_table = Table([[verdict_paragraph]], colWidths=[520])
-        verdict_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(verdict_bg)),
-            ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor(verdict_border)),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(verdict_table)
-        elements.append(Spacer(1, 12))
-
         # 4. The two results that matter
         elements.append(Paragraph("Resultados", h2_style))
         metrics_data = [[Paragraph(f"<b>{h}</b>", body_style) for h in ("Analisis", "Resultado")]]
@@ -247,30 +225,6 @@ class PdfReportService:
         elements.append(Paragraph(escape(content.label), body_style))
         elements.append(Spacer(1, 10))
 
-        # 5. Observations
-        if report.indicadores and len(report.indicadores) > 0:
-            elements.append(Paragraph("Observaciones", h2_style))
-            indicators_data = [
-                [
-                    Paragraph("<b>Observacion</b>", body_style),
-                    Paragraph("<b>Detalle</b>", body_style),
-                ]
-            ]
-            for ind in report.indicadores:
-                indicators_data.append([
-                    Paragraph(f"<b>{escape(ind.tipo_alerta)}</b>", body_style),
-                    Paragraph(escape(ind.descripcion), body_style),
-                ])
-            ind_table = Table(indicators_data, colWidths=[160, 360])
-            ind_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ]))
-            elements.append(ind_table)
         # 6. Observaciones y Anotaciones del Docente (si existen)
         if comments and len(comments) > 0:
             elements.append(Spacer(1, 14))

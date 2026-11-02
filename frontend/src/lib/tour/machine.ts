@@ -126,6 +126,12 @@ export function tourExpandedProblemId(state: TourState): number | null {
     return step?.expandProblem ? state.context.problemId : null;
 }
 
+/** Problem the library must make visible now (its group section open): the one the current step points at. */
+export function tourRevealProblemId(state: TourState): number | null {
+    const step = currentStep(state);
+    return step?.scopedToProblem ? state.context.problemId : null;
+}
+
 /** True when the step advances on a route change and `path` satisfies it. */
 export function routeAdvancesStep(step: TourStep, path: string): boolean {
     return step.advance.kind === "route" && matchRoute(step.advance.pattern, path).isMatch;

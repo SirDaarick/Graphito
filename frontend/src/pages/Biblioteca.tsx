@@ -5,7 +5,7 @@ import { SearchBar } from "../components/layout/SearchBar";
 import { api, Grupo, CodigoFuente } from "../lib/api";
 import { toComparison } from "../lib/dictamen";
 import { navigate } from "../lib/router";
-import { tourExpandedProblemId, tourGroupId } from "../lib/tour/machine";
+import { tourExpandedProblemId, tourGroupId, tourRevealProblemId } from "../lib/tour/machine";
 import { useTour } from "../components/tour/TourContext";
 import {
     Loader2,
@@ -91,6 +91,20 @@ export function Biblioteca({
         // In the grouped view the example group's section must be open so its problems are on screen.
         setExpandedGroupIds((prev) => new Set(prev).add(`group-${tourGroup}`));
     }, [tourGroup]);
+
+    // A step that points at one problem's buttons needs the section holding it open, whatever group it is in.
+    const tourRevealProblem = tourRevealProblemId(tour.state);
+    useEffect(() => {
+        if (tourRevealProblem === null) return;
+        const target = references.find((r) => r.problemId === tourRevealProblem);
+        if (!target) return;
+        setExpandedGroupIds((prev) => {
+            const next = new Set(prev);
+            if (target.assignedGroups.length === 0) next.add("unassigned");
+            target.assignedGroups.forEach((g) => next.add(`group-${g.id}`));
+            return next;
+        });
+    }, [tourRevealProblem, references]);
 
     const fetchGroups = async () => {
         try {

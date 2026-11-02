@@ -208,7 +208,7 @@ async def test_pdf_of_abstained_no_evaluable_report_is_honest(client, pdf_text):
     pdf = await client.get(f"/api/v1/analysis/reports/{body['id']}/pdf", headers=headers)
     assert pdf.status_code == 200
     text = pdf_text(pdf.content)
-    assert "ABSTENIDO" in text and "NO EVALUABLE" in text and PDF_LABEL_START in text
+    assert "ABSTENIDO" in text and "Resultados" in text and PDF_LABEL_START in text and "ALERTA" not in text and "Observaciones" not in text
     assert "stub" in text and "Jaccard" not in text and "sha256" not in text
     assert "CONFORMIDAD" not in text and "discrepancia" not in text.lower()
 
@@ -220,7 +220,7 @@ async def test_pdf_of_sin_referencia_report_says_so(client, pdf_text):
     body = await _analyze(client, headers, problema_id, PLAIN_C)
     assert body["dictamen"] == "SIN_REFERENCIA"
     text = pdf_text((await client.get(f"/api/v1/analysis/reports/{body['id']}/pdf", headers=headers)).content)
-    assert "SIN REFERENCIA" in text and "CONFORMIDAD" not in text and "SIN ALERTAS" not in text
+    assert "No evaluado" in text and "CONFORMIDAD" not in text and "SIN ALERTAS" not in text and "ALERTA" not in text
 
 
 def test_content_model_is_short_and_has_no_technical_or_discrepancy_rows():

@@ -17,6 +17,8 @@ export interface ComparisonView extends ReportScoring {
     similarity: number | null;
     indicadores?: IndicadorIntegridad[];
     grupo_id?: number;
+    /** The teacher's mark as saved on the server (persists across sessions and devices). */
+    decision_docente?: ReporteAnalisis["decision_docente"];
 }
 
 export function toComparison(report: ReporteAnalisis, title: string, grupoId?: number): ComparisonView {

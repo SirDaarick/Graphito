@@ -4,7 +4,6 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
 import { clearVerdict, getVerdict, saveVerdict } from "../lib/verdicts";
-import { calibrationLabel } from "../lib/dictamen";
 import { evidenceByLine } from "../lib/evidence";
 import type { StyleAttribution } from "../lib/styleAttribution";
 import { useDialogFocus } from "../lib/focusTrap";
@@ -55,7 +54,7 @@ type CodeStatus = "idle" | "loading" | "error" | "ready";
 /** How long the teacher can undo a decision before the toast goes away (and the last submission closes). */
 const UNDO_WINDOW_MS = 5000;
 
-const KBD ="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono text-[10px]";
+const KBD ="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono text-xs";
 
 const FOOTER_TOOLTIP =
     "absolute bottom-full right-0 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-graphito-surface/95 border border-slate-700/80 text-white text-xs font-sans font-medium whitespace-nowrap shadow-2xl z-[150]";
@@ -164,7 +163,7 @@ export function SimilarityReportModal({
     const handleVerdictAndAdvance = (type: "conforme" | "aclaracion") => {
         const isConforme = type === "conforme";
         const msg = isConforme
-            ? "Entrega marcada por el docente como revisada, sin observaciones."
+            ? "Entrega marcada como revisada."
             : "Entrega marcada por el docente para aclarar con el estudiante.";
 
         clearToastTimers();
@@ -503,15 +502,32 @@ export function SimilarityReportModal({
                                     </button>
                                 )}
                                 <div className="min-w-0" data-tour="report-title">
-                                    <h2 id="report-modal-title" className="text-base sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                                        {inCodeView ? "Comparación de código" : "Reporte de similitud"}
-                                    </h2>
-                                    <p
-                                        className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium line-clamp-2 break-words"
-                                        title={comparison.title}
-                                    >
-                                        Entrega de {comparison.title}
-                                    </p>
+                                    {inCodeView ? (
+                                        <>
+                                            <h2
+                                                id="report-modal-title"
+                                                className="text-lg sm:text-2xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight line-clamp-2 break-words"
+                                                title={comparison.title}
+                                            >
+                                                {comparison.title}
+                                            </h2>
+                                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                                                Comparación de código con la referencia
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h2 id="report-modal-title" className="text-base sm:text-xl font-display font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                                                Reporte de similitud
+                                            </h2>
+                                            <p
+                                                className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium line-clamp-2 break-words"
+                                                title={comparison.title}
+                                            >
+                                                Entrega de {comparison.title}
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -527,11 +543,6 @@ export function SimilarityReportModal({
                                         className="px-2.5 py-1 rounded-full text-xs font-semibold border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-300 dark:border-graphito-subtle"
                                     >
                                         Ejemplo
-                                    </span>
-                                )}
-                                {comparison.estado_calibracion && !isSample && (
-                                    <span className="hidden md:inline px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-100 dark:bg-graphito-surface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-graphito-subtle">
-                                        {calibrationLabel(comparison.estado_calibracion)}
                                     </span>
                                 )}
                                 {comparison.engine === "demo" && (
@@ -612,11 +623,11 @@ export function SimilarityReportModal({
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-slate-50 dark:bg-graphito-dark border-t border-slate-200 dark:border-graphito-subtle/40 shrink-0">
-                            <div className="hidden lg:flex items-center gap-2.5 text-[11px] text-slate-600 dark:text-slate-400">
+                        <div className="flex flex-wrap items-center justify-between gap-y-2 px-4 sm:px-6 py-3 bg-slate-50 dark:bg-graphito-dark border-t border-slate-200 dark:border-graphito-subtle/40 shrink-0">
+                            <div className="hidden lg:flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-400">
                                 <span><kbd className={KBD}>←</kbd> <kbd className={KBD}>→</kbd> navegar</span>
                                 <span aria-hidden="true">•</span>
-                                <span><kbd className={KBD}>A</kbd> sin observaciones</span>
+                                <span><kbd className={KBD}>A</kbd> revisado</span>
                                 <span aria-hidden="true">•</span>
                                 <span><kbd className={KBD}>R</kbd> aclarar</span>
                                 <span aria-hidden="true">•</span>
@@ -627,11 +638,11 @@ export function SimilarityReportModal({
                                 {/* Validar Conforme */}
                                 <button
                                     onClick={() => handleVerdictAndAdvance("conforme")}
-                                    aria-label="Marcar sin observaciones (tecla A)"
+                                    aria-label="Marcar como revisado (tecla A)"
                                     className="group relative px-3 py-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
                                 >
                                     <ShieldCheck size={19} aria-hidden="true" />
-                                    <span className="hidden sm:inline">Sin observaciones</span>
+                                    <span className="hidden sm:inline whitespace-nowrap">Marcar como revisado</span>
                                 </button>
 
                                 {/* Citar a Aclaración */}
@@ -641,7 +652,7 @@ export function SimilarityReportModal({
                                     className="group relative px-3 py-2.5 min-w-[44px] min-h-[44px] rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/60 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                                 >
                                     <UserCheck size={19} aria-hidden="true" />
-                                    <span className="hidden sm:inline">Aclarar con el estudiante</span>
+                                    <span className="hidden sm:inline whitespace-nowrap">Aclarar con el estudiante</span>
                                 </button>
 
                                 </div>

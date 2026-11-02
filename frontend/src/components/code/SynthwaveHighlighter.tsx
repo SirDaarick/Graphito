@@ -137,92 +137,26 @@ export function tokenizeLine(line: string): Token[] {
     return tokens;
 }
 
-export function renderSynthwaveTokens(tokens: Token[]): React.ReactNode {
-    return tokens.map((token, idx) => {
-        switch (token.type) {
-            case "keyword":
-                return (
-                    <span
-                        key={idx}
-                        className="text-[#ff7edb] font-semibold"
-                        style={{ textShadow: "0 0 5px rgba(255, 126, 219, 0.45)" }}
-                    >
-                        {token.text}
-                    </span>
-                );
-            case "type":
-                return (
-                    <span
-                        key={idx}
-                        className="text-[#fe4450] font-medium"
-                        style={{ textShadow: "0 0 4px rgba(254, 68, 80, 0.4)" }}
-                    >
-                        {token.text}
-                    </span>
-                );
-            case "function":
-                return (
-                    <span
-                        key={idx}
-                        className="text-[#36f9f6] font-medium"
-                        style={{ textShadow: "0 0 5px rgba(54, 249, 246, 0.4)" }}
-                    >
-                        {token.text}
-                    </span>
-                );
-            case "string":
-                return (
-                    <span
-                        key={idx}
-                        className="text-[#fede5d]"
-                        style={{ textShadow: "0 0 3px rgba(254, 222, 93, 0.3)" }}
-                    >
-                        {token.text}
-                    </span>
-                );
-            case "number":
-                return (
-                    <span
-                        key={idx}
-                        className="text-[#f97e72]"
-                        style={{ textShadow: "0 0 3px rgba(249, 126, 114, 0.3)" }}
-                    >
-                        {token.text}
-                    </span>
-                );
-            case "preprocessor":
-                return (
-                    <span
-                        key={idx}
-                        className="text-[#fede5d] font-bold"
-                        style={{ textShadow: "0 0 4px rgba(254, 222, 93, 0.35)" }}
-                    >
-                        {token.text}
-                    </span>
-                );
-            case "comment":
-                return (
-                    <span key={idx} className="text-[#848bbd] italic">
-                        {token.text}
-                    </span>
-                );
-            case "operator":
-                return (
-                    <span key={idx} className="text-[#fede5d]/85">
-                        {token.text}
-                    </span>
-                );
-            case "plain":
-            default:
-                return (
-                    <span key={idx} className="text-[#e2e8f0]">
-                        {token.text}
-                    </span>
-                );
-        }
-    });
-}
+/** Light theme: deep, readable hues on white. Dark theme: the Synthwave '84 neon palette. */
+const TOKEN_CLASS: Record<Token["type"], string> = {
+    keyword: "text-fuchsia-700 font-semibold dark:text-[#ff7edb] dark:[text-shadow:0_0_5px_rgba(255,126,219,0.45)]",
+    type: "text-rose-700 font-medium dark:text-[#fe4450] dark:[text-shadow:0_0_4px_rgba(254,68,80,0.4)]",
+    function: "text-cyan-800 font-medium dark:text-[#36f9f6] dark:[text-shadow:0_0_5px_rgba(54,249,246,0.4)]",
+    string: "text-amber-800 dark:text-[#fede5d] dark:[text-shadow:0_0_3px_rgba(254,222,93,0.3)]",
+    number: "text-orange-700 dark:text-[#f97e72] dark:[text-shadow:0_0_3px_rgba(249,126,114,0.3)]",
+    preprocessor: "text-amber-800 font-bold dark:text-[#fede5d] dark:[text-shadow:0_0_4px_rgba(254,222,93,0.35)]",
+    comment: "text-slate-500 italic dark:text-[#848bbd]",
+    operator: "text-slate-600 dark:text-[#fede5d]/85",
+    plain: "text-slate-800 dark:text-[#e2e8f0]",
+};
 
+export function renderSynthwaveTokens(tokens: Token[]): React.ReactNode {
+    return tokens.map((token, idx) => (
+        <span key={idx} className={TOKEN_CLASS[token.type]}>
+            {token.text}
+        </span>
+    ));
+}
 export function SynthwaveLine({ line }: { line: string }) {
     const tokens = useMemo(() => tokenizeLine(line), [line]);
     return <>{renderSynthwaveTokens(tokens)}</>;

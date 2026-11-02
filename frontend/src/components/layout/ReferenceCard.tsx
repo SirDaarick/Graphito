@@ -129,7 +129,16 @@ export function ReferenceCard({
         action?.();
     };
 
-    const [, setVerdicts] = useState<Record<string, VerdictType>>(() => getSavedVerdicts());
+    const [verdicts, setVerdicts] = useState<Record<string, VerdictType>>(() => getSavedVerdicts());
+
+    /** The teacher's own mark: what they just set here wins over what the server returned with the list. */
+    const verdictOf = (comparison: Comparison): VerdictType | null => {
+        const local = verdicts[String(comparison.id)];
+        if (local) return local;
+        if (comparison.decision_docente === "APROBADO") return "CONFORME";
+        if (comparison.decision_docente === "EN_DUDA") return "DUDA";
+        return null;
+    };
 
     useEffect(() => {
         const handleUpdate = () => {
@@ -357,6 +366,7 @@ export function ReferenceCard({
 
                                 <div className="space-y-2">
                                     {comparisons.map((comparison, idx) => {
+                                        const verdict = verdictOf(comparison);
                                         return (
                                             <div
                                                 key={comparison.id}
@@ -369,7 +379,14 @@ export function ReferenceCard({
                                                         onComparisonClick?.(comparison, comparisons);
                                                     }
                                                 }}
-                                                className="flex items-center justify-between p-3 px-4 bg-white/40 hover:bg-white/90 dark:bg-graphito-dark/30 dark:hover:bg-graphito-dark/60 backdrop-blur-[2px] border border-slate-200/80 dark:border-white/[0.06] rounded-xl hover:border-graphito-blue/40 transition-all duration-150 cursor-pointer group shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
+                                                className={cn(
+                                                    "flex items-center justify-between p-3 px-4 backdrop-blur-[2px] border rounded-xl transition-all duration-150 cursor-pointer group shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue",
+                                                    verdict === "CONFORME"
+                                                        ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/40 hover:border-emerald-500/60"
+                                                        : verdict === "DUDA"
+                                                        ? "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/40 hover:border-amber-500/60"
+                                                        : "bg-white/40 hover:bg-white/90 dark:bg-graphito-dark/30 dark:hover:bg-graphito-dark/60 border-slate-200/80 dark:border-white/[0.06] hover:border-graphito-blue/40"
+                                                )}
                                             >
                                                 {/* Left: Index badge & Student Name */}
                                                 <div className="flex items-center gap-3 min-w-0">
@@ -383,6 +400,18 @@ export function ReferenceCard({
 
                                                 {/* Right: Similarity Score & Chevron */}
                                                 <div className="flex items-center gap-3 shrink-0">
+                                                    {verdict && (
+                                                        <span
+                                                            className={cn(
+                                                                "px-2 py-0.5 rounded-md text-xs font-bold border",
+                                                                verdict === "CONFORME"
+                                                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                                                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40"
+                                                            )}
+                                                        >
+                                                            {verdict === "CONFORME" ? "Revisado" : "Por aclarar"}
+                                                        </span>
+                                                    )}
                                                     {comparison.engine === "stub" && (
                                                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                                                             STUB

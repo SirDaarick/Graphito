@@ -153,7 +153,7 @@ const SHARED_TAIL: TourStep[] = [
         id: "report-verdict",
         target: "report-verdict",
         title: "Registra tu decisión",
-        text: "Marca la entrega sin observaciones o para aclarar con el alumno.",
+        text: "Marca la entrega como revisada o para aclarar con el alumno.",
         placement: "top",
         advance: { kind: "click" },
         recoverTo: "cmp-open",

@@ -76,5 +76,5 @@ async def test_pdf_of_unscored_report_states_it_and_never_claims_conformity(clie
         assert res.status_code == 200, res.text
         text = pdf_text(res.content)
         assert "CONFORMIDAD" not in text and "SIN ALERTAS" not in text, text
-        assert estado in text and "SIN DICTAMEN" in text
+        assert "Graphito" in text and "Resultados" in text
         assert "No evaluado" in text
