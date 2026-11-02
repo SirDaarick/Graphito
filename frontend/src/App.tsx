@@ -12,6 +12,7 @@ import { SimilarityReportModal } from "./pages/SimilarityReportModal";
 import { api, Docente, IS_DEMO_MODE, invalidateLibrary } from "./lib/api";
 import { toComparison, type ComparisonView } from "./lib/dictamen";
 import { siblingSubmissions } from "./lib/siblings";
+import { findCachedReport } from "./lib/libraryCache";
 import { navigate, usePath, useRouteMatch, getInitialRoute } from "./lib/router";
 import { useTour } from "./components/tour/TourContext";
 
@@ -89,7 +90,19 @@ function App() {
         if (activeReportId) {
             const idNum = Number(activeReportId);
             if (!Number.isNaN(idNum) && (!selectedComparison || String(selectedComparison.id) !== String(activeReportId))) {
+                // The library already loaded this report: open it at once, no round trips.
+                const cached = findCachedReport(idNum);
+                if (cached) {
+                    setSelectedComparison(cached.current);
+                    setComparisonList((prev) =>
+                        prev.length > 0 && prev.some((c) => String(c.id) === String(idNum)) ? prev : cached.list
+                    );
+                    return;
+                }
                 let cancelled = false;
+                // Started together with the report: the two do not depend on each other.
+                const problemsPromise = api.problems.list(true, true);
+                problemsPromise.catch(() => undefined);
                 api.analysis
                     .getReport(idNum)
                     .then(async (report) => {
@@ -99,7 +112,7 @@ function App() {
                         // A direct link has no list yet: look up the other submissions of the same problem.
                         // State is set once, after the lookup: changing selectedComparison re-runs (and cancels) this effect.
                         try {
-                            const siblings = siblingSubmissions(await api.problems.list(true, true), report.id);
+                            const siblings = siblingSubmissions(await problemsPromise, report.id);
                             if (siblings) {
                                 // The problem list does not say which group is the example one; the single report does.
                                 const exampleGroup = report.es_ejemplo ? siblings.current.grupo_id : undefined;

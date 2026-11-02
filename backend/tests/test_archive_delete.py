@@ -281,3 +281,18 @@ async def test_delete_group_keeps_problems_and_submissions(client: AsyncClient, 
     assert await _count(db_session, Problema) == 1
     submissions = (await db_session.execute(select(CodigoFuente))).scalars().all()
     assert len(submissions) == 1 and submissions[0].grupo_id is None
+
+@pytest.mark.asyncio
+async def test_problem_list_with_submissions_says_which_groups_hold_each_problem(client: AsyncClient):
+    headers = await _headers(client)
+    assigned = await _problem(client, headers, "Asignado")
+    loose = await _problem(client, headers, "Suelto")
+    gid = await _group(client, headers)
+    assert (await client.post(f"{G}{gid}/assign", headers=headers, json={"problema_id": assigned})).status_code == 201
+
+    rows = (await client.get(f"{P}?with_submissions=true", headers=headers)).json()
+    by_id = {r["id"]: r for r in rows}
+    assert by_id[assigned]["grupo_ids"] == [gid] and by_id[loose]["grupo_ids"] == []
+    # The plain list does not pay for the extra query.
+    plain = (await client.get(P, headers=headers)).json()
+    assert all(r["grupo_ids"] is None for r in plain)

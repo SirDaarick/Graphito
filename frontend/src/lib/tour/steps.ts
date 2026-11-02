@@ -197,7 +197,7 @@ function exampleReport(caso: ExampleCase): (context: TourContext) => string | nu
 const LIBRARY_ROUTE = () => "/biblioteca";
 
 /** A report is fetched after its step starts, so its targets may take a while to appear. */
-const REPORT_GRACE_MS = 8000;
+const REPORT_GRACE_MS = 20000;
 
 /**
  * "Ver ejemplos": walks the preloaded example group. It has its own ending (the reports

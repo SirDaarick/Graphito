@@ -89,10 +89,11 @@ class PdfReportService:
         estado = getattr(report.estado, "value", report.estado)
         tone, text = verdict_banner(dictamen, estado)
 
-        if report.similitud_semantica is None:
-            a_value = f"No evaluado ({report.estado_canal_a or estado})"
+        # The headline similarity is the GraphCodeBERT one, as on screen; the lexical (Jaccard) score is not shown.
+        if report.gcb_similarity is None:
+            a_value = f"No evaluado ({report.gcb_estado or 'sin calcular'})"
         else:
-            a_value = _pct(report.similitud_semantica)
+            a_value = _pct(report.gcb_similarity)
         if report.estado_canal_b == "ABSTENIDO":
             b_value = "ABSTENIDO (codigo demasiado corto)"
         elif report.probabilidad_ia is None:

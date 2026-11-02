@@ -232,11 +232,14 @@ def test_content_model_is_short_and_has_no_technical_or_discrepancy_rows():
         estado_canal_b="EVALUADO", flag_a=True, flag_b=False, umbral_a=0.4321, umbral_b=0.1715,
         similitud_semantica=0.61, puntaje_calibrado_a=0.7, probabilidad_ia=0.1, calibracion_sha_a="a" * 64,
         calibracion_sha_b="b" * 64, checkpoint_sha_b="c" * 64, manifest_sha="d" * 64, discrepancia_score=0.3,
-        gcb_estado="ERROR",
+        gcb_similarity=0.82, gcb_estado="OK",
     )
     content = PdfReportService.build_content(report)
     flat = " ".join(" ".join(map(str, row)) for row in content.metric_rows)
-    assert "61.0%" in flat and "10.0%" in flat
+    # The similarity row is the GraphCodeBERT score; the Jaccard one (0.61) is not shown.
+    assert "82.0%" in flat and "10.0%" in flat and "61.0%" not in flat
+    unavailable = PdfReportService.build_content(report.model_copy(update={"gcb_similarity": None, "gcb_estado": "ERROR"}))
+    assert "No evaluado (ERROR)" in unavailable.metric_rows[0][1]
     assert "aaaaaaaaaaaa" not in flat and "0.4321" not in flat
     assert "discrepancia" not in flat.lower() and "0.3" not in flat
     assert PDF_LABEL_START in content.label and "ALERTA" in content.verdict_text

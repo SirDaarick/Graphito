@@ -67,9 +67,21 @@ class ProblemService:
         if not with_submissions:
             return [ProblemaResponse.model_validate(p) for p in problemas]
 
+        # Group assignments in one query, so the library does not fetch every group's detail to learn them.
+        grupo_ids: dict = {p.id: [] for p in problemas}
+        if grupo_ids:
+            rows = await self.db.execute(
+                select(GrupoProblema.problema_id, GrupoProblema.grupo_id).where(
+                    GrupoProblema.problema_id.in_(list(grupo_ids))
+                )
+            )
+            for problema_id, grupo_id in rows.all():
+                grupo_ids[problema_id].append(grupo_id)
+
         response_list: List[ProblemaResponse] = []
         for p in problemas:
             resp = ProblemaResponse.model_validate(p)
+            resp.grupo_ids = grupo_ids[p.id]
             entregas_resp: List[CodigoFuenteResponse] = []
             alumno_codigos = [c for c in p.codigos if c.tipo == TipoCodigoEnum.ENTREGA_ALUMNO]
             alumno_codigos.sort(key=lambda c: c.created_at, reverse=True)

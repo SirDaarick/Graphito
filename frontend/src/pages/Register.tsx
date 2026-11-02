@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, Loader2, Sun, Moon } from "lucide-react";
+import { Loader2, Sun, Moon } from "lucide-react";
 import logo from "../assets/logo.png";
 import { AuthCard } from "../components/layout/AuthCard";
+import { PasswordToggle } from "../components/ui/PasswordToggle";
 import { api } from "../lib/api";
 import { useTheme } from "../context/ThemeContext";
 
@@ -15,6 +16,7 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [agreed, setAgreed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -207,15 +209,18 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
                         <label htmlFor="register-password" className="text-[12px] font-bold text-slate-700 dark:text-slate-400 ml-1">
                             Contraseña
                         </label>
-                        <input
-                            id="register-password"
-                            type="password"
-                            required
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            className="w-full bg-slate-50 dark:bg-[#121827]/30 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm tracking-widest font-mono"
-                        />
+                        <div className="relative">
+                            <input
+                                id="register-password"
+                                type={showPassword ? "text" : "password"}
+                                required
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full bg-slate-50 dark:bg-[#121827]/30 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-xl py-3 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm tracking-widest font-mono"
+                            />
+                            <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+                        </div>
 
                         {/* Password Strength meter */}
                         <div className="flex gap-1.5 px-1 mt-2">
@@ -237,16 +242,14 @@ export function Register({ onRegister, onNavigateToLogin }: RegisterProps) {
                         <div className="relative">
                             <input
                                 id="register-confirm-password"
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 required
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full bg-slate-50 dark:bg-[#121827]/30 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm tracking-widest font-mono"
+                                className="w-full bg-slate-50 dark:bg-[#121827]/30 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-xl py-3 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm tracking-widest font-mono"
                             />
-                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center text-graphito-blue">
-                                <Check size={16} strokeWidth={3} />
-                            </div>
+                            <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
                         </div>
                     </div>
 

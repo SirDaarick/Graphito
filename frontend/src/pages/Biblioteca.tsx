@@ -5,6 +5,7 @@ import { SearchBar } from "../components/layout/SearchBar";
 import { api, Grupo, CodigoFuente } from "../lib/api";
 import { toComparison } from "../lib/dictamen";
 import { navigate } from "../lib/router";
+import { libraryCache, LIBRARY_CACHE_KEY } from "../lib/libraryCache";
 import { tourExpandedProblemId, tourGroupId, tourRevealProblemId } from "../lib/tour/machine";
 import { useTour } from "../components/tour/TourContext";
 import {
@@ -28,6 +29,11 @@ type PendingAction =
     | { kind: "delete-group"; group: Grupo };
 
 type SortOption = "recientes" | "similitud" | "entregas" | "alfabetico";
+
+interface LibrarySnapshot {
+    references: Reference[];
+    groups: Grupo[];
+}
 
 interface Reference {
     id: string;
@@ -64,9 +70,11 @@ export function Biblioteca({
     const [groupByCourse, setGroupByCourse] = useState(true);
     const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
 
-    const [references, setReferences] = useState<Reference[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [groups, setGroups] = useState<Grupo[]>([]);
+    // The last load is shown at once on coming back to the library; a fresh one replaces it when it arrives.
+    const cached = libraryCache.get<LibrarySnapshot>(LIBRARY_CACHE_KEY);
+    const [references, setReferences] = useState<Reference[]>(cached?.references ?? []);
+    const [isLoading, setIsLoading] = useState(!cached);
+    const [groups, setGroups] = useState<Grupo[]>(cached?.groups ?? []);
     const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
     const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -128,13 +136,20 @@ export function Biblioteca({
                 api.groups.list(showArchived).catch(() => groups),
             ]);
             setLoadFailed(false);
-            if (groupList && groupList.length > 0) {
+            if (groupList) {
                 setGroups(groupList);
             }
 
-            // Map group assignments by querying group details in parallel
+            // The server says which groups each problem belongs to; only an older server (or the demo)
+            // leaves that out, and then every group's detail has to be fetched to learn it.
             const groupAssignmentsMap = new Map<number, number[]>();
-            if (groupList && groupList.length > 0) {
+            problems?.forEach((p) => {
+                if (p.grupo_ids) p.grupo_ids.forEach((gid) => {
+                    groupAssignmentsMap.set(gid, [...(groupAssignmentsMap.get(gid) ?? []), p.id]);
+                });
+            });
+            const needsGroupDetails = Boolean(problems?.some((p) => p.grupo_ids === undefined));
+            if (needsGroupDetails && groupList && groupList.length > 0) {
                 await Promise.allSettled(
                     groupList.map(async (g) => {
                         try {
@@ -229,8 +244,12 @@ export function Biblioteca({
                     })
                 );
                 setReferences(mapped);
+                if (!showArchived && failedTitles.length === 0) {
+                    libraryCache.set(LIBRARY_CACHE_KEY, { references: mapped, groups: groupList ?? groups });
+                }
             } else {
                 setReferences([]);
+                if (!showArchived) libraryCache.set(LIBRARY_CACHE_KEY, { references: [], groups: groupList ?? groups });
             }
         } catch (err) {
             console.error("Error al cargar problemas:", err);
@@ -241,11 +260,7 @@ export function Biblioteca({
         }
     };
 
-    useEffect(() => {
-        fetchGroups();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showArchived]);
-
+    // One load covers the problems and the groups (`fetchProblems` fetches both).
     useEffect(() => {
         fetchProblems();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -254,7 +269,6 @@ export function Biblioteca({
     useEffect(() => {
         const handleRefresh = () => {
             fetchProblems();
-            fetchGroups();
         };
         window.addEventListener("graphito_library_refresh", handleRefresh);
         return () => window.removeEventListener("graphito_library_refresh", handleRefresh);

@@ -2,6 +2,7 @@
  * Graphito Backend API Client
  */
 
+import { libraryCache } from "./libraryCache";
 import {
     DEMO_DOCENTE,
     DEMO_PROBLEMAS,
@@ -43,6 +44,8 @@ function getAuthToken(): string | null {
 }
 
 export function setAuthToken(token: string | null) {
+    // A different session must never see the previous account's library.
+    libraryCache.clear();
     if (token) {
         localStorage.setItem("graphito_token", token);
     } else {
@@ -104,6 +107,8 @@ export interface Problema {
     /** Hidden from the default lists; reversible. */
     archivado?: boolean;
     entregas?: CodigoFuente[];
+    /** Ids of the groups it is assigned to (only on the list with submissions). */
+    grupo_ids?: number[];
 }
 
 export interface Grupo {

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { AtSign, Lock, Eye, EyeOff, Loader2, Sun, Moon } from "lucide-react";
+import { AtSign, Lock, Loader2, Sun, Moon } from "lucide-react";
 import logo from "../assets/logo.png";
 import { AuthCard } from "../components/layout/AuthCard";
+import { PasswordToggle } from "../components/ui/PasswordToggle";
 import { api } from "../lib/api";
 import { useTheme } from "../context/ThemeContext";
 
@@ -200,14 +201,7 @@ export function Login({ onLogin, onNavigateToRegister }: LoginProps) {
                                 placeholder="••••••••"
                                 className="w-full bg-slate-50 dark:bg-[#121827]/30 border border-slate-200 dark:border-[#2b3346] text-slate-900 dark:text-white rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-graphito-blue/50 focus:border-graphito-blue transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 text-[15px] tracking-widest font-mono"
                             />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
-                                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                            >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                            </button>
+                            <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
                         </div>
                     </div>
 

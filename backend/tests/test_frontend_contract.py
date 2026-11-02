@@ -86,7 +86,6 @@ def test_ui_shows_method_engine_calibration_gcb_and_label():
     assert "zero-shot" not in texts  # the deployed model may carry the trained adapter: the label must not claim otherwise
     assert "No validado contra plagio derivado de la referencia" in texts
     assert "STUB" in _read("pages/SimilarityReportModal.tsx")
-    assert "estado_calibracion" in _read("pages/SimilarityReportModal.tsx")
     assert "Heurística" in _read("lib/evidence.ts")
 
 

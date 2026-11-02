@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import secrets
 from typing import Awaitable, Callable, Optional
@@ -41,7 +42,8 @@ class AuthService:
 
         docente = Docente(
             email=data.email,
-            hashed_password=get_password_hash(data.password),
+            # bcrypt is CPU-bound (hundreds of ms): off the event loop so other requests keep flowing.
+            hashed_password=await asyncio.to_thread(get_password_hash, data.password),
             nombre=data.nombre,
         )
         self.db.add(docente)
@@ -55,7 +57,7 @@ class AuthService:
     async def login(self, data: LoginRequest) -> TokenResponse:
         result = await self.db.execute(select(Docente).where(Docente.email == data.email))
         docente = result.scalar_one_or_none()
-        if not docente or not verify_password(data.password, docente.hashed_password):
+        if not docente or not await asyncio.to_thread(verify_password, data.password, docente.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciales incorrectas.",
@@ -115,7 +117,7 @@ class AuthService:
                 random_secret = secrets.token_urlsafe(32)
                 docente = Docente(
                     email=email,
-                    hashed_password=get_password_hash(random_secret),
+                    hashed_password=await asyncio.to_thread(get_password_hash, random_secret),
                     nombre=nombre,
                 )
                 self.db.add(docente)

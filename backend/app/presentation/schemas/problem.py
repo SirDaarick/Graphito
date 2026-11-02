@@ -28,3 +28,5 @@ class ProblemaResponse(BaseModel):
     catalogo_id: Optional[str] = None
     archivado: bool = False
     entregas: Optional[List[CodigoFuenteResponse]] = None
+    # Ids of the groups the problem is assigned to; only filled by the list with submissions.
+    grupo_ids: Optional[List[int]] = None
