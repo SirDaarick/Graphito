@@ -108,6 +108,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
             onClose={onClose}
             title="Agregar código de referencia"
             maxWidth="4xl"
+            fixedHeight="h-auto max-h-[94vh]"
             footer={
                 <div className="flex items-center justify-end gap-4">
                     <Button

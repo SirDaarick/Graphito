@@ -79,7 +79,9 @@ export function NewComparisonModal({
         (activeProblem as PreselectedProblem)?.lenguaje ||
         ""
     ).toLowerCase();
-    const isCpp = activeLanguage.includes("cpp") || activeLanguage === "c++";
+    // Downloadable samples exist only for the preloaded "Ejemplo" problems (their catalog id is prefixed).
+    const isExampleProblem = (problems.find((p) => p.id === selectedProblemId)?.catalogo_id ?? "").startsWith("ejemplo:");
+    const isCpp =activeLanguage.includes("cpp") || activeLanguage === "c++";
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -100,8 +102,7 @@ export function NewComparisonModal({
         setIsLoadingExample(true);
         try {
             const summary = await api.examples.ensure();
-            const picked = summary.problemas.find((p) => p.problema_id === selectedProblemId);
-            const reportId = (picked?.casos ?? summary.recorrido.casos)[exampleCase];
+            const reportId = summary.problemas.find((p) => p.problema_id === selectedProblemId)?.casos[exampleCase];
             if (reportId === undefined) throw new Error("Este ejemplo no está disponible para el problema elegido.");
             const comparison = await api.analysis.getCode(reportId);
             const extension = comparison.language.toLowerCase().includes("cpp") ? "cpp" : "c";
@@ -172,6 +173,7 @@ export function NewComparisonModal({
             onClose={onClose}
             title="Nueva Comparación de Código"
             maxWidth="xl"
+            fixedHeight="h-auto max-h-[94vh]"
             footer={
                 <div className="flex items-center justify-between">
                     <Button
@@ -382,6 +384,7 @@ export function NewComparisonModal({
                         {fileName ? "Cambiar archivo" : "Seleccionar archivo"}
                     </Button>
                 </div>
+                {isExampleProblem && (
                 <div className="space-y-1.5">
                     <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
                         ¿No tienes un código para comparar? Descarga uno de ejemplo:
@@ -401,6 +404,7 @@ export function NewComparisonModal({
                     </div>
                     {isLoadingExample && <p className="text-[11px] text-slate-500">Preparando archivo…</p>}
                 </div>
+                )}
                 <textarea
                     id={ids.code}
                     required
