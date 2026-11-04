@@ -124,12 +124,12 @@ describe("tourReducer", () => {
 
         it("a problem without an AI case skips that step in next, back, goTo and progress", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
-            expect(stepProgress(picked)).toEqual({ current: 2, total: 12 });
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 13 });
             const atDifferentCode = run([{ type: "goTo", stepId: "ex-different-code" }], picked);
             expect(currentStep(atDifferentCode)?.id).toBe("ex-different-code");
             const afterIt = run([{ type: "next" }], atDifferentCode);
             expect(currentStep(afterIt)?.id).toBe("ex-done");
-            expect(stepProgress(afterIt)).toEqual({ current: 12, total: 12 });
+            expect(stepProgress(afterIt)).toEqual({ current: 13, total: 13 });
             expect(currentStep(run([{ type: "back" }], afterIt))?.id).toBe("ex-different-code");
             expect(run([{ type: "goTo", stepId: "ex-ai-style" }], picked)).toBe(picked);
             expect(run([{ type: "next" }], afterIt)).toEqual(INITIAL_TOUR_STATE);

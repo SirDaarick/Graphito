@@ -58,6 +58,7 @@ describe("tour steps", () => {
             "cmp-code",
             "cmp-submit",
             "report-title",
+            "report-ai-lines",
             "report-verdict",
             "done",
         ]);
@@ -72,6 +73,7 @@ describe("tour steps", () => {
             "cmp-code",
             "cmp-submit",
             "report-title",
+            "report-ai-lines",
             "report-verdict",
             "done",
         ]);
@@ -80,13 +82,13 @@ describe("tour steps", () => {
     it("own and library end with the same shared tail", () => {
         const tail = (flow: TourFlow) => getSteps(flow).filter((s) => s.id.startsWith("cmp-") || s.id.startsWith("report-") || s.final).map((s) => s.id);
         expect(tail("own")).toEqual(tail("library"));
-        expect(tail("own")).toEqual(["cmp-open", "cmp-author", "cmp-code", "cmp-submit", "report-title", "report-verdict", "done"]);
+        expect(tail("own")).toEqual(["cmp-open", "cmp-author", "cmp-code", "cmp-submit", "report-title", "report-ai-lines", "report-verdict", "done"]);
     });
 
     it.each(SHARED_TAIL_FLOWS)("%s: no step needs the examples summary", (flow) => {
         for (const step of getSteps(flow)) {
             expect(step.enterRoute, step.id).toBeUndefined();
-            expect(step.reportView, step.id).toBeUndefined();
+            if (!step.id.startsWith("report-")) expect(step.reportView, step.id).toBeUndefined();
         }
     });
 
@@ -115,13 +117,13 @@ describe("examples flow", () => {
             "ex-identical-literal-extra",
             "ex-code-open",
             "ex-code-panes",
+            "ex-ai-lines",
             "ex-code-comment",
             "ex-similar-semantic",
             "ex-similar-code",
             "ex-different-semantic",
             "ex-different-code",
             "ex-ai-style",
-            "ex-ai-lines",
             "ex-done",
         ]);
     });
@@ -189,7 +191,8 @@ describe("examples flow", () => {
 
     it("shows how to write a review comment right after the code panes", () => {
         const ids = steps.map((s) => s.id);
-        expect(ids.indexOf("ex-code-comment")).toBe(ids.indexOf("ex-code-panes") + 1);
+        expect(ids.indexOf("ex-ai-lines")).toBe(ids.indexOf("ex-code-panes") + 1);
+        expect(ids.indexOf("ex-code-comment")).toBe(ids.indexOf("ex-ai-lines") + 1);
         expect(byId("ex-code-comment")).toMatchObject({
             target: "add-comment",
             reportView: "code",
@@ -238,7 +241,7 @@ describe("examples flow", () => {
     });
 
     it("only the AI step depends on a case, and it is skipped for a problem without one", () => {
-        expect(steps.filter((s) => s.requiresCase).map((s) => [s.id, s.requiresCase])).toEqual([["ex-ai-style", "ai"], ["ex-ai-lines", "ai"]]);
+        expect(steps.filter((s) => s.requiresCase).map((s) => [s.id, s.requiresCase])).toEqual([["ex-ai-style", "ai"]]);
         const ai = byId("ex-ai-style");
         expect(stepApplies(ai, { problemId: 31, examples: EXAMPLES })).toBe(true);
         expect(stepApplies(ai, { problemId: 32, examples: EXAMPLES })).toBe(false);
