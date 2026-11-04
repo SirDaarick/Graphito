@@ -5,6 +5,13 @@ import { Button } from "../components/ui/Button";
 import { api, Problema, IS_DEMO_MODE } from "../lib/api";
 import { toComparison } from "../lib/dictamen";
 import { cn } from "../lib/utils";
+import { downloadTextFile } from "../lib/downloadTextFile";
+
+const EXAMPLE_OPTIONS = [
+    { key: "identical", label: "Idéntica" },
+    { key: "similar", label: "Solución propia" },
+    { key: "different", label: "Problema distinto" },
+] as const;
 
 export interface PreselectedProblem {
     id: number;
@@ -37,6 +44,7 @@ export function NewComparisonModal({
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState<string>("Iniciando análisis bimodal...");
     const [error, setError] = useState<string | null>(null);
+    const [isLoadingExample, setIsLoadingExample] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uid = useId();
@@ -84,6 +92,25 @@ export function NewComparisonModal({
             setCode(content);
         };
         reader.readAsText(file);
+    };
+
+    // Offers a submission already stored for this problem as a download (it may repeat one) to upload by hand.
+    const handleDownloadExample = async (exampleCase: "identical" | "similar" | "different") => {
+        setError(null);
+        setIsLoadingExample(true);
+        try {
+            const summary = await api.examples.ensure();
+            const picked = summary.problemas.find((p) => p.problema_id === selectedProblemId);
+            const reportId = (picked?.casos ?? summary.recorrido.casos)[exampleCase];
+            if (reportId === undefined) throw new Error("Este ejemplo no está disponible para el problema elegido.");
+            const comparison = await api.analysis.getCode(reportId);
+            const extension = comparison.language.toLowerCase().includes("cpp") ? "cpp" : "c";
+            downloadTextFile(`entrega_${exampleCase}.${extension}`, comparison.student_code);
+        } catch (err: any) {
+            setError(err.message || "No se pudo cargar el código de ejemplo.");
+        } finally {
+            setIsLoadingExample(false);
+        }
     };
 
     const handleStartAnalysis = async () => {
@@ -354,6 +381,25 @@ export function NewComparisonModal({
                     >
                         {fileName ? "Cambiar archivo" : "Seleccionar archivo"}
                     </Button>
+                </div>
+                <div className="space-y-1.5">
+                    <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                        ¿No tienes un código para comparar? Descarga uno de ejemplo:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {EXAMPLE_OPTIONS.map((option) => (
+                            <button
+                                key={option.key}
+                                type="button"
+                                onClick={() => handleDownloadExample(option.key)}
+                                disabled={isLoading || isLoadingExample}
+                                className="px-3 py-1.5 text-xs font-bold text-graphito-blue bg-graphito-blue/10 hover:bg-graphito-blue/20 rounded-lg disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue transition-colors"
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                    {isLoadingExample && <p className="text-[11px] text-slate-500">Preparando archivo…</p>}
                 </div>
                 <textarea
                     id={ids.code}

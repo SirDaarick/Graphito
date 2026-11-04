@@ -3,6 +3,7 @@ import { Upload, Database, Check, Minus, Plus, Loader2, Info } from "lucide-reac
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/Button";
 import { api, IS_DEMO_MODE } from "../lib/api";
+import { downloadTextFile } from "../lib/downloadTextFile";
 
 interface NewReferenceModalProps {
     isOpen: boolean;
@@ -20,6 +21,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
     const [isLoading, setIsLoading] = useState(false);
     const [loadingStep, setLoadingStep] = useState<"creating" | "indexing" | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isLoadingExample, setIsLoadingExample] = useState(false);
 
     const [variations, setVariations] = useState(3);
     const [generateAI, setGenerateAI] = useState(true);
@@ -44,6 +46,23 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                 setCode(event.target?.result as string);
             };
             reader.readAsText(file);
+        }
+    };
+
+    // Gives someone without a program a catalog one to download and upload themselves.
+    const handleUseExample = async () => {
+        setError(null);
+        setIsLoadingExample(true);
+        try {
+            const subjects = await api.catalog.list();
+            const first = subjects.flatMap((s) => s.unidades).flatMap((u) => u.programas)[0];
+            if (!first) throw new Error("No hay programas de ejemplo disponibles.");
+            const program = await api.catalog.get(first.id);
+            downloadTextFile(program.nombre_archivo, program.codigo);
+        } catch (err: any) {
+            setError(err.message || "No se pudo cargar el código de ejemplo.");
+        } finally {
+            setIsLoadingExample(false);
         }
     };
 
@@ -229,6 +248,14 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                             {fileName ? "Cambiar archivo" : "Seleccionar archivo"}
                         </Button>
                     </div>
+                    <button
+                        type="button"
+                        onClick={handleUseExample}
+                        disabled={isLoading || isLoadingExample}
+                        className="text-xs font-bold text-graphito-blue hover:underline disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue rounded"
+                    >
+                        {isLoadingExample ? "Preparando archivo…" : "¿No tienes un código? Haz clic aquí para descargar uno"}
+                    </button>
                     <textarea
                         id={ids.code}
                         required

@@ -121,6 +121,7 @@ describe("examples flow", () => {
             "ex-different-semantic",
             "ex-different-code",
             "ex-ai-style",
+            "ex-ai-lines",
             "ex-done",
         ]);
     });
@@ -237,7 +238,7 @@ describe("examples flow", () => {
     });
 
     it("only the AI step depends on a case, and it is skipped for a problem without one", () => {
-        expect(steps.filter((s) => s.requiresCase).map((s) => [s.id, s.requiresCase])).toEqual([["ex-ai-style", "ai"]]);
+        expect(steps.filter((s) => s.requiresCase).map((s) => [s.id, s.requiresCase])).toEqual([["ex-ai-style", "ai"], ["ex-ai-lines", "ai"]]);
         const ai = byId("ex-ai-style");
         expect(stepApplies(ai, { problemId: 31, examples: EXAMPLES })).toBe(true);
         expect(stepApplies(ai, { problemId: 32, examples: EXAMPLES })).toBe(false);

@@ -1,5 +1,5 @@
 import { forwardRef, type CSSProperties } from "react";
-import { MousePointerClick, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, MousePointerClick, X, type LucideIcon } from "lucide-react";
 import { Button } from "../ui/Button";
 import type { TooltipPosition } from "../../lib/tour/geometry";
 import type { TourPlacement, TourStep } from "../../lib/tour/types";
@@ -35,6 +35,14 @@ const ARROW_BY_PLACEMENT: Record<TourPlacement, { side: "top" | "bottom" | "left
 
 const ARROW_SIZE = 14;
 
+/** Icon pointing from the card toward its target (the card sits on `placement` side of it). */
+const POINTER_BY_PLACEMENT: Record<TourPlacement, { Icon: LucideIcon; className: string }> = {
+    bottom: { Icon: ArrowUp, className: "tour-nudge-y" },
+    top: { Icon: ArrowDown, className: "tour-nudge-y" },
+    right: { Icon: ArrowLeft, className: "tour-nudge-x" },
+    left: { Icon: ArrowRight, className: "tour-nudge-x" },
+};
+
 export const TourTooltip = forwardRef<HTMLDivElement, TourTooltipProps>(function TourTooltip(
     { step, mode, current, total, isFirst, filled, position, recoverLabel, otherFlowLabel, onNext, onBack, onExit, onRecover, onOtherFlow },
     ref
@@ -58,6 +66,7 @@ export const TourTooltip = forwardRef<HTMLDivElement, TourTooltipProps>(function
               }
             : undefined;
 
+    const pointer = position && !isLost ? POINTER_BY_PLACEMENT[position.placement] : null;
     const advance = step.advance;
     const title = isLost ? "No encuentro este paso" : step.title;
     const text = isLost ? "Parece que cerraste la ventana. Puedes retomar donde ibas." : step.text;
@@ -151,9 +160,14 @@ export const TourTooltip = forwardRef<HTMLDivElement, TourTooltipProps>(function
                                     {advance.kind === "filled" ? "Siguiente" : "Entendido"}
                                 </Button>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                    <MousePointerClick size={14} aria-hidden="true" className="text-graphito-blue" />
-                                    Haz clic para continuar
+                                // Not a button: the user must act on the highlighted element, so the hint points at it.
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-graphito-blue">
+                                    {pointer ? (
+                                        <pointer.Icon size={14} aria-hidden="true" className={pointer.className} />
+                                    ) : (
+                                        <MousePointerClick size={14} aria-hidden="true" />
+                                    )}
+                                    Haz clic en el botón señalado
                                 </span>
                             )}
                         </>

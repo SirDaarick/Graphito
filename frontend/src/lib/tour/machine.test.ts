@@ -119,7 +119,7 @@ describe("tourReducer", () => {
         it("a problem with four cases walks all thirteen steps", () => {
             const picked = run([{ type: "pick", problemId: 31, from: "ex-library" }], started);
             expect(ids(picked)).toHaveLength(getSteps("examples").length);
-            expect(stepProgress(picked)).toEqual({ current: 2, total: 13 });
+            expect(stepProgress(picked)).toEqual({ current: 2, total: 14 });
         });
 
         it("a problem without an AI case skips that step in next, back, goTo and progress", () => {
@@ -139,7 +139,7 @@ describe("tourReducer", () => {
             const picked = run([{ type: "pick", problemId: 32, from: "ex-library" }], started);
             const again = run([{ type: "goTo", stepId: "ex-library" }, { type: "pick", problemId: 31 }], picked);
             expect(again.context.problemId).toBe(31);
-            expect(stepProgress(again).total).toBe(13);
+            expect(stepProgress(again).total).toBe(14);
         });
     });
 
