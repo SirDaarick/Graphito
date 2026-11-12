@@ -168,6 +168,8 @@ export function getInitialRoute(isAuthenticated?: boolean): string {
     if (
         currentPath === "/biblioteca" ||
         currentPath === "/catalogo" ||
+        currentPath === "/estudiantes" ||
+        matchRoute("/estudiantes/:nombre", currentPath).isMatch ||
         matchRoute("/reporte/:id", currentPath).isMatch
     ) {
         return currentPath;

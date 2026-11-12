@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Header, AppSection } from "./components/layout/Header";
 import { Biblioteca } from "./pages/Biblioteca";
 import { Catalogo } from "./pages/Catalogo";
+import { Estudiantes } from "./pages/Estudiantes";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { MouseGlowBackground } from "./components/layout/MouseGlowBackground";
@@ -32,12 +33,16 @@ function App() {
     const [comparisonTargetProblem, setComparisonTargetProblem] = useState<{ id: number; title: string; lenguaje?: string } | null>(null);
     const [selectedComparison, setSelectedComparison] = useState<any>(null);
     const [comparisonList, setComparisonList] = useState<any[]>([]);
-    const [section, setSection] = useState<AppSection>(path === "/catalogo" ? "catalogo" : "biblioteca");
+    const [section, setSection] = useState<AppSection>(
+        path === "/catalogo" ? "catalogo" : path.startsWith("/estudiantes") ? "estudiantes" : "biblioteca"
+    );
 
     // Keep section in sync with URL
     useEffect(() => {
         if (path === "/catalogo") {
             setSection("catalogo");
+        } else if (path.startsWith("/estudiantes")) {
+            setSection("estudiantes");
         } else if (path === "/biblioteca" || path === "/") {
             setSection("biblioteca");
         }
@@ -175,7 +180,7 @@ function App() {
     };
 
     const handleCloseReportModal = () => {
-        const fallback = section === "catalogo" ? "/catalogo" : "/biblioteca";
+        const fallback = `/${section}`;
         if (typeof window !== "undefined" && window.history.state?.fromGraphito) {
             window.history.back();
         } else {
@@ -227,7 +232,7 @@ function App() {
                         activeSection={section}
                         onNavigate={(newSection) => {
                             setSection(newSection);
-                            navigate(newSection === "catalogo" ? "/catalogo" : "/biblioteca");
+                            navigate(`/${newSection}`);
                         }}
                         onViewComparison={(comp) => handleOpenComparison(comp, [comp])}
                     />
@@ -243,6 +248,8 @@ function App() {
                             }}
                             onComparisonClick={(comp, allComps) => handleOpenComparison(comp, allComps)}
                         />
+                    ) : section === "estudiantes" ? (
+                        <Estudiantes onOpenReport={(comp, all) => handleOpenComparison(comp, all)} />
                     ) : (
                         <Catalogo
                             onProgramAdded={(problemId) => {

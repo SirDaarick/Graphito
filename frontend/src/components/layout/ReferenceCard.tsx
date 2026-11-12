@@ -17,6 +17,7 @@ import { cn } from "../../lib/utils";
 import { getSavedVerdicts, VerdictType } from "../../lib/verdicts";
 import { ComparisonView, toPct } from "../../lib/dictamen";
 import { Grupo } from "../../lib/api";
+import { navigate } from "../../lib/router";
 
 export interface Comparison extends ComparisonView {
     veredicto?: VerdictType | null;
@@ -413,9 +414,18 @@ export function ReferenceCard({
                                                     <span className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-black/30 border border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400 flex items-center justify-center text-[11px] font-mono font-bold shrink-0">
                                                         #{idx + 1}
                                                     </span>
-                                                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-graphito-blue dark:group-hover:text-white transition-colors truncate">
+                                                    <button
+                                                        type="button"
+                                                        title="Ver historial del estudiante"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate(`/estudiantes/${encodeURIComponent(comparison.title)}`);
+                                                        }}
+                                                        onKeyDown={(e) => e.stopPropagation()}
+                                                        className="text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-graphito-blue dark:hover:text-white hover:underline transition-colors truncate text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue rounded-sm"
+                                                    >
                                                         {comparison.title}
-                                                    </span>
+                                                    </button>
                                                 </div>
 
                                                 {/* Right: Similarity Score & Chevron */}

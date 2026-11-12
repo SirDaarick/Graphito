@@ -4,6 +4,7 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { api, IndicadorIntegridad, ReportScoring, VarianteCodigo } from "../lib/api";
 import { toPct } from "../lib/dictamen";
+import { navigate } from "../lib/router";
 import { clearVerdict, getVerdict, saveVerdict } from "../lib/verdicts";
 import { evidenceByLine } from "../lib/evidence";
 import type { StyleAttribution } from "../lib/styleAttribution";
@@ -527,7 +528,14 @@ export function SimilarityReportModal({
                                                 className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium line-clamp-2 break-words"
                                                 title={comparison.title}
                                             >
-                                                Entrega de {comparison.title}
+                                                Entrega de{" "}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigate(`/estudiantes/${encodeURIComponent(comparison.title ?? "")}`)}
+                                                    className="font-semibold underline-offset-2 hover:underline hover:text-graphito-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue rounded-sm"
+                                                >
+                                                    {comparison.title}
+                                                </button>
                                             </p>
                                         </>
                                     )}

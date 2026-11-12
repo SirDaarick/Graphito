@@ -29,11 +29,12 @@ interface HeaderProps {
     onNavigate?: (section: AppSection) => void;
 }
 
-export type AppSection = "biblioteca" | "catalogo";
+export type AppSection = "biblioteca" | "catalogo" | "estudiantes";
 
 const NAV_SECTIONS: { key: AppSection; label: string }[] = [
     { key: "biblioteca", label: "Biblioteca" },
     { key: "catalogo", label: "Catálogo" },
+    { key: "estudiantes", label: "Estudiantes" },
 ];
 
 export function Header({
@@ -121,7 +122,7 @@ export function Header({
                                     key={item.key}
                                     type="button"
                                     onClick={() => {
-                                        navigate(item.key === "catalogo" ? "/catalogo" : "/biblioteca");
+                                        navigate(`/${item.key}`);
                                         onNavigate?.(item.key);
                                     }}
                                     aria-current={isActive ? "page" : undefined}
@@ -324,7 +325,7 @@ export function Header({
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setShowUserMenu(false);
-                                                navigate(item.key === "catalogo" ? "/catalogo" : "/biblioteca");
+                                                navigate(`/${item.key}`);
                                                 onNavigate?.(item.key);
                                             }}
                                             aria-current={activeSection === item.key ? "page" : undefined}
