@@ -8,8 +8,8 @@ function MiniRadial({ variant, animate }: { variant: VarianteMetrica; animate: b
     const pct = toPct(variant.gcb_similarity);
     const offset = pct === null ? CIRCUMFERENCE : CIRCUMFERENCE * (1 - (animate ? pct : 0) / 100);
     return (
-        <li className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-[#2b3346]/60 dark:bg-[#121827]/40">
-            <div className="relative h-14 w-14 shrink-0">
+        <li className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-2 dark:border-[#2b3346]/60 dark:bg-[#121827]/40">
+            <div className="relative h-12 w-12 shrink-0">
                 <svg
                     className="h-full w-full -rotate-90"
                     viewBox="0 0 50 50"
@@ -48,14 +48,15 @@ function MiniRadial({ variant, animate }: { variant: VarianteMetrica; animate: b
 export function VariantMetrics({ variants, animate }: { variants?: VarianteMetrica[]; animate: boolean }) {
     if (!variants || variants.length === 0) return null;
     return (
-        <section aria-labelledby="variant-metrics-title" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40">
-            <h3 id="variant-metrics-title" className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Otras implementaciones
+        <section aria-labelledby="variant-metrics-title" className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40">
+            <h3
+                id="variant-metrics-title"
+                title="Similitud con variantes generadas con IA. La referencia del docente sigue siendo la principal."
+                className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+            >
+                Otras implementaciones (IA)
             </h3>
-            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-                Similitud con variantes generadas con IA. La referencia del docente sigue siendo la principal.
-            </p>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {variants.map((v, i) => (
                     <MiniRadial key={v.variante_id ?? `${v.titulo}-${i}`} variant={v} animate={animate} />
                 ))}

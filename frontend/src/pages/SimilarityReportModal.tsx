@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { ArrowLeft, Code2, Download, ShieldCheck, UserCheck, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { api, IndicadorIntegridad, ReportScoring } from "../lib/api";
+import { api, IndicadorIntegridad, ReportScoring, VarianteCodigo } from "../lib/api";
+import { toPct } from "../lib/dictamen";
 import { clearVerdict, getVerdict, saveVerdict } from "../lib/verdicts";
 import { evidenceByLine } from "../lib/evidence";
 import type { StyleAttribution } from "../lib/styleAttribution";
@@ -46,6 +47,7 @@ interface CodeData {
     student_author: string;
     language: string;
     indicadores?: IndicadorIntegridad[];
+    variantes: VarianteCodigo[];
 }
 
 type ViewMode = "report" | "code_diff";
@@ -243,6 +245,7 @@ export function SimilarityReportModal({
                     student_author: data.student_author || comparison?.title || "Estudiante",
                     language: data.language || "c",
                     indicadores: data.indicadores,
+                    variantes: data.variantes ?? [],
                 });
                 setCodeStatus("ready");
             })
@@ -600,6 +603,8 @@ export function SimilarityReportModal({
                         >
                             {inCodeView ? (
                                 <CodeView
+                                    key={reportId ?? 0}
+                                    referencePct={comparison.similarity ?? null}
                                     status={codeStatus}
                                     codeData={codeData}
                                     reportId={reportId ?? 1}
@@ -706,10 +711,21 @@ interface CodeViewProps {
     styleAttribution: StyleAttribution | null;
     paneHeight: string;
     onRetry: () => void;
+    /** Headline similarity of the teacher's reference, shown on its tab. */
+    referencePct: number | null;
 }
 
+const TAB_BASE =
+    "flex min-w-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue";
+const TAB_ON = "border-graphito-blue bg-graphito-blue/10 text-graphito-blue";
+const TAB_OFF =
+    "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800";
+
 /** The optional second view: loading, error with retry, or the side-by-side comparison. */
-function CodeView({ status, codeData, reportId, evidence, styleAttribution, paneHeight, onRetry, ...viewer }: CodeViewProps) {
+function CodeView({ status, codeData, reportId, evidence, styleAttribution, paneHeight, onRetry, referencePct, ...viewer }: CodeViewProps) {
+    // null = the teacher's reference; otherwise the id of the AI variant shown in the reference pane.
+    const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+
     if (status === "error") {
         return (
             <div role="alert" className="flex flex-col items-center justify-center gap-3 py-20 text-center">
@@ -736,12 +752,43 @@ function CodeView({ status, codeData, reportId, evidence, styleAttribution, pane
         );
     }
 
+    const variant = codeData.variantes.find((v) => v.variante_id === selectedVariant) ?? null;
+    const pctText = (pct: number | null) => (pct === null ? "—" : `${pct}%`);
+
     return (
         <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
+            {codeData.variantes.length > 0 && (
+                <div role="tablist" aria-label="Código contra el que se compara" className="flex flex-wrap gap-2 px-1 pb-2 shrink-0">
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={variant === null}
+                        onClick={() => setSelectedVariant(null)}
+                        className={`${TAB_BASE} ${variant === null ? TAB_ON : TAB_OFF}`}
+                    >
+                        <span className="truncate">Referencia del docente</span>
+                        <span className="font-mono font-black">{pctText(referencePct)}</span>
+                    </button>
+                    {codeData.variantes.map((v) => (
+                        <button
+                            key={v.variante_id}
+                            type="button"
+                            role="tab"
+                            aria-selected={variant?.variante_id === v.variante_id}
+                            onClick={() => setSelectedVariant(v.variante_id)}
+                            title={v.titulo}
+                            className={`${TAB_BASE} ${variant?.variante_id === v.variante_id ? TAB_ON : TAB_OFF}`}
+                        >
+                            <span className="max-w-[160px] truncate">{v.titulo}</span>
+                            <span className="font-mono font-black">{pctText(toPct(v.gcb_similarity))}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
             <SideBySideDiffViewer
-                referenceCode={codeData.reference_code}
+                referenceCode={variant ? variant.contenido : codeData.reference_code}
                 studentCode={codeData.student_code}
-                referenceAuthor={codeData.reference_author}
+                referenceAuthor={variant ? `IA: ${variant.titulo}` : codeData.reference_author}
                 studentAuthor={codeData.student_author}
                 language={codeData.language}
                 reportId={reportId}

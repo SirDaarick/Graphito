@@ -14,7 +14,7 @@ import {
 import { Button } from "../ui/Button";
 import { cn } from "../../lib/utils";
 import { getSavedVerdicts, VerdictType } from "../../lib/verdicts";
-import { ComparisonView } from "../../lib/dictamen";
+import { ComparisonView, toPct } from "../../lib/dictamen";
 import { Grupo } from "../../lib/api";
 
 export interface Comparison extends ComparisonView {
@@ -428,9 +428,22 @@ export function ReferenceCard({
                                                             Similitud lógica
                                                         </span>
                                                         <span className={cn("text-sm font-black font-mono", SCORE_COLOR)}>
-                                                            {comparison.similarity == null
-                                                                ? "—"
-                                                                : `${comparison.similarity}%`}
+                                                            <span title="Referencia del docente">
+                                                                {comparison.similarity == null
+                                                                    ? "—"
+                                                                    : `${comparison.similarity}%`}
+                                                            </span>
+                                                            {/* AI variants, same order as in the report: X% | X% | X% */}
+                                                            {(comparison.variantes ?? []).map((v, i) => {
+                                                                const pct = toPct(v.gcb_similarity);
+                                                                return (
+                                                                    <span key={v.variante_id ?? i} title={v.titulo}>
+                                                                        <span aria-hidden="true" className="mx-1 font-normal text-slate-400 dark:text-slate-500">|</span>
+                                                                        <span className="sr-only">{v.titulo}: </span>
+                                                                        {pct === null ? "—" : `${pct}%`}
+                                                                    </span>
+                                                                );
+                                                            })}
                                                         </span>
                                                     </div>
                                                     <ChevronDown className="h-4 w-4 text-slate-400 dark:text-slate-500 -rotate-90 group-hover:translate-x-0.5 transition-transform" />

@@ -111,6 +111,14 @@ async def test_report_carries_variant_metrics_and_pdf_lists_them(client, generat
     text = pdf_text(pdf.content)
     assert "Usando funcion" in text and "Version recursiva" in text
 
+    # The code view gets each variant's code and metric; the teacher's reference stays the default.
+    code = (await client.get(f"/api/v1/analysis/reports/{report['id']}/code", headers=headers)).json()
+    assert code["reference_code"] == REF_CODE
+    assert [(v["titulo"], v["contenido"]) for v in code["variantes"]] == [
+        ("Usando funcion", VARIANT_CODE), ("Version recursiva", VARIANT_CODE)
+    ]
+    assert all(v["gcb_similarity"] is not None for v in code["variantes"])
+
 
 @pytest.mark.asyncio
 async def test_report_without_variants_has_an_empty_list_and_no_variant_section(client, pdf_text):
@@ -122,6 +130,22 @@ async def test_report_without_variants_has_an_empty_list_and_no_variant_section(
     assert report["variantes"] == []
     pdf = await client.get(f"/api/v1/analysis/reports/{report['id']}/pdf", headers=headers)
     assert "variantes generadas" not in pdf_text(pdf.content)
+
+
+@pytest.mark.asyncio
+async def test_pdf_of_a_long_submission_splits_across_pages(client, generator, pdf_text):
+    """A submission longer than a page used to raise a reportlab LayoutError (one-cell code table)."""
+    headers, pid = await _setup(client)
+    await _variant(client, headers, pid, "Usando funcion")
+    long_code = REF_CODE + "".join(f"int v{i} = {i}; /* linea {i} */\n" for i in range(400))
+    sub = await client.post(
+        f"/api/v1/problems/{pid}/submissions", json={"problema_id": pid, "autor": "A", "contenido": long_code}, headers=headers
+    )
+    report = (await client.post("/api/v1/analysis/run", json={"entrega_id": sub.json()["id"]}, headers=headers)).json()
+    pdf = await client.get(f"/api/v1/analysis/reports/{report['id']}/pdf", headers=headers)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    text = pdf_text(pdf.content)
+    assert "linea 399" in text and "Usando funcion" in text
 
 
 def test_extract_code_strips_markdown_fences():

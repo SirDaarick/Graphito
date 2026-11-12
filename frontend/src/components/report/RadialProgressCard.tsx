@@ -12,6 +12,8 @@ interface RadialProgressCardProps {
     help: ReactNode;
     accent: "blue" | "violet";
     animate: boolean;
+    /** Smaller card so the report fits without scrolling when AI variants add a row. */
+    compact?: boolean;
 }
 
 const ACCENT = {
@@ -43,6 +45,7 @@ export function RadialProgressCard({
     help,
     accent,
     animate,
+    compact = false,
 }: RadialProgressCardProps) {
     const config = ACCENT[accent];
     const available = pct !== null;
@@ -53,7 +56,7 @@ export function RadialProgressCard({
         : circumference;
 
     return (
-        <article className="relative flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40">
+        <article className={`relative flex flex-col justify-between rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40 ${compact ? "p-4" : "p-6"}`}>
             {/* Header: Title + Info Popover */}
             <div className="flex items-center justify-between gap-3 mb-2">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
@@ -65,7 +68,7 @@ export function RadialProgressCard({
             </div>
 
             {/* Radial Chart - Text container */}
-            <div className="relative w-36 h-36 my-2 mx-auto flex items-center justify-center">
+            <div className={`relative my-1 mx-auto flex items-center justify-center ${compact ? "w-28 h-28" : "w-36 h-36"}`}>
                 <svg
                     className="w-full h-full transform -rotate-90"
                     viewBox="0 0 140 140"
@@ -143,7 +146,7 @@ export function RadialProgressCard({
             </div>
 
             {/* Footer: Concise Description */}
-            <p className="mt-4 text-xs text-center text-slate-500 dark:text-slate-400 leading-relaxed min-h-[32px] flex items-center justify-center">
+            <p className={`text-xs text-center text-slate-500 dark:text-slate-400 leading-relaxed flex items-center justify-center ${compact ? "mt-2" : "mt-4 min-h-[32px]"}`}>
                 {available ? description : (unavailableReason ?? description)}
             </p>
         </article>

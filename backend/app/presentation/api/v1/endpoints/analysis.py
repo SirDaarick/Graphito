@@ -7,7 +7,9 @@ from app.application.services.style_attribution_service import StyleAttributionS
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.database.session import get_db
-from app.infrastructure.database.models import Docente, CodigoFuente, Grupo, ReporteAnalisis, TipoCodigoEnum
+from app.infrastructure.database.models import (
+    Docente, CodigoFuente, Grupo, ReporteAnalisis, TipoCodigoEnum, VarianteReferencia,
+)
 from sqlalchemy import select
 from app.application.orchestrator.analysis_orchestrator import AnalysisOrchestrator
 from app.application.services.pdf_service import PdfReportService
@@ -27,6 +29,7 @@ from app.presentation.schemas.analysis import (
     ReportCodeComparisonResponse,
     IndicadorResponse,
     StyleAttributionResponse,
+    VarianteCodigoResponse,
 )
 from app.presentation.schemas.batch import (
     BatchUploadResponse,
@@ -164,6 +167,21 @@ async def get_report_code(
     ]
     metricas = XAIService.compute_code_metrics(student_code)
 
+    # AI variants measured by this report, with their code (a deleted variant keeps its metric but has no code).
+    variant_ids = [v.variante_id for v in report.variantes if v.variante_id is not None]
+    variant_code = {}
+    if variant_ids:
+        rows = await db.execute(select(VarianteReferencia).where(VarianteReferencia.id.in_(variant_ids)))
+        variant_code = {v.id: v.contenido for v in rows.scalars().all()}
+    variantes_resp = [
+        VarianteCodigoResponse(
+            variante_id=v.variante_id, titulo=v.titulo, contenido=variant_code[v.variante_id],
+            gcb_similarity=v.gcb_similarity, gcb_estado=v.gcb_estado,
+        )
+        for v in report.variantes
+        if v.variante_id in variant_code
+    ]
+
     return ReportCodeComparisonResponse(
         reporte_id=report.id,
         student_author=student_author,
@@ -174,6 +192,7 @@ async def get_report_code(
         problem_title=problem_title,
         indicadores=indicadores_resp,
         metricas_codigo=metricas,
+        variantes=variantes_resp,
     )
 
 

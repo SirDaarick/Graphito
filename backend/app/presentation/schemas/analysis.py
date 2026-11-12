@@ -175,6 +175,16 @@ class StyleAttributionResponse(BaseModel):
     aproximacion: bool = True
 
 
+class VarianteCodigoResponse(BaseModel):
+    """An AI variant with its code and the similarity this report measured against it."""
+
+    variante_id: uuid.UUID
+    titulo: str
+    contenido: str
+    gcb_similarity: Optional[float] = None
+    gcb_estado: Optional[str] = None
+
+
 class ReportCodeComparisonResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -187,3 +197,4 @@ class ReportCodeComparisonResponse(BaseModel):
     problem_title: str
     indicadores: List[IndicadorResponse] = []
     metricas_codigo: Optional[Dict[str, Any]] = None
+    variantes: List[VarianteCodigoResponse] = []

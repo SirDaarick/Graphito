@@ -255,7 +255,14 @@ export interface ReporteAnalisis extends ReportScoring {
     indicadores: IndicadorIntegridad[];
 }
 
+/** An AI variant with its code and the similarity measured against it (code view selector). */
+export interface VarianteCodigo extends VarianteMetrica {
+    variante_id: string;
+    contenido: string;
+}
+
 export interface ReportCodeComparison {
+    variantes?: VarianteCodigo[];
     reporte_id: number;
     student_author: string;
     student_code: string;

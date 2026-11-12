@@ -1,4 +1,5 @@
-﻿import { Info } from "lucide-react";
+﻿import type { ElementType } from "react";
+import { Info } from "lucide-react";
 import type { ReportScoring } from "../../lib/api";
 import { gcbHeadline, isAbstained, toPct, VALIDATION_LABEL } from "../../lib/dictamen";
 import { InfoPopover } from "../ui/InfoPopover";
@@ -89,9 +90,18 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
         ? "El código es demasiado corto para analizar su estilo."
         : "No se pudo analizar el estilo de esta entrega.";
     const literalPct = toPct(report.similitud_semantica);
+    // With AI variants the report gains a row: shrink the cards and fold the reading guide so it fits without scrolling.
+    const hasVariants = (report.variantes?.length ?? 0) > 0;
+    const Guide: ElementType = hasVariants ? "details" : "div";
+    const guideHeading = (
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            <Info size={16} className="text-graphito-blue shrink-0" aria-hidden="true" />
+            <h3>Cómo leer estas métricas</h3>
+        </div>
+    );
 
     return (
-        <div className="flex flex-col gap-4">
+        <div className={`flex flex-col ${hasVariants ? "gap-3" : "gap-4"}`}>
             {/* Top Row: Two Radial Progress Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* The wrappers are guided-tour anchors; they stretch the card like a direct grid child. */}
@@ -107,6 +117,7 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                         help={<SemanticHelp />}
                         accent="blue"
                         animate={animate}
+                        compact={hasVariants}
                     />
                 </div>
 
@@ -122,6 +133,7 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                         help={<StyleHelp />}
                         accent="violet"
                         animate={animate}
+                        compact={hasVariants}
                     />
                 </div>
             </div>
@@ -129,11 +141,8 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
             <VariantMetrics variants={report.variantes} animate={animate} />
 
             {/* Bottom Row: how to read the numbers. Context only; the teacher decides what they mean. */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                    <Info size={16} className="text-graphito-blue shrink-0" aria-hidden="true" />
-                    <h3>Cómo leer estas métricas</h3>
-                </div>
+            <Guide className={`rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40 ${hasVariants ? "p-4" : "p-6"}`}>
+                {hasVariants ? <summary className="cursor-pointer list-none">{guideHeading}</summary> : guideHeading}
 
                 <ul className="space-y-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed list-disc pl-4">
                     <li>
@@ -166,7 +175,7 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                         </InfoPopover>
                     </div>
                 </div>
-            </div>
+            </Guide>
         </div>
     );
 }

@@ -304,18 +304,14 @@ class PdfReportService:
                 fontSize=7.5,
                 leading=10,
                 textColor=colors.HexColor("#0f172a"),
+                backColor=colors.HexColor("#f8fafc"),
+                borderColor=colors.HexColor("#cbd5e1"),
+                borderWidth=1,
+                borderPadding=8,
             )
-            code_p = Preformatted(code_text, code_style)
-            code_table = Table([[code_p]], colWidths=[520])
-            code_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e1")),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('LEFTPADDING', (0, 0), (-1, -1), 10),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ]))
-            elements.append(code_table)
+            # Not wrapped in a one-cell Table: a cell cannot split across pages, so long code made the
+            # whole PDF fail with a LayoutError. A Preformatted block splits like plain text.
+            elements.append(Preformatted(code_text, code_style))
 
         elements.append(Spacer(1, 20))
         elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#94a3b8"), spaceAfter=10))
