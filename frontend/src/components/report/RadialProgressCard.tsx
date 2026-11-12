@@ -122,9 +122,9 @@ export function RadialProgressCard({
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
                     {available ? (
                         <>
-                            <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
+                            <span className={`font-display font-extrabold text-slate-900 dark:text-white tracking-tight leading-none ${compact ? "text-xl" : "text-[1.65rem]"}`}>
                                 {pct}
-                                <span className="text-xl font-bold text-slate-400 dark:text-slate-500">
+                                <span className={`font-bold text-slate-400 dark:text-slate-500 ${compact ? "text-sm" : "text-lg"}`}>
                                     %
                                 </span>
                             </span>
