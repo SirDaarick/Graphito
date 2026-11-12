@@ -14,6 +14,7 @@ export interface StudentTask {
     problemId: number;
     problemTitle: string;
     groupName: string | null;
+    groupCode: string | null;
     lenguaje: string;
     date: string;
     /** Null while the submission has no analysis: there is no report to open. */
@@ -41,6 +42,7 @@ export function groupStudents(problems: Problema[], groups: Grupo[]): Student[] 
                 problemId: p.id,
                 problemTitle: p.titulo,
                 groupName: group?.nombre ?? null,
+                groupCode: group?.codigo_grupo ?? null,
                 lenguaje: s.lenguaje,
                 date: s.created_at,
                 comparison,
