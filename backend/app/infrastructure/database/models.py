@@ -114,6 +114,41 @@ class Problema(Base):
     codigos = relationship("CodigoFuente", back_populates="problema", cascade="all, delete-orphan")
 
 
+class CatalogoDocente(Base):
+    """Personal catalog: private to its teacher."""
+    __tablename__ = "catalogos_docente"
+
+    id = Column(Integer, primary_key=True, index=True)
+    docente_id = Column(Integer, ForeignKey("docentes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nombre = Column(String(150), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class ProgramaCatalogo(Base):
+    """A saved copy of a program (statement + reference code), independent of any library problem."""
+    __tablename__ = "programas_catalogo"
+
+    id = Column(Integer, primary_key=True, index=True)
+    catalogo_id = Column(Integer, ForeignKey("catalogos_docente.id", ondelete="CASCADE"), nullable=False, index=True)
+    titulo = Column(String(255), nullable=False)
+    enunciado = Column(Text, nullable=False)
+    lenguaje = Column(String(50), default="c", nullable=False)
+    codigo = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class VarianteCatalogo(Base):
+    """Saved copy of an AI variant; re-indexed (not regenerated) when the program is adopted."""
+    __tablename__ = "variantes_catalogo"
+
+    id = Column(Integer, primary_key=True, index=True)
+    programa_id = Column(Integer, ForeignKey("programas_catalogo.id", ondelete="CASCADE"), nullable=False, index=True)
+    titulo = Column(String(120), nullable=False)
+    instrucciones = Column(Text, nullable=False)
+    contenido = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class LoteAnalisis(Base):
     __tablename__ = "lotes_analisis"
 

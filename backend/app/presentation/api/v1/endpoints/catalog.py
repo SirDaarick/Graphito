@@ -29,7 +29,7 @@ async def get_catalog_entry(
     current_user: Docente = Depends(get_current_docente),
     db: AsyncSession = Depends(get_db),
 ):
-    return CatalogService(db).get_entry(catalog_id)
+    return await CatalogService(db).get_entry(current_user.id, catalog_id)
 
 
 @router.post("/{catalog_id}/use", response_model=ProblemaResponse)

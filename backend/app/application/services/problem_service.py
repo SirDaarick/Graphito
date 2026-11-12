@@ -293,6 +293,19 @@ class ProblemService:
             instructions=data.instrucciones,
             language=problema.lenguaje,
         )
+        return await self._store_variant(problema, data.titulo, data.instrucciones, contenido)
+
+    async def add_stored_variant(
+        self, docente_id: int, problema_id: int, titulo: str, instrucciones: str, contenido: str
+    ) -> VarianteResponse:
+        """Index an already-generated variant (e.g. restored from a catalog) without calling the LLM."""
+        problema = await self.get_problem(docente_id, problema_id)
+        return await self._store_variant(problema, titulo, instrucciones, contenido)
+
+    async def _store_variant(
+        self, problema: Problema, titulo: str, instrucciones: str, contenido: str
+    ) -> VarianteResponse:
+        problema_id = problema.id
         semantic_vector: Optional[List[float]] = None
         try:
             semantic_vector = await self.inference.extract_semantic_embedding(contenido, lang=problema.lenguaje)
@@ -302,8 +315,8 @@ class ProblemService:
             logger.info("GraphCodeBERT disabled: variant stored without a vector.")
 
         variante = VarianteReferencia(
-            id=uuid.uuid4(), problema_id=problema_id, titulo=data.titulo.strip(),
-            instrucciones=data.instrucciones, contenido=contenido, lenguaje=problema.lenguaje,
+            id=uuid.uuid4(), problema_id=problema_id, titulo=titulo.strip(),
+            instrucciones=instrucciones, contenido=contenido, lenguaje=problema.lenguaje,
         )
         self.db.add(variante)
         await self.db.flush()

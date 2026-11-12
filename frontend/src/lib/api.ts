@@ -339,6 +339,20 @@ export interface CatalogProgramDetail extends CatalogProgram {
     codigo: string;
 }
 
+/** A teacher's personal catalog; its program ids ("mio-<n>") work with `api.catalog.get` / `use`. */
+export interface MyCatalog {
+    id: number;
+    nombre: string;
+    programas: CatalogProgram[];
+}
+
+export interface MyProgramInput {
+    titulo: string;
+    enunciado: string;
+    lenguaje: "c" | "cpp";
+    codigo: string;
+}
+
 const DEMO_READ_ONLY = "El modo demo está configurado en solo lectura para exhibición.";
 
 // In-memory comments store for demo mode
@@ -811,6 +825,40 @@ export const api = {
             return request<Problema>(`/catalog/${encodeURIComponent(id)}/use`, {
                 method: "POST",
             });
+        },
+    },
+
+    myCatalogs: {
+        async list(): Promise<MyCatalog[]> {
+            if (IS_DEMO_MODE) return [];
+            return request<MyCatalog[]>("/my-catalogs/");
+        },
+        async create(nombre: string): Promise<MyCatalog> {
+            if (IS_DEMO_MODE) throw new ApiError(403, DEMO_READ_ONLY);
+            return request<MyCatalog>("/my-catalogs/", { method: "POST", body: JSON.stringify({ nombre }) });
+        },
+        async remove(id: number): Promise<void> {
+            if (IS_DEMO_MODE) throw new ApiError(403, DEMO_READ_ONLY);
+            return request<void>(`/my-catalogs/${id}`, { method: "DELETE" });
+        },
+        async addProgram(catalogId: number, data: MyProgramInput): Promise<CatalogProgram> {
+            if (IS_DEMO_MODE) throw new ApiError(403, DEMO_READ_ONLY);
+            return request<CatalogProgram>(`/my-catalogs/${catalogId}/programs`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            });
+        },
+        /** Copies a library problem (statement + first reference code) into the catalog. */
+        async saveProblem(catalogId: number, problemId: number): Promise<CatalogProgram> {
+            if (IS_DEMO_MODE) throw new ApiError(403, DEMO_READ_ONLY);
+            return request<CatalogProgram>(`/my-catalogs/${catalogId}/programs/from-problem/${problemId}`, {
+                method: "POST",
+            });
+        },
+        /** `programId` is the "mio-<n>" id of the program. */
+        async removeProgram(programId: string): Promise<void> {
+            if (IS_DEMO_MODE) throw new ApiError(403, DEMO_READ_ONLY);
+            return request<void>(`/my-catalogs/programs/${programId.replace("mio-", "")}`, { method: "DELETE" });
         },
     },
 

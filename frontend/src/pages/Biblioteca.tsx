@@ -23,6 +23,7 @@ import { CreateGroupModal } from "../components/groups/CreateGroupModal";
 import { BulkUploadModal } from "../components/batch/BulkUploadModal";
 import { AssignGroupModal } from "../components/groups/AssignGroupModal";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { SaveToCatalogModal } from "../components/catalog/MyCatalogModals";
 
 type PendingAction =
     | { kind: "delete-problem"; id: number; title: string }
@@ -81,6 +82,7 @@ export function Biblioteca({
     const [bulkUploadProblemId, setBulkUploadProblemId] = useState<number | null>(null);
     const [showArchived, setShowArchived] = useState(false);
     const [assignTarget, setAssignTarget] = useState<{ id: number; title: string } | null>(null);
+    const [catalogTarget, setCatalogTarget] = useState<{ id: number; title: string } | null>(null);
     const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
     const [isActing, setIsActing] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -420,6 +422,7 @@ export function Biblioteca({
             archived={ref.archived}
             forceExpanded={tourExpandedProblem === ref.problemId}
             onAssignToGroup={() => setAssignTarget({ id: ref.problemId, title: ref.title })}
+            onSaveToCatalog={() => setCatalogTarget({ id: ref.problemId, title: ref.title })}
             onToggleArchive={() => handleToggleProblemArchive(ref)}
             onDelete={() => {
                 setActionError(null);
@@ -877,6 +880,11 @@ export function Biblioteca({
                 onGroupCreated={handleGroupCreated}
             />
 
+            <SaveToCatalogModal
+                isOpen={catalogTarget !== null}
+                problem={catalogTarget}
+                onClose={() => setCatalogTarget(null)}
+            />
             <AssignGroupModal
                 isOpen={assignTarget !== null}
                 problemId={assignTarget?.id ?? null}

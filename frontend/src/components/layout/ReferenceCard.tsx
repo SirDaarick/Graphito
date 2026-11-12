@@ -10,6 +10,7 @@ import {
     Archive,
     ArchiveRestore,
     Trash2,
+    BookmarkPlus,
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { cn } from "../../lib/utils";
@@ -39,6 +40,7 @@ interface ReferenceCardProps {
     onComparisonClick?: (comparison: Comparison, allComparisons?: Comparison[]) => void;
     archived?: boolean;
     onAssignToGroup?: () => void;
+    onSaveToCatalog?: () => void;
     onToggleArchive?: () => void;
     onDelete?: () => void;
     /** Guided tour: keep the submissions list open while true (closed again when it turns false). */
@@ -66,6 +68,7 @@ export function ReferenceCard({
     onComparisonClick,
     archived = false,
     onAssignToGroup,
+    onSaveToCatalog,
     onToggleArchive,
     onDelete,
     forceExpanded = false,
@@ -76,7 +79,7 @@ export function ReferenceCard({
     const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const menuButtonRef = useRef<HTMLButtonElement>(null);
-    const hasActions = Boolean(onAssignToGroup || onToggleArchive || onDelete);
+    const hasActions = Boolean(onAssignToGroup || onSaveToCatalog || onToggleArchive || onDelete);
 
     // The guided tour opens the list while its step is current and closes it when the step ends.
     useEffect(() => {
@@ -291,6 +294,17 @@ export function ReferenceCard({
                                             >
                                                 <Users className="h-4 w-4 text-graphito-blue" />
                                                 Asignar a grupo
+                                            </button>
+                                        )}
+                                        {onSaveToCatalog && (
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => runAction(onSaveToCatalog)}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[40px] rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-graphito-dark transition-colors text-left"
+                                            >
+                                                <BookmarkPlus className="h-4 w-4 text-graphito-blue" />
+                                                Guardar en catálogo
                                             </button>
                                         )}
                                         {onToggleArchive && (

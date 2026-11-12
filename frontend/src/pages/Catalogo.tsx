@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Loader2, ChevronDown, FileCode2, Check, Layers } from "lucide-react";
+import { Loader2, ChevronDown, FileCode2, Check, Layers, Plus, Trash2, FolderPlus } from "lucide-react";
 import { SearchBar } from "../components/layout/SearchBar";
 import { CatalogProgramModal } from "../components/catalog/CatalogProgramModal";
-import { api, CatalogSubject } from "../lib/api";
+import { NewCatalogModal, AddProgramModal } from "../components/catalog/MyCatalogModals";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { api, CatalogSubject, MyCatalog } from "../lib/api";
 import { navigate } from "../lib/router";
 import { cn } from "../lib/utils";
 
@@ -64,6 +66,44 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
             cancelled = true;
         };
     }, []);
+
+    // The teacher's own catalogs; a failure here must not break the ESCOM catalog.
+    const [myCatalogs, setMyCatalogs] = useState<MyCatalog[]>([]);
+    const [showNewCatalog, setShowNewCatalog] = useState(false);
+    const [addTarget, setAddTarget] = useState<MyCatalog | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<
+        { kind: "catalog"; catalog: MyCatalog } | { kind: "program"; id: string; titulo: string } | null
+    >(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const loadMine = useCallback(async () => {
+        try {
+            setMyCatalogs(await api.myCatalogs.list());
+        } catch {
+            setMyCatalogs([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadMine();
+    }, [loadMine]);
+
+    const confirmDelete = async () => {
+        if (!pendingDelete) return;
+        setIsDeleting(true);
+        setDeleteError(null);
+        try {
+            if (pendingDelete.kind === "catalog") await api.myCatalogs.remove(pendingDelete.catalog.id);
+            else await api.myCatalogs.removeProgram(pendingDelete.id);
+            await loadMine();
+            setPendingDelete(null);
+        } catch (err: any) {
+            setDeleteError(err.message || "No se pudo eliminar.");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     // Programs already adopted by the teacher; a failure here must not break the catalog.
     const loadAdded = useCallback(async () => {
@@ -187,6 +227,129 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
                     <span>{isAllExpanded ? "Colapsar todo" : "Expandir todo"}</span>
                 </button>
             </div>
+
+            <section aria-label="Mis catálogos" className="mb-10">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                    <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white">Mis catálogos</h2>
+                    <button
+                        type="button"
+                        onClick={() => setShowNewCatalog(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold border border-slate-200 dark:border-graphito-border bg-white dark:bg-graphito-card text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-graphito-dark transition-all shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue active:scale-95"
+                    >
+                        <FolderPlus size={15} className="text-graphito-blue" />
+                        Nuevo catálogo
+                    </button>
+                </div>
+                {myCatalogs.length === 0 ? (
+                    <p className="text-sm text-slate-600 dark:text-slate-400 border border-dashed border-slate-300 dark:border-graphito-subtle rounded-2xl p-5">
+                        Crea un catálogo propio para guardar tus problemas y reutilizarlos. Solo tú los ves. También puedes
+                        guardar un programa desde la biblioteca con “Guardar en catálogo”.
+                    </p>
+                ) : (
+                    <div className="flex flex-col gap-4">
+                        {myCatalogs.map((catalog) => {
+                            const term = searchTerm.trim().toLowerCase();
+                            const programs = term
+                                ? catalog.programas.filter((p) => p.titulo.toLowerCase().includes(term))
+                                : catalog.programas;
+                            if (term && programs.length === 0) return null;
+                            return (
+                                <div
+                                    key={catalog.id}
+                                    className="bg-white/25 dark:bg-graphito-card/15 border border-slate-200/60 dark:border-white/10 rounded-2xl p-4 sm:p-5"
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-display font-bold text-slate-900 dark:text-white">{catalog.nombre}</h3>
+                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-graphito-surface text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-graphito-border">
+                                                {catalog.programas.length} {catalog.programas.length === 1 ? "programa" : "programas"}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setAddTarget(catalog)}
+                                                className="flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-lg text-xs font-bold text-graphito-blue hover:bg-graphito-blue/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue transition-colors"
+                                            >
+                                                <Plus size={14} />
+                                                Agregar programa
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setDeleteError(null);
+                                                    setPendingDelete({ kind: "catalog", catalog });
+                                                }}
+                                                aria-label={`Eliminar catálogo ${catalog.nombre}`}
+                                                className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition-colors"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {programs.length === 0 ? (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">Aún no tiene programas.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                                            {programs.map((program) => (
+                                                <div
+                                                    key={program.id}
+                                                    className="relative group/card rounded-xl border border-slate-200/60 dark:border-white/10 bg-slate-50/30 dark:bg-graphito-dark/20 hover:border-graphito-blue/50 hover:shadow-lg hover:shadow-graphito-blue/10 transition-all"
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openProgram(program.id)}
+                                                        className="w-full text-left p-4 pr-12 min-h-[48px] rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <h4 className="font-display font-bold text-sm text-slate-900 dark:text-white leading-snug">
+                                                                {program.titulo}
+                                                            </h4>
+                                                            <span
+                                                                className={cn(
+                                                                    "shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border",
+                                                                    program.lenguaje === "cpp" ? languageBadge.cpp : languageBadge.c
+                                                                )}
+                                                            >
+                                                                {program.lenguaje === "cpp" ? "C++" : "C"}
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-3 flex items-center justify-between gap-2">
+                                                            <p className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-mono truncate">
+                                                                <FileCode2 size={13} className="shrink-0 text-graphito-blue" />
+                                                                <span className="truncate">{program.nombre_archivo}</span>
+                                                            </p>
+                                                            {addedIds.has(program.id) && (
+                                                                <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
+                                                                    <Check size={11} />
+                                                                    En tu biblioteca
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setDeleteError(null);
+                                                            setPendingDelete({ kind: "program", id: program.id, titulo: program.titulo });
+                                                        }}
+                                                        aria-label={`Quitar ${program.titulo} del catálogo`}
+                                                        className="absolute top-2 right-2 p-2 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition-colors"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
+
+            <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white mb-4">Catálogo ESCOM</h2>
 
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
@@ -371,6 +534,39 @@ export function Catalogo({ onProgramAdded, onGoToBiblioteca }: CatalogoProps) {
                 onClose={() => setIsModalOpen(false)}
                 onAdded={handleAdded}
                 onGoToBiblioteca={handleGoToBiblioteca}
+            />
+            <NewCatalogModal
+                isOpen={showNewCatalog}
+                onClose={() => setShowNewCatalog(false)}
+                onCreated={() => loadMine()}
+            />
+            <AddProgramModal
+                isOpen={addTarget !== null}
+                catalog={addTarget}
+                onClose={() => setAddTarget(null)}
+                onAdded={() => loadMine()}
+            />
+            <ConfirmDialog
+                isOpen={pendingDelete !== null}
+                title={pendingDelete?.kind === "catalog" ? "Eliminar catálogo" : "Quitar programa"}
+                message={
+                    pendingDelete?.kind === "catalog" ? (
+                        <>
+                            Se eliminará <strong>{pendingDelete.catalog.nombre}</strong> con sus programas guardados. Los problemas ya
+                            agregados a tu biblioteca se conservan. Esta acción no se puede deshacer.
+                        </>
+                    ) : pendingDelete ? (
+                        <>
+                            Se quitará <strong>{pendingDelete.titulo}</strong> del catálogo. Si ya está en tu biblioteca, se conserva.
+                        </>
+                    ) : null
+                }
+                confirmLabel="Eliminar"
+                loadingLabel="Eliminando..."
+                isLoading={isDeleting}
+                error={deleteError}
+                onConfirm={confirmDelete}
+                onCancel={() => setPendingDelete(null)}
             />
         </main>
     );
