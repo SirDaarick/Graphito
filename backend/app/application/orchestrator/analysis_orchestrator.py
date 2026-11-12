@@ -80,6 +80,7 @@ class AnalysisOrchestrator:
         self.db.add(reporte)
         await self.db.flush()
         scoring.persist(self.db, reporte, outcome, entrega)
+        await scoring.add_variant_metrics(self.db, reporte, entrega)
         await self.db.commit()
         await record_analysis(
             "individual", docente_id=docente_id, outcome=outcome, entrega=entrega, duracion_ms=elapsed_ms(started)
@@ -139,6 +140,7 @@ class AnalysisOrchestrator:
                 rep_res = await session.execute(select(ReporteAnalisis).where(ReporteAnalisis.id == report_id))
                 reporte = rep_res.scalar_one()
                 scoring.persist(session, reporte, outcome, entrega)
+                await scoring.add_variant_metrics(session, reporte, entrega)
                 await session.commit()
                 logger.info(f"Reporte {report_id} completado con éxito de forma asíncrona.")
                 await record_analysis(

@@ -29,6 +29,19 @@ class VectorStorePort(ABC):
     ) -> List[Dict[str, Any]]:
         """Nearest references of one problem (`reference_id`, `similarity`, `distance`, `metadata`)."""
 
+    async def query_variants(
+        self,
+        embedding: List[float],
+        problema_id: int,
+        top_k: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Nearest AI variants of one problem (same shape as `query_nearest`).
+
+        Variants are stored with `variante_problema_id` metadata (never `problema_id`) so they never
+        reach `query_nearest`. Not abstract: a store without variant support returns no matches.
+        """
+        return []
+
     @abstractmethod
     async def delete_reference(self, reference_id: str) -> bool:
         """Remove one reference. Raises `VectorStoreError` on failure."""

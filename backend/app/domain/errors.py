@@ -22,5 +22,9 @@ class VectorStoreError(GraphitoError):
     """The vector store failed or returned a malformed result (never an empty result instead)."""
 
 
+class GenerationError(GraphitoError):
+    """The LLM that writes reference variants is unconfigured, unreachable or returned nothing usable."""
+
+
 class NotReadyError(GraphitoError):
     """The inference engine or its artifacts are not ready; scoring and indexing must not run."""

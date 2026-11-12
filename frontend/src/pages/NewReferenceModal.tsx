@@ -1,9 +1,17 @@
-﻿import React, { useId, useState, useRef } from "react";
-import { Upload, Database, Check, Minus, Plus, Loader2, Info } from "lucide-react";
+import React, { useId, useState, useRef } from "react";
+import { Upload, Database, Plus, Loader2, Info, X } from "lucide-react";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/Button";
 import { api, IS_DEMO_MODE } from "../lib/api";
 import { downloadTextFile } from "../lib/downloadTextFile";
+
+/** Keep in sync with the backend's MAX_REFERENCE_VARIANTS (it enforces the limit too). */
+const MAX_VARIANTS = 3;
+
+interface VariantDraft {
+    titulo: string;
+    instrucciones: string;
+}
 
 interface NewReferenceModalProps {
     isOpen: boolean;
@@ -19,12 +27,14 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
     const [language, setLanguage] = useState<"c" | "cpp">("c");
     const [fileName, setFileName] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [loadingStep, setLoadingStep] = useState<"creating" | "indexing" | null>(null);
+    const [loadingStep, setLoadingStep] = useState<"creating" | "indexing" | "generating" | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isLoadingExample, setIsLoadingExample] = useState(false);
 
-    const [variations, setVariations] = useState(3);
-    const [generateAI, setGenerateAI] = useState(true);
+    // AI variants: an optional short title plus the instructions the LLM follows for that implementation.
+    const [variants, setVariants] = useState<VariantDraft[]>([{ titulo: "", instrucciones: "" }]);
+    // Set once the problem and its reference exist, so a retry after a failed variant never duplicates them.
+    const [createdProblemId, setCreatedProblemId] = useState<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uid = useId();
     const ids = {
@@ -32,10 +42,19 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
         language: `ref-lang-${uid}`,
         code: `ref-code-${uid}`,
         description: `ref-desc-${uid}`,
-        aiToggle: `ref-ai-${uid}`,
-        aiInstructions: `ref-ai-text-${uid}`,
-        variations: `ref-var-${uid}`,
+        variant: (i: number, field: "title" | "prompt") => `ref-variant-${field}-${i}-${uid}`,
     };
+
+    // Closing abandons a half-created problem's retry state, so the next open starts from scratch.
+    const handleClose = () => {
+        setCreatedProblemId(null);
+        setVariants([{ titulo: "", instrucciones: "" }]);
+        setError(null);
+        onClose();
+    };
+
+    const updateVariant = (i: number, patch: Partial<VariantDraft>) =>
+        setVariants((rows) => rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -81,18 +100,52 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
             return;
         }
 
+        // Rows left completely blank are ignored; a half-filled row is a mistake worth stopping on.
+        const filled = variants.filter((v) => v.titulo.trim() || v.instrucciones.trim());
+        if (filled.some((v) => !v.titulo.trim() || !v.instrucciones.trim())) {
+            setError("Cada implementación necesita un título corto y sus instrucciones.");
+            return;
+        }
+
         setError(null);
         setIsLoading(true);
         setLoadingStep("creating");
         try {
-            const prob = await api.problems.create(title, description || "Solución de referencia", language);
-            setLoadingStep("indexing");
-            await api.problems.addReference(prob.id, "Docente", code, language);
+            let problemId = createdProblemId;
+            if (problemId === null) {
+                const prob = await api.problems.create(title, description || "Solución de referencia", language);
+                problemId = prob.id;
+                setLoadingStep("indexing");
+                await api.problems.addReference(problemId, "Docente", code, language);
+                setCreatedProblemId(problemId);
+            }
+
+            // One call per variant so a failure names the implementation; the rest still get created.
+            const failed: VariantDraft[] = [];
+            const failures: string[] = [];
+            for (const v of filled) {
+                setLoadingStep("generating");
+                try {
+                    await api.problems.addVariant(problemId, v.titulo.trim(), v.instrucciones.trim());
+                } catch (err: any) {
+                    failed.push(v);
+                    failures.push(`"${v.titulo.trim()}": ${err.message || "error al generar"}`);
+                }
+            }
+            if (failed.length > 0) {
+                onSuccess?.(problemId); // the problem and its reference exist already: refresh the library
+                setVariants(failed);
+                setError(`La referencia se guardó, pero no se generaron: ${failures.join("; ")}. Puedes reintentar o cerrar.`);
+                return;
+            }
+
             setTitle("");
             setDescription("");
             setCode("");
             setFileName(null);
-            onSuccess?.(prob.id);
+            setVariants([{ titulo: "", instrucciones: "" }]);
+            setCreatedProblemId(null);
+            onSuccess?.(problemId);
             onClose();
         } catch (err: any) {
             setError(err.message || "Error al agregar la referencia.");
@@ -105,7 +158,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             title="Agregar código de referencia"
             maxWidth="4xl"
             fixedHeight="h-auto max-h-[94vh]"
@@ -114,7 +167,7 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={onClose}
+                        onClick={handleClose}
                         disabled={isLoading}
                     >
                         Cancelar
@@ -133,7 +186,9 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                         {isLoading
                             ? loadingStep === "creating"
                                 ? "Registrando problema..."
-                                : "Indexando en ChromaDB..."
+                                : loadingStep === "generating"
+                                    ? "Generando variantes con IA..."
+                                    : "Indexando en ChromaDB..."
                             : "Agregar código de referencia"}
                     </Button>
                 </div>
@@ -155,12 +210,16 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                         <p className="text-xs font-bold text-slate-900 dark:text-white">
                             {loadingStep === "creating"
                                 ? "Registrando problema de referencia..."
-                                : "Generando embeddings vectoriales e indexando en ChromaDB..."}
+                                : loadingStep === "generating"
+                                    ? "Generando implementaciones alternativas con IA..."
+                                    : "Generando embeddings vectoriales e indexando en ChromaDB..."}
                         </p>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
                             {loadingStep === "creating"
                                 ? "Guardando metadatos y código fuente canónico en la base de datos."
-                                : "Calculando vectores para comparaciones y búsquedas semánticas inmediatas."}
+                                : loadingStep === "generating"
+                                    ? "Cada variante se genera, se vectoriza y se guarda; puede tardar unos segundos."
+                                    : "Calculando vectores para comparaciones y búsquedas semánticas inmediatas."}
                         </p>
                     </div>
                 </div>
@@ -286,70 +345,75 @@ export function NewReferenceModal({ isOpen, onClose, onSuccess }: NewReferenceMo
                 </div>
             </div>
 
-            {/* Bottom Section: AI Variations */}
-            <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/40 rounded-2xl p-6 space-y-6 transition-colors">
-                <div className="flex items-center gap-3">
-                    <div
-                        id={ids.aiToggle}
-                        role="checkbox"
-                        aria-checked={generateAI}
-                        aria-labelledby={`${ids.aiToggle}-label`}
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                            if (e.key === " " || e.key === "Enter") {
-                                e.preventDefault();
-                                setGenerateAI(!generateAI);
-                            }
-                        }}
-                        className={`w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue ${generateAI ? 'bg-graphito-blue' : 'bg-slate-200 dark:bg-[#121827]'}`}
-                        onClick={() => setGenerateAI(!generateAI)}
-                    >
-                        {generateAI && <Check size={14} className="text-white" />}
-                    </div>
-                    <span id={`${ids.aiToggle}-label`} className="text-xs font-bold text-slate-800 dark:text-white">
-                        Generar variaciones mediante inteligencia artificial
-                    </span>
+            {/* Bottom Section: other implementations generated with AI */}
+            <div className="bg-slate-50 dark:bg-[#121827]/50 border border-slate-200 dark:border-[#2b3346]/40 rounded-2xl p-6 space-y-4 transition-colors">
+                <div>
+                    <h3 className="text-xs font-bold text-slate-800 dark:text-white">
+                        ¿Quieres comparar también contra otras implementaciones?
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                        Opcional. Describe cada variante y la IA la generará a partir de tu referencia (máximo {MAX_VARIANTS}).
+                        Las entregas se compararán también contra ellas, sin reemplazar tu referencia.
+                    </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                    <div className="md:col-span-2 space-y-2">
-                        <label htmlFor={ids.aiInstructions} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 ml-1">
-                            Instrucciones para la IA
-                        </label>
-                        <textarea
-                            id={ids.aiInstructions}
-                            className="w-full h-24 bg-white dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-graphito-blue/50 transition-all resize-none font-medium"
-                            placeholder="Ej: Generar una versión más optimizada y otra con comentarios detallados..."
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <span id={ids.variations} className="block text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 ml-1">
-                            Número de variaciones
-                        </span>
-                        <div role="group" aria-labelledby={ids.variations} className="flex items-center bg-white dark:bg-[#121827]/60 border border-slate-200 dark:border-[#2b3346] rounded-xl overflow-hidden h-24 transition-colors">
-                            <button
-                                type="button"
-                                aria-label="Disminuir número de variaciones"
-                                onClick={() => setVariations(Math.max(1, variations - 1))}
-                                className="flex-1 h-full flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                <Minus size={18} />
-                            </button>
-                            <div className="w-12 text-center text-2xl font-black text-slate-900 dark:text-white">
-                                {variations}
+                {variants.map((variant, i) => (
+                    <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                        <div className="space-y-1.5">
+                            <label htmlFor={ids.variant(i, "title")} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 ml-1">
+                                Título de la implementación {i + 1}
+                            </label>
+                            <input
+                                id={ids.variant(i, "title")}
+                                type="text"
+                                maxLength={120}
+                                value={variant.titulo}
+                                onChange={(e) => updateVariant(i, { titulo: e.target.value })}
+                                disabled={isLoading}
+                                placeholder="Ej: Usando factorial"
+                                className="w-full bg-white dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] rounded-xl py-2.5 px-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-graphito-blue/50 transition-all disabled:opacity-60"
+                            />
+                        </div>
+                        <div className="md:col-span-2 space-y-1.5">
+                            <label htmlFor={ids.variant(i, "prompt")} className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400 ml-1">
+                                Instrucciones para la IA
+                            </label>
+                            <div className="flex gap-2">
+                                <textarea
+                                    id={ids.variant(i, "prompt")}
+                                    maxLength={2000}
+                                    value={variant.instrucciones}
+                                    onChange={(e) => updateVariant(i, { instrucciones: e.target.value })}
+                                    disabled={isLoading}
+                                    placeholder="Ej: Resuelve el problema usando recursión con una función factorial."
+                                    className="w-full h-20 bg-white dark:bg-[#121827]/40 border border-slate-200 dark:border-[#2b3346] rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-graphito-blue/50 transition-all resize-none disabled:opacity-60"
+                                />
+                                {variants.length > 1 && (
+                                    <button
+                                        type="button"
+                                        aria-label={`Quitar implementación ${i + 1}`}
+                                        disabled={isLoading}
+                                        onClick={() => setVariants((rows) => rows.filter((_, idx) => idx !== i))}
+                                        className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200/60 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
                             </div>
-                            <button
-                                type="button"
-                                aria-label="Aumentar número de variaciones"
-                                onClick={() => setVariations(Math.min(10, variations + 1))}
-                                className="flex-1 h-full flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-graphito-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                <Plus size={18} />
-                            </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </Modal>
+                ))}
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Plus size={14} />}
+                    disabled={isLoading || variants.length >= MAX_VARIANTS}
+                    onClick={() => setVariants((rows) => [...rows, { titulo: "", instrucciones: "" }])}
+                >
+                    Agregar otra implementación ({variants.length}/{MAX_VARIANTS})
+                </Button>
+            </div>        </Modal>
     );
 }

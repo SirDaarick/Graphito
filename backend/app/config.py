@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     # Development only (with INFERENCE_MODE=REAL): score a channel without calibration, unflagged.
     ALLOW_UNCALIBRATED: bool = False
 
+    # AI reference variants (OpenAI-compatible chat API; OpenRouter by default). Without a key the
+    # STUB mode returns a canned program and REAL mode refuses with 503.
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "openai/gpt-4o-mini"
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    MAX_REFERENCE_VARIANTS: int = 3
+
     # Security
     JWT_SECRET: str = "supersecretjwtkey_change_in_production_123456789"
     JWT_ALGORITHM: str = "HS256"

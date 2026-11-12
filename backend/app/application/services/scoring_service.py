@@ -47,7 +47,9 @@ from app.infrastructure.database.models import (
     EstadoAnalisisEnum,
     IndicadorIntegridad,
     ReporteAnalisis,
+    ReporteVariante,
     TipoCodigoEnum,
+    VarianteReferencia,
 )
 
 logger = logging.getLogger(__name__)
@@ -222,6 +224,46 @@ class ScoringService:
             channel_a, channel_b, reference_id=reference_id, gcb_similarity=gcb,
             engine=self.engine_label, provenance=provenance,
         )
+
+    async def add_variant_metrics(self, db: AsyncSession, reporte: ReporteAnalisis, entrega: CodigoFuente) -> None:
+        """One `ReporteVariante` row per AI variant of the problem (the caller commits).
+
+        Best effort and non-deciding: a failure here is logged and leaves the main analysis intact.
+        The variant similarity is the GraphCodeBERT cosine, the same signal as the headline circle.
+        """
+        try:
+            variants = (
+                await db.execute(
+                    select(VarianteReferencia)
+                    .where(VarianteReferencia.problema_id == entrega.problema_id)
+                    .order_by(VarianteReferencia.created_at, VarianteReferencia.id)
+                )
+            ).scalars().all()
+            if not variants:
+                return
+            sims: Dict[str, float] = {}
+            estado = GCB_OK
+            try:
+                CANONICALIZATION_FALLBACK.set(False)
+                vector = await self.inference.extract_semantic_embedding(entrega.contenido, lang=entrega.lenguaje)
+                raw_fallback = CANONICALIZATION_FALLBACK.get()
+                matches = await self.vector_store.query_variants(vector, entrega.problema_id, top_k=len(variants))
+                sims = {m["reference_id"]: m["similarity"] for m in matches}
+                estado = GCB_OK_RAW if raw_fallback else GCB_OK
+            except InferenceError as exc:
+                estado = GCB_DISABLED if exc.reason == "gcb_disabled" else GCB_ERROR
+            except Exception as exc:
+                logger.warning("Variant similarity unavailable: %s", type(exc).__name__)
+                estado = GCB_ERROR
+            for variant in variants:
+                sim = sims.get(str(variant.id))
+                row_estado = estado if sim is not None or estado not in (GCB_OK, GCB_OK_RAW) else GCB_NOT_INDEXED
+                db.add(ReporteVariante(
+                    reporte_id=reporte.id, variante_id=variant.id, titulo=variant.titulo,
+                    gcb_similarity=_round(sim), gcb_estado=row_estado,
+                ))
+        except Exception as exc:
+            logger.warning("Variant metrics skipped: %s", type(exc).__name__)
 
     @staticmethod
     def apply_outcome(reporte: ReporteAnalisis, outcome: ScoringOutcome) -> None:

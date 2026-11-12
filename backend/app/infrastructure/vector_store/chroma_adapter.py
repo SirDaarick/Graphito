@@ -110,15 +110,17 @@ class ChromaVectorStoreAdapter(VectorStorePort):
         problema_id: int,
         top_k: int = 1,
     ) -> List[Dict[str, Any]]:
+        return await self._query(embedding, {"problema_id": problema_id}, top_k)
+
+    async def query_variants(self, embedding: List[float], problema_id: int, top_k: int = 10) -> List[Dict[str, Any]]:
+        return await self._query(embedding, {"variante_problema_id": problema_id}, top_k)
+
+    async def _query(self, embedding: List[float], where: Dict[str, Any], top_k: int) -> List[Dict[str, Any]]:
         self._check_dim(embedding)
         try:
             if self.collection.count() == 0:
                 return []  # RI3.2: no references indexed yet is a valid empty result
-            results = self.collection.query(
-                query_embeddings=[list(embedding)],
-                n_results=top_k,
-                where={"problema_id": problema_id},
-            )
+            results = self.collection.query(query_embeddings=[list(embedding)], n_results=top_k, where=where)
         except Exception as exc:
             raise VectorStoreError("vector_store_query_failed", f"{type(exc).__name__}: {exc}") from exc
         return self._parse(results)

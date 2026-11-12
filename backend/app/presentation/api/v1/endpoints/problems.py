@@ -9,7 +9,9 @@ from app.infrastructure.inference import get_inference_engine
 from app.infrastructure.vector_store import get_vector_store
 from app.application.services.problem_service import ProblemService
 from app.presentation.api.v1.deps import get_current_docente
-from app.presentation.schemas.problem import ProblemaCreate, ProblemaResponse
+from app.domain.ports.reference_generator_port import ReferenceGeneratorPort
+from app.infrastructure.llm import get_reference_generator
+from app.presentation.schemas.problem import ProblemaCreate, ProblemaResponse, VarianteCreate, VarianteResponse
 from app.presentation.schemas.submission import CodigoFuenteCreate, CodigoFuenteResponse
 
 router = APIRouter()
@@ -91,6 +93,21 @@ async def add_reference_code(
     return await service.add_reference_code(
         current_user.id, problem_id, autor, contenido, lenguaje
     )
+
+
+@router.post("/{problem_id}/variants", response_model=VarianteResponse, status_code=status.HTTP_201_CREATED)
+async def add_variant(
+    problem_id: int,
+    data: VarianteCreate,
+    current_user: Docente = Depends(get_current_docente),
+    db: AsyncSession = Depends(get_db),
+    inference: InferencePort = Depends(get_inference_engine),
+    vector_store: VectorStorePort = Depends(get_vector_store),
+    generator: ReferenceGeneratorPort = Depends(get_reference_generator),
+):
+    """Generate an AI variant of the problem's reference from a short title and an instruction prompt."""
+    service = ProblemService(db, inference, vector_store)
+    return await service.add_variant(current_user.id, problem_id, data, generator)
 
 
 @router.post("/{problem_id}/submissions", response_model=CodigoFuenteResponse, status_code=status.HTTP_201_CREATED)

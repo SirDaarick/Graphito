@@ -204,6 +204,44 @@ class ReporteAnalisis(Base):
     lote = relationship("LoteAnalisis", back_populates="reportes")
     indicadores = relationship("IndicadorIntegridad", back_populates="reporte", cascade="all, delete-orphan")
     comentarios = relationship("ComentarioRevision", back_populates="reporte", cascade="all, delete-orphan")
+    # selectin: every query that loads a report also loads its variant metrics (async sessions cannot lazy-load).
+    variantes = relationship(
+        "ReporteVariante", back_populates="reporte", cascade="all, delete-orphan", lazy="selectin",
+        order_by="ReporteVariante.id",
+    )
+
+
+class VarianteReferencia(Base):
+    """An AI-generated alternative solution of a problem, compared alongside the teacher's reference.
+
+    Kept apart from `codigos_fuente` on purpose: the Channel A argmax and every reference listing
+    read REFERENCIA rows, and a variant must never become the headline reference.
+    """
+
+    __tablename__ = "variantes_referencia"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    problema_id = Column(Integer, ForeignKey("problemas.id", ondelete="CASCADE"), nullable=False, index=True)
+    titulo = Column(String(120), nullable=False)
+    instrucciones = Column(Text, nullable=False)
+    contenido = Column(Text, nullable=False)
+    lenguaje = Column(String(50), default="c", nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class ReporteVariante(Base):
+    """GraphCodeBERT similarity of one report's submission against one variant (never decides)."""
+
+    __tablename__ = "reportes_variante"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reporte_id = Column(Integer, ForeignKey("reportes_analisis.id", ondelete="CASCADE"), nullable=False, index=True)
+    variante_id = Column(Uuid(as_uuid=True), ForeignKey("variantes_referencia.id", ondelete="SET NULL"), nullable=True)
+    titulo = Column(String(120), nullable=False)  # snapshot: the report keeps its label if the variant is deleted
+    gcb_similarity = Column(Float, nullable=True)
+    gcb_estado = Column(String(20), nullable=True)
+
+    reporte = relationship("ReporteAnalisis", back_populates="variantes")
 
 
 class IndicadorIntegridad(Base):

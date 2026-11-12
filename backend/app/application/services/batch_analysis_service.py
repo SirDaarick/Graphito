@@ -222,6 +222,7 @@ class BatchAnalysisService:
                         )
                         reporte = r_res.scalar_one()
                         scoring.persist(inner_session, reporte, outcome, entrega)
+                        await scoring.add_variant_metrics(inner_session, reporte, entrega)
 
                         l_res = await inner_session.execute(
                             select(LoteAnalisis).where(LoteAnalisis.id == batch_id)

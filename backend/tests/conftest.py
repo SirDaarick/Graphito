@@ -86,6 +86,19 @@ class InMemoryVectorStore(VectorStorePort):
         results.sort(key=lambda r: (-r["similarity"], r["reference_id"]))
         return results[:top_k]
 
+    async def query_variants(self, embedding: list, problema_id: int, top_k: int = 10):
+        self._maybe_fail("query")
+        results = []
+        for ref_id, data in self.store.items():
+            if data["metadata"].get("variante_problema_id") == problema_id:
+                sim = max(0.0, min(1.0, _cosine(embedding, data["embedding"])))
+                results.append({
+                    "reference_id": ref_id, "similarity": round(sim, 4),
+                    "distance": round(1.0 - sim, 4), "metadata": data["metadata"],
+                })
+        results.sort(key=lambda r: (-r["similarity"], r["reference_id"]))
+        return results[:top_k]
+
     async def delete_reference(self, reference_id: str):
         self._maybe_fail("delete")
         self.deleted.append(reference_id)

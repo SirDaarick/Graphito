@@ -198,7 +198,17 @@ export type EngineLabel = "real" | "stub" | "legacy" | "demo";
  * Decision and provenance fields of a report (spec AR1.1). Every score is nullable: null means
  * "not evaluated", never 0. The decision comes only from the calibrated flags.
  */
+/** Similarity to one AI-generated variant of the reference (exploratory, never decides). */
+export interface VarianteMetrica {
+    variante_id?: string | null;
+    titulo: string;
+    gcb_similarity?: number | null;
+    gcb_estado?: string | null;
+}
+
 export interface ReportScoring {
+    /** One entry per AI variant of the problem at analysis time; the teacher's reference stays the headline. */
+    variantes?: VarianteMetrica[];
     /** Raw Channel A Jaccard (lexical, 5-token shingles). */
     similitud_semantica?: number | null;
     /** Calibrated Channel B CharCNN score. */
@@ -432,6 +442,16 @@ export const api = {
             const params = new URLSearchParams({ autor, contenido, lenguaje });
             return request<CodigoFuente>(`/problems/${problemId}/references?${params.toString()}`, {
                 method: "POST",
+            });
+        },
+        /** Generates one AI variant of the problem's reference from a short title and an instruction prompt. */
+        async addVariant(problemId: number, titulo: string, instrucciones: string): Promise<{ id: string; titulo: string }> {
+            if (IS_DEMO_MODE) {
+                throw new ApiError(403, "El modo demo no permite generar variantes (solo lectura).");
+            }
+            return request<{ id: string; titulo: string }>(`/problems/${problemId}/variants`, {
+                method: "POST",
+                body: JSON.stringify({ titulo, instrucciones }),
             });
         },
         async addSubmission(problemId: number, autor: string, contenido: string, lenguaje = "c"): Promise<CodigoFuente> {

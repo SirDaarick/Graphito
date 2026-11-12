@@ -3,6 +3,7 @@ import type { ReportScoring } from "../../lib/api";
 import { gcbHeadline, isAbstained, toPct, VALIDATION_LABEL } from "../../lib/dictamen";
 import { InfoPopover } from "../ui/InfoPopover";
 import { RadialProgressCard } from "./RadialProgressCard";
+import { VariantMetrics } from "./VariantMetrics";
 
 function SemanticHelp() {
     return (
@@ -124,6 +125,8 @@ export function ReportMetrics({ report, animate }: ReportMetricsProps) {
                     />
                 </div>
             </div>
+
+            <VariantMetrics variants={report.variantes} animate={animate} />
 
             {/* Bottom Row: how to read the numbers. Context only; the teacher decides what they mean. */}
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[#2b3346]/60 dark:bg-[#121827]/40">

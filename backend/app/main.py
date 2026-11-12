@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import settings
 from app.application.services.usage_events import elapsed_ms, record_event, route_template
-from app.domain.errors import GraphitoError, InferenceError, NotReadyError, VectorStoreError
+from app.domain.errors import GenerationError, GraphitoError, InferenceError, NotReadyError, VectorStoreError
 from app.infrastructure.database.session import engine, Base
 import app.infrastructure.database.models  # Registra todas las entidades en Base.metadata
 from app.infrastructure.inference import runtime as inference_runtime
@@ -96,6 +96,16 @@ async def dependency_failure_handler(request: Request, exc: GraphitoError):
         status_code=503, content=dependency_failure_body(request.method, request.url.path, exc)
     )
 
+
+@app.exception_handler(GenerationError)
+async def generation_failure_handler(request: Request, exc: GenerationError):
+    logger.error("GenerationError on %s %s: %s", request.method, request.url.path, exc)
+    detail = (
+        "La generación con IA no está configurada en el servidor."
+        if exc.reason == "generation_not_configured"
+        else "No se pudo generar la variante con IA. Intenta de nuevo."
+    )
+    return JSONResponse(status_code=503, content={"detail": detail, "reason": exc.reason})
 
 # CORS
 app.add_middleware(

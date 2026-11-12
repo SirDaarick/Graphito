@@ -1,11 +1,15 @@
 import logging
 from typing import List, Optional
 import uuid
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from app.config import settings
+from app.domain.ports.reference_generator_port import ReferenceGeneratorPort
 from app.infrastructure.database.models import (
+    ReporteVariante,
+    VarianteReferencia,
     CodigoFuente,
     ComentarioRevision,
     Grupo,
@@ -19,7 +23,7 @@ from app.infrastructure.database.models import (
 from app.domain.errors import InferenceError, VectorStoreError
 from app.domain.ports.inference_port import InferencePort
 from app.domain.ports.vector_store_port import VectorStorePort
-from app.presentation.schemas.problem import ProblemaCreate, ProblemaResponse
+from app.presentation.schemas.problem import ProblemaCreate, ProblemaResponse, VarianteCreate, VarianteResponse
 from app.presentation.schemas.submission import CodigoFuenteCreate, CodigoFuenteResponse
 from app.presentation.schemas.analysis import ReporteAnalisisResponse
 
@@ -127,10 +131,14 @@ class ProblemService:
             )
         ).scalars().all()
 
-        if reference_ids:
+        variant_ids = (
+            await self.db.execute(select(VarianteReferencia.id).where(VarianteReferencia.problema_id == problema_id))
+        ).scalars().all()
+
+        if reference_ids or variant_ids:
             if self.vector_store is None:
                 raise VectorStoreError("vector_store_unavailable", "no vector store configured")
-            for reference_id in reference_ids:
+            for reference_id in [*reference_ids, *variant_ids]:
                 try:
                     await self.vector_store.delete_reference(str(reference_id))
                 except VectorStoreError:
@@ -148,6 +156,7 @@ class ProblemService:
                     ReporteAnalisis.referencia_id.in_(code_ids),
                 )
             )
+            await self.db.execute(delete(ReporteVariante).where(ReporteVariante.reporte_id.in_(report_ids)))
             await self.db.execute(delete(IndicadorIntegridad).where(IndicadorIntegridad.reporte_id.in_(report_ids)))
             await self.db.execute(delete(ComentarioRevision).where(ComentarioRevision.reporte_id.in_(report_ids)))
             await self.db.execute(
@@ -159,6 +168,7 @@ class ProblemService:
                 )
             )
             await self.db.execute(delete(CodigoFuente).where(CodigoFuente.id.in_(code_ids)))
+        await self.db.execute(delete(VarianteReferencia).where(VarianteReferencia.problema_id == problema_id))
         await self.db.execute(delete(LoteAnalisis).where(LoteAnalisis.problema_id == problema_id))
         await self.db.execute(delete(GrupoProblema).where(GrupoProblema.problema_id == problema_id))
         await self.db.execute(delete(Problema).where(Problema.id == problema_id))
@@ -241,6 +251,92 @@ class ProblemService:
             raise
         await self.db.refresh(codigo)
         return CodigoFuenteResponse.model_validate(codigo)
+
+    async def add_variant(
+        self,
+        docente_id: int,
+        problema_id: int,
+        data: VarianteCreate,
+        generator: ReferenceGeneratorPort,
+    ) -> VarianteResponse:
+        """Generate one AI variant of the teacher's reference and index its vector.
+
+        Same ordering as `add_reference_code`: generate and embed before writing anything, then
+        row -> flush -> upsert -> commit, removing the vector again if the commit fails.
+        """
+        problema = await self.get_problem(docente_id, problema_id)
+        existing = (
+            await self.db.execute(select(func.count()).select_from(VarianteReferencia).where(
+                VarianteReferencia.problema_id == problema_id))
+        ).scalar_one()
+        if existing >= settings.MAX_REFERENCE_VARIANTS:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Un problema admite como máximo {settings.MAX_REFERENCE_VARIANTS} variantes.",
+            )
+        reference = (
+            await self.db.execute(
+                select(CodigoFuente)
+                .where(CodigoFuente.problema_id == problema_id, CodigoFuente.tipo == TipoCodigoEnum.REFERENCIA)
+                .order_by(CodigoFuente.created_at, CodigoFuente.id)
+            )
+        ).scalars().first()
+        if reference is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Agrega primero el código de referencia del docente.",
+            )
+
+        contenido = await generator.generate(
+            enunciado=problema.enunciado,
+            reference_code=reference.contenido,
+            instructions=data.instrucciones,
+            language=problema.lenguaje,
+        )
+        semantic_vector: Optional[List[float]] = None
+        try:
+            semantic_vector = await self.inference.extract_semantic_embedding(contenido, lang=problema.lenguaje)
+        except InferenceError as exc:
+            if exc.reason != "gcb_disabled":
+                raise
+            logger.info("GraphCodeBERT disabled: variant stored without a vector.")
+
+        variante = VarianteReferencia(
+            id=uuid.uuid4(), problema_id=problema_id, titulo=data.titulo.strip(),
+            instrucciones=data.instrucciones, contenido=contenido, lenguaje=problema.lenguaje,
+        )
+        self.db.add(variante)
+        await self.db.flush()
+
+        upserted = False
+        if semantic_vector is not None:
+            try:
+                await self.vector_store.upsert_reference(
+                    reference_id=str(variante.id),
+                    embedding=semantic_vector,
+                    # `variante_problema_id`, not `problema_id`: the variant must never win a reference query.
+                    metadata={"variante_problema_id": problema_id, "titulo": variante.titulo, "tipo": "VARIANTE"},
+                    document=contenido,
+                )
+            except Exception as exc:
+                await self.db.rollback()
+                if isinstance(exc, VectorStoreError):
+                    raise
+                raise VectorStoreError("vector_store_write_failed", f"{type(exc).__name__}: {exc}") from exc
+            upserted = True
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            if upserted:
+                try:
+                    await self.vector_store.delete_reference(str(variante.id))
+                except Exception as cleanup_exc:
+                    logger.error("Compensation failed: variant vector %s left without a row (%s).",
+                                 variante.id, type(cleanup_exc).__name__)
+            raise
+        await self.db.refresh(variante)
+        return VarianteResponse.model_validate(variante)
 
     async def add_submission(
         self, docente_id: int, data: CodigoFuenteCreate

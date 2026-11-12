@@ -74,6 +74,8 @@ class PdfContent:
     metric_rows: List[Tuple[str, str]] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
     label: str = PDF_LABEL
+    # (variante, similitud): AI variants compared alongside the teacher's reference; empty when none.
+    variant_rows: List[Tuple[str, str]] = field(default_factory=list)
 
 
 class PdfReportService:
@@ -105,7 +107,16 @@ class PdfReportService:
             ("Estilo parecido a codigo generado por IA", b_value),
         ]
         notes = [ENGINE_NOTES[report.engine]] if report.engine in ENGINE_NOTES else []
-        return PdfContent(tone, text, metric_rows, notes)
+        variant_rows = [
+            (
+                v.titulo,
+                _pct(v.gcb_similarity) if v.gcb_similarity is not None
+                else f"No evaluado ({v.gcb_estado or 'sin calcular'})",
+            )
+            for v in report.variantes
+        ]
+        return PdfContent(tone, text, metric_rows, notes, variant_rows=variant_rows)
+
     @staticmethod
     def generate_pdf(
         report: ReporteAnalisis,
@@ -219,6 +230,22 @@ class PdfReportService:
             ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ]))
         elements.append(metrics_table)
+        if content.variant_rows:
+            elements.append(Spacer(1, 10))
+            elements.append(Paragraph("Similitud con variantes generadas por IA", h2_style))
+            variants_data = [[Paragraph(f"<b>{h}</b>", body_style) for h in ("Variante", "Similitud")]]
+            for row in content.variant_rows:
+                variants_data.append([Paragraph(escape(cell), body_style) for cell in row])
+            variants_table = Table(variants_data, colWidths=[280, 240])
+            variants_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            elements.append(variants_table)
         for note in content.notes:
             elements.append(Spacer(1, 6))
             elements.append(Paragraph(f"<i>{escape(note)}</i>", body_style))

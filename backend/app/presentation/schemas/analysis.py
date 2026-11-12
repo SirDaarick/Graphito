@@ -48,6 +48,17 @@ class IndicadorResponse(BaseModel):
         return "decision" if (self.categoria or "GENERAL") in DECISION_CATEGORIES else "heuristica"
 
 
+class VarianteMetricaResponse(BaseModel):
+    """Similarity of the submission to one AI variant (exploratory, never decides)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    variante_id: Optional[uuid.UUID] = None
+    titulo: str
+    gcb_similarity: Optional[float] = None
+    gcb_estado: Optional[str] = None
+
+
 class ReporteAnalisisResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -92,6 +103,8 @@ class ReporteAnalisisResponse(BaseModel):
     # GraphCodeBERT v2_norm cosine (with the trained adapter when the bundle lists it): exploratory, never decides (spec AS8).
     gcb_similarity: Optional[float] = None
     gcb_estado: Optional[str] = None
+    # Per-variant similarities, one entry per AI variant of the problem at analysis time.
+    variantes: List[VarianteMetricaResponse] = []
     # Resolved from the running engine when the report's manifest is the loaded one (the manifest
     # pins the checkpoint, the calibration keys and the GraphCodeBERT pipeline); NULL otherwise.
     clave_umbral_a: Optional[str] = None

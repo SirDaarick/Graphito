@@ -34,6 +34,9 @@ class LazyVectorStore(VectorStorePort):
     async def query_nearest(self, embedding: List[float], problema_id: int, top_k: int = 1) -> List[Dict[str, Any]]:
         return await self._store().query_nearest(embedding, problema_id, top_k)
 
+    async def query_variants(self, embedding: List[float], problema_id: int, top_k: int = 10) -> List[Dict[str, Any]]:
+        return await self._store().query_variants(embedding, problema_id, top_k)
+
     async def delete_reference(self, reference_id: str) -> bool:
         return await self._store().delete_reference(reference_id)
 
